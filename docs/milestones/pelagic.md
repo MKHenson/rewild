@@ -1,1293 +1,377 @@
-# Pelagic: Water Milestone
+![Water](../images/pelagic.jpg)
 
-> **Draft.** This is a working plan. The decisions and phases can change.
->
-> Successor to **Understory**. _Pelagic_ means the open sea, far from any shore. Understory filled
-> the land with plants and stones. Pelagic adds the water around and between them.
+# Water (Pelagic)
 
-## Overview
+Rewild's world has oceans, lakes, mountain tarns and lagoons. The water moves with the weather,
+breaks on the shore, wets the sand and changes the light under it. You can add lakes, remove
+water and move a lake's level in the editor, and the player can wade, swim and dive. This page
+explains what the water system does and how to use it.
 
-Rewild has no water today. Terrain is an endless, seeded heightfield in chunks of 241 × 241
-samples. A climate model (temperature × moisture) picks the biome, and a per-chunk splat map blends
-the materials. Scatter grows plants and stones from biome rules.
+> **Where the name comes from.** _Pelagic_ means the open sea, far from any shore. Pelagic was the
+> milestone that built this system. That work is complete. This page is now the plain-English
+> guide to what it gives you.
 
-Pelagic adds oceans and lakes as **one system**. A per-chunk **water map** stores where the water
-is, how high its surface is, and what kind of water it is. Oceans and lakes are entries in a
-**water palette**, in the same way that grass and rock are entries in the material palette. Water
-bodies blend where they meet. For example, a brown lake can flow into a blue sea through a lagoon.
+---
 
-The work has four parts:
+## The short version
 
-1. **World generation.** Sea level, ocean basins, seeded lakes and the water map.
-2. **Rendering.** A water surface shader, waves driven by the weather, and shore effects.
-3. **Biome and scatter rules.** Beaches, wet shores, coastal moisture and water-aware scatter.
-4. **Editor and gameplay.** A water brush, saved water edits and a water query for the player.
+- **Every world has a sea level.** Large, slow land shapes sink below it to make oceans. Coasts
+  get beaches.
+- **Lakes grow from the seed.** Each world has the same lakes every time you load it. Steep
+  mountains get small tarns, and lakes near the coast become lagoons.
+- **Oceans and lakes are one system.** Each chunk has a small **water map** that says where water
+  is, how high it is and what kind it is.
+- **The sea follows the weather.** A calm day is a mirror with a slow swell. A storm is a rough sea
+  with whitecaps and spray.
+- **Waves break on the shore.** They turn toward the beach, roll in as lines of foam and run up
+  the sand, which darkens where it is wet.
+- **You can go under the water.** The view turns the water's colour, light falls in shafts, and
+  the surface shows from below.
+- **Rain wets the whole world**, and drops make rings on wet ground and open water.
+- **The editor has a water brush.** Add a lake, remove water, change a lake's type or level.
+- **The player wades and swims.** Water slows the player down, and deep water lifts them so they
+  float, swim and dive.
 
-The water map comes before the objects milestone for a reason. Water sets where game objects,
-paths and goals can go. If objects come first, they must move later.
+---
 
-## Goals
+## Oceans and sea level
 
-- A world-wide **sea level** and **ocean basins** from a low-frequency continent field.
-- **Seeded lakes** that always rebuild the same, with a guaranteed shore around each one.
-- **One water map per chunk**, generated in the terrain workers with the splat map.
-- A **water palette** with per-type colour, absorption, turbidity, wave style and foam.
-- **Smooth blends** between water types, with a surface level that is always continuous.
-- A **surface shader**: sky reflection, depth colour, Fresnel, foam and refraction.
-- **Waves driven by the weather**. A storm makes the ocean rough and the lake only a little rough.
-- **Waves at the shore** that turn toward the beach, foam lines that roll in, and swash.
-- **Foam that matches the wind**, from a calm mirror to whitecaps everywhere at full wind.
-- **Beaches and wet shores** on the terrain, and **coastal moisture** in the climate.
-- **Scatter conditions** for water depth and water type.
-- A **water brush** in the editor, with edits saved like other terrain edits.
-- **Edit rules** that keep every lake at or below its spill height, so levels stay valid.
-- A **water query** for gameplay. The player wades in shallow water and swims in deep water.
-- Stay inside the WebGPU and browser performance budget.
+Each world stores one **sea level**, like its seed. A very large, slow noise field, the
+**continent field**, lowers the ground into ocean basins. Where it does, the ground gets a sea
+bed: a shallow shelf near the coast, then deeper water.
 
-## Non-goals (deferred)
+The coast changes the land next to it:
 
-- **Rivers with a real drainage graph.** A river must run downhill from a source to an outlet.
-  That needs data from far outside the chunk. Noise-channel rivers are a stretch goal (Phase 5).
-- **Waterfalls.** A waterfall is a jump in the surface level. The water map does not allow jumps.
-- **Screen-space reflections.** Sky reflections from the existing sky cube are enough for now.
-- **Buoyancy, boats and floating objects.** These belong to the objects milestone.
-- **Tides.** Sea level stays fixed for a world.
+- **Beaches.** Sand, then wet sand, then sea bed, chosen by the height above sea level. Steep
+  coasts keep their rock, so cliffs stay cliffs.
+- **Coastal moisture.** The air is wetter near the sea, which can change the biome next to it.
+- **Fewer plants on the sand.** Trees do not grow on the beach.
 
-## Key technical decisions
+**How to use it.** Open **Terrain settings** in the editor ribbon. Sea level sits next to the seed
+and the climate. Changing it rebuilds the world.
 
-| Decision              | Choice                                              | Why                                                                                                                  |
-| --------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Water model           | **One per-chunk water map** for every water body    | Oceans and lakes use the same data and shader. They blend where they meet. No special case at the join.              |
-| Water types           | **Weights over a water palette**                    | This mirrors the splat and material palette. "60% ocean, 40% lake" is a plain weight blend.                          |
-| Surface height        | **Stored in the water map** with a coverage value   | Type weights say what the water looks like. Level says where it is. A blend needs both.                               |
-| Level rule            | **Continuous wherever water shows**                 | Two bodies can touch only at the same level. A level can change only where land separates them.                     |
-| Wave strength         | **Palette response × weather wind**                 | A storm acts on every water body at once. Nothing extra is saved per texel.                                          |
-| Water mesh            | **One shared flat grid per LOD**, drawn per wet chunk | No mesh is generated for a water body. The vertex shader places the grid and reads the chunk's water map.          |
-| Shoreline             | **Depth test against the terrain**                  | The water plane covers the whole chunk. Terrain above the level hides it, so the shore is correct for each pixel.    |
-| Shore effects         | **Depth from the map**: `level − terrainHeight`     | Foam, shallow colour and wet sand stay stable at low view angles. They do not depend on screen depth.                |
-| Terrain height on GPU | **New per-chunk `R16F` height texture**, relative to the chunk's base level | The terrain mesh is built on the CPU, and the GPU has no heights today. Shore effects need them. Relative values keep `f16` precise near the waterline. |
-| Lakes                 | **Sparse seeded cells**, one possible lake per cell | Any chunk can compute a lake's shape and level from the seed. It needs no data from other chunks.                     |
-| Water bodies          | **Records with an ID**, plus a body ID channel      | Edit rules must know which lake a texel belongs to. The ocean is body 0.                                             |
-| Edit rule             | **A lake's level is at most its spill height**      | The editor keeps levels valid with no water simulation. A high lake cannot join the ocean by accident.               |
-| Edits                 | **Extend `PaintMask`** plus a float level grid      | One format, one sampler and one brush. It reuses the existing seam fix at chunk edges.                                |
-| Waves                 | **FFT ocean**: cascaded JONSWAP tiles, choppy       | A measured sea spectrum with a wind sea and a swell reads as water; a sum of a few waves reads as noise.             |
-| Wave queries          | **GPU readback**                                    | The CPU cannot afford the FFT. A few heights per frame arrive a frame or three late, which gameplay tolerates.        |
-| Horizon               | **Ocean ring** from the last chunk to the far plane | Chunks stop at 2,800 m. From high ground, the ocean would stop short of the horizon.                                 |
-| Render position       | **After opaque geometry, before the atmosphere**    | Water refracts the opaque scene. Fog and sky composite over water in the same way as over terrain.                   |
+**Files to look at:** `ClimateField.ts` (the continent field), `Biomes.ts` (the beach, in a
+climate's `coast`).
 
-## The water map
+---
 
-Each chunk gets a water map next to its splat map. The terrain worker builds both from the same
-climate and height data.
+## Lakes, tarns and lagoons
 
-| Data              | Form                                        | Notes                                                                             |
-| ----------------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
-| Surface level     | 1 `f16` channel, relative to the base level | Height of the water surface. Continuous across chunk seams.                       |
-| Coverage          | 1 channel, 0 to 1                           | Is there water here? Zero means dry land at any terrain height.                   |
-| Type weights      | Weights over the water palette              | Ocean and lake first. Swamp and river later. Weights sum to 1 where coverage > 0. |
-| Body ID           | 1 integer channel, nearest sampled          | Which water body owns this texel. 0 is the ocean. Used by the edit rules.         |
-| Flow              | 2 channels (direction), optional speed      | Zero for still water. Drives flow-map scrolling, and later, rivers.               |
+The world is divided into large **lake cells**. The seed decides if a cell has a lake, where its
+centre is, and how big and deep it is. Any chunk can work out every lake that touches it, so a
+lake never needs data from far away.
 
-**Resolution.** Water properties change slowly. The map can use the biome mask's step of 4, which
-gives 61² texels per chunk. Neighbouring chunks share their edge texels, so values match at seams.
-The fine shoreline comes from the terrain height, not from the map.
+- **A lake's level** is set a little below the lowest point of the ground around it, so land
+  always holds the water in. The ground is dug into a bowl, with a small bank (a **lip**)
+  wherever the ground would let the water out.
+- **Tarns.** Where the ground is too steep for a lake, the cell tries a smaller lake in a hollow,
+  with a steep wall uphill and the lip holding the downhill side. This is how water reaches the
+  mountains.
+- **Lagoons.** A lake that touches the sea takes the sea's level, gets a channel cut to the sea,
+  and its colour blends from lake water to sea water.
+- **Spacing.** Two lakes at different heights never touch, so a water surface never has a step in
+  it.
 
-**Sampling.** Level, coverage, type weights and flow are sampled linearly. Body ID is an integer
-and is always sampled nearest. In a lagoon, the type weights blend but each texel still has one
-owner: the lagoon's own ID. The ocean's ID stops where the lagoon's coverage starts.
+**Files to look at:** `Lakes.ts`. The lake settings are in `ClimateConfig.lakes` in `Biomes.ts`.
 
-**Chunk summary.** The water map also holds the **base level** and the highest level in the
-chunk. The base level is the lowest water level in the chunk. Water **shows** where the ground
-dips below a covered level, or below it plus the swash's 1.5 m reach. A chunk where none shows
-draws no water (`shows` is false). It keeps its water map only while its ground comes within 2 m
-of a covered level, for the terrain's wet band. Otherwise it gets none. Most inland chunks are in
-this group.
+---
 
-**Terrain heights.** The worker also writes a small `R16F` height texture for each chunk, at the
-water map's resolution. The GPU has no terrain heights today, because the terrain mesh is built on
-the CPU. The water shader and the terrain shader need them for `level − terrainHeight`.
+## How the water is stored
 
-**Relative heights.** The height texture and the level channel both store `height − baseLevel`.
-The shader adds the base level back from a per-chunk uniform. At world heights `f16` is too coarse:
-at 1,000 m a step is 0.5 m, so shore foam and the wet band would band. Relative values are small
-near the waterline, where precision matters. Far above or below the water, precision drops, but
-there the values only need to show "dry" or "deep".
+### The water map
+
+Each chunk has a **water map** beside its splat map. The terrain worker builds both at the same
+time. Each texel (8 m across) holds:
+
+| Data         | What it means                                           |
+| ------------ | ------------------------------------------------------- |
+| Level        | The height of the water surface.                        |
+| Coverage     | Is there water here? Zero means dry land at any height. |
+| Type weights | What kind of water: for example 60% lake, 40% ocean.    |
+| Body ID      | Which body of water owns this texel. The ocean is 0.    |
+
+Water shows where there is coverage **and** the ground is lower than the level. So when you
+sculpt, the shore moves on its own. Dig a hole in a lake bed and it fills. Raise an island and the
+water moves away from it.
+
+A chunk with no water near it has no water map, and costs nothing.
+
+### The water palette
+
+Kinds of water are entries in a **water palette** in the climate, in the same way that grass and
+rock are entries in the material palette. Each entry sets the water's colour, how quickly the bed
+fades with depth, how much the wind moves it, how big its waves are and how much foam it makes.
+Where two kinds meet, they blend.
 
 ### Water bodies
 
-The water map holds a body ID for each texel. The body itself is a record:
+Every lake is a **body** with an ID, a level and a **spill height**: the lowest point of its rim,
+where it would overflow. A lake the seed makes is never saved, because the seed makes it again. A
+lake you add or change is saved as a small record.
 
-| Field          | Notes                                                                        |
-| -------------- | ---------------------------------------------------------------------------- |
-| `id`           | 0 for the ocean. A generated lake takes its ID from its lake cell coordinate. |
-| `level`        | The surface level. For the ocean, this is the world's sea level.             |
-| `spillHeight`  | The lowest point of the rim. Calculated, not authored. See [Computing the spill height](#computing-the-spill-height). A generated lake's is its lowest rim sample, a tarn's its lip and a lagoon's sea level. |
-| `typeWeights`  | The default palette weights for new water in this body.                      |
+**Files to look at:** `WaterMap.ts`, `Water.ts` (the palette), `WaterBodies.ts`.
 
-A generated lake that nobody edits costs nothing to save. The seed builds its record again. Each
-chunk's water map carries the records of the bodies that cover it (`WaterMap.bodies`), as the
-seed and the edit build them.
+---
 
-**Saved records.** A body the editor has changed has a saved record: one whose rim a sculpt
-stroke touched (its spill height found again, and its level if it drained), and one made with
-**Add water**. They live in one blob per level, `water-bodies.json`, in the chunk
-folder beside the water edits, so clearing a level's chunks clears them too. A saved record
-wins over the one the seed or the edit builds. `WaterBodyRules` (`TerrainRenderer.waterRules`)
-reads them once through `waterBodyProvider` and holds them for the edit rules.
+## Drawing the water
 
-**Coverage and the terrain.** Water shows where coverage > 0 **and** `terrainHeight < level`. So
-sculpting changes the shore with no change to the water data. Dig a hole in the lake bed and it
-fills. Raise an island and the water moves away from it.
+Each chunk with water draws one flat grid, and every chunk shares the same grid. The vertex shader
+lifts it to the water's level and adds the waves. The ground hides the water wherever it is
+higher than the level, so the shoreline is exact at every pixel.
 
-**The water palette.** It lives in `ClimateConfig` beside the biomes. Each entry defines:
+The surface has:
 
-- Scattering colour and absorption (for Beer-Lambert depth colour), and the in-water glow seen
-  from inside it.
-- Turbidity: how quickly the bed disappears with depth.
-- Wave response: how strongly the wind moves this water.
-- Wave scale: long ocean swells, or short lake ripples.
-- Foam amount and shore foam width.
-- Normal-map detail strength.
+- **Waves from a real sea model.** An FFT ocean, in four layers from long swells to small ripples,
+  driven by the weather's wind. Lakes use only the smaller layers, so they stay calmer.
+- **Sky reflection** and **sun glint**. The glint is hidden in shadow.
+- **Refraction.** You see the bed through the water, bent by the waves.
+- **Depth colour.** Shallow water is clear and deep water is dark. Each palette entry sets its own
+  colour.
+- **Crest glow.** The sun shines green through the thin top of a tall wave.
+- **Darker troughs**, which see less of the sky.
 
-## World generation
+**The horizon.** Chunks stop at 2.8 km, but the sea should reach the horizon. A **horizon ring**
+draws the far sea and the far land past the last chunk, so the view from a hill does not end in
+empty sky.
 
-### Oceans
+**Files to look at:** `ChunkWater.ts`, `OceanFFT.ts`, `OceanSpectrum.ts`, `HorizonOcean.ts`,
+`water.wgsl`, `water-surface.wgsl`.
 
-Terrain does not go below a sea level today. Pelagic adds a **continent field**: a very
-low-frequency noise that lowers the terrain into ocean basins. The climate model reads it in the
-same way as temperature and moisture.
+---
 
-- **Sea level** is one value per world, stored with the world like the seed.
-- Coverage for the ocean comes from the continent field, with a soft edge. Inland ground below sea
-  level stays dry unless the map says otherwise. See the open questions.
-- Terrain inside the basin gets a sea-bed profile: a shelf near the coast, then deeper water.
+## Waves at the shore
 
-### Lakes
+- **Shallow water.** Shallow water cannot hold a big sea, so the long swell fades first and a
+  little chop stays.
+- **Shore waves.** Lines of waves roll in from deep water. They bend toward the beach, wrap
+  around headlands and islands, and slow down as the bed rises. A lagoon behind a sand bar gets
+  none. Their paths are worked out on a grid around the camera.
+- **Foam lines.** Foam gathers where a wave breaks and trails behind it, so bands of white water
+  roll in.
+- **Swash.** After a wave breaks, a thin sheet of water runs up the sand and drains back. Big
+  waves in a set run farther than the small ones.
+- **Lapping.** Lakes do not get shore waves. Their water laps gently at the bank instead, more in
+  a strong wind.
 
-The world is split into a coarse grid of **lake cells** (`ClimateConfig.lakes`, 1.6 km in the
-default climate). The seed decides if a cell holds a lake, and where its centre is. Any chunk can
-compute every lake that touches it (`Lakes.ts`):
+### Wet sand
 
-1. Take the lake centre, a radius and a depth from the cell's hash. The shore wanders from a circle
-   by a few sine harmonics with seeded phases.
-2. Sample the pre-lake terrain at 24 rim points on the top of the bank. The ground sampler reads the
-   un-eroded, uncarved height at any point, so no neighbouring chunk is needed.
-3. Set the lake level to the lowest rim height minus a margin. This makes sure that land
-   surrounds the water on all sides.
-4. Carve the terrain after erosion: a bowl `level − depth·(1 − d²)` inside the shore, rising
-   across the bank to the natural ground or the **lip** (`level + margin`), whichever is higher, then
-   easing back to the natural ground over the `moraine` beyond the bank. The lip keeps the water in
-   wherever the ground between rim samples, or after erosion, dips below the level. Every chunk that
-   shares a sample carves it the same way.
-5. Write coverage, level, the body ID and the "lake" type weight into the water map. Coverage is
-   full to halfway up the bank and fades out at its top. The level reaches a little past the bank,
-   so the filtered surface does not sag at the shore.
+The ground at the edge of the water gets wet in two ways:
 
-A lake is rejected when any rim point is within the ocean's coverage. When the spread of its rim
-heights, over the rim radius, is steeper than `maxRimSlope`, the site tries a **tarn** instead: a
-smaller radius from `tarns.radius`, the rim sampled again, and rejected if steeper than
-`tarns.maxRimSlope`. A tarn's level sits `lipShare` of the way up its rim's spread, so it sits in a
-cirque with a steep wall uphill, and the lip dams the downhill side. This is how lakes reach the
-mountains, which are too steep for a lake anywhere.
+- **Damp.** Below the highest point the swash reaches, the ground is darker.
+- **Soaked.** Where the sheet has just drained away, the sand is shiny and darker still, then
+  dries back to damp.
 
-**Cells around the chunk.** A lake can reach past its own cell. Its reach, including the bank, is
-less than one cell, so a chunk finds every lake by checking the cells that overlap its own bounds
-grown by that reach.
+It works on any ground, not only sand. Steep rock keeps only a thin damp line.
 
-**Spacing.** Two lakes at different levels must not overlap, or the level would jump. The banks
-of two lakes keep `spacing` apart. When two lakes are too close, the lake with the lower cell hash
-is removed. Two reaches are each under a cell, so only cells up to two away can conflict. Every
-chunk makes the same choice, because it uses only the seed.
+**Files to look at:** `ShoreField.ts`, `ShoreWaves.ts`, `shore-waves.wgsl`.
 
-**Scatter and beaches.** Scatter measures water depth from the lake level, so land layers stay out
-of lakes and `underwater` layers grow in them. Beaches and the sea bed material follow the ocean
-only.
+---
 
-### Where a lake meets the ocean
+## Wind, foam and spray
 
-A lake becomes a **lagoon** when any rim point stands in the sea: below sea level, inside the
-ocean's coverage. Coverage alone is not enough, since it reaches a little way over dry land.
+The weather's **windiness** sets the sea:
 
-- Its level becomes sea level, so the level stays continuous with the ocean.
-- It has no lip, and a **mouth** is cut through its bank toward the lowest rim point in the sea: a
-  channel 2 m below sea level from just inside the shore to the top of the bank, easing out beyond
-  it. Without it the natural beach between the shore and the rim would close the lagoon off.
-- Where it and the ocean overlap, the water is one surface: coverage is the larger of the two, and
-  the texel belongs to the lagoon while the lagoon covers it. The ocean's ID starts where the
-  lagoon's coverage ends.
-- Its type weights blend from "lake" out to a fifth of its radius to "ocean" at its shore.
+| Windiness | The sea                                                 |
+| --------- | ------------------------------------------------------- |
+| 0         | Calm, a slow swell, no foam                             |
+| 0.3       | Small waves, no foam                                    |
+| 0.5       | Moderate waves                                          |
+| 0.7       | Rough, the first whitecaps and small spray              |
+| 1         | Storm: crossing crests, whitecaps everywhere, big spray |
 
-A lagoon's rim slope is judged over its dry rim only, with sea points counted at sea level, against
-`maxLagoonSlope`: the sea holds its seaward side. It never falls back to a tarn.
+- **Whitecaps** form where waves fold over. The foam stays on the water after the crest moves on,
+  and fades slowly into lace.
+- **Foam texture.** A tiling foam image gives the foam its bubbles and holes.
+- **Edge foam.** In a strong wind, foam collects in the shallows of a lake.
+- **Sea spray.** Breaking crests near the camera throw spray. Storms throw big plumes off rocks,
+  and breaking surf throws spray along the beach.
 
-Few seeded centres land just behind a shore, so a share (`lagoonChance`) of the candidates that fall
-out at sea **slide ashore** instead of being dropped: up the continent field's gradient, in small
-steps, to the first ground a metre above sea level, then back from it by the lake's radius so the
-shore lies inside the rim. A slid candidate takes the larger `lagoonRadius`, and settles as a lagoon
-or not at all. The slide is decided from the seed and the procedural ground, so every
-chunk slides a candidate the same way, and spacing is checked on the moved centres. It moves a
-candidate at most `0.4` of a cell, which widens the cells a chunk and the spacing test look at. A candidate whose
-centre is below sea level within the ocean's coverage is out at sea, and is dropped.
+**Files to look at:** `OceanFFT.ts` (the foam), `SeaSpray.ts`.
 
-This is the only way two bodies join. All other lakes sit above sea level inside their own shore.
+---
 
-### Edit rules
+## Rain on surfaces
 
-A real lake fills until it reaches the lowest gap in its rim. Then it overflows there. That point
-is its **spill height**. The editor keeps every lake at or below its spill height. It does not
-simulate water.
+Rain wets every surface, not only the shore:
 
-| Edit                                              | Result                                                                                           |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Lower the rim, and it stays above the level       | No change.                                                                                       |
-| Lower the rim below the level                     | The lake **drains** to the new spill height. The level drops and the coverage shrinks.           |
-| Cut the rim down to sea level, next to the ocean  | The lake drains to sea level and joins the ocean as a lagoon. Its type weights blend to "ocean". |
-| Raise the level with the water brush              | Water spreads by flood fill up to the new level. The level stops at the spill height.           |
-| Dig a hole in dry land                            | Nothing fills. Use **Add water** on the water brush to make a new lake.                          |
-| Dig below sea level, connected to the ocean       | The trench **fills with sea water**. See [Channels from the sea](#channels-from-the-sea).        |
-| Fill in a flooded trench                          | The terrain rises above the level, and the depth test hides the water.                           |
-| Raise land inside a lake or the ocean             | An island. See [Islands](#islands).                                                              |
+- Ground and stone go **darker** as water soaks in.
+- Flat surfaces get a **shiny film**. Slopes and walls shed it.
+- **Drops land** on wet ground and open water and spread small rings.
+- After the rain, the shine goes quickly but the dark stays for a while.
 
-So a lake above sea level always has land between it and the ocean. It joins the ocean only if
-its spill height comes down to sea level. Then it takes the ocean's level.
+Leaves only darken a little and stay matte.
 
-**After a stroke.** When a sculpt stroke ends, the editor saves the heights and then runs the
-rules over the box the stroke covered, plus two texels. Every body other than the ocean that owns
-a texel there is touched. Each has its spill height found again, and one whose level stands more
-than 5 cm above it **drains**:
+**Files to look at:** `RainWetness.ts`, `rain-wet.wgsl`.
 
-- Its level drops to the spill height, in every texel it owns.
-- It keeps its water over the **basin**: its texels below the spill height that drain through the
-  outlet, and one texel around them for the shoreline. Its other texels go dry. A hollow inside
-  the old shore that is cut off from the basin at the new level goes dry too; **Add water** puts
-  a pond back.
-- The result is written into the water edits of every chunk the body covers, loaded or not, with
-  full authority, so it overrides the generated lake. The edits and the record are saved.
-
-**Joining the ocean.** When the outlet is the sea and the rim was cut to sea level or below,
-the lake drains to sea level and becomes a lagoon. It keeps its body ID. Its type weights blend
-from its own water, out to 80% of the way from its deepest point to its shore, to "ocean" at the
-shore. The cut between it and the sea is filled by the sea channel flood fill (see
-[Channels from the sea](#channels-from-the-sea)), which runs before the drain. A cut that stops above sea
-level drains the lake to the cut, and it stays a lake.
-
-### Computing the spill height
-
-For a generated lake, the spill height is the lowest ring height. After a sculpt, the rim may have
-changed, so the editor finds it again with a **priority flood** (`findSpillHeight`):
-
-1. The body is every texel it owns connected to the texels the stroke touched. The flood starts
-   from those that are covered and below its level.
-2. Always grow the lowest unvisited neighbour first, and keep track of the highest terrain
-   height passed so far.
-3. The first time the flood reaches ground lower than that height, the water would run out there.
-   That highest point is the spill height.
-4. If the flood reaches the sea (covered ocean texels over ground below sea level), the spill
-   height is that highest point or sea level, whichever is higher.
-5. The search runs only inside the lake cell that holds the centre of the flood's starting
-   texels, and that cell's neighbours. If it reaches that edge first, the spill height is the
-   highest ground it crossed to get there.
-
-Another lake's covered water counts as ground at its surface. The basin a drain keeps comes from
-the flood as well. It grows from the path to the outlet through the texels the flood took, at or
-below the spill height. For a lake joining the sea, it grows through the lake's own texels too.
-
-The flood runs on the CPU at the water map's resolution, and only for lakes that the stroke
-touched. Its heights are the samples on the texels, so it may not see a cut narrower than a
-texel (8 m).
-
-**Chunks that are not loaded.** The flood and the drain reach past what is loaded. A chunk they
-need takes its in-memory heights, else its saved snapshot, else its generated heights, built on a
-worker (`TerrainRenderer.generateChunkHeights`). Its water edit comes from the chunk, or from the
-store if the chunk is not loaded. When the search needs a chunk it does not have, it reads the
-chunk and its eight neighbours together, and runs again. A drained chunk that is not loaded has
-its edit saved, and reads it when it loads.
-
-### Channels from the sea
-
-A trench that joins the ocean and goes below sea level fills with sea water. A dry trench next to
-the sea would look wrong.
-
-After each sculpt stroke, before the lake rules, the editor runs a flood fill
-(`fillSeaChannels`) over the box the stroke covered, grown by the stroke's widest brush radius:
-
-1. Start from the sea in the box: ocean texels (body 0, coverage > 0) over ground below sea level.
-2. Spread to each neighbour texel where the terrain is below sea level, unless another body's
-   water covers it. A lake's dry texels past its shore are taken.
-3. Stop at the edge of the box. The fill does not search the whole world.
-4. Write each texel it reached that is not already full sea, and the dry texels around those for
-   the shoreline, into the water edits: full authority, full coverage, body 0, sea level and the
-   "ocean" type weight. The open sea is left to the generator.
-
-The trench fills a little more with each stroke, as the dig reaches farther inland. A trench that
-does not touch the ocean stays dry. `settleWater(x, z, radius)` runs the same fill over a disc.
-
-**A canal to a lake.** If the channel reaches a lake, the lake's spill height drops to sea level.
-The fill stops at the lake's water, and the lake's own flood then reaches the filled channel as
-sea: the spill rule drains the lake to sea level, and it joins the ocean as a lagoon. The spill
-flood finds the sea through the terrain on its own as well, so a rim cut down to sea level beside
-the ocean joins it even where the cut lies outside the fill's box.
-
-**Undo.** A drain changes the level and the coverage. One undo step restores the terrain, the level
-and the coverage together: a chunk's heights and its water edit (see
-[Water edits](#water-edits)) are captured and restored as one unit (`cloneWaterEdit`,
-`TerrainChunk.setWaterEdit`). The editor's undo stack is its own work, shared by every terrain
-brush.
-
-**Cost.** The spill check and the flood fill run on the CPU, and only after an edit. The spill
-check stays inside a lake cell and its neighbours, and the fill inside the stroke's box, so both
-stay small.
-
-### Islands
-
-Raised land inside water gets a full shoreline with no special work:
-
-- **Foam, shallow colour and the wet band** come from `level − terrainHeight` in each pixel. They
-  show as soon as the terrain updates.
-- **Beach material** comes from the splat map. The worker builds it again after each sculpt. The
-  beach rule uses height above water **and** slope, so steep sides get rock, not sand.
-- **Scatter** regenerates with the same depth rules. Reeds, driftwood and seaweed follow.
-
-### Climate
-
-- **Coastal moisture.** Moisture increases near the ocean. The continent field gives this without
-  a distance search: `coastalMoisture` is added at the coast and fades out `coastalMoistureReach`
-  inland. It moves biomes only in a climate whose moisture axis has cuts.
-- **Beaches.** A climate's `coast` lays sand over the biome layers, the way a layer covers those
-  beneath it. The band is chosen by height above sea level: sand, then wet sand, then sea bed. It
-  fades out on steep ground, so cliffs keep their rock, and it only appears where the continent
-  field puts the ocean close, so low ground inland stays as it is. The biomes' scatter thins by the
-  same amount, so trees do not grow on the sand. Wet sand and sea bed fall back to the sand when a
-  climate has no splat channel spare for them.
-
-## Rendering
-
-### Frame order
-
-```
-scene pass (opaque)  ──▶ terrain, scatter, objects        ──▶ HDR colour + depth
-        │
-        ▼
-refraction capture   ──▶ HDR colour + view depth          ──▶ refraction texture (rgba16f)
-        │
-        ▼
-water pass           ──▶ per-chunk water patches          ──▶ HDR colour + depth (water writes depth)
-        │                  reads: water map, refraction, sky cube, CSM, clouds
-        │                ──▶ horizon ring (far shading only)
-        │                ──▶ transparent meshes, BLEND materials (no depth write)
-        ▼
-atmosphere composite ──▶ sky, clouds, fog, god rays, rain over scene and water
-        ▼
-bloom + tonemap      ──▶ swapchain
-```
-
-Water writes depth. So the existing atmosphere composite puts fog over water at the correct
-distance, and needs no change.
-
-**The scene pass splits when water is in view.** The opaque groups draw, the pass ends, and
-`RefractionCapture` copies the colour and the view depth, linearised from the depth buffer, into
-one `rgba16float` texture. A second pass loads the colour and depth and draws the water, then the
-transparent groups. BLEND materials write no depth, so water drawn after them would cover a
-transparent mesh in front of it; drawing them after water, and after the capture, keeps them
-tested against the water's depth and out of what the water refracts. Rain already draws with the
-atmosphere, so it shows over water with no change. With no water in view, everything draws in the
-one pass and nothing is copied.
-
-### Mesh
-
-No mesh is generated for a water body. The worker makes only data.
-
-1. At startup, build one flat square grid for each LOD, for example 64², 32² and 16² quads. These
-   buffers are shared by every chunk and never change.
-2. For each visible chunk where water `shows`, draw the grid at that chunk's LOD. The chunk binds its
-   origin, its water map and its height texture, as it binds its splat map for terrain.
-3. The vertex shader moves each vertex to `chunkOrigin + gridPosition`. It samples the water map
-   for level, coverage and type weights. It sets the height to `level`, then adds the waves.
-4. The fragment shader discards pixels where coverage is 0.
-5. The depth test hides the water wherever the terrain is higher than the level. This makes the
-   shoreline correct for each pixel. It is also why sculpting needs no change to the water data.
-
-The cost is overdraw on chunks that are partly wet. The terrain in front of that water fails the
-early depth test, so the rejected pixels are cheap.
-
-**LOD seams.** Neighbouring chunks at different LODs have different edge spacing. Waves can open
-small cracks between them. Use the terrain's skirt method (`MeshGenerator.ts`), or fade the wave
-amplitude to zero at the edges of far chunks.
-
-**Later.** If draw calls become a cost, put the chunk water maps in a texture array and draw every
-wet chunk in one instanced call.
-
-**Not chosen.** One grid centred on the camera, reading a "clipmap" texture that the CPU fills from
-the chunk water maps. It gives one draw call and no seams, but it needs more new code. Per-chunk
-draws reuse the chunk streaming and LOD that exist.
-
-### Horizon
-
-The world is flat, so open water should reach the horizon line. But the last terrain LOD ends at
-2,800 m (`maxViewDst`), and the water patches end with it. The camera's far plane is 4,000 m.
-
-The gap below the horizon covers an angle of about `eyeHeight / 2800`:
-
-| Camera                        | Gap angle | On screen (about 0.06° per pixel) |
-| ----------------------------- | --------- | --------------------------------- |
-| Standing on a beach, 2 m      | 0.04°     | Less than 1 pixel                 |
-| On a hill, 30 m               | 0.6°      | About 10 pixels                   |
-| On a cliff or mountain, 150 m | 3°        | About 50 pixels                   |
-
-A **horizon ring** closes the gap. It is one ring mesh, centred where chunk visibility was last
-computed, from three chunks inside 2,800 m (1,360 m) out to the horizon. Chunks stop on a ragged
-edge of whole squares, and a chunk in range is drawn only once it has meshed, so the ring discards
-exactly where a chunk drew this frame. The terrain writes that to a 16² chunk mask (one texel per
-chunk, centred on the visibility centre's chunk) and the ring reads it with `textureLoad`. The ring
-and the chunk water then never overlap, and a chunk still streaming in shows the ring's far sea and
-land instead of sky.
-
-- **Shading.** The water shader with far features only: sky reflection, Fresnel, depth colour and
-  the ripples as roughness. No waves, refraction or foam, because none of them show at that range.
-  None of the waves resolve there, so the whole of their mean square slope (Cox and Munk, from the
-  ocean's wind speed) is added to α², as the chunk water adds its unresolved share. A smooth ring
-  mirrors the bright horizon sky at a grazing angle and reads far lighter than the chunk water
-  beside it. `setWaterHorizonSlope(scale)` scales it in the console.
-- **Far map.** Two textures centred on the chunks' visibility centre hold, per texel, the raw
-  continent value and the land's colour: 128² over 16 km, and 128² over 131 km for the rest of the
-  way to the horizon. The continent value is smooth, so a bilinear sample of it gives a smooth
-  coast. The CPU rebuilds a level a few rows per frame once the centre drifts an eighth of its span.
-- **Land.** The ring draws the land past the chunks too, flat at sea level, as a matte surface in
-  the far colour of the biomes there (`farColor` on each biome). Without it the sea would meet
-  holes of bare sky below the horizon. Sea and land blend across the coast in one shading pass.
-- **Fog.** The ring writes depth, so the atmosphere composite fogs it correctly.
-- **The join.** The last chunks use the lowest LOD with no waves. The ring starts at sea level with
-  the same flat shading, so the join does not show.
-- **Past the far plane.** The gap after 4,000 m is about `eyeHeight / 4000`. That is under 1 pixel
-  below about 70 m. For higher cameras, the ring's outer vertices use `w = 0`, so they project onto
-  the horizon line. Those pixels would get the depth of the far plane, and the composite treats
-  that depth as sky. So the ring clamps its depth just inside the far plane, and the composite
-  fogs it as it does other far water.
-
-### Surface
-
-- **Waves.** The FFT ocean's displacement moves the grid in the vertex shader, sideways as well
-  as up. Water types weight the **cascades**, not separate oceans, so the surface does not tear
-  at a blend. The weather sets the sea. See [Wind](#wind).
-- **Normals.** The FFT ocean's slopes, per pixel. See [Wind](#wind). No detail normal maps: they
-  would tile.
-- **Reflection.** Sample the prefiltered sky cube (`SkyCubeCapture`, `SkyIblPrefilter`). Rougher
-  water samples a blurrier mip.
-- **Sun glint.** A specular sun term, gated by CSM geometry shadows and cloud shadows. This follows
-  the Foxfire rule: shadows act on the sun term only.
-- **Fresnel.** Blends reflection and refraction by the view angle.
-- **Crest glow.** Sunlight through the thin top of a wave, after the height term of the Atlas
-  water talk. It fades in with the wave's height from 0.5 m to 3 m above rest. It needs the
-  viewer to face the sun across the water, compared flat so a high sun still counts
-  (`facing³`), and a face turned away from the sun (`(1 − N·L)⁴`). Its colour is the palette's
-  scatter shifted toward green. It is gated by the sun's shadows, and fades where the bed shows
-  or foam covers the water. `setWaterCrestGlow(strength)` scales it in the console, 1 the default.
-- **Trough darkening.** Troughs are darker than crests. A trough sees less sky, since much of
-  what it reflects is the next wave, so the sky reflection and ambient fall to 84%. Less light
-  reaches the water under it than under a thin crest, so its scatter falls to 84%. Both reach
-  their floor at 3.5 m below rest. Water at rest or above is unchanged, so a calm sea is too.
-  `setWaterTroughDarkening(strength)` scales it in the console, 1 the default.
-- **Scatter lighting.** The light the water scatters back comes from under the surface, so its
-  diffuse lobe is lit along the vertical, not by each ripple's tilt. Shading it by the wave normal
-  reads as painted plastic. The waves show through the reflection and the Fresnel instead. Foam is
-  a surface layer, so its diffuse takes the wave normal. The scatter colours are dark (ocean
-  `[0.003, 0.018, 0.04]`, tropical `[0.004, 0.03, 0.06]`) so the sky's reflection stands out.
-- **Depth colour.** Beer-Lambert absorption over the water depth, from the palette. Each chunk
-  first writes its depth alone: the waves fold the surface over itself on screen, so the shading
-  draws that follow test for equal depth and shade only the nearest layer, whatever order the
-  triangles come in. The position is `@invariant` so all three draws agree on it, and chunks draw
-  nearest first so a near crest hides the water behind it in the next chunk too. Then an absorb draw replaces the scene behind with the refracted
-  scene times the transmittance and `1 − Fresnel`, per channel (see Refraction), and a light draw adds reflection and the light the water scatters back. The
-  scatter is shaded as the diffuse lobe of a dielectric with F0 0.02, so sun, sky ambient and
-  local lights all reach it.
-- **Refraction.** The absorb draw replaces the scene behind with a sample of the refraction
-  texture, times the transmittance and `1 − Fresnel`, blended by coverage. The view ray bends
-  into the water (index 1.33) by the wave normal and is followed down the water depth, at most
-  3 m; the sample moves by how far that lands on screen from where a flat surface would bend it,
-  since the scene behind is already drawn where a flat surface puts it. Shallow water bends it
-  less, so the offset fades out at the shore. A sample whose view depth is in front of the water
-  is not under it, and the pixel keeps its own.
-- **Foam.** Shore foam where the depth is small. Crest foam where waves are steep. See
-  [Foam](#foam).
-
-### Wind
-
-`SkyRenderer` gives `windDirection` (a normalized XZ vector) and `windiness` (0 to 1). The base
-wind speed is `windiness × 10` m/s, with gusts on top. Foliage reads the gusts. The ocean reads
-the direction and the windiness.
-
-- **FFT ocean.** `OceanFFT` runs a Tessendorf ocean (adapted from Tidewater, MIT) in one compute
-  pass a frame: four cascades of 256² texels over tiles of 733, 157, 33.3 and 7.1 m. Their ratios
-  are not whole numbers, so the tiles never repeat in step. Each cascade holds the wavenumbers from
-  6 cycles over its own tile to 6 over the next (`cascadeBand`), so every wave lives in exactly
-  one. A row and a column inverse transform give per cascade a displacement texture (Dx, Dy, Dz,
-  foam) and a slope texture (dDy/dx, dDy/dz, dDx/dx, dDz/dz), 2D arrays with compute-built mips.
-- **Spectrum.** JONSWAP with directional spreading (`OceanSpectrum`), for two sea states: a local
-  **wind sea** over a 200 km fetch, spread around the wind, and a **swell** from a fixed bearing
-  over 1200 km, narrow and always there, about 0.7 m high: a slow heave under the wind sea. The spectrum sets the random phases once per wavenumber
-  from a seed; changing the wind only rebuilds the amplitudes, so the surface never jumps.
-- **Wind.** The weather's `windiness` maps to a wind speed from 0.5 m/s to 22 m/s, climbing as
-  `windiness^1.5` (`oceanWindSpeed`): a sea about 0.2 m high in a calm, 2.5 m at 0.5 and 5.9 m at
-  1. The ocean follows the weather's wind lagged by 6 s, so a sea builds and
-  calms, and it rebuilds the spectrum when the lagged wind has moved by 0.05 m/s or 0.5°. A
-  stronger wind raises a longer, higher sea.
-- **Rough sea.** A measured spectrum reads as a gentle heave at game scale, so the windiness also
-  roughens the wind sea past it (`seaState`), climbing as `windiness^1.5`. At full wind the wave
-  heights are 2.5 ×, 20% of the energy spreads over all directions so waves cross into pointed
-  peaks, and the peak wavelength is held to 90 m so the energy is in the waves the viewer sees.
-  `setOceanSeaState({ ... })` overrides it in the console.
-- **Choppiness.** The horizontal displacement is 0.8 × its linear value in a calm, rising to 1.1
-  in full wind: crests sharpen and bunch, troughs broaden.
-- **Speed.** A wave's speed comes from its length, as in deep water, `c = √(g·λ / 2π)`. Every
-  angular frequency is snapped to whole cycles over a 1024 s loop, and the clock wraps there.
-- **Water types.** A palette type takes every cascade up to 8 × its `waveScale` long, fading out
-  by 16 ×, scaled by its `waveResponse` (`cascadeWeight`). The ocean (100 m) takes all four; a
-  lake (25 m, 0.6) takes all but the 733 m cascade: about 0.13 m in a calm and 1.3 m in a gale,
-  a short choppy sea under the same shoaling as the ocean, with no shore waves.
-- **Grid and distance.** Water grids are 2 m a quad within the first LOD distance, then 4, 8,
-  16 and 32 m. A vertex samples each cascade's displacement at the mip whose texels match the
-  grid, 0.7 levels coarser, so no wave shorter than the grid can hold moves it. The spacing comes
-  from the vertex's **distance** from where chunk LODs were last chosen, not from its chunk's grid:
-  the coarsest grid the LOD system can put there, ramped in 60 m before each LOD distance. Two
-  chunks meeting at a vertex measure the same distance and sample the same mip, so the seam does
-  not crack.
-- **Precision.** Positions are measured from an origin near the camera, snapped to 1024 m. The CPU
-  gives each cascade where that origin falls in its tile, in double precision, so the shader adds
-  only small numbers.
-- **Normals.** The pixel shader samples each cascade's slopes at the pixel's rest position (where
-  its water came from), with gradients from the pixel's footprint: anisotropic, trilinear. The
-  normal divides the height slopes by the surface's stretch. The slope a mip averages away is
-  estimated from a wind sea's mean square slope (Cox and Munk, `0.003 + 0.00512 × U`) times the
-  share of the spectrum finer than the pixel, and added to α², so the highlight widens instead of
-  sparkling.
-- **Quality.** The `water` quality aspect (`WaterQuality.ts`) biases the slope mip, from −0.5 on
-  ultra to 1 on low. The displacement and the foam are the same on every tier.
-
-### Waves at the shore
-
-The shader has the depth and the terrain height texture. These give the main shore effects:
-
-- **Shoaling.** Water holds a sea whose significant height is at most 0.6 of its depth; taller
-  waves break. The CPU integrates the spectrum over each cascade's band for its RMS height
-  (`cascadeVariance`), and the shader shares the depth's budget out from the shortest cascade to
-  the longest, so shallow water loses its long heave first and keeps its chop. Sideways movement
-  and slopes scale with the height. Troughs ease toward a floor at 0.8 of the depth, so a rare
-  deep one never reaches the bed. Lakes are held the same way. Crest foam is not held: a
-  depth-limited sea is breaking, so its foam stays until the last 1.5 m.
-- **Shore waves.** Two trains of Gerstner waves roll in from deep water, with periods of 8 s and
-  9.7 s that beat into sets. Their phase is `ω × (time − T)`, where `T` is the seconds a wave
-  takes to get to a point from water 24 m deep, moving at the shallow-water speed `√(g·h)` and
-  blocked by land (`ShoreField`). `T` comes from an eikonal solve by fast sweeping over a
-  256² grid of 8 m texels around the camera, from the terrain heights and the chunks' ocean
-  coverage. A shelf can keep water 24 m deep outside the grid. A grid without it starts the
-  waves from water within 2 m of its deepest, which lies out to sea. Water that joins the open sea
-  only outside the grid, such as a bay behind a headland past its edge, starts them where it meets
-  the grid's edge. The wavefronts are the crests, so they turn toward the shallows, wrap around
-  headlands and islands, fill bays, and slow and bunch up as the bed rises. Water deep water
-  cannot reach, such as a lagoon behind a bar, gets none, and so do lakes. Past the water the
-  waves reach, the times carry on at a metre-deep wave's speed with no strength, so the phase has
-  no step where a lagoon or lake meets the sea. The grid is aligned
-  to the world. It follows the camera 128 m at a time and is rebuilt a second after ground loads
-  or changes: sampled over a few frames, then solved, extended, and packed and uploaded, a frame
-  each. The waves fade
-  toward its edge, where paths from deep water outside it are missing. A breaker is half the
-  open sea's significant height, at least 0.8 m so a still day has surf too
-  (`setWaterShoreWaves(strength)` scales it), and grows as the
-  water shallows (Green's law) until it reaches 0.78 of the depth. It comes in between 24 m and
-  12 m deep. Where it breaks it steepens and pulls the water harder toward its crest, never
-  folding. Noise over 64 m bends the crests and varies their height. Shore waves take up to 80%
-  of the depth's height budget from the open sea, so a little chop still rides between them. They
-  fade where the grid or the pixel is too coarse to hold them. `setWaterShoreDebug()` paints the
-  field on the water, and `shoreFieldStats()` counts the last build's texels.
-- **Foam lines.** Where a shore wave breaks, foam gathers over the last 6% of its cycle before the
-  crest and trails behind it, fading by e every fifth of a cycle, so bands of white water roll in
-  with the crests. It scales with how near breaking the wave is, so a calm day has a narrow surf
-  line and a storm whitens the shelf. The water it lies on is flat enough that the whitecaps'
-  lace would hide it on its own, so 2 m and 1 m noise joins the lace to break it into grain,
-  with a sharp edge. Unlike crest foam it runs up to the waterline.
-- **Swash.** After a wave breaks, a thin sheet of water runs up the beach and drains back. The
-  two trains' periods are close, so together they are one wave whose height swells and fades
-  over a set. Each time its crest reaches the waterline, the sheet's edge climbs to a **runup**
-  of 0.4 × the breaker height × the set's swell. So a still day runs up about 0.3 m and a storm
-  about 1.2 m, and the big waves of a set run farther than the small ones between. The uprush
-  takes the first 30% of the cycle and eases out. The backwash takes the rest and eases in, as
-  the sheet thins and soaks into the sand. Crest height noise varies the runup along the coast.
-  - **Swash field.** The shore field's times rise inland at a metre-deep wave's speed, and its
-    strength is 0 on land, so the swash reads a second grid over the same texels
-    (`packSwashField`, `rg16float`). Reached texels keep their own time and strength. Ground up
-    to 3 texels (24 m) from them takes the nearest one's, so a beach keeps time with the crests
-    at its waterline. Water the waves do not reach gets none, so a lagoon behind a bar has no
-    swash. Only water that takes the longest cascade, the open sea's, has this swash, so a
-    lake beside the sea gets none of it; it laps instead.
-  - **Lapping.** Where no shore waves reach, water laps at its shore (`lakeSwashState`): the
-    wind's short chop runs up as one train (`ShoreWaves`): a slow 6 s lap and a 2 cm runup in calm
-    air, quickening to 2.5 s and running up 0.1 m in a gale (2 to 18 m/s). Its phase is carried
-    from frame to frame at the current period (`advanceLakePhase`), so the wind changing its
-    speed never makes it jump.
-    Its phase drifts by up to a full cycle over 16 m noise, so the sheet does not rise all round
-    a lake at once, and the same noise varies its runup down to 0.6 ×. Each palette type's
-    `lapping` (0..1, 1 for lakes, 0 for the ocean) scales it. It feeds the same sheet, foam,
-    sheen and soaking as the ocean's swash (`waterSwash` picks one).
-  - **The sheet.** The water surface lifts by the swash height near the waterline, fading out by
-    1.5 m of depth into the breaking waves. The depth test against the terrain cuts its edge, so
-    the edge climbs the beach by `runup / slope`, and the sheet is thin at the edge with no extra
-    work. It shows only where coverage reaches; the ocean's soft edge runs well past the beach.
-  - **Thickness.** The 8 m height texture cannot resolve a sheet a few centimetres thick. The
-    water reads the thickness from the gap to the scene behind it in the refraction texture, so
-    the light draw binds that texture as well as the absorb draw. That gap is along the view
-    ray, so near level it says nothing of the depth below, and on the level ray it reads zero.
-    Where the ray is within about 6° of level, the water map's depth takes over. Foam rides the last 6 cm of
-    the sheet's edge during the uprush and thins as it drains.
-  - **Shared.** The swash is a function in `shore-waves.wgsl`, so the water and the terrain agree
-    where the sheet is. See [Terrain changes](#terrain-changes) for the wet sand it leaves
-    behind. `setWaterSwash(strength)` scales it in the console.
-
-Breaking waves that curl over are out of scope. A heightfield cannot overhang.
-
-### Foam
-
-At `windiness = 1` the trees look like a strong wind, so the water must look like a storm. The
-ocean's own wind speed (see [Wind](#wind)) and the rough-sea mapping make it so:
-
-| `windiness` | Ocean wind | Water                                                          |
-| ----------- | ---------- | -------------------------------------------------------------- |
-| 0           | 0.5 m/s    | Calm, the swell's slow heave, no foam                          |
-| 0.3         | 4 m/s      | Small waves, no foam                                           |
-| 0.5         | 8 m/s      | Moderate waves, no foam                                        |
-| 0.7         | 13 m/s     | Rough, the first whitecaps and small spray                     |
-| 1.0         | 22 m/s     | Storm: crossing crests, whitecaps with long lace trails, big spray |
-
-The foam comes from the ocean alone, with no texture:
-
-- **Whitecaps.** Foam grows where the surface folds: the ocean's Jacobian, from the choppy
-  displacement's derivatives. Each cascade has its own whitecap and foam amount
-  (`CASCADE_FOAM`). A texel grows foam where its Jacobian falls below the whitecap, at 7.5 × amount
-  a second for each unit below. It decays at `max(0.5, 10 − amount)` × 1.15 a second, in a buffer
-  kept from frame to frame. The longest cascade holds the peak waves, so its foam (whitecap 0.7,
-  amount 9) caps the big crests. The next (0.5, 3) adds broken chop. The short two make none. A
-  calm sea never folds that far, so it makes no foam.
-- **Persistence.** The foam buffer lives at the water's rest positions, so the foam rides the
-  surface it formed on and is left behind as the crest moves on, thinning as it decays.
-- **Sampling.** The pixel sums the cascades' foam, filtered to its footprint through the mips:
-  the coverage. It is coarse (the longest cascade's texel is 2.86 m), so it only says where foam
-  may show.
-- **Lace.** The whole surface's stretch at the pixel, summed over every cascade at full
-  resolution, says where inside that the foam shows: from none at a stretch of 1.1 to all at
-  0.5. Foam shows where the lace passes `1 − coverage`, over a soft band of 0.3, so it starts on
-  the spots the small waves squeeze, grows out from there as the coverage rises, and thins back
-  to lace as it decays. From 0.3 m to 2.5 m of water per pixel the plain coverage takes over,
-  since far out the small waves average away.
-- **Per type.** The palette's foam amount scales it all, so a lake stays much calmer than the ocean
-  in the same wind.
-- **Edge foam.** Where water laps (see [Waves at the shore](#waves-at-the-shore)), the wind drives
-  foam into the shallows (`lakeEdgeFoam`). It is the foam texture's own bubbles, not thresholded
-  like the ocean's breaker foam, so it has no hard edge: strongest in the shallowest water and
-  gone by the palette's `shoreFoamWidth` of depth (0.8 m for lakes), the depth read per pixel
-  from the sheet's thickness rather than the 8 m water map, and fading in over the first 4 cm at
-  the waterline. 16 m noise varies it along the shore down to 0.4 ×. None shows below 5 m/s of
-  wind; it is full by 14 m/s. It surges as each lap runs up and ebbs to 0.4 × as it drains, at
-  0.9 × at full wind. Lapping water has no swash foam; its sheet's edge is this foam alone.
-- **Texture.** A tiling grey foam texture (`sea-foam.webp`, `WaterTextures`) gives the foam its
-  bubbles and holes. It is sampled over a 4 m tile and again over a 12.8 m tile turned by a 3-4-5
-  angle, 0.4 of it the larger, so its repeat does not show; both turn a whole number of times
-  over the 1024 m the origin snaps by, so the pattern holds when it moves. It joins the lace
-  and the breakup noise in deciding where foam shows (0.6 of the say), so whitecaps and shore
-  foam grow in from its thick parts and break up through its holes. Far away it averages out
-  with the lace into the plain coverage.
-- **Shading.** All foam is scaled by an overall opacity of 0.9. It is a rough (0.6) diffuse
-  layer, albedo 0.65 where the texture is brightest and half that in its bubbles: the light
-  draw blends the water's diffuse and roughness toward it, and the absorb draw hides the water
-  beneath it.
-- **Tuning.** `setOceanFoam(cascade, { whitecap, amount })` in the console changes one cascade's
-  foam live.
-
-### Sea spray
-
-Spray rises from breaking crests near the camera (`SeaSpray`, after GodotOceanWaves).
-
-- **Pool.** 4096 particles. A particle keeps only where and when it rose, how hard its crest
-  broke and a random value, so its motion is a function of its age and the waves under it.
-- **Spawning.** A compute pass gives each free particle four tries a frame at random spots within
-  150 m of the camera. A spot must be open sea at least 1.5 m deep and under foam coverage of at
-  least 0.75. Its chance climbs from none at windiness 0.45 to all at 0.75. Shallow water holds
-  only part of the sea (see [Waves at the shore](#waves-at-the-shore)), and both the chance and
-  the puff's strength scale by that share. Recycling free
-  particles straight onto new spots keeps the pool busy, where scattering them evenly and culling
-  most would not.
-- **Open sea.** A depth mask of 64² texels over the spray's reach, from the terrain heights
-  (`TerrainRenderer.sampleHeight`) and the sea level. It is rebuilt when the camera crosses a
-  texel, and every second as chunks load.
-- **Motion.** A puff rides the wave's displacement where it rose, lifts off it fast and falls back
-  slower, drifts downwind at 2 m/s in full wind, and grows as it spreads. It fades in fast, fades
-  out slow, and dissolves from its thin edges.
-- **Shape by wind.** The first breaking crests throw small puffs and a storm throws big ones. The
-  shape blends from moderate at windiness 0.7 and below (2 m across, 1.3 m rise, 1.6 s) to storm
-  at 1 (7 m, 2.3 m, 2.6 s), fully opaque at both. Lifetimes vary ±30%.
-- **Drawing.** Camera-facing quads with the `sea-spray.png` texture, after the atmosphere
-  composite, premultiplied. It is lit by the sun, 4 × brighter looking toward it (droplets
-  scatter forward), and by the sky's irradiance. It fades where the scene is close behind it, so
-  it meets the water softly and hides behind nearer waves, and fades near the camera and at the
-  edge of its reach.
-- **Fog.** The composite fogs by the depth buffer, and the spray writes none, so it applies the
-  scene's fog itself (`sceneFogTransmittance`, `getFogScatterColor` in `fog.wgsl`), reading the
-  composite's own uniforms.
-- **Shore spray.** The first quarter of the pool is kept for the shore, so the open sea cannot
-  starve it. Its particles try the same random spots, and rise while a shore wave's crest is
-  over the spot. The two trains' periods are close, so together they are one wave whose height
-  swells and fades over a set; its crest is where their sum stands above 0.85 of that height,
-  and a set's big waves throw more than the small ones between. So bursts run along the crests
-  the water shows:
-  - **Plumes** where water at least 2.5 m deep lies beside known land in the depth mask: rock,
-    not a beach. Ground that is not loaded, or past the mask, is not land. A shore wave's crest arriving sets one off, or an open-sea crest standing 0.35 of the
-    sea's significant height above rest. Their strength climbs from none at 1 m of wave height
-    to all at 5 m, so a calm sea throws none and a storm throws plumes 12 m high, 1.8 × taller
-    than wide, that rise fast and fall back.
-  - **Surf** where a shore wave is breaking, as its crest passes, scaled by the breaker's height
-    and faded in from windiness 0.3. It is carried shoreward at 0.9 of the wave's speed, so it
-    keeps up with its crest, and is thrown up whole then shrinks to 0.35 of its size.
-  - Both rise from the level rather than riding the open sea's displacement.
-- **Tuning.** `setSeaSpray({ moderate: { ... }, storm: { ... }, surf: { ... }, impact: { ... },
-  ... })` in the console.
-- **Not yet.** Spray takes no shadows (cloud or terrain) and no god rays, and rises only from the
-  palette's first type, the ocean.
-
-### Terrain changes
-
-The terrain shader reads the chunk's water map as well:
-
-- **Bindings.** A chunk's terrain binds the same surface and type textures its water draws with,
-  plus the chunk's base level and texel count. A chunk with no water map binds a shared dry
-  texel and skips the water terms.
-- **Height above the water.** Each pixel compares its own world height with the level sampled
-  from the map: `h = height − level`. The level is smooth, and the pixel's height is exact, so
-  the band follows the ground at full resolution. The coarse height texture is not used here.
-- **Coverage gate.** The terms fade out where coverage is 0, so dry ground below a nearby level
-  stays dry. A chunk whose ground comes within 2 m of a covered level keeps its water map for
-  the terrain, even when no water shows in it and none draws. Otherwise the band would stop at
-  that chunk's edge.
-- **Caustics** on the bed (see [Lighting under water](#lighting-under-water)). They multiply the
-  sun term under water, with the chunk's own water types.
-
-**Wet band.** Wet sand is darker, because water fills the gaps between grains, and smoother,
-because a film lies on top. These change at different speeds, so the band has two parts:
-
-- **Damp.** Below the highest runup of a set, plus 0.15 m for water that the sand draws up, the
-  ground stays damp. Its albedo falls to 0.75 × and a rougher surface eases 30% of the way
-  toward 0.35. It fades out over 0.3 m above that. On lakes the highest runup is the lapping's,
-  or 0.2 × the significant height of the water's own waves where that is higher, and the
-  capillary rise and the fade are 0.4 × the sea's (6 cm, over 12 cm), as no surf soaks the
-  bank. The reach changes with the weather, not with each wave.
-- **Soaked.** Where the swash sheet has just drained, the sand is soaked. The swash height has a
-  closed form over the cycle (`swashDrained`), so the time since the sheet left a given height
-  is found without saved state. A sheen at roughness 0.08 sinks in by e every second. The sand
-  is a further 0.7 × darker, drying by e every 3 s. So a glossy, dark band follows the backwash
-  down the beach, and the sand lightens back to damp behind it. Ground under water stays
-  soaked.
-- **Slope.** Steep ground drains fast, so the wave reach and the soaking thin from 20° to 40° of
-  slope. Rock at the waterline keeps only the 0.15 m damp line, not a wide band.
-- **All materials.** The band acts on whatever the splat shows, not only on sand. The coast's
-  `wetSand` material, where a climate has one, is the colour at rest. The band is the water on
-  top of it. `setWaterWetBand(strength)` scales it in the console.
-
-**Under-water tint.** The absorb draw already dims the view path from the surface to the bed.
-The light that reaches the bed has passed through the water as well, and nothing dims it yet:
-
-- **Sun.** The sun term is dimmed by `exp(−extinction × depth / cosθ)`, where θ is the sun's
-  angle after it bends into the water. The extinction is the palette's, weighted by the type
-  map.
-- **Sky.** The ambient term is dimmed by the same extinction over 1.2 × the depth, for the slant
-  paths of the sky light.
-- **Soaked.** The bed takes the damp and soaked albedo, and loses its specular over its first 5 cm under
-  water: sun and sky alike (`evaluateIblTerms` splits the sky's two lobes). The surface above
-  gives the water's reflections, so a glint on the bed would be counted twice.
-
-The terrain draws before the refraction capture, so the water refracts a bed that is already
-tinted. The depth is the level's, not the swash's: a sheet a few centimetres thick absorbs
-nothing that shows.
-
-### Rain on surfaces
-
-Rain wets every lit surface, not only the ground by the water (`RainWetness`, `rain-wet.wgsl`):
-
-- **Two parts.** Water soaks into porous surfaces and darkens them, and a film on top makes them
-  glossy. They follow the rain's strength (`rainShare`: the precipitation, as rain rather than
-  snow), so there is none in dry weather. They reach full at a rain strength of 0.4 (`fullAt`) and
-  scale down in proportion below it, so a drizzle leaves the world damp and steady rain leaves it
-  soaked and shining. The soak builds by e every 20 s and dries by e every 120 s. The film
-  forms by e every 4 s and runs off by e every 25 s, so the shine goes soon after the rain and
-  the dark ground stays a while.
-- **Soak.** Albedo falls to 0.5 on a fully porous surface. Porosity follows roughness, from
-  sealed at 0.2 to fully porous at 0.8, and metals do not soak. Faces turned to the sky take all
-  of it, walls 0.4, faces turned down none.
-- **Film.** Roughness eases 85% of the way toward 0.12 on level surfaces, fading out from a rise
-  of 0.9 to 0.3, so slopes and walls shed it.
-- **Who takes it.** The terrain, which the water's own wet band has already soaked does not
-  darken again; standard materials; impostors of rock and bark. Leaves shed water, so foliage
-  only darkens to 0.85 and takes no film.
-- **Drops.** While rain falls, drops land on level wet surfaces and on open water and spread
-  rings (`rainPatter`). They land on a grid 0.9 m apart, one somewhere in the middle of each
-  cell, again every second at a time of their own; light rain lands in only some cells. A ring
-  spreads to 17 cm, 3 cm wide and 5 mm high, and flattens as it goes. Seen from above, a wet
-  surface reflects a few percent of an overcast sky that looks the same however a ring tilts
-  it, so the rings do more than ripple the reflection: they tilt the shading normal as well,
-  and their crests catch the light, the surface up to 60% brighter at the top of one. On water,
-  whose colour is too dark to brighten, a crest shows as a faint foam instead, in the light
-  draw only; the absorb draw does not bind the rain, so the refraction stays still. They fade
-  out from 15 m to 45 m away. They are procedural, with no texture: ultra and high draw two
-  layers half a cell apart, medium one, and low none (`rainPatterLayers`).
-- **Not yet.** Nothing shelters a surface from the rain: the ground under a tree or an overhang
-  wets as the open ground does. No puddles form.
-- `setRainWetness({ soakIn, soakOut, filmIn, filmOut, strength })` tunes it in the console, and
-  `holdRainWetness(value)` holds every surface at a wetness whatever the weather;
-  `holdRainWetness(null)` lets go.
-
-## Scatter
-
-New conditions for a scatter layer, AND'ed with slope, height and noise:
-
-- `waterDepth`: a range. Negative values are height above the water. The layer grows only where
-  water reaches, fading with its coverage.
-- `waterType`: only grow where a given palette type has weight, for example "lake" for reeds.
-- By default, a layer does not grow where `waterDepth > 0`. A layer sets `underwater: true` to
-  grow there, for example seaweed or lilies.
-- A layer with none of these conditions is thinned by the beach.
-
-Example additions: reeds at lake edges, driftwood on beaches, lilies on still lakes, seaweed on the
-shelf.
-
-## Editor
-
-- **Water brush** in the editor ribbon, next to sculpt, biome paint and scatter
-  (`TerrainWaterBrushController`, `WaterBrushToolbar`). Its toolbar reports what the brush last
-  did, such as a picked lake's level and spill height.
-  - **Level**: click a lake to pick it and sample its level, then drag up or down to move the
-    whole body. Strength sets how many metres a pixel moves it. It applies while the drag
-    runs, taking the latest target each time a rebuild finishes, and saves on release. The
-    level cannot go above the spill height found when the lake was picked. Rising, the water
-    spreads by flood fill over the ground below the new level; falling, it shrinks to its
-    own texels below it, and hollows it covered keep water at the new level
-    (`setBodyLevel`).
-  - **Type**: paints the chosen palette entry over the water under the brush. A texel the edit
-    does not own outright is taken over as it stands first, so its coverage, level and body
-    stay.
-  - **Add**: paints coverage; Shift makes it Remove. A stroke that starts on water adds to
-    that body at its level, or to the sea at sea level. One that starts on dry land makes a
-    new body with its surface at the clicked ground, and saves its record.
-  - **Add shapes the terrain** (`WaterCarve.ts`), as a generated lake does, so the water it
-    paints is the water that stays:
-    - The brush's circle is the **shoreline**. Outside it, a **shore apron** 40 m wide holds
-      the coverage past the shoreline and the lip; it is measured in water map texels (8 m),
-      so it does not grow with the brush.
-    - The stroke digs toward one **bed**. Each stamp's shape is a bowl the toolbar's
-      **depth** (3 m by default) below the level at the brush centre, `depth·(1 − (d/r)²)`,
-      rising to the level at the shoreline, where it is steepest. Across the apron, ground
-      above the level rises from the level, steeply at first, to the ground as it stood when
-      the stroke began, so a stroke up a hill cuts into it with no wall. The bed is the lowest
-      of the stroke's shapes so far, and each stamp moves the ground under it a share of the
-      way down to that one surface, set by the **strength**: holding the brush deepens the
-      lake, and overlapping stamps leave no ledges. Ground is only lowered.
-    - The water takes full coverage and its type at once, with no falloff
-      (`WaterStamp.hard`), out to 12 m past the shoreline (`WATER_COVER_MARGIN`): a texel and
-      a half, so every texel the filtered coverage reads at the shoreline is full. The ground,
-      not the coverage's texels, makes the shoreline. Partial coverage would blend the scene
-      behind over the water, unabsorbed and unbent.
-    - When the stroke ends, dry ground in the apron is raised into a **lip**: from the level at
-      the shoreline up to the level plus the lakes' `margin` over 6 m, steeply at first,
-      holding its top out to `SHORE_CREST`, past every texel the coverage's filter reaches so
-      no water shows beyond it, then easing to the ground as it stood before the stroke by
-      the apron's edge. It is measured from the outline of the stroke's stamps rather than
-      the water map's texels. It holds the water where the ground around it is lower, and
-      never rises under water that was there when the stroke began: another body's water
-      that shows, or its own lake's where the ground then lay below the level, judged per
-      height sample so an existing shore stays smooth. A stroke inside a lake leaves the lake
-      as it is, and the stroke's own new water takes a lip around it.
-    - The stroke **stops at other water**: another body's texels, and the texels around them,
-      get no coverage and no digging (`buildWaterGuard`). Water at the stroke's level, within
-      5 cm, is not in the way, so a lake brought to sea level with **Level** joins the sea when
-      a channel is painted between them. Nor is covered water that does not show
-      (`waterShowsAt`: no ground in its texel dips below its level plus the swash) and whose
-      level plus the swash stays at or below the stroke's bed, so digging cannot uncover it.
-      The sea's coverage runs inland of the coast under land that stands above it, and that
-      land can still take a lake.
-    - A stroke that starts on covered ground standing above the water's level plus the swash
-      starts on dry land, not on that water.
-    - The edit rules do not run after an Add stroke. The heights are saved with the water edit.
-  - **Remove**: hands the area under the brush back to the generator, and the brush's circle
-    becomes the shore of any water it cuts. Shift makes it Add. The edit rules do not run
-    after it, so the water left beside the cut keeps its level.
-    - Each stamp hands the water edit back in full more than `WATER_COVER_MARGIN` inside its
-      circle, and blends the ground toward its generated heights by the strength and the
-      brush's falloff, as the sculpt brush's Reset does. A generated lake there comes back as
-      the seed made it.
-    - When the stroke ends (`buildCutGrid`), edited water the generator does not make is kept
-      outside the circles, and inside them within the margin where it joins that water, so
-      the coverage stays full out to the outline. Other edited water inside the circles is
-      handed back.
-    - A **bank** (`applyCutBank`) rises inside the circles where water stays: Add's lip turned
-      inward, from the water's level at the outline to the level plus the lakes' `margin`
-      over `SHORE_RISE`, held to `SHORE_CREST`, then easing to the generated ground. It fades
-      out along the outline away from the water that stays, and never rises under other
-      water. A stroke inside a lake leaves an island the size of its circle.
-- The sculpt brush applies the edit rules after each stroke. A lake that drains shows its new
-  shore at once.
-- **Debug views** as console commands: level, coverage, type weights, depth and flow.
-
-### Water edits
-
-Authored water is a **water edit** per chunk (`WaterEdit`), at the water map's resolution:
-
-| Data        | Form                                   | Notes                                                                 |
-| ----------- | -------------------------------------- | --------------------------------------------------------------------- |
-| Authority   | `PaintMask` channel 0                  | How much of the texel the edit owns. The generated water keeps the rest. |
-| Coverage    | `PaintMask` channel 1                  | The edit's own coverage. 0 with full authority removes water.         |
-| Type weights | `PaintMask` channels 2 to 5           | The edit's palette weights.                                           |
-| Level       | `f32` per texel                        | World height of the edit's surface. Read where the edit has authority. |
-| Body ID     | `u32` per texel                        | The body the edit's water belongs to. Nearest sampled.                |
-
-- **Blend.** The worker builds the water map from the generator, then blends the edit over it
-  (`applyWaterEdit`). Each side counts by its coverage times its share of the authority, so
-  removing water leaves the level alone and added water takes the edit's level, type and body.
-  Scatter's water conditions read the same blend, so reeds follow an edited shore.
-- **Bodies.** A body the editor makes takes an id from `editedBodyId`: never 0, and never with the
-  top bit that generated lakes set. Its record is built from the edit: its level, and its spill
-  height at that level until the edit rules find its rim.
-- **Stamps.** `applyWaterStamp` adds water, removes it, or resets texels back to the generator,
-  over a disc. A texel on a chunk edge is written in every chunk that owns it, with the same
-  values, or not at all, as the paint masks are.
-- **Saving.** Each chunk's edit is one blob, `{cx}_{cy}.water.bin`, beside its height snapshot
-  and masks: saved locally first, then synced to the cloud with them. A chunk reads its edit
-  once, on its first build.
-- **Rebuilds.** An edit bumps the chunk's water edit version. The chunk's current LOD rebuilds
-  and brings back the water map and the instances, and the other LODs catch up when they next
-  build.
-- **Console.** `addWater(x, z, radius, level)`, `removeWater(x, z, radius)` and
-  `resetWater(x, z, radius)` stamp the loaded chunks and save them. Each defaults to the
-  viewer's position, a 20 m radius, and 1.5 m above the ground for the level. `addWater` saves
-  the new body's record.
-- **Edit rules in the console.** `waterBody(x, z)` logs the record of the body that owns the
-  ground at a point, and its spill height found again. `settleWater(x, z, radius)` runs the edit rules
-  over a disc, as a sculpt stroke does, and saves what they change. Each defaults to the viewer's
-  position.
-
-## Gameplay
-
-- A **water query** (`TerrainRenderer.waterQuery`): `sample(x, z, out, probe)` gives the level,
-  ground, depth, coverage, type weights, body ID and flow at once. It reads the chunk's water map
-  as the shader does: filtered bilinearly, the weights normalised, the body from the nearest
-  texel. The depth is measured from the full-resolution ground. `waterAt(x, z)` logs it in the
-  console.
-- **Wave height** comes from a GPU probe (`WaterProbe`). A caller takes a probe
-  (`acquireProbe`) and samples with it each frame, and gets the height the probe last reported,
-  a few frames old. The probe moves the point with the same function as the water's vertices
-  (`surfaceDisplacement` in `water-surface.wgsl`): the cascades, the shore waves and the swash,
-  held by the depth. The displacement is sideways as well as up, so it finds the rest position
-  that lands on the point in four fixed-point steps. The depth and type it uses are the map's at
-  the point. There are 16 probes, one dispatch a frame and up to three readbacks in flight.
-- The player holds a probe and reads the water over their feet each frame, waves included
-  (`Player.immersion`). Rules are in `Swimming.ts`.
-- Depths are measured against the eye's height above the feet, so they follow the player's body.
-- **Wading.** Past 0.1 m of water the player slows, down to 0.6 of walking speed at the swim
-  depth.
-- **Swimming.** With the water 0.6 m below the eye, shoulder deep, the player swims. They stand
-  again 0.2 m shallower, so a wave does not flicker the switch. A swimmer has no gravity and
-  cannot jump or crouch. They float with the eye 0.2 m above the surface, closing on it at a
-  rate of 3 a second, so the waves lift and drop them. Water takes a falling player's speed at
-  the same rate, so a fall plunges and then floats up. They move at 0.8 of walking speed, and
-  starting to swim ends a crouch.
-- **Diving.** Holding C dives at 1.5 m a second. Holding Space rises at the same speed. Between
-  them the swimmer holds the height they stopped at, which stays out of the waves' reach. The eye
-  stays at least its height above the feet plus 0.1 m over the bed, so a rising bed lifts them.
-  A swimmer who stops within 0.4 m of the floating height floats again. C is the crouch key on
-  land; Left Ctrl is not used, as Ctrl+W closes the browser tab.
-- **Headwind.** A gale holds back a player walking into it (`Headwind.ts`): full drag within
-  20° of straight into the wind, easing out by 45° either side, ramping in from windiness 0.8.
-  At windiness 1 a player walking into the wind keeps 45% of their speed. It goes by the
-  way the player walks, not where they look, and leaves swimmers alone.
-- **Gusts.** A gale's gusts shove the player downwind whatever they do: up to 4 m/s at a full
-  gale's strongest (`GUST_PUSH`), building and easing over 0.3 s. That is enough to push a
-  player back while they walk into it, or off a ridge. The gusts are the foliage's own gust
-  field (`gustField` in `scatter-wind.wgsl`), mirrored on the CPU in `GustField.ts` and read
-  where the player stands, so a shove lands as the trees around them bend. The field's hash is
-  integer arithmetic on both sides, so the two agree exactly. The field drifts at 20 m/s in
-  full wind, near the rain's gale wind. `gustShare` reads only its peaks, 0 below 0.6 and 1 by
-  0.8, so a fixed point in full wind is in a gust about a quarter of the time, in bursts of
-  1.7 s on average.
-- The camera knows when its eye is below the surface (`Player.cameraUnderWater`), from the same
-  sample. The under-water view uses the GPU probe at the camera instead (see
-  [Under water](#under-water)).
+---
 
 ## Under water
 
-When the camera goes below the surface, the view is inside the water: it fogs with the water's
-own colour, the surface is seen from below, and light reaches down in shafts. Where the surface
-crosses the lens, the view splits into an above-water and an under-water part. After surfacing,
-drops of water stay on the lens for a few seconds. The design follows Tidewater's under-water
-post-process (MIT), fitted to this renderer.
+When the camera goes below the surface:
 
-Everything below keys off one question per pixel: **is the lens in water or in air here?** The
-lens is the camera's near clip plane (0.1 m). The water between the eye and the lens is clipped
-away, so the view starts at the lens.
-
-### The water probe
-
-The camera holds one of the water query's probes (`UnderWater`, `TerrainRenderer.underWater`):
-
-- **Level, coverage and type weights** come from the water map at the camera, read on the CPU
-  each frame. The palette at the camera gives the extinction and scatter colour, and the sky
-  gives the sun's radiance and its direction, refracted into the water.
-- **Wave height** comes from the probe's dispatch that frame (see [Gameplay](#gameplay)).
-- All of it goes into one uniform, `UnderWater` (`under-water.wgsl`). The probe's result for the
-  camera is copied into it on the GPU after the dispatch, so the passes that read it in the same
-  frame never lag. The CPU's readback, a few frames late, is for what the CPU decides: rain,
-  lightning and spray are skipped while it says the camera is under.
-- The camera **may** be under water while it stands over covered water within 15 m of its level
-  (`WAVE_REACH`). Then the probe decides. Farther above, or over no water, nothing under-water
-  runs.
-
-The camera also holds two more probes, 0.25 m along +x and along +z (`LENS_PROBE_STEP`). The
-three give the surface's height and slope over the lens.
-
-### Medium at the lens
-
-The lens spans centimetres, so the surface over it is the plane through the three probes. Each
-pixel's ray meets the near plane at a point; the pixel is in water where that point lies below
-the plane (`lensWaterDepth`, `lensInWater` in `under-water.wgsl`). This takes a few operations,
-so every pass that cares asks per pixel: the atmosphere composite, the water fog, and the water
-surface's choice of face. No medium texture is written. The waterline on the lens is where the
-answer flips.
-
-### The surface from below
-
-The water pipelines draw both faces. Each draw keeps only the side the camera is on
-(`facesCamera`): the top from above, the underside from below. A back face is the surface seen
-from below:
-
-- **Snell's window.** The view ray refracts out into the air (1.333 to 1). Inside the window,
-  about 48.6° from straight up, it shows the sky cube along the refracted ray, and objects above
-  the water from the refraction capture where they stand in front of the sky. The capture's
-  sample moves by how far the waves bend the ray from a calm surface, as refraction from above
-  does. A sample at the far plane is the sky.
-- **Total internal reflection.** Outside the window the surface is a mirror of the water below:
-  the in-water colour of an endless ray, as the fog gives it (see [Fog in the water](#fog-in-the-water)).
-- **Fresnel.** From water into air, so the window's edge brightens into the mirror.
-- **Foam** from below is a dim layer: its albedo times 0.3, lit by the sun and the sky through it.
-- The absorb draw replaces the scene behind with the scene above the window. The light draw adds
-  the sky through the window, the mirror and the foam. The water between the camera and the
-  surface is the fog's, so no depth absorption applies here.
-
-The shore waves, whitecaps and swash are the same surface, so they show from below with no extra
-work.
-
-### Fog in the water
-
-While the camera is in water, the atmosphere composite leaves the frame alone: no sky, clouds,
-air fog or god rays. Two full-screen draws in its pass take their place (`UnderWaterFog`,
-`waterFog.wgsl`). The first multiplies the scene by the transmittance, per channel. The second
-adds the in-scatter. Both discard while the camera is above the surface, and are not drawn
-unless it may be under water.
-
-- **Transmittance.** `exp(−σt × distance)` to the first thing the pixel hits: the bed, an object
-  or the surface from below (water writes depth).
-- **In-scatter.** Scattering of the sun, the sky and the bed, each dimmed by the water it has
-  crossed to reach that depth. Light at depth `z` is `E × exp(−σt × z / μ)`, with `μ` the cosine
-  of the refracted sun. A rising ray stops at the surface and a falling one at the bed, so along
-  it the depth changes linearly and the integral has a closed form. It is written so both
-  exponents stay at or below zero, so looking up through deep water cannot overflow, and where
-  the ray's rise nearly cancels the extinction a series replaces the difference.
-- **The bed.** It returns 0.3 of the sun and sky that reach it, and that light rises through the
-  water as the sky's comes down. The bed under the camera is the one the water map reads, so
-  shallow water glows with the light off its sand and deep water keeps its dark blue.
-- **Phase.** Forward scattering (Henyey-Greenstein, g 0.85) blended with 25% isotropic, so the
+- **The view fills with the water's colour.** Near things are clear and far things fade away. The
   water glows toward the sun.
-- **Coefficients** come from the palette at the camera: `σt` is the absorption plus the
-  turbidity. The scattering is the palette's `inScatter` times `σt`, so an endless level ray
-  near the surface returns `inScatter` lit by the sun and sky. `inScatter` is several times the
-  `scatter` seen from above: from inside, the light the water scatters many times over is what
-  the viewer sees, where from above the sky's reflection outshines it. The sky's light is the
-  irradiance cube's, straight up.
-- A pixel that hits nothing, the sky, is taken as 10 km of water.
-
-### Light shafts
-
-With caustics (see [Lighting under water](#lighting-under-water)), shafts of light run down
-through the water (`LightShafts`, `lightShafts.wgsl`):
-
-- A half-resolution pass, before the atmosphere composite, marches the view ray to 22 m in 20
-  steps, or to the surface or the first thing it hits if nearer. At each step it samples the
-  caustics at that depth, dimmed along the sun's path and the view's.
-- The fog already scatters the light of a calm surface, so the march sums only what the
-  caustics add or take away: `caustics − 1`, with the fog's phase and scattering. Points along
-  one refracted sun ray read the same place in the caustics, so the shafts run toward the sun.
-- There is no TAA over the scene to resolve the noise. So, like the god rays, the march is
-  jittered per pixel, turning each frame. A draw in the composite's pass, after the fog, adds it
-  to the full frame from the four nearest half-resolution texels, weighted by how near each
-  one's distance is to the pixel's, so the shafts do not bleed across edges.
-- `setWaterShafts(strength)` scales them in the console, 1 the default.
-
-### The waterline on the lens
-
-Water on the lens draws over the composited frame, before bloom and the tonemap (`WaterLens`,
-`water-lens.wgsl`). It copies the frame with a mip chain, then redraws it, and runs only while
-there is something to show: the camera under water or near the surface, the blur still
-clearing, a gale, or drops on the lens.
-
-- **Meniscus.** The lens's water depth over its screen gradient gives each pixel's signed
-  distance in pixels to the waterline, at any roll. Within 16 px either side, samples bend away
-  from the line by up to 6 px, a dark contact line 1.5 px wide sits on it, and a bright rim
-  follows on the water side.
-- **Blur.** Water on the eye blurs the view: where the lens is in water, by a share of the
-  frame's height that ramps with the windiness, from `underWater` in a calm (0.3% by default)
-  to `underWaterGale` at windiness 1 (1.2%) (`underWaterBlur`), sampled on a ring of 8 taps at
-  the mip that matches. After surfacing the air side starts as blurred and clears over
-  `recovery` seconds (3 by default), easing out. Goggles turn both down; 0 is clear.
-- **Wind.** In a gale the eyes water: from windiness 0.8 to 1 the air side of the lens blurs
-  toward the screen's edges. The middle stays clear; from `windClear` (30%) of the way out to
-  the corners the blur grows, as its share squared, to `wind` of the frame's height (1.2% by
-  default) at the corners. It is full looking into the wind and eases to none with the wind
-  behind (`windFacing`). The eye keeps refocusing: the clear middle's edge swings by
-  `windSwing` (0.25) either way on an irregular signal of about 0.3 to 1.2 a second
-  (`eyeAdjust`), more the windier it is. Gusts drive the blur's strength: the foliage's gust
-  field read at the camera (`GustField.ts`), so the eyes water as the trees around bend, and the
-  eye follows it quickly as a gust hits and slowly as it passes (`followGust`, a quarter second and a second
-  and a half). Between gusts the blur falls to 0.4 of its strength. Under water this blur does not
-  apply. `setWaterLens({ underWater, underWaterGale, recovery, wind, windStart, windClear, windSwing })` sets
-  these in the console.
-- **Droplets** (`LensDrops`). On surfacing, 120 drops stay on the lens, a third of them large.
-  Small drops cling and evaporate. Large ones hang for 0.3 to 2.8 s, then slide down faster and
-  faster, leaving a thin wet trail that dries behind them. The lens is dry after 9 s. Going under
-  clears them. Surfacing is read from the probe's readback, a few frames late. The drops are
-  drawn in screen space, so they stay stuck to the lens as the view moves.
-- **Drop shape** (after Tidewater's lens droplets, MIT). Each outline wobbles by two sine lobes,
-  3 and 5 to a turn, at phases from the drop's own seed. A sliding drop pulls into a teardrop as
-  it gathers speed: at full speed its tail reaches 2.6 radii above its centre and its belly 1.3
-  below, it narrows to 0.8 of its width, its tail tapers to the width of the trail it leads
-  into, and its lobes settle. A drop is a strong fisheye lens: the scene inside is inverted and
-  moved along its surface, blurred, darkened toward its edge, with a highlight scaled by what it
-  shows. A trail is blurred and darkened.
-- **Rain** lands drops on the lens while it is in air (`lensRain`): up to 60 a second, scaled by
-  the precipitation and by the snow-to-rain blend over temperature 0 to 0.5 that the rain itself
-  uses. Rain drops are smaller and shorter-lived than the ones left on surfacing; about one in
-  eight is large enough to slide. In rain alone the full-screen lens draw is skipped and only the drops draw.
+- **The surface shows from below.** Looking up, you see the sky through a bright circle (Snell's
+  window). Outside it, the surface is a mirror of the water below.
+- **The waterline on the lens.** When the surface crosses the camera, the screen splits into an
+  above-water and an under-water part, with a thin line between them.
+- **Drops on the lens.** After you surface, drops cling to the lens, slide down and dry. Rain lands
+  drops on it too. In a gale, your eyes water and the edges of the view blur.
+- **Caustics.** The waves focus sunlight into moving bright lines on the bed and on anything under
+  the water.
+- **Light shafts.** Beams of light fall through the water toward the sun.
+- **Marine snow.** Small specks drift in the water around the camera.
 
 ### Lighting under water
 
-- **Terrain** is dimmed by its depth already (see [Terrain changes](#terrain-changes)).
-- **Standard and scatter materials** take the same sun and sky dimming (`water-light.wgsl`),
-  so rocks, props and seaweed under water match the bed. They are not bound to a chunk, so they
-  read the water over them from a **water level field** around the camera (`WaterLevelField`):
-  256² water map texels (8 m, 2 km across), each with its level and coverage (`rg32float`) and
-  its extinction from the palette weights (`rgba16float`). A pixel filters the four texels
-  around it as the water maps are filtered, the level weighted by coverage, and is dimmed by
-  the depth of that water over it. Dry ground below a nearby lake's level is not dimmed, and a
-  lake's rocks keep the lake's tint seen from anywhere. Past the field nothing is dimmed. The
-  CPU fills it from the chunks' water maps over eight frames when the camera strays 128 m from
-  its centre, and a second after chunks load or water changes. The material passes bind it at
-  bindings 15–16 of the environment group.
-- **Caustics** by photon splatting (`Caustics`, `caustics.wgsl`, as in Evan Wallace's WebGL
-  Water). Each frame a grid over the 7.1 m cascade's tile is drawn into a 512² `rg16float`
-  texture, with mips. That cascade holds ripples 5 cm to 1.2 m long, curved enough to focus the
-  sun a metre or two down; the longer cascades focus far below any lake bed and change the
-  light by a few percent there. The grid has a vertex per FFT texel. Each vertex refracts the
-  sun ray through the wave normal there and lands on a plane below. Its fragment adds the ratio
-  of the areas on the surface and on the plane, so focusing folds into bright lines and a calm
-  surface gives 1.
-  - **Where it is stored.** A ray is stored where it lands less where a calm surface would land
-    it, at most 1 m away. So the texture is indexed by where the sun's ray entered the water,
-    and a point under water reads it after tracing back toward the refracted sun. The grid
-    reaches past the tile by a margin wider than that 1 m, so every ray that lands in the tile
-    is drawn and the result tiles without seams.
-  - **Planes.** Two planes, 1 m (r) and 3 m (g) down, drawn as two instances of one grid. The
-    pattern grows from none at the surface to the shallow plane's, blends to the deep plane's,
-    and fades out below it by e every 3 m.
-  - **Strength.** It scales by the water's weight on the cascade, so a lake's caustics are
-    weaker than the sea's. It fades in as the sun rises, is off while the sun is down, and fades
-    out from 40 m to 120 m from the camera. A point reads the mip whose texels match its
-    pixel's footprint, so a distant bed reads the average rather than sparkling.
-  - **Repeat.** The pattern repeats every 7.1 m. It is drawn only while the camera
-    is over water or a drawn chunk has water.
-  - **Who reads it.** The terrain bed, by its own chunk's water types; standard and scatter
-    materials under the camera's water; the light shafts; and the marine snow. It acts on the
-    sun term only. The material passes and the terrain bind it in their environment group
-    (`EnvironmentUniforms`, bindings 12 to 14). `setWaterCaustics({ strength, shallow, deep })` sets
-    it in the console.
-- **Marine snow** (`MarineSnow`, `marine-snow.wgsl`). 2048 specks, about 8 mm across, in a 12 m
-  box that wraps around the camera. Their positions are a hash of the instance, carried by a
-  slow current the CPU keeps, so there is no simulation. They sway with the longest cascade's
-  displacement, as much as the water takes it, falling by e every 16 m down. They are lit by the
-  sun, focused by the caustics, and the sky through the water above them, and scatter forward as
-  the water does. They draw after the atmosphere composite, so they apply the water's
-  transmittance to the camera themselves, tested against the scene's depth. A speck smaller than
-  1.5 pixels is drawn at that size and fades instead. They fade in over the first 0.5 m and out
-  toward the box's edge. They draw only while the camera is in water, and only below the surface.
-  `setMarineSnow({ ... })` sets them in the console.
+Anything under water gets less light, the deeper it is. The terrain reads its own chunk's water
+map. Rocks, plants and props read a **water level field**: a grid around the camera that holds
+the level and colour of the water over each spot. So a rock in a lake is dimmed by that lake, and
+a tree on dry land in a valley is not dimmed by a lake higher up.
 
-### Cost and quality
+**Files to look at:** `UnderWater.ts`, `UnderWaterFog.ts`, `WaterLens.ts`, `LensDrops.ts`,
+`Caustics.ts`, `LightShafts.ts`, `MarineSnow.ts`, `WaterLevelField.ts`, `water-light.wgsl`.
 
-- The probe runs every frame the camera stands over water, as one of its points. The back faces
-  rasterise but are discarded from above.
-- The lens pass runs only while the camera is under water or within a metre of the surface,
-  the view is still clearing, the windiness is over 0.8, or drops are on the lens: a frame copy, its mips, and one
-  full-screen draw with 9 taps a pixel, plus the drops.
-- The fog is two full-screen draws, and only while the camera is within 15 m of the level.
-- The shafts and marine snow are the extras. They are the parts a low quality tier turns off;
-  medium keeps half the snow (`underWaterQuality`). The fog, the surface from below, the
-  waterline and the caustics are not: without them the view is wrong, not plainer.
-- The caustics are one draw of about 440k small triangles a frame, and a mip chain, while
-  water is in view and the sun is up. The shafts are a half-resolution pass of 20 caustics samples a pixel, and one
-  full-screen draw of four taps, while the camera may be under water.
+---
 
-### Build order
+## Plants and water
 
-1. The water probe, fog in the water, the surface from below, and the lighting of materials
-   under water.
-2. The medium at the lens, the meniscus and the droplets.
-3. Caustics, light shafts and marine snow.
+Scatter rules know about water:
 
-## Phases
+- By default, a rule does **not** grow under water.
+- `underwater: true` lets it grow under water, for example seaweed or lilies.
+- `waterDepth` grows it only in a range of depths. A negative value means "above the water", for
+  example reeds on a bank.
+- `waterType` grows it only in one kind of water, for example reeds only in lakes.
 
-1. **Water map and ocean.** Continent field, sea level, water map and height texture in the worker,
-   `shows`, the shared grid mesh, the horizon ring, sky reflection, depth colour, beach band,
-   scatter kept out of water.
-2. **Lakes.** Lake cells, carving, lagoons, water body records and palette blending.
-3. **Surface detail.** The FFT ocean from the wind, whitecaps, crest glow, sea spray,
-   refraction, sun glint, the wet band and waves at the shore.
-4. **Editor and gameplay.** Water brush, edit rules and spill height, sea channels,
-   saved edits, water query with probed waves, wading and swimming.
-5. **Stretch.** [Under water](#under-water) (the view, the waterline on the lens, caustics),
-   rain on surfaces and rain ripples on them and on water, noise-channel rivers.
+Water you edit counts too, so reeds follow a shore you have changed.
 
-## Performance notes (web budget)
+**How to use it.** Add these to a rule in a biome's `scatter` list in `Biomes.ts`.
 
-- **One extra full-screen copy** per frame for the refraction texture (HDR colour).
-- Water patches draw only for chunks with coverage. Dry chunks cost nothing.
-- Patches reuse terrain LOD. Far water uses fewer vertices and fewer waves.
-- One compute pass a frame for the ocean: two transforms and the mip chains over four 256²
-  cascades. The vertex shader takes a displacement sample per cascade and a swash field sample;
-  the fragment shader a slope and a foam sample per cascade, one sky cube sample, two refraction
-  samples and a swash field sample.
-- Sea spray: one compute pass over 4096 particles (four tries each while free), and one draw of
-  4096 instanced quads, most of them dropped before rasterising. The CPU rebuilds its 64² depth
-  mask (4096 height samples) when the camera crosses a texel, and every second.
-- The shore field rebuilds when the camera moves 128 m or ground loads: 65k height samples over
-  eight frames, then a fast-sweeping solve (about 4 ms), the extension past the reached water
-  (about 4 ms), and a pack and upload (about 3 ms) on three more. The swash field packs and
-  uploads with the shore field.
-- The water probe: one dispatch over 16 points while any is asked for, each five displacement
-  evaluations, and a 256-byte readback.
-- Terrain pixels in a chunk with a water map take a surface, a type and a swash field sample.
-  Chunks without one skip them.
-- The horizon ring is one draw call. Its vertices take no waves, and its pixels skip refraction.
-- `QualitySettings` (the `water` aspect, `WaterQuality.ts`) controls the ocean's slope mip bias
-  and the lens: ultra and high keep every drop, an 8-tap ring for the blur and blurred trails;
-  medium keeps 60% of the drops and 6 taps; low 30% of the drops, 4 taps and one sample a
-  trail. The drop share scales the pool, the drops left on surfacing and the rain's rate.
-- Each drop draws two quads, its body and a strip as wide as its trail above it, so a long
-  trail does not shade a body-wide column up the screen.
-- GPU timers (`gpu/water`): `ocean`, the FFT's compute pass; `caustics`, the photon splat;
-  `shafts`, the half-resolution march; `lens-frame`, the lens's mip chain over the frame copy;
-  `lens`, its full-screen draw and the drops.
-- The terrain shader samples 16 textures with the caustics, the most a stage may by default.
-  Another texture in it needs one taken out first.
-- The water level field: 65k texel copies from the water maps over eight frames when it moves,
-  two uploads of 512 KB, and four texel loads a pixel for standard and scatter materials, a
-  fifth under water.
+---
+
+## The water brush in the Editor
+
+Open it with the **droplets** button in the editor ribbon, next to sculpt, biome paint and scatter.
+A small panel shows over the viewport. It shows only the controls the chosen brush uses, and what
+the brush last did.
+
+| Brush      | What it does                                                                        |
+| ---------- | ----------------------------------------------------------------------------------- |
+| **Level**  | Click a lake, then drag up or down to move its level. It stops at the spill height. |
+| **Type**   | Paint a kind of water, such as lake or ocean, over the water under the brush.       |
+| **Add**    | Drag to add water. Hold **Shift** to remove.                                        |
+| **Remove** | Drag to give the area back to the generated world. Hold **Shift** to add.           |
+
+| Control      | What it does                                 |
+| ------------ | -------------------------------------------- |
+| **Type**     | The kind of water the Type brush paints.     |
+| **Radius**   | The size of the brush, in metres.            |
+| **Strength** | How fast the brush works.                    |
+| **Depth**    | How deep the Add brush digs below the water. |
+
+**Add.** The brush's circle is the new shoreline. On a lake, it adds to that lake at its level. On
+dry land, it makes a new lake at the height you clicked. It digs a bowl under the water, and when
+you let go it raises a small bank around it. It stops at other water that sits at a different
+height.
+
+**Remove.** The brush gives the water and the ground back to what the generator made. A lake the
+seed made comes back as it was. If you cut through part of a lake, the circle becomes that lake's
+new shore and a bank is raised along it. Brushing inside a lake leaves an island.
+
+Hold **Alt** and drag, or drag with the right mouse button, to move the camera. Press **Esc** to
+close the brush.
+
+### Sculpting near water
+
+After each sculpt stroke, the water is checked:
+
+- **Cut a lake's rim** below its level, and the lake **drains** down to the new lowest point.
+- **Cut a rim down to the sea**, and the lake joins the ocean as a lagoon.
+- **Dig a trench below sea level** that joins the sea, and it **fills with sea water**.
+- **Dig a hole in dry land**, and nothing fills it. Use **Add** to make a pond.
+
+**Files to look at:** `TerrainWaterBrushController.ts`, `WaterBrushToolbar.tsx`, `WaterCarve.ts`
+(the bowl, the bank and the cut), `WaterEdit.ts`, `WaterBodyRules.ts` and `SpillHeight.ts`
+(draining and sea channels).
+
+---
+
+## In the game: wading and swimming
+
+The player reads the water under their feet each frame, waves included.
+
+- **Wading.** As the water gets deeper, the player slows down.
+- **Swimming.** At about shoulder depth, the player starts to swim. They float with their eyes
+  just above the surface, and the waves lift and drop them.
+- **Diving.** Hold **C** to dive and **Space** to rise. Let go, and the swimmer stays at that
+  depth. Come back near the surface, and they float again.
+- **Jumping in.** A fall into water plunges, then floats back up.
+- **Wind.** In a gale, walking into the wind is slow, and gusts push the player downwind, in time
+  with the trees bending around them.
+
+For game code, `TerrainRenderer.waterQuery` gives the water at any point: the level, the depth,
+the coverage, the kind of water and the height of the waves there. The wave height comes back from
+the GPU a few frames late.
+
+**Files to look at:** `Swimming.ts` (all the swimming numbers), `Headwind.ts`, `Player.ts`,
+`WaterQuery.ts`, `WaterProbe.ts`.
+
+---
+
+## Saving & sync
+
+Water edits save in the same way as terrain edits:
+
+- Water the seed makes is never saved. The engine makes it again.
+- Each chunk you edit saves a small water file beside its height file.
+- Lakes you add or change save in one small list for each level.
+- Edits save to the browser first, and sync to the cloud when you log in.
+
+---
+
+## Quality and performance
+
+- Chunks with no water cost nothing.
+- Far water uses fewer vertices and fewer wave layers.
+- The ocean is one GPU compute pass a frame.
+- Under-water effects only run when the camera can be under water.
+- The **water** quality setting changes how sharp the ripples are, and how many lens drops and
+  blur samples the lens uses. Light shafts and marine snow turn off on low quality.
+
+The perf panel shows the water's GPU time under `gpu/water`. See
+[Debugger & Console Commands](../debug-commands.md#perf-panel).
+
+---
+
+## Debugger / console functions
+
+Type these in the browser console. Most of the scale commands take a number, with 1 as the
+normal look.
+
+| Command                                                                | What it does                                       |
+| ---------------------------------------------------------------------- | -------------------------------------------------- |
+| `waterAt(x, z)`                                                        | Logs the water at a point. Defaults to the camera. |
+| `waterBody(x, z)`                                                      | Logs the lake at a point and its spill height.     |
+| `addWater(...)`, `removeWater(...)`, `resetWater(...)`                 | Edit the water around a point and save it.         |
+| `settleWater(x, z, radius)`                                            | Runs the drain and sea-fill rules over an area.    |
+| `setOceanSeaState({...})`, `setOceanFoam(...)`                         | Override the sea and its foam.                     |
+| `setWaterShoreWaves`, `setWaterSwash`, `setWaterWetBand`               | Scale the shore waves, swash and wet sand.         |
+| `setWaterCrestGlow`, `setWaterTroughDarkening`, `setWaterHorizonSlope` | Scale parts of the surface's look.                 |
+| `setSeaSpray({...})`                                                   | Tune the sea spray.                                |
+| `setWaterCaustics({...})`, `setWaterShafts`, `setMarineSnow({...})`    | Tune the light under water.                        |
+| `setWaterLens({...})`                                                  | Tune the lens blur.                                |
+| `setRainWetness({...})`, `holdRainWetness(value)`                      | Tune rain wetness, or hold it at one value.        |
+| `setWaterShoreDebug`, `setWaterFoamDebug`, `setWaterRefractionDebug`   | Paint debug views on the water.                    |
+| `shoreFieldStats()`                                                    | Counts what the last shore wave grid found.        |
+
+The commands are registered in `WaterDebugCommands.ts` and `WaterEditDevCommands.ts`.
+
+---
+
+## Related docs
+
+- [Weather System](../weather.md): the wind and rain that drive the sea.
+- [Sky Rendering](../sky-rendering.md): the sky the water reflects.
+- [Renderer](../renderer.md): how the render passes fit together.
+- [Debugger & Console Commands](../debug-commands.md): all the other console commands.
