@@ -602,3 +602,23 @@ export function applyWaterStamp(
   }
   return [...touched.values()];
 }
+
+/** Hands world texel (i, j) back to the generator in every chunk that owns it. */
+export function releaseWaterTexel(
+  source: WaterEditSource,
+  i: number,
+  j: number
+): TouchedWaterChunk[] {
+  const unit = source.metersPerSample * WATER_EDIT_STEP;
+  return applyWaterStamp(source, {
+    type: 'reset',
+    centerX: i * unit,
+    centerZ: j * unit,
+    radius: unit / 2,
+    amount: 1,
+    hard: true,
+    level: 0,
+    bodyId: 0,
+    typeWeights: [],
+  });
+}

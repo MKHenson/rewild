@@ -17,20 +17,21 @@ import {
   buildWaterGuard,
   editedBody,
   editedBodyId,
+  releaseWaterTexel,
 } from 'rewild-renderer/lib/renderers/terrain/WaterEdit';
 import {
   SHORE_REACH,
   WATER_COVER_MARGIN,
   applyCarveStamp,
-  applyRaiseStamp,
+  applyCutBank,
   applyWaterLip,
+  buildCutGrid,
   buildShoreGrid,
-  buildWaterLevels,
-  WaterLevels,
 } from 'rewild-renderer/lib/renderers/terrain/WaterCarve';
-import type {
+import {
   SculptHeightSource,
   TouchedChunk,
+  applySculptStamp,
 } from 'rewild-renderer/lib/renderers/terrain/Sculpt';
 import {
   ResolvedWater,
@@ -62,9 +63,9 @@ interface PaintStroke {
   typeWeights: number[];
   // The record of a body this stroke made on dry land.
   newBody: WaterBody | null;
-  // Chunks whose heights an add or remove stroke carved or raised.
+  // Chunks whose heights an add stroke carved or a remove stroke reset.
   heights: Map<string, TouchedChunk>;
-  // The add stroke's stamps, as (x, z, radius) triples.
+  // The add or remove stroke's stamps, as (x, z, radius) triples.
   discs: number[];
   // Chunks' heights as they stood when the add stroke first reached them.
   originals: Map<string, Float32Array>;
@@ -98,14 +99,13 @@ type Stroke = PaintStroke | LevelStroke;
 const metres = (value: number) => `${value.toFixed(2)} m`;
 
 /**
- * Editor water brush. Add, remove, reset and type paint the chunks' water
- * edits under the brush like the paint brushes. Add also digs a bed under the
- * water and raises a lip around it when the stroke ends, and stops at other
- * water that shows unless it stands at the same level. Remove raises the ground under
- * the water above its level. After reset, the edit rules settle the water it
- * changed. Level picks the lake under the click
- * and moves its level with a vertical drag, live and capped at its spill
- * height.
+ * Editor water brush. Add, remove and type paint the chunks' water edits
+ * under the brush like the paint brushes. Add also digs a bed under the water
+ * and raises a lip around it when the stroke ends, and stops at other water
+ * that shows unless it stands at the same level. Remove hands the water and
+ * the ground back to the generator; where it cuts water that stays, a bank
+ * inside the brush's circles becomes that water's shore. Level picks the lake under the click and moves its level with a
+ * vertical drag, live and capped at its spill height.
  */
 export class TerrainWaterBrushController {
   private stroke: Stroke | null = null;
@@ -153,6 +153,7 @@ export class TerrainWaterBrushController {
         return controller.renderer.terrainRenderer.metersPerSample;
       },
       getHeights: (cx: number, cy: number) => this.heights.get(cx, cy),
+      getBaseline: (cx: number, cy: number) => this.heights.baseline(cx, cy),
     };
   }
 
@@ -197,17 +198,12 @@ export class TerrainWaterBrushController {
       return;
     }
 
+    // Remove resets the water edit, handing the texels back to the generator.
     const type: WaterStampType =
       brush === 'type'
         ? 'paint'
-        : brush === 'add'
-        ? shift
-          ? 'remove'
-          : 'add'
-        : brush === 'remove'
-        ? shift
-          ? 'add'
-          : 'remove'
+        : (brush === 'add') !== shift
+        ? 'add'
         : 'reset';
     const stroke: PaintStroke = {
       kind: 'paint',
@@ -254,9 +250,8 @@ export class TerrainWaterBrushController {
   }
 
   /**
-   * Ends the stroke: saves the edits it changed, then, for add, remove and
-   * reset, settles the water with the edit rules and saves what they changed
-   * and the body records.
+   * Ends the stroke: add raises its lip, remove banks the water it cut, then
+   * the water edits, heights and any new body's record are saved.
    */
   async endStroke(): Promise<void> {
     const stroke = this.stroke;
@@ -279,47 +274,23 @@ export class TerrainWaterBrushController {
       return;
     }
 
+    if (stroke.type === 'add') this.raiseLip(stroke);
+    else if (stroke.type === 'reset') this.bankCut(stroke);
+
     if (stroke.touched.size === 0 && stroke.heights.size === 0) return;
     if (!levelId) return this.warnUnsaved();
-    await Promise.all(
-      [...stroke.touched.values()].map((t) =>
+    const size = this.renderer.terrainRenderer.mapChunkSizeLod;
+    await Promise.all([
+      ...[...stroke.touched.values()].map((t) =>
         writeWaterEdit(levelId, t.cx, t.cy, t.edit)
-      )
-    );
-    if (stroke.newBody) await rules.setRecord(stroke.newBody);
-
-    if (stroke.type === 'add' || stroke.type === 'remove') {
-      if (stroke.type === 'add') this.raiseLip(stroke);
-      const size = this.renderer.terrainRenderer.mapChunkSizeLod;
-      await Promise.all(
-        [...stroke.heights.values()].map((t) =>
-          writeChunkSnapshot(levelId, t.cx, t.cy, t.heights, size)
-        )
-      );
-      if (stroke.newBody) await writeWaterBodies(levelId, rules.savedBodies());
-    } else if (stroke.type === 'reset') {
-      const settled = await rules.settle(
-        stroke.minX,
-        stroke.minZ,
-        stroke.maxX,
-        stroke.maxZ
-      );
-      await Promise.all(
-        settled.chunks.map((t) => writeWaterEdit(levelId, t.cx, t.cy, t.edit))
-      );
-      const drained = settled.outcomes.filter((o) => o.drained);
-      waterBrushStore.setInfo(
-        drained
-          .map(
-            (o) =>
-              `Lake ${o.body.id} drained to ${metres(o.body.level)}${
-                o.joined ? ', joining the sea' : ', its rim'
-              }.`
-          )
-          .join(' ')
-      );
-      if (settled.outcomes.length > 0 || stroke.newBody)
-        await writeWaterBodies(levelId, rules.savedBodies());
+      ),
+      ...[...stroke.heights.values()].map((t) =>
+        writeChunkSnapshot(levelId, t.cx, t.cy, t.heights, size)
+      ),
+    ]);
+    if (stroke.newBody) {
+      await rules.setRecord(stroke.newBody);
+      await writeWaterBodies(levelId, rules.savedBodies());
     }
     this.markDirty();
   }
@@ -374,41 +345,34 @@ export class TerrainWaterBrushController {
           floor: stroke.level - waterBrushStore.depth,
         }
       );
+    }
+    if (stroke.type === 'add' || stroke.type === 'reset')
       stroke.discs.push(point.x, point.z, radius);
-    }
 
-    // Read before the stamp takes the water away.
-    let levels: WaterLevels | undefined;
-    if (stroke.type === 'remove') {
-      const unit = terrain.metersPerSample * WATER_EDIT_STEP;
-      levels = buildWaterLevels(
-        this.resolvedWater,
-        (terrain.mapChunkSizeLod - 1) / WATER_EDIT_STEP,
-        Math.floor((point.x - radius) / unit),
-        Math.floor((point.z - radius) / unit),
-        Math.ceil((point.x + radius) / unit),
-        Math.ceil((point.z + radius) / unit)
-      );
-    }
-
+    // The ground makes the shoreline, so add and remove change the water in
+    // full at once. Remove keeps the water within the cover margin of its
+    // circle until the stroke ends, when that left beside water that stays
+    // takes a bank (see bankCut).
+    const hard = stroke.type !== 'paint';
+    const coverRadius =
+      stroke.type === 'add'
+        ? radius + WATER_COVER_MARGIN
+        : stroke.type === 'reset'
+        ? radius - WATER_COVER_MARGIN
+        : radius;
     const touched = applyWaterStamp(this.source, {
       type: stroke.type,
       centerX: point.x,
       centerZ: point.z,
-      radius: guard ? radius + WATER_COVER_MARGIN : radius,
-      // The ground makes the shoreline, so added water is full at once.
-      amount: guard ? 1 : amount,
-      hard: !!guard,
+      radius: coverRadius,
+      amount: hard ? 1 : amount,
+      hard,
       level: stroke.level,
       bodyId: stroke.bodyId,
       typeWeights: stroke.typeWeights,
       guard,
     });
-    for (const t of touched) {
-      const key = `${t.cx},${t.cy}`;
-      if (!stroke.touched.has(key)) stroke.touched.set(key, t);
-      terrain.refreshChunkWater(t.cx, t.cy);
-    }
+    this.keepEdits(stroke, touched);
 
     if (guard) {
       this.keepOriginals(stroke, point.x, point.z, radius + SHORE_REACH);
@@ -427,15 +391,15 @@ export class TerrainWaterBrushController {
         })
       );
     }
-    if (levels)
+    if (stroke.type === 'reset')
       this.keepHeights(
         stroke,
-        applyRaiseStamp(this.heightSource, {
+        applySculptStamp(this.heightSource, {
+          type: 'reset',
           centerX: point.x,
           centerZ: point.z,
           radius,
-          rise: terrain.waterRules.lakeMargin,
-          levels,
+          amount,
         })
       );
   }
@@ -473,6 +437,44 @@ export class TerrainWaterBrushController {
         original
       )
     );
+  }
+
+  // Hands back the water a remove stroke left inside its circles that is not
+  // beside water that stays, and banks the water that stays.
+  private bankCut(stroke: PaintStroke) {
+    const terrain = this.renderer.terrainRenderer;
+    const rules = terrain.waterRules;
+    const unit = terrain.metersPerSample * WATER_EDIT_STEP;
+    const reach = SHORE_REACH + unit;
+    const cut = buildCutGrid(
+      (cx, cy) => rules.chunkWater(cx, cy),
+      (cx, cy) => rules.generatedWater(cx, cy),
+      (terrain.mapChunkSizeLod - 1) / WATER_EDIT_STEP,
+      unit,
+      Math.floor((stroke.minX - reach) / unit),
+      Math.floor((stroke.minZ - reach) / unit),
+      Math.ceil((stroke.maxX + reach) / unit),
+      Math.ceil((stroke.maxZ + reach) / unit),
+      stroke.discs
+    );
+    for (let k = 0; k < cut.released.length; k += 2)
+      this.keepEdits(
+        stroke,
+        releaseWaterTexel(this.source, cut.released[k], cut.released[k + 1])
+      );
+    this.keepHeights(
+      stroke,
+      applyCutBank(this.heightSource, cut, stroke.discs, rules.lakeMargin)
+    );
+  }
+
+  private keepEdits(stroke: PaintStroke, touched: TouchedWaterChunk[]) {
+    const terrain = this.renderer.terrainRenderer;
+    for (const t of touched) {
+      const key = `${t.cx},${t.cy}`;
+      if (!stroke.touched.has(key)) stroke.touched.set(key, t);
+      terrain.refreshChunkWater(t.cx, t.cy);
+    }
   }
 
   // Copies the heights of the chunks under the brush the first time the

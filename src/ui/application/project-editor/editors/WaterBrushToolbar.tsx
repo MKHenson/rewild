@@ -36,7 +36,6 @@ const BRUSHES: Array<{
   { type: 'type', icon: 'palette', label: 'Type' },
   { type: 'add', icon: 'droplet', label: 'Add' },
   { type: 'remove', icon: 'eraser', label: 'Remove' },
-  { type: 'reset', icon: 'rotate-ccw', label: 'Reset' },
 ];
 
 const WATER_TYPES = [
@@ -49,8 +48,8 @@ const HINTS: Record<WaterBrushType, string> = {
     'Click a lake, then drag up or down to set its level · Strength sets the speed · It stops at the spill height',
   type: 'Drag to paint the water type over the water there',
   add: 'Drag to add water and dig its bed · On a lake it joins it, on dry land it makes a new one at the ground · It stops at other water · Shift removes',
-  remove: 'Drag to remove water and raise land in its place · Shift adds',
-  reset: 'Drag to hand the water back to the generated world',
+  remove:
+    'Drag to hand the water and the ground back to the generated world · Shift adds',
 };
 
 // Floating brush controls shown over the viewport while the water brush is
@@ -168,18 +167,11 @@ export class WaterBrushToolbar extends Component<Props> {
     );
 
     return () => {
-      // A control the current brush ignores is disabled rather than hidden, so
-      // the panel does not jump between brushes.
+      // A control the current brush ignores is hidden.
       const brush = waterBrushStore.brush;
-      const typeOff = brush !== 'type';
-      const radiusOff = brush === 'level';
-      const depthOff = brush !== 'add';
-      typeRow.classList.toggle('inactive', typeOff);
-      radiusRow.classList.toggle('inactive', radiusOff);
-      depthRow.classList.toggle('inactive', depthOff);
-      typeSelect.disabled = typeOff;
-      radiusSlider.disabled = radiusOff;
-      depthSlider.disabled = depthOff;
+      typeRow.classList.toggle('hidden', brush !== 'type');
+      radiusRow.classList.toggle('hidden', brush === 'level');
+      depthRow.classList.toggle('hidden', brush !== 'add');
       typeSelect.value = waterBrushStore.waterType;
 
       for (let i = 0, l = brushButtons.length; i < l; i++) {
@@ -274,10 +266,9 @@ const StyledWaterBrushToolbar = cssStylesheet(css`
     color: ${theme.colors.onSubtle};
   }
 
-  .field.inactive x-typography,
-  .slider-row.inactive x-typography,
-  .slider-row.inactive .value {
-    opacity: 0.4;
+  .field.hidden,
+  .slider-row.hidden {
+    display: none;
   }
 
   .info {

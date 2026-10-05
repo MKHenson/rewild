@@ -3,10 +3,10 @@ import {
   SHORE_CREST,
   SHORE_RISE,
   applyCarveStamp,
-  applyRaiseStamp,
+  applyCutBank,
   applyWaterLip,
+  buildCutGrid,
   buildShoreGrid,
-  buildWaterLevels,
 } from './WaterCarve';
 import { WATER_EDIT_STEP, buildWaterGuard, isWaterBlocked } from './WaterEdit';
 import { ResolvedWater, SWASH_REACH, waterShowsAt } from './WaterMap';
@@ -347,34 +347,75 @@ describe('applyWaterLip', () => {
   });
 });
 
-describe('applyRaiseStamp', () => {
-  // A lake at 10 m over the texels within 12 m of the origin.
-  const water = fakeWater((i, j) =>
-    Math.hypot(i * UNIT, j * UNIT) <= 12 ? [255, 10, 3] : null
+describe('remove stroke cut', () => {
+  // A remove circle at (28, 0) with a 20 m radius: its outline crosses the
+  // axis at x = 8. Edited lake water at level 10 covers x <= 16, and a pond
+  // stands at x = 28 in the circle's middle.
+  const discs = [28, 0, 20];
+  const lake = fakeWater((i, j) =>
+    i * UNIT <= 16 || (i === 7 && j === 0) ? [255, 10, 7] : null
   );
-  const levels = buildWaterLevels(
-    only(water),
-    TEXEL_SPAN,
-    -TEXEL_HALF,
-    -TEXEL_HALF,
-    TEXEL_HALF,
-    TEXEL_HALF
-  );
-  const raise = { centerX: 0, centerZ: 0, radius: 12, rise: 1, levels };
+  const cut = (
+    water: ResolvedWater = lake,
+    generated: ResolvedWater = fakeWater(() => null)
+  ) =>
+    buildCutGrid(
+      only(water),
+      only(generated),
+      TEXEL_SPAN,
+      UNIT,
+      -TEXEL_HALF,
+      -TEXEL_HALF,
+      TEXEL_HALF,
+      TEXEL_HALF,
+      discs
+    );
+  const levelAt = (grid: ReturnType<typeof cut>, i: number, j: number) =>
+    grid.level[(j - grid.j0) * grid.width + (i - grid.i0)];
 
-  it('raises the bed above the water at the centre, to the level at the edge', () => {
-    const source = new FakeSource(() => 6);
-    applyRaiseStamp(source, raise);
-    expect(source.at(0, 0)).toBeCloseTo(11);
-    expect(source.at(12, 0)).toBeCloseTo(10);
-    expect(source.at(14, 0)).toBe(6);
+  it('keeps water outside the circle and joined to it within the margin', () => {
+    const grid = cut();
+    expect(levelAt(grid, -5, 0)).toBe(10);
+    expect(levelAt(grid, 3, 0)).toBe(10);
+    expect(levelAt(grid, 4, 0)).toBe(10);
   });
 
-  it('leaves dry ground and higher ground alone', () => {
-    const dry = new FakeSource(() => 6);
-    applyRaiseStamp(dry, { ...raise, centerX: 30 });
-    expect(dry.at(30, 0)).toBe(6);
-    const high = new FakeSource(() => 20);
-    expect(applyRaiseStamp(high, raise)).toEqual([]);
+  it('releases edited water inside the circle that does not stay', () => {
+    const grid = cut();
+    expect(Number.isNaN(levelAt(grid, 7, 0))).toBe(true);
+    expect(grid.released).toEqual([7, 0]);
+  });
+
+  it('leaves water the generator makes alone', () => {
+    const grid = cut(lake, lake);
+    expect(Number.isNaN(levelAt(grid, -5, 0))).toBe(true);
+    expect(grid.released).toEqual([]);
+  });
+
+  it('banks the cut from the water level at the outline to the top', () => {
+    const source = new FakeSource(() => 8);
+    applyCutBank(source, cut(), discs, 1);
+    expect(source.at(0, 0)).toBe(8);
+    expect(source.at(8, 0)).toBe(8);
+    expect(source.at(8 + SHORE_RISE, 0)).toBe(11);
+    expect(source.at(28, 0)).toBe(11);
+  });
+
+  it('leaves ground under other water alone', () => {
+    const pond = fakeWater((i, j) => (i === 7 && j === 0 ? [255, 5, 3] : null));
+    const lakeAndPond = fakeWater((i, j) =>
+      i * UNIT <= 16 ? [255, 10, 7] : i === 7 && j === 0 ? [255, 5, 3] : null
+    );
+    const source = new FakeSource(() => 3);
+    applyCutBank(source, cut(lakeAndPond, pond), discs, 1);
+    expect(source.at(28, 0)).toBe(3);
+    expect(source.at(8 + SHORE_RISE, 0)).toBe(11);
+  });
+
+  it('raises nothing where no water stays', () => {
+    const source = new FakeSource(() => 8);
+    expect(
+      applyCutBank(source, cut(fakeWater(() => null)), discs, 1)
+    ).toEqual([]);
   });
 });

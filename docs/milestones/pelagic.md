@@ -874,7 +874,7 @@ shelf.
   - **Type**: paints the chosen palette entry over the water under the brush. A texel the edit
     does not own outright is taken over as it stands first, so its coverage, level and body
     stay.
-  - **Add / Remove**: paint coverage; Shift swaps them. A stroke that starts on water adds to
+  - **Add**: paints coverage; Shift makes it Remove. A stroke that starts on water adds to
     that body at its level, or to the sea at sea level. One that starts on dry land makes a
     new body with its surface at the clicked ground, and saves its record.
   - **Add shapes the terrain** (`WaterCarve.ts`), as a generated lake does, so the water it
@@ -916,14 +916,22 @@ shelf.
     - A stroke that starts on covered ground standing above the water's level plus the swash
       starts on dry land, not on that water.
     - The edit rules do not run after an Add stroke. The heights are saved with the water edit.
-  - **Remove makes land** (`applyRaiseStamp`): each stamp raises the ground under the water it
-    takes away up to the water's level plus the lakes' `margin` at the brush centre, falling
-    to the level at the brush edge, so the shore follows the brush and a stroke inside a lake
-    leaves an island. Only ground under water rises, straight to that shape. The edit rules do
-    not run after it; the heights are saved with the water edit.
-  - **Reset**: hands the water under the brush back to the generator.
-  - After a Reset stroke, the edit rules settle the stroke's box as they do after a sculpt
-    stroke.
+  - **Remove**: hands the area under the brush back to the generator, and the brush's circle
+    becomes the shore of any water it cuts. Shift makes it Add. The edit rules do not run
+    after it, so the water left beside the cut keeps its level.
+    - Each stamp hands the water edit back in full more than `WATER_COVER_MARGIN` inside its
+      circle, and blends the ground toward its generated heights by the strength and the
+      brush's falloff, as the sculpt brush's Reset does. A generated lake there comes back as
+      the seed made it.
+    - When the stroke ends (`buildCutGrid`), edited water the generator does not make is kept
+      outside the circles, and inside them within the margin where it joins that water, so
+      the coverage stays full out to the outline. Other edited water inside the circles is
+      handed back.
+    - A **bank** (`applyCutBank`) rises inside the circles where water stays: Add's lip turned
+      inward, from the water's level at the outline to the level plus the lakes' `margin`
+      over `SHORE_RISE`, held to `SHORE_CREST`, then easing to the generated ground. It fades
+      out along the outline away from the water that stays, and never rises under other
+      water. A stroke inside a lake leaves an island the size of its circle.
 - The sculpt brush applies the edit rules after each stroke. A lake that drains shows its new
   shore at once.
 - **Debug views** as console commands: level, coverage, type weights, depth and flow.
