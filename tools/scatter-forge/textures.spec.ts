@@ -6,10 +6,10 @@
 // asserts anything a larger atlas would say differently.
 
 import { resolveParams, type Params, type RawConfig } from './lib/params.ts';
-import { columnPixels, gutterFor, insetRect, leafCellPixels, type PixelRect } from './lib/atlas.ts';
+import { cellPixels, columnPixels, gutterFor, insetRect, leafCellPixels, type PixelRect } from './lib/atlas.ts';
 import { compositeCluster } from './lib/cluster.ts';
 import { srgbToLinear } from './lib/colour.ts';
-import { CROWN_CELLS_GENERATED, type LeafSource, type LeafStamp } from './lib/sources.ts';
+import { atlasLayoutFor, type LeafSource, type LeafStamp } from './lib/sources.ts';
 import { buildBarkCanvas, buildCrownCanvases, buildFrondCanvas, buildLeafCanvas, type Canvas } from './lib/textures.ts';
 
 const SIZE = '128';
@@ -288,11 +288,12 @@ describe('frond atlas', () => {
   const params = paramsFor({ type: 'crown', name: 'test-crown', cardAspect: 0.3 });
   const canvas = buildFrondCanvas(params);
 
-  // The card samples a centred column of its cell, `cardAspect` of the cell's
-  // height wide. A frond painted outside it would never be seen, and a column
-  // left blank would leave the card empty.
+  // Each frond's cell is a strip shaped like its card, and the card samples
+  // the centred `cardAspect` column of it. A frond painted outside that column
+  // would never be seen, and a column left blank would leave the card empty.
   it('paints every frond inside the column its card samples, and nothing outside it', () => {
-    const rects = leafCellPixels(canvas.width, 2).slice(0, CROWN_CELLS_GENERATED);
+    const layout = atlasLayoutFor(params, null, []);
+    const rects = cellPixels(canvas.width, layout).slice(0, layout.cells);
     const gutter = gutterFor(canvas.width);
 
     for (const rect of rects) {
