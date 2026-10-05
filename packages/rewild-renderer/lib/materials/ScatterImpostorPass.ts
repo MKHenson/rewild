@@ -10,12 +10,12 @@ import { IS_SCATTER_IMPOSTOR_PASS } from '../typeGuards';
 import { IMaterialPass, SceneCategory } from './IMaterialPass';
 import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Lighting } from './uniforms/Lighting';
-import { ShadowUniforms } from './uniforms/ShadowUniforms';
+import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
 
 const materialGroupIndex = 0;
 const instanceGroupIndex = 1;
 const lightingGroup = 2;
-const shadowGroup = 3;
+const environmentGroup = 3;
 
 const _viewerLocal = new Vector3();
 
@@ -40,7 +40,7 @@ export class ScatterImpostorPass implements IMaterialPass {
   readonly doubleSided = true;
   perMeshTracker: SharedUniformsTracker;
   lightingUniforms: Lighting;
-  shadowUniforms: ShadowUniforms;
+  environmentUniforms: EnvironmentUniforms;
   readonly atlas: ScatterImpostorAtlas;
 
   private atlasBindGroup: GPUBindGroup | null = null;
@@ -48,10 +48,15 @@ export class ScatterImpostorPass implements IMaterialPass {
   constructor(atlas: ScatterImpostorAtlas) {
     this.atlas = atlas;
     this.lightingUniforms = new Lighting(lightingGroup);
-    this.shadowUniforms = new ShadowUniforms(shadowGroup, true, true);
+    this.environmentUniforms = new EnvironmentUniforms(
+      environmentGroup,
+      true,
+      true,
+      true
+    );
     this.perMeshTracker = new SharedUniformsTracker(this, [
       this.lightingUniforms,
-      this.shadowUniforms,
+      this.environmentUniforms,
     ]);
   }
 

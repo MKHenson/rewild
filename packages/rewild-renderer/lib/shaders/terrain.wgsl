@@ -165,7 +165,7 @@ struct VertexOutput {
 @group(3) @binding(5) var<uniform> directionalShadowParams: DirectionalShadowParams;
 @group(3) @binding(6) var<uniform> spotLightShadowParams: SpotLightShadowParams;
 // Sky IBL — the same bindings standard.wgsl declares, since terrain now runs
-// the same shading. TerrainPass opts its ShadowUniforms into populating them.
+// the same shading. TerrainPass opts its EnvironmentUniforms into populating them.
 @group(3) @binding(7) var iblIrradianceMap: texture_cube<f32>;
 @group(3) @binding(8) var iblSpecularMap: texture_cube<f32>;
 @group(3) @binding(9) var iblBrdfLut: texture_2d<f32>;

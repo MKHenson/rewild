@@ -126,7 +126,7 @@ const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 @group(3) @binding(6) var<uniform> spotLightShadowParams: SpotLightShadowParams;
 // Sky IBL. These share group 3 with the shadow resources because WebGPU only
 // guarantees four bind groups and 0–2 are taken by the object, the material and
-// the light buffer. ShadowUniforms populates them, and only for the passes
+// the light buffer. EnvironmentUniforms populates them, and only for the passes
 // whose shader declares them — see its class comment.
 @group(3) @binding(7) var iblIrradianceMap: texture_cube<f32>;
 @group(3) @binding(8) var iblSpecularMap: texture_cube<f32>;
@@ -136,6 +136,8 @@ const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 @group(3) @binding(12) var causticsMap: texture_2d<f32>;
 @group(3) @binding(13) var causticsSampler: sampler;
 @group(3) @binding(14) var<uniform> caustics: CausticsParams;
+@group(3) @binding(15) var waterLevelMap: texture_2d<f32>;
+@group(3) @binding(16) var waterOpticsMap: texture_2d<f32>;
 
 fn transformVertex(position: vec3f, uv: vec2f, normal: vec3f, color: vec4f, tangent: vec4f) -> VertexOutput {
   var output : VertexOutput;

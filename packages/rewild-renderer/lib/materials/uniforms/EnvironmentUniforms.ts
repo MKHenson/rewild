@@ -6,6 +6,7 @@ import { IVisualComponent } from '../../../types/interfaces';
 import { NUM_CASCADES } from '../../renderers/shadow/DirectionalShadowRenderer';
 import { SKY_CUBE_MIP_COUNT } from '../../renderers/sky/SkyCubeCapture';
 import { rainPatterLayers } from '../../renderers/water/WaterQuality';
+import { WATER_LEVEL_TEXEL } from '../../renderers/water/WaterLevelField';
 
 const _tempMat = new Matrix4();
 // IblParams in ibl.wgsl.
@@ -15,29 +16,35 @@ const IBL_FLOATS = 40;
 const RAIN_CLOCK_LOOP = 1000;
 
 /**
- * Manages bind group 3 — the scene-wide resources a material pass shades with.
+ * Manages bind group 3 — the environment a material pass shades in: the
+ * shadows over it, the sky's light, the water around it and the weather.
  *
  * Bindings 0–2:  cloud shadow (transmittance map, linear sampler, params buffer)
  * Bindings 3–5:  shadow atlas (depth texture, comparison sampler, directional params buffer)
  * Binding  6:    spot light shadow params buffer
- * Bindings 7–11: sky IBL (irradiance cube, specular cube, BRDF map, sampler, params) — opt-in
+ * Bindings 7–11: sky IBL (irradiance cube, specular cube, BRDF map, sampler,
+ *                IblParams, which also carries the water level field's place,
+ *                rain wetness, raindrops and lightning) — opt-in
  * Bindings 12–14: caustics (texture, repeating sampler, params) — opt-in
+ * Bindings 15–16: the water level field (levels, optics) — opt-in
  *
  * All packed into a single bind group because WebGPU limits bind groups to 4 (0–3).
  *
- * The IBL bindings are opt-in because this group is shared with the Lambert,
- * Phong and terrain passes, whose shaders do not declare them. Their pipelines
- * use `layout: 'auto'`, so a layout is derived from what a shader actually
- * uses — and a bind group carrying entries the layout has no slot for fails
- * validation. Terrain flips this on in #202.
+ * The opt-in bindings exist because the Lambert and Phong passes share this
+ * group without declaring them. Every pipeline uses `layout: 'auto'`, so a
+ * layout is derived from what a shader actually uses — and a bind group
+ * carrying entries the layout has no slot for fails validation.
  */
-export class ShadowUniforms implements ISharedUniformBuffer {
+export class EnvironmentUniforms implements ISharedUniformBuffer {
   group: number;
   /** Whether bindings 7–11 are populated. See the class comment. */
   private includeIbl: boolean;
   /** Whether bindings 12–14 are populated, for the passes that light what
    *  lies under water (water-light.wgsl, terrain). */
   private includeCaustics: boolean;
+  /** Whether bindings 15–16 are populated, for the passes that read the water
+   *  over what they shade (water-light.wgsl). */
+  private includeWaterLevels: boolean;
   cloudBuffer: GPUBuffer;
   directionalBuffer: GPUBuffer;
   spotBuffer: GPUBuffer;
@@ -64,7 +71,7 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   private boundIrradianceMap: GPUTexture | null = null;
 
   /** viewToWorld (16) + intensity + maxSpecularMip + debugChannel + debugScale,
-   *  then water (4), waterExtinction (4), rain (4), flash (4) and
+   *  then water (4), waterSun (4), rain (4), flash (4) and
    *  rainPatter (4). */
   private iblData: Float32Array;
   /** Aliases iblData so debugChannel can be written as the u32 the shader reads. */
@@ -74,11 +81,13 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   constructor(
     group: number,
     includeIbl: boolean = false,
-    includeCaustics: boolean = false
+    includeCaustics: boolean = false,
+    includeWaterLevels: boolean = false
   ) {
     this.group = group;
     this.includeIbl = includeIbl;
     this.includeCaustics = includeCaustics;
+    this.includeWaterLevels = includeWaterLevels;
     this.requiresBuild = true;
     this.cloudData = new Float32Array(20);
     this.directionalData = new ArrayBuffer(224);
@@ -209,6 +218,14 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       );
     }
 
+    if (this.includeWaterLevels) {
+      const levels = renderer.terrainRenderer.waterLevels;
+      entries.push(
+        { binding: 15, resource: levels.levelMap(device).createView() },
+        { binding: 16, resource: levels.opticsMap(device).createView() }
+      );
+    }
+
     this.bindGroup = device.createBindGroup({
       layout: pipelineLayout,
       entries,
@@ -255,13 +272,12 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       this.iblInts[18] = renderer.materialDebugChannel;
       const exposure = camera.exposure;
       this.iblData[19] = exposure > 1e-6 ? 1 / exposure : 1;
-      const underWater = renderer.terrainRenderer.underWater;
-      this.iblData[20] = underWater.sample.level;
-      this.iblData[21] = underWater.covered ? 1 : 0;
-      this.iblData[24] = underWater.extinction[0];
-      this.iblData[25] = underWater.extinction[1];
-      this.iblData[26] = underWater.extinction[2];
-      this.iblData[27] = underWater.sunCosine;
+      const terrain = renderer.terrainRenderer;
+      const levels = terrain.waterLevels;
+      this.iblData[20] = levels.originX;
+      this.iblData[21] = levels.originZ;
+      this.iblData[22] = levels.built ? WATER_LEVEL_TEXEL : 0;
+      this.iblData[24] = terrain.underWater.sunCosine;
       const rain = renderer.sky.skyRenderer.rainWetness;
       this.iblData[28] = rain.soak;
       this.iblData[29] = rain.film;

@@ -47,15 +47,13 @@ struct IblParams {
    */
   debugScale: f32,
   /**
-   * The water around the camera (UnderWater), for water-light.wgsl: x the
-   * world height of its level, y 1 while there is one.
+   * The water level field around the camera (WaterLevelField), for
+   * water-light.wgsl: xy the world xz of its first texel's centre, z the
+   * metres a texel spans, 0 until it is built.
    */
   water: vec4f,
-  /**
-   * rgb its extinction per metre; a the cosine from straight up of the sun
-   * refracted into it.
-   */
-  waterExtinction: vec4f,
+  /** x the cosine from straight up of the sun refracted into water. */
+  waterSun: vec4f,
   /**
    * How wet the rain has left the world (RainWetness), for rain-wet.wgsl: x
    * the soak, y the film on top, both 0..1.

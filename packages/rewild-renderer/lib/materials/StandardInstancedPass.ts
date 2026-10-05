@@ -6,7 +6,7 @@ import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { StandardMaterial } from './uniforms/StandardMaterial';
 import { Lighting } from './uniforms/Lighting';
-import { ShadowUniforms } from './uniforms/ShadowUniforms';
+import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
 import { ProjectionAndInstances } from './uniforms/ProjectionAndInstances';
 import { StandardPassBase } from './StandardPassBase';
 import { composeShader } from '../utils/shaderDefines';
@@ -14,7 +14,7 @@ import { composeShader } from '../utils/shaderDefines';
 const materialGroupIndex = 0;
 const projectionAndInstancesGroup = 1;
 const lightingGroup = 2;
-const shadowGroup = 3;
+const environmentGroup = 3;
 
 /**
  * Instanced metallic-roughness material — StandardPass's shading over one draw
@@ -41,7 +41,7 @@ export class StandardInstancedPass extends StandardPassBase {
   material: StandardMaterial;
   projectionAndInstances: ProjectionAndInstances;
   lightingUniforms: Lighting;
-  shadowUniforms: ShadowUniforms;
+  environmentUniforms: EnvironmentUniforms;
 
   constructor() {
     super();
@@ -50,13 +50,18 @@ export class StandardInstancedPass extends StandardPassBase {
       projectionAndInstancesGroup
     );
     this.lightingUniforms = new Lighting(lightingGroup);
-    this.shadowUniforms = new ShadowUniforms(shadowGroup, true, true);
+    this.environmentUniforms = new EnvironmentUniforms(
+      environmentGroup,
+      true,
+      true,
+      true
+    );
 
     this.perMeshTracker = new SharedUniformsTracker(this, [
       this.material,
       this.projectionAndInstances,
       this.lightingUniforms,
-      this.shadowUniforms,
+      this.environmentUniforms,
     ]);
   }
 

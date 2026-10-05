@@ -8,12 +8,12 @@ import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { Lighting } from './uniforms/Lighting';
-import { ShadowUniforms } from './uniforms/ShadowUniforms';
+import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
 import { HorizonUniforms } from './uniforms/HorizonUniforms';
 
 const horizonGroupIndex = 1;
 const lightingGroupIndex = 2;
-const shadowGroupIndex = 3;
+const environmentGroupIndex = 3;
 
 // The ocean ring past the terrain chunks. Opaque and depth-writing, ordered with
 // the chunk water; the two never overlap, since the ring discards wherever a
@@ -33,7 +33,7 @@ export class HorizonOceanPass implements IMaterialPass {
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.horizonUniforms,
       new Lighting(lightingGroupIndex),
-      new ShadowUniforms(shadowGroupIndex, true),
+      new EnvironmentUniforms(environmentGroupIndex, true),
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => [
       new ProjModelView(0),

@@ -45,9 +45,10 @@ import { LightShafts } from '../water/LightShafts';
 import { MarineSnow } from '../water/MarineSnow';
 import { GpuPassTimer } from '../../metrics/GpuPassTimer';
 import { WaterQuery, WaterQuerySource } from '../water/WaterQuery';
-import { WaterMap } from './WaterMap';
+import { WATER_MAP_STEP, WaterMap } from './WaterMap';
 import { shoreWaveHeight } from '../water/ShoreWaves';
 import { SHORE_FIELD_SPAN, ShoreField } from '../water/ShoreField';
+import { WaterLevelField } from '../water/WaterLevelField';
 import { MAX_WATER_TYPES, OCEAN_WATER } from './Water';
 import { MAX_WATER_GRID_BANDS, waterGridBands } from '../water/WaterGrid';
 
@@ -214,6 +215,9 @@ export class TerrainRenderer implements WaterQuerySource {
   /** The sun focused by the waves under water. Its texture and params
    *  outlive the chunks, as the material passes bind them once. */
   readonly caustics = new Caustics();
+  /** The water over the ground around the camera, for materials under it.
+   *  Its textures outlive the chunks, as the material passes bind them once. */
+  readonly waterLevels = new WaterLevelField();
   readonly lightShafts = new LightShafts();
   readonly marineSnow = new MarineSnow();
   // GPU time of the ocean's transforms, the caustics, the light shafts and
@@ -257,6 +261,7 @@ export class TerrainRenderer implements WaterQuerySource {
   /** Where the ocean's shore waves run, around the camera. Made in init. */
   shoreField!: ShoreField;
   private sampleOceanDepthDelegate = this.sampleOceanDepth.bind(this);
+  private waterMapAtDelegate = this.waterMapAt.bind(this);
   private oceanType = -1;
   private oceanChunk: TerrainChunk | null = null;
   private oceanChunkX = NaN;
@@ -457,6 +462,7 @@ export class TerrainRenderer implements WaterQuerySource {
   private onChunkLoaded(event: TerrainChunkEvent) {
     this._needsVisibilityUpdate = true;
     this.shoreField?.invalidate();
+    this.waterLevels.invalidate();
     // Note: a re-mesh (edit) raises chunk-loaded again for that LOD without a
     // preceding chunk-unloaded — the chunk never went away. Listeners holding
     // per-chunk resources built from a mesh must release the old one when they
@@ -1080,6 +1086,15 @@ export class TerrainRenderer implements WaterQuerySource {
       eye.x,
       eye.z,
       this.sampleOceanDepthDelegate
+    );
+    this.waterLevels.update(
+      renderer.device,
+      deltaSeconds,
+      eye.x,
+      eye.z,
+      (this.mapChunkSizeLod - 1) / WATER_MAP_STEP,
+      this.waterMapAtDelegate,
+      palette
     );
 
     // Distances are measured from where chunk LODs were last chosen, so a

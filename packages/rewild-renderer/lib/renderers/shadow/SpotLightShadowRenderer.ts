@@ -16,7 +16,7 @@ export class SpotLightShadowRenderer {
   /** True when a shadow-casting spot light was found this frame. */
   hasSpotShadow: boolean = false;
   enabled: boolean = true;
-  /** Light VP matrix (world-space) — read by ShadowUniforms.prepare() to form lightMVPFromView. */
+  /** Light VP matrix (world-space) — read by EnvironmentUniforms.prepare() to form lightMVPFromView. */
   lightVP: Matrix4;
 
   private pipeline: GPURenderPipeline;

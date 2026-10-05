@@ -87,7 +87,6 @@ function chunkPlane(
   };
 }
 
-
 /**
  * Digs the ground toward the stroke's bed. A stamp's shape is a bowl `depth`
  * below the level at the centre, rising to the level at the radius, steepest

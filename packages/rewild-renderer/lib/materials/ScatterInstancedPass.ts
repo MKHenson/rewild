@@ -7,7 +7,7 @@ import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { StandardMaterial } from './uniforms/StandardMaterial';
 import { Lighting } from './uniforms/Lighting';
-import { ShadowUniforms } from './uniforms/ShadowUniforms';
+import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
 import { StandardPassBase } from './StandardPassBase';
 import { composeShader } from '../utils/shaderDefines';
 import { IScatterInstanceGroup } from '../../types/interfaces';
@@ -20,7 +20,7 @@ const _viewerLocal = new Vector3();
 const materialGroupIndex = 0;
 const instanceGroupIndex = 1;
 const lightingGroup = 2;
-const shadowGroup = 3;
+const environmentGroup = 3;
 
 // projMatrix + modelViewMatrix + nodeMatrix + band + debug + wind + windParams
 // + windOrigin.
@@ -49,18 +49,23 @@ export class ScatterInstancedPass extends StandardPassBase {
   perMeshTracker: SharedUniformsTracker;
   material: StandardMaterial;
   lightingUniforms: Lighting;
-  shadowUniforms: ShadowUniforms;
+  environmentUniforms: EnvironmentUniforms;
 
   constructor() {
     super();
     this.material = new StandardMaterial(materialGroupIndex);
     this.lightingUniforms = new Lighting(lightingGroup);
-    this.shadowUniforms = new ShadowUniforms(shadowGroup, true, true);
+    this.environmentUniforms = new EnvironmentUniforms(
+      environmentGroup,
+      true,
+      true,
+      true
+    );
 
     this.perMeshTracker = new SharedUniformsTracker(this, [
       this.material,
       this.lightingUniforms,
-      this.shadowUniforms,
+      this.environmentUniforms,
     ]);
   }
 
