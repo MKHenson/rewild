@@ -148,6 +148,14 @@ export class SceneGraphStore {
               type: 'weatherState',
               value: project.sceneGraph?.atmosphere?.weatherState ?? 'auto',
             },
+            {
+              type: 'moonPhase',
+              value: project.sceneGraph?.atmosphere?.moonPhase ?? 0.5,
+            },
+            {
+              type: 'randomMoonPhase',
+              value: project.sceneGraph?.atmosphere?.randomMoonPhase ?? false,
+            },
           ],
         },
       } as ITreeNode<IResource>,

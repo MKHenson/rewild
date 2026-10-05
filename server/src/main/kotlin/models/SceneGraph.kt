@@ -20,7 +20,11 @@ data class Atmosphere(
     val temperature: PropValue,
     val dayNightCycle: PropValue,
     // A weather state id to start in, or "auto". Defaulted so older records deserialize.
-    val weatherState: PropValue = JsonPrimitive("auto")
+    val weatherState: PropValue = JsonPrimitive("auto"),
+    // 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter. Defaulted so older records deserialize.
+    val moonPhase: PropValue = JsonPrimitive(0.5),
+    // Picks a moon phase at random on load. Defaulted so older records deserialize.
+    val randomMoonPhase: PropValue = JsonPrimitive(false)
 )
 
 @Serializable

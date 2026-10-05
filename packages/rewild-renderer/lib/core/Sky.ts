@@ -26,6 +26,9 @@ export class Sky {
 
     if (this.atmosphere.running) {
       const sample = this.atmosphere.update(deltaSeconds);
+      // Jumps in time of day leave the phase where it is.
+      const sunDegrees = sample.elevation - sky.elevation;
+      if (sunDegrees > 0 && sunDegrees < 90) sky.moon.advance(sunDegrees);
       sky.elevation = sample.elevation;
       sky.cloudiness = sample.cloudiness;
       sky.windiness = sample.windiness;

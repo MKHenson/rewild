@@ -251,7 +251,7 @@ export class Lighting implements ISharedUniformBuffer {
         this.lightingFloats[offset + 11] = 0.0; // lightType = point
         this.lightingFloats[offset + 12] = 0.0;
         this.lightingFloats[offset + 13] = 0.0;
-        this.lightingFloats[offset + 14] = 0.0;
+        this.lightingFloats[offset + 14] = light.decay;
         this.lightingFloats[offset + 15] = 0.0;
 
         offset += LIGHT_STRIDE_FLOATS;
@@ -294,7 +294,7 @@ export class Lighting implements ISharedUniformBuffer {
         this.lightingFloats[offset + 11] = 2.0; // lightType = spot
         this.lightingFloats[offset + 12] = light.innerAngle;
         this.lightingFloats[offset + 13] = light.outerAngle;
-        this.lightingFloats[offset + 14] = 0.0;
+        this.lightingFloats[offset + 14] = light.decay;
         this.lightingFloats[offset + 15] = 0.0;
 
         if (light.castShadow) {

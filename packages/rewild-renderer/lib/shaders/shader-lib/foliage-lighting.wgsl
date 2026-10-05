@@ -108,7 +108,7 @@ fn shadeFoliage(
       let dist = sqrt(d2);
       L = lightVec / max(dist, 1e-4);
 
-      var attenuation = lightDistanceAttenuation(dist, light.range);
+      var attenuation = lightDistanceAttenuation(dist, light.range, light.decay);
       if (light.lightType == 2.0) {
         let angle = acos(clamp(dot(-L, light.direction), 0.0, 1.0));
         attenuation *= 1.0 - smoothstep(light.innerAngle, light.outerAngle, angle);

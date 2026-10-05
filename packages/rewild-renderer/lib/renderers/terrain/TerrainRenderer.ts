@@ -1144,7 +1144,7 @@ export class TerrainRenderer implements WaterQuerySource {
         this.shoreField.texture,
         renderer.samplerManager.get('linear-clamped')
       );
-    const sun = renderer.sky.skyRenderer.sun;
+    const sun = renderer.sky.skyRenderer.keyLight;
     const radiance = sun.intensity;
     this.sunRadiance[0] = sun.color.r * radiance;
     this.sunRadiance[1] = sun.color.g * radiance;

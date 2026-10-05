@@ -87,6 +87,12 @@ export function starCaptureLod(
  */
 const STAR_LOD_INDEX = 37;
 
+/** Float indices of `ObjectStruct.moonNightRadiance` and `moonDayRadiance`,
+ *  zeroed so the capture has no moon disc: the moon already lights the scene
+ *  as the key light, and a disc here would add it twice. */
+export const MOON_NIGHT_RADIANCE_INDEX = 56;
+export const MOON_DAY_RADIANCE_INDEX = 57;
+
 /**
  * Per-face replacements for `ObjectStruct.invViewProjectionMatrix`.
  *
@@ -168,7 +174,8 @@ export class SkyCubeCapture {
     renderer: Renderer,
     skyUniformData: Float32Array,
     gradientPipeline: GPURenderPipeline,
-    nightSkyCubemap: GPUTexture
+    nightSkyCubemap: GPUTexture,
+    moonTexture: GPUTexture
   ): void {
     const { device } = renderer;
 
@@ -246,6 +253,7 @@ export class SkyCubeCapture {
               binding: 5,
               resource: nightSkyCubemap.createView({ dimension: 'cube' }),
             },
+            { binding: 6, resource: moonTexture.createView() },
           ],
         })
       );
@@ -334,6 +342,8 @@ export class SkyCubeCapture {
       faceData.set(skyUniformData);
       faceData.set(SKY_CUBE_FACE_MATRICES[face], 0);
       faceData[STAR_LOD_INDEX] = this.starLod;
+      faceData[MOON_NIGHT_RADIANCE_INDEX] = 0;
+      faceData[MOON_DAY_RADIANCE_INDEX] = 0;
       device.queue.writeBuffer(
         this.uniformBuffer,
         face * this.stride,

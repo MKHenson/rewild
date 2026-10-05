@@ -8,6 +8,9 @@ import {
 
 export type AtmosphereProps = Partial<Record<string, PropValue>>;
 
+/** Rolled once per load, so editing other settings keeps the same moon. */
+const randomMoonPhase = Math.random();
+
 /**
  * Sets the sky to the authored atmosphere. With the day/night switch on, the
  * atmosphere system starts from those values and runs the cycle and the
@@ -24,6 +27,9 @@ export function applyAtmosphere(renderer: Renderer, atmosphere: AtmosphereProps)
   sky.precipitation = atmosphere.precipitation as f32;
   sky.temperature = atmosphere.temperature as f32;
   sky.elevation = atmosphere.elevation as f32;
+  sky.moon.phase = atmosphere.randomMoonPhase
+    ? randomMoonPhase
+    : ((atmosphere.moonPhase ?? 0.5) as f32);
 
   const system = renderer.sky.atmosphere;
   if (!atmosphere.dayNightCycle) {

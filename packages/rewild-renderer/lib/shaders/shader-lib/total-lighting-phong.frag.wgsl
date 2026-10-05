@@ -44,7 +44,7 @@
           let H = normalize(L + viewDir);
           specular = specNorm * pow(max(dot(normalizedNormal, H), 0.0), shadingShininess);
         }
-        attenuation = lightDistanceAttenuation(dist, light.range);
+        attenuation = lightDistanceAttenuation(dist, light.range, light.decay);
       } else {
         attenuation = 0.0;
       }
@@ -85,7 +85,7 @@
         // compresses a hot near-field instead of flattening the falloff that
         // produced it. If a specific light still reads badly, the fix belongs
         // in that light's range and intensity, not in the shading model.
-        let distAttenuation = lightDistanceAttenuation(dist, light.range);
+        let distAttenuation = lightDistanceAttenuation(dist, light.range, light.decay);
         let angle = acos(clamp(dot(-L, light.direction), 0.0, 1.0));
         let coneAttenuation = 1.0 - smoothstep(light.innerAngle, light.outerAngle, angle);
         attenuation = distAttenuation * coneAttenuation;

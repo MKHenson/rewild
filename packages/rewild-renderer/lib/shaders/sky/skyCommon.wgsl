@@ -46,6 +46,13 @@ struct ObjectStruct {
     cirrusScroll: f32,        // byte 172, WindState.cirrusScroll
     cloudDrift: vec2<f32>,    // byte 176, WindState.cloudDrift
     cloudFront: vec4<f32>,    // byte 192, WindState.cloudFront
+    moonDirection: vec3<f32>, // byte 208, unit vector toward the moon
+    moonRadius: f32,          // byte 220, angular radius in radians
+    // Radiance of the lit disc with the sky dark and in full day. Both 0 in
+    // the IBL capture, where the moon is the key light's job.
+    moonNightRadiance: f32,   // byte 224
+    moonDayRadiance: f32,     // byte 228
+    moonLod: f32,             // byte 232, mip of the moon image for its size on screen
 };
 
 struct OutputStruct {

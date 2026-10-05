@@ -1,7 +1,14 @@
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
-import { Color, degToRad, Matrix4, smoothstep, Vector2 } from 'rewild-common';
+import {
+  Color,
+  degToRad,
+  Matrix4,
+  smoothstep,
+  Vector2,
+  Vector3,
+} from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
 import {
   bilateralSigmas,
@@ -32,6 +39,7 @@ import { LightningBoltPass } from '../../post-processes/LightningBoltPass';
 import type { LightningStrike } from './LightningController';
 import { RainWetness, rainShare } from './RainWetness';
 import { LightningFlash } from './LightningFlash';
+import { Moon, MOON_COLOR } from './Moon';
 
 /** How much brighter the fully-cold, fully-desaturated colour reads. 1.0 = plain
  *  grey; above that it lifts toward a pale white-out. Mirrors COLD_LIFT in
@@ -91,10 +99,16 @@ export class SkyRenderer {
   cloudShadowIntensity: f32;
   windiness: f32;
   upDot: f32;
-  sun: DirectionLight;
+  /** The light the world is lit by: the sun by day, the moon by night. Its
+   *  cascade and cloud shadows follow whichever it is. */
+  keyLight: DirectionLight;
+  /** Where the sun is, at orbit distance. The sky is drawn from this, not
+   *  from keyLight, which leaves the sun at night. */
+  readonly sunPosition = new Vector3();
+  readonly moon = new Moon();
 
   /** Sun intensity at a neutral climate (temperature 0.5). The live
-   *  sun.intensity is derived from this each frame — hot climates scale it up. */
+   *  keyLight.intensity is derived from this each frame — hot climates scale it up. */
   baseSunIntensity: f32 = 120;
 
   // God rays tunables (updatable at runtime without pipeline recreation)
@@ -160,9 +174,9 @@ export class SkyRenderer {
     this.cloudShadowIntensity = 0.6;
     this.windiness = 0.5;
     this.upDot = 0.0;
-    this.sun = new DirectionLight();
-    this.sun.intensity = this.baseSunIntensity;
-    parent.addChild(this.sun.transform);
+    this.keyLight = new DirectionLight();
+    this.keyLight.intensity = this.baseSunIntensity;
+    parent.addChild(this.keyLight.transform);
     this.flash = new LightningFlash(parent);
     this.requiresRebuild = true;
 
@@ -271,6 +285,11 @@ export class SkyRenderer {
         2 * 4 + // cloudDrift (vec2)
         2 * 4 + // padding (aligns cloudFront)
         4 * 4 + // cloudFront (vec4)
+        3 * 4 + // moonDirection (vec3)
+        4 + // moonRadius
+        4 + // moonNightRadiance
+        4 + // moonDayRadiance
+        4 + // moonLod
         0;
 
       // Align the buffer size to the next multiple of 256
@@ -288,10 +307,13 @@ export class SkyRenderer {
     this.cloudsPass.init(renderer, this.uniformBuffer);
     this.starfieldRenderer.init(renderer);
     this.cloudShadowRenderer.init(renderer);
+    const moonTexture = renderer.textureManager.get('moon').gpuTexture;
+    this.moonTextureSize = moonTexture.width;
     this.atmospherePass.init(
       renderer,
       this.uniformBuffer,
-      this.starfieldRenderer.cubemap
+      this.starfieldRenderer.cubemap,
+      moonTexture
     );
 
     // IBL capture reuses the atmosphere pass's pipeline, so it has to be built
@@ -301,7 +323,8 @@ export class SkyRenderer {
       renderer,
       this.uniformData,
       this.atmospherePass.pipeline,
-      this.starfieldRenderer.cubemap
+      this.starfieldRenderer.cubemap,
+      moonTexture
     );
     this.iblPrefilter.init(renderer, this.cubeCapture.cubemap);
     this.cubeDebugRenderer.init(
@@ -344,6 +367,7 @@ export class SkyRenderer {
   }
 
   addingCloudiness: boolean = false;
+  private moonTextureSize = 1;
 
   update(renderer: Renderer, camera: Camera, width: number, height: number) {
     this.rainWetness.update(
@@ -355,7 +379,8 @@ export class SkyRenderer {
     const theta = degToRad(this.azimuth);
 
     const cloudiness = this.cloudiness;
-    const sunPosition = this.sun.transform.position;
+    const sunPosition = this.sunPosition;
+    const keyLight = this.keyLight;
     const uniformData = this.uniformData;
 
     // Sun orbital distance (arbitrary units for spherical coordinate placement)
@@ -372,20 +397,16 @@ export class SkyRenderer {
     //    0.0  to  0.3   → evening → day (orange fades to white sunlight)
     //   sunDotUp > 0.3  → full daylight (white)
     //
-    // There is no night colour. This used to ramp toward a dark blue below the
-    // horizon, standing in for moonlight, which a PBR pipeline reads as the sun
-    // literally shining blue from underneath the terrain — normals on the wrong
-    // side of the surface get lit and specular picks up a key light that is not
-    // in the sky. Direct sunlight only ever gets redder and dimmer as it sets;
-    // it never turns blue. Ambient at night now comes from the sky IBL, which
-    // already carries the starlight and airglow.
+    // Sunlight has no night colour: it only gets redder and dimmer as it sets.
+    // Night light comes from the moon, from where the moon is, and ambient
+    // from the sky IBL.
     if (sunDotUp < 0.0) {
-      this.sun.color.copy(this._eveColor);
+      keyLight.color.copy(this._eveColor);
     } else if (sunDotUp < 0.3) {
       const t = sunDotUp / 0.3;
-      this.sun.color.lerpColors(this._eveColor, this._dayColor, t);
+      keyLight.color.lerpColors(this._eveColor, this._dayColor, t);
     } else {
-      this.sun.color.copy(this._dayColor);
+      keyLight.color.copy(this._dayColor);
     }
 
     // Climate tint. temperature 0.5 is neutral; 1 = hot (warmer, yellower), 0 =
@@ -394,33 +415,44 @@ export class SkyRenderer {
     // Keep the two in sync or the key light and the haze disagree about season.
     const warm = Math.max(this.temperature - 0.5, 0.0) * 2.0;
     const cool = Math.max(0.5 - this.temperature, 0.0) * 2.0;
-    this.sun.color.r *= 1.0 + 0.085 * warm;
-    this.sun.color.g *= 1.0 + 0.035 * warm;
-    this.sun.color.b *= 1.0 - 0.07 * warm;
+    keyLight.color.r *= 1.0 + 0.085 * warm;
+    keyLight.color.g *= 1.0 + 0.035 * warm;
+    keyLight.color.b *= 1.0 - 0.07 * warm;
 
     const luma =
-      this.sun.color.r * 0.2126 +
-      this.sun.color.g * 0.7152 +
-      this.sun.color.b * 0.0722;
+      keyLight.color.r * 0.2126 +
+      keyLight.color.g * 0.7152 +
+      keyLight.color.b * 0.0722;
     const cold = luma * COLD_LIFT;
-    this.sun.color.r += (cold - this.sun.color.r) * cool;
-    this.sun.color.g += (cold - this.sun.color.g) * cool;
-    this.sun.color.b += (cold - this.sun.color.b) * cool;
+    keyLight.color.r += (cold - keyLight.color.r) * cool;
+    keyLight.color.g += (cold - keyLight.color.g) * cool;
+    keyLight.color.b += (cold - keyLight.color.b) * cool;
 
     // Heavy-overcast dimming: in the 0.9→1.0 cloudiness bracket the sky is thick
     // enough that direct sun should fall off toward a dull, sunless grey. Ramps
     // the key light down to 40% by full cover, eased so it doesn't snap on at 0.9.
     const overcastDim = 1.0 - 0.8 * smoothstep(this.cloudiness, 0.9, 1.0);
 
-    // The key light switches off below the horizon — there is no direct sunlight
-    // at night, and leaving one on is what made the old blue night light read as
-    // wrong once shading went physically based. Same window the sun disc uses for
+    // Sunlight switches off below the horizon. Same window the sun disc uses for
     // sunExtinction in cloudsTemporal.wgsl, so the light dies exactly as the disc
     // it represents does rather than out of step with it.
     const nightFade = smoothstep(sunDotUp, -0.12, 0.0);
 
-    this.sun.intensity =
+    keyLight.intensity =
       this.baseSunIntensity * (1.0 + 0.15 * warm) * overcastDim * nightFade;
+    keyLight.transform.position.copy(sunPosition);
+
+    // The sun's light is gone before the moon's starts, so the key light
+    // changes body with nothing lit and its shadows never jump.
+    const moon = this.moon;
+    moon.update(this.elevation, this.azimuth);
+    if (moon.isKeyLight(this.elevation)) {
+      keyLight.transform.position
+        .copy(moon.direction)
+        .multiplyScalar(sunOrbitDistance);
+      keyLight.color.copy(MOON_COLOR);
+      keyLight.intensity = moon.intensity * overcastDim;
+    }
 
     // Compute view-projection matrix (forward) and its inverse for ray reconstruction.
     // The forward matrix is needed by the temporal renderer for reprojection.
@@ -480,6 +512,19 @@ export class SkyRenderer {
     uniformData[44] = wind.cloudDrift[0];
     uniformData[45] = wind.cloudDrift[1];
     uniformData.set(wind.cloudFront, 48);
+
+    // The moon image's mip for the disc's size on screen: projection[5] is
+    // 1 / tan(fovY / 2), so a pixel spans about 2 / (projection[5] * height).
+    const moonRadius = degToRad(moon.size);
+    const pixelAngle = 2 / (camera.projectionMatrix.elements[5] * height);
+    const moonPixels = (2 * moonRadius) / pixelAngle;
+    uniformData[52] = moon.direction.x;
+    uniformData[53] = moon.direction.y;
+    uniformData[54] = moon.direction.z;
+    uniformData[55] = moonRadius;
+    uniformData[56] = moon.nightRadiance;
+    uniformData[57] = moon.dayRadiance;
+    uniformData[58] = Math.max(0, Math.log2(this.moonTextureSize / moonPixels));
 
     // Extract XZ camera forward from the world matrix (-Z column)
     const m = camera.transform.matrixWorld.elements;
@@ -556,13 +601,10 @@ export class SkyRenderer {
 
     const commandEncoder = device.createCommandEncoder();
 
-    // Render cloud shadow map (every N frames)
-    const sunPosition = this.sun.transform.position;
-    const sunDir = Math.sqrt(
-      sunPosition.x * sunPosition.x +
-        sunPosition.y * sunPosition.y +
-        sunPosition.z * sunPosition.z
-    );
+    // Render cloud shadow map (every N frames), cast from the key light so
+    // moonlight is shadowed by cloud too.
+    const lightPosition = this.keyLight.transform.position;
+    const lightDistance = lightPosition.length() || 1;
     this.cloudShadowRenderer.render(
       device,
       commandEncoder,
@@ -571,11 +613,14 @@ export class SkyRenderer {
       this.cloudiness,
       this.wind.cloudDrift,
       this.wind.cloudFront,
-      sunPosition.x / sunDir,
-      sunPosition.y / sunDir,
-      sunPosition.z / sunDir,
+      lightPosition.x / lightDistance,
+      lightPosition.y / lightDistance,
+      lightPosition.z / lightDistance,
       () => this.gpuTimer.writes('sky-cloud-shadow')
     );
+
+    const sunPosition = this.sunPosition;
+    const sunDir = sunPosition.length() || 1;
 
     // Update temporal state: teleport detection + store prev view-proj for next frame's reprojection
     this.cloudsPass.updateTemporalState(camera, this.viewProjMatrix);

@@ -56,6 +56,8 @@ export class ProjectStore {
           elevation: 80,
           dayNightCycle: false,
           weatherState: 'auto',
+          moonPhase: 0.5,
+          randomMoonPhase: false,
         },
         containers: [],
         terrain: {

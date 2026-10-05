@@ -122,12 +122,18 @@ export class Player extends Node {
   private _flashlight: SpotLight | null = null;
   private _flashlightOn: boolean = false;
   private _crouching: boolean = false;
-  // Was 1.5 against the plateau falloff, which sat at ~0.93 at the beam's 30m
-  // mid-range rather than the linear ramp's 0.5 — so this is converted against
-  // that, not against the generic ramp factor in Light.intensity. It preserves
-  // how bright the beam reads at 30m; near the player it is now much brighter
-  // and past ~40m much dimmer, because inverse-square says so.
-  private static readonly _FLASHLIGHT_INTENSITY: f32 = 5000;
+  // Modelled on a 1000-lumen LED torch: ~5,000 cd peak, ANSI throw 141m — the
+  // distance at which it lights a surface as brightly as a full moon (moon key
+  // light intensity 18). Intensity is set so the beam meets that at 141m under
+  // its own decay: 18 * 141^1.2 ≈ 6800.
+  //
+  // Decay is below inverse-square because exposure is fixed: real 1/d² spans
+  // too many stops between 5m and 100m for one exposure to show both, and
+  // without eye adaptation the near ground blows out while the far end vanishes.
+  private static readonly _FLASHLIGHT_INTENSITY: f32 = 5800;
+  private static readonly _FLASHLIGHT_DECAY: f32 = 1.2;
+  // Window stays near 1 through the 141m throw and reaches zero at range.
+  private static readonly _FLASHLIGHT_RANGE: f32 = 400;
 
   private _onMouseMove: (e: MouseEvent) => void;
   private _onKeyDown: (e: KeyboardEvent) => void;
@@ -221,14 +227,11 @@ export class Player extends Node {
         new Color(1, 0.95, 0.85),
         Player._FLASHLIGHT_INTENSITY
       );
-      // Beam throw. Falloff is inverse-square with a window that reaches zero
-      // at range, so brightness now drops continuously rather than holding a
-      // plateau — but the range still needs to be generous enough that terrain
-      // the beam lands on down-slope lights at all instead of silently falling
-      // outside it.
-      flash.range = 6000.0;
-      flash.innerAngle = 10 * _DEG2RAD;
-      flash.outerAngle = 25 * _DEG2RAD;
+      flash.range = Player._FLASHLIGHT_RANGE;
+      flash.decay = Player._FLASHLIGHT_DECAY;
+      // ~10° hotspot fading into a ~40° spill, typical of a reflector torch.
+      flash.innerAngle = 5 * _DEG2RAD;
+      flash.outerAngle = 20 * _DEG2RAD;
       flash.castShadow = true;
       this._flashlight = flash;
     }

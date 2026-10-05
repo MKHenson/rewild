@@ -975,20 +975,26 @@
                     "foginess": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement4"
                     },
-                    "precipitation": {
+                    "moonPhase": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement5"
                     },
-                    "temperature": {
+                    "precipitation": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement6"
                     },
-                    "weatherState": {
+                    "randomMoonPhase": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement7"
                     },
-                    "windDirection": {
+                    "temperature": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement8"
                     },
-                    "windiness": {
+                    "weatherState": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement9"
+                    },
+                    "windDirection": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement10"
+                    },
+                    "windiness": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement11"
                     }
                 },
                 "required": [
@@ -996,7 +1002,9 @@
                     "dayNightCycle",
                     "elevation",
                     "foginess",
+                    "moonPhase",
                     "precipitation",
+                    "randomMoonPhase",
                     "temperature",
                     "weatherState",
                     "windDirection",
@@ -1213,6 +1221,42 @@
                 ],
                 "title": "JsonElement"
             },
+            "kotlinx.serialization.json.JsonElement10": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
+            "kotlinx.serialization.json.JsonElement11": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
             "com.rewild.models.Container": {
                 "type": "object",
                 "properties": {
@@ -1270,7 +1314,7 @@
                 ],
                 "title": "Container"
             },
-            "kotlinx.serialization.json.JsonElement10": {
+            "kotlinx.serialization.json.JsonElement12": {
                 "anyOf": [
                     {
                         "type": "array",

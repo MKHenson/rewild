@@ -31,6 +31,8 @@ declare module 'models' {
     | 'elevation'
     | 'dayNightCycle'
     | 'weatherState'
+    | 'moonPhase'
+    | 'randomMoonPhase'
     | 'color'
     | 'target'
     | 'active'
@@ -135,6 +137,10 @@ declare module 'models' {
         dayNightCycle: PropValue;
         /** A weather state id to start in, or 'auto' for the nearest to the knobs. */
         weatherState?: PropValue;
+        /** 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter. */
+        moonPhase?: PropValue;
+        /** Picks a moon phase at random when the world loads. */
+        randomMoonPhase?: PropValue;
       };
       terrain?: WorldGenConfig;
     };

@@ -57,6 +57,17 @@ face would mean a drifting sun restarts it every frame and it never reaches the 
 discontinuity is the exception and runs every step in one frame. The BRDF map depends on nothing
 but the BRDF, so it is generated once at init and never re-run.
 
+**Moon**: follows the sun's path, trailing it by the phase (0 new, 0.5 full), on a path tilted
+5° so a new moon passes beside the sun. The disc is drawn in the atmosphere pass from
+`assets/shared/nature/atmosphere/moon.webp`, shaded as a sphere lit from the real sun direction,
+so the phase falls out of where the two stand. It hides the stars behind it, is dimmed by fog and
+covered by clouds, and is left out of the IBL capture. The sky's `keyLight` is the sun by day and
+the moon by night: it changes body once sunlight has faded to nothing, so cascade and cloud shadows,
+water glints and every material follow the moon with no shader of their own. Moonlight scales with
+the square of the lit fraction. The phase is set per world (`moonPhase`, or `randomMoonPhase` to
+roll one per load) and, while the day/night cycle runs, moves on through a full month every
+`daysPerCycle` days (8); see [Debugger & Console Commands](./debug-commands.md#moon) to tune it.
+
 **Performance Monitoring**: GPU timestamp queries exposed via console API — zero overhead when off
 
 ## Performance Budget

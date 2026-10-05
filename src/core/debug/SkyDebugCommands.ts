@@ -1,4 +1,4 @@
-import { Renderer } from 'rewild-renderer';
+import { Moon, Renderer } from 'rewild-renderer';
 
 // Sky console commands (moved out of SkyRenderer.init so all debug commands
 // live together). GPU timings are not here: they go to the perf panel.
@@ -111,6 +111,35 @@ export function registerSkyDebugCommands(renderer: Renderer) {
       'setRainWetness — rain wetness is now',
       wetness.settings,
       '\nKeys: soakIn and soakOut, seconds by e for the ground to soak up rain and to dry; filmIn and filmOut, the same for the glossy film on top; fullAt, the rain strength at which the world is fully wet (0.4); strength, scale on both (0 dry).'
+    );
+  };
+
+  (window as any).setMoon = (
+    override: Partial<
+      Pick<
+        Moon,
+        | 'phase'
+        | 'size'
+        | 'baseIntensity'
+        | 'nightRadiance'
+        | 'dayRadiance'
+        | 'daysPerCycle'
+      >
+    > = {}
+  ) => {
+    const moon = renderer.sky.skyRenderer.moon;
+    Object.assign(moon, override);
+    console.log(
+      'setMoon — the moon is now',
+      {
+        phase: moon.phase,
+        size: moon.size,
+        baseIntensity: moon.baseIntensity,
+        nightRadiance: moon.nightRadiance,
+        dayRadiance: moon.dayRadiance,
+        daysPerCycle: moon.daysPerCycle,
+      },
+      '\nKeys: phase, 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter; size, angular radius in degrees; baseIntensity, the light of a full moon; nightRadiance and dayRadiance, the brightness of the disc in a dark and a daylit sky; daysPerCycle, day/night cycles from one new moon to the next.'
     );
   };
 

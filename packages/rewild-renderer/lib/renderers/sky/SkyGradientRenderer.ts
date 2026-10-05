@@ -14,7 +14,8 @@ export class SkyGradientRenderer {
   init(
     renderer: Renderer,
     uniformBuffer: GPUBuffer,
-    nightSkyCubemap: GPUTexture
+    nightSkyCubemap: GPUTexture,
+    moonTexture: GPUTexture
   ) {
     const { device, canvas } = renderer;
 
@@ -66,6 +67,7 @@ export class SkyGradientRenderer {
           binding: 5,
           resource: nightSkyCubemap.createView({ dimension: 'cube' }),
         },
+        { binding: 6, resource: moonTexture.createView() },
       ],
     });
   }

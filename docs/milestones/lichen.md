@@ -124,9 +124,11 @@ because the atmosphere's radiance scale was already hand-tuned against exactly
 this number.
 
 **Light intensity is radiance on the sky's scale**, not a photometric unit. Point
-and spot lights divide it by distance squared, so it reads as _"the brightness
-this light delivers one metre away"_ — which is why values look large compared to
-the ones that came before. The unit system is deliberately anchored to the sky
+and spot lights divide it by distance^`decay` (default 2, inverse-square), so it
+reads as _"the brightness this light delivers one metre away"_ — which is why
+values look large compared to the ones that came before. Lights that must carry
+further than the fixed exposure can show, like the player's flashlight, use a
+lower `decay`. The unit system is deliberately anchored to the sky
 rather than to lux and candela: the atmosphere model already defines an absolute
 scale that has been tuned by hand, and adopting real-world units would mean
 re-deriving all of it to arrive back at the same picture. The tradeoff is that

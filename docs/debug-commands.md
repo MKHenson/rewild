@@ -194,6 +194,23 @@ variation runs in seconds and does not.
 
 See [Weather System](./weather.md#atmosphere-system).
 
+### Moon
+
+Registered in `SkyDebugCommands.ts`. Works with the cycle on or off.
+
+```js
+setMoon({ phase: 0.25 }); // 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter
+setMoon({ baseIntensity: 8 }); // Light of a full moon; scaled by phase, moon height and night
+setMoon({ size: 2, nightRadiance: 40, dayRadiance: 3 }); // Disc radius in degrees, disc brightness
+setMoon({ daysPerCycle: 2 }); // Day/night cycles from one new moon to the next (8)
+```
+
+While the cycle runs the phase moves on with the sun; `setTimeOfDay` jumps leave it
+where it is.
+
+The moon trails the sun along its path by the phase, so `setTimeOfDay(200)`
+with `phase: 0.5` puts a full moon just over the horizon.
+
 ---
 
 ## Shadows

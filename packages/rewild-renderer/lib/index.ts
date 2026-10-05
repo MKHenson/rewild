@@ -33,6 +33,7 @@ export * from './renderers/terrain/Water';
 export * from './renderers/terrain/WaterMap';
 export * from './renderers/water/WaterQuery';
 export * from './renderers/sky/GustField';
+export * from './renderers/sky/Moon';
 export * from './atmosphere';
 export * from './renderers/terrain/ChunkSnapshot';
 export * from './renderers/terrain/Sculpt';

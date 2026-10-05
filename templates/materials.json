@@ -124,6 +124,11 @@
       "name": "water-foam",
       "url": "nature/water/sea-foam.webp",
       "colorSpace": "linear"
+    },
+    {
+      "name": "moon",
+      "url": "nature/atmosphere/moon.webp",
+      "colorSpace": "srgb"
     }
   ],
   "materials": [

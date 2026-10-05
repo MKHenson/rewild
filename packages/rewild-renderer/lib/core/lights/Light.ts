@@ -9,7 +9,7 @@ export class Light implements IComponent {
   /**
    * Radiance on the sky's scale, not a photometric unit. For a directional
    * light that is simply the value that reaches every surface. For point and
-   * spot lights, `lightDistanceAttenuation` divides it by distance squared, so
+   * spot lights, `lightDistanceAttenuation` divides it by distance^decay, so
    * it reads as "the brightness this light delivers at one unit away" — which
    * is why converted values look large next to the ones that preceded them.
    *
@@ -25,6 +25,13 @@ export class Light implements IComponent {
    * about 1.85x larger.
    */
   intensity: f32;
+
+  /**
+   * Point/spot distance falloff exponent: brightness goes as `intensity / d^decay`.
+   * 2 is physical inverse-square. Lower values carry the light further relative
+   * to its near field, at the cost of physical accuracy.
+   */
+  decay: f32 = 2.0;
 
   transform: Transform;
 

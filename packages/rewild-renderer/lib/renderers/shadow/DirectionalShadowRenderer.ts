@@ -349,7 +349,7 @@ export class DirectionalShadowRenderer {
     camera: PerspectiveCamera,
     renderer: Renderer
   ): void {
-    const sun = renderer.sky?.skyRenderer?.sun;
+    const sun = renderer.sky?.skyRenderer?.keyLight;
     if (!sun) return;
 
     // When the sun is at or below the horizon its light comes from underground, which produces

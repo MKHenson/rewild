@@ -10,13 +10,16 @@ var noiseTexture: texture_2d<f32>;
 @group( 0 ) @binding( 5 )
 var nightSkyCubemap: texture_cube<f32>;
 
+@group( 0 ) @binding( 6 )
+var moonTexture: texture_2d<f32>;
+
 var<private> varyings: VaryingsStruct;
 var<private> output: OutputStruct;
 var<private> sunDotUp: f32;
 
 const STAR_ROTATION_OFFSET: f32 = -1.8; // radians
 
-fn sampleNightSky(direction: vec3f) -> vec3f {
+fn sampleNightSkyLevel(direction: vec3f, lod: f32) -> vec3f {
     let rotationAngle = STAR_ROTATION_OFFSET + object.iTime * 0.00001;
     let cosAngle = cos(rotationAngle);
     let sinAngle = sin(rotationAngle);
@@ -31,7 +34,63 @@ fn sampleNightSky(direction: vec3f) -> vec3f {
     // is meaningless for a direction vector. object.starLod is what band-limits
     // the star field to the resolution of whoever is sampling it: 0 for the
     // screen, higher for the IBL capture
-    return textureSampleLevel(nightSkyCubemap, noiseSampler, rotatedDir, object.starLod).rgb;
+    return textureSampleLevel(nightSkyCubemap, noiseSampler, rotatedDir, lod).rgb;
+}
+
+fn sampleNightSky(direction: vec3f) -> vec3f {
+    return sampleNightSkyLevel(direction, object.starLod);
+}
+
+// Mips above starLod the sky behind the moon is read at: blurred enough that
+// the stars average away and only the sky's own glow is left.
+const MOON_BACKDROP_LOD: f32 = 6.0;
+
+// The night sky with the moon in front: the disc hides the stars, but the air
+// between still glows, so the unlit side reads as dark sky rather than black.
+fn nightSkyBehindMoon(direction: vec3f, coverage: f32) -> vec3f {
+    let stars = sampleNightSky(direction);
+    if (coverage <= 0.0) {
+        return stars;
+    }
+    let backdrop = sampleNightSkyLevel(direction, object.starLod + MOON_BACKDROP_LOD);
+    return mix(stars, backdrop, coverage);
+}
+
+// Where the disc sits in the moon image, in uv.
+const MOON_IMAGE_CENTRE: vec2f = vec2f(0.495, 0.502);
+const MOON_IMAGE_RADIUS: vec2f = vec2f(0.482, 0.489);
+// Light the unlit side still catches from the earth.
+const EARTHSHINE: f32 = 0.012;
+
+// The moon along `dir`: rgb radiance, and coverage in a. Shaded as a sphere
+// lit from the sun, so the phase follows from where the two stand.
+fn moonDisc(dir: vec3f, sunDirection: vec3f) -> vec4f {
+    let toMoon = object.moonDirection;
+    if (object.moonNightRadiance <= 0.0 || dot(dir, toMoon) < cos(object.moonRadius)) {
+        return vec4f(0.0);
+    }
+
+    var right = cross(toMoon, vec3f(0.0, 1.0, 0.0));
+    let rightLength = length(right);
+    right = select(vec3f(1.0, 0.0, 0.0), right / rightLength, rightLength > 1e-4);
+    let up = cross(right, toMoon);
+
+    let disc = vec2f(dot(dir, right), dot(dir, up)) / sin(object.moonRadius);
+    let r = length(disc);
+    if (r >= 1.0) {
+        return vec4f(0.0);
+    }
+
+    let normal = right * disc.x + up * disc.y - toMoon * sqrt(1.0 - r * r);
+    let lit = smoothstep(-0.03, 0.08, dot(normal, sunDirection));
+
+    let uv = MOON_IMAGE_CENTRE + vec2f(disc.x, -disc.y) * MOON_IMAGE_RADIUS;
+    let albedo = textureSampleLevel(moonTexture, noiseSampler, uv, object.moonLod).rgb;
+
+    let night = 1.0 - smoothstep(NIGHT_FADE_END, NIGHT_FADE_START, sunDotUp);
+    let radiance = mix(object.moonDayRadiance, object.moonNightRadiance, night);
+    let coverage = 1.0 - smoothstep(0.97, 1.0, r);
+    return vec4f(albedo * (lit + EARTHSHINE * night) * radiance * coverage, coverage);
 }
 
 @fragment
@@ -68,11 +127,12 @@ fn fs(
 
     if (camHeight >= ATM_START_FS) {
         // Above the cloud layer. Fade out stars when looking down and when clouds are thick.
-        let nightSky: vec3f = sampleNightSky(direction);
+        let moon = moonDisc(direction, vSunDirection);
+        let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a);
         let downFade = smoothstep(-0.1, 0.1, viewVertical);
         let cloudinessFade = 1.0 - object.cloudiness;
         let adjustedNightSky = nightSky * downFade * cloudinessFade;
-        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, adjustedNightSky );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, adjustedNightSky, moon.rgb );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
     }
@@ -89,7 +149,7 @@ fn fs(
     // Stars fade with cloud coverage.
     let horizonDir = normalize(vec3f(direction.x, max(0.001, direction.y), direction.z));
     let horizonNightSky = sampleNightSky(horizonDir) * starVisibility * (1.0 - object.cloudiness);
-    var horizonFog = drawSkyAndHorizonFog(horizonDir, org, vSunDirection, horizonNightSky);
+    var horizonFog = drawSkyAndHorizonFog(horizonDir, org, vSunDirection, horizonNightSky, vec3f(0.0));
 
     // Azimuth is undefined looking straight down — every azimuth converges on
     // that single direction — so painting the lower hemisphere with a
@@ -118,7 +178,7 @@ fn fs(
         }
 
         let nadirNightSky = sampleNightSky(sunPerp) * starVisibility * (1.0 - object.cloudiness);
-        let nadirFog = drawSkyAndHorizonFog(sunPerp, org, vSunDirection, nadirNightSky);
+        let nadirFog = drawSkyAndHorizonFog(sunPerp, org, vSunDirection, nadirNightSky, vec3f(0.0));
         horizonFog = mix(horizonFog, nadirFog, nadirFade);
     }
 
@@ -128,8 +188,9 @@ fn fs(
 
     // Horizon transition band: blend between below-horizon color and atmosphere above
     if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
-        let nightSky: vec3f = sampleNightSky(direction) * (1.0 - object.cloudiness);
-        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky );
+        let moon = moonDisc(direction, vSunDirection);
+        let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a) * (1.0 - object.cloudiness);
+        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky, moon.rgb );
         output.color = vec4f( mix( horizonFog, atmosphereColor, hemisphereMask), 1.0 );
         return output;
     }
@@ -140,16 +201,18 @@ fn fs(
     }
     // Above horizon: full atmosphere
     else {
-        let nightSky: vec3f = sampleNightSky(direction) * (1.0 - object.cloudiness);
-        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky );
+        let moon = moonDisc(direction, vSunDirection);
+        let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a) * (1.0 - object.cloudiness);
+        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky, moon.rgb );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
     } 
 }
 
-fn drawSkyAndHorizonFog(dir: vec3f, org: vec3f, vSunDirection: vec3f, nightSky: vec3f ) -> vec3f {
+// `moon` is added over the sky before the fog, so haze dims it near the horizon.
+fn drawSkyAndHorizonFog(dir: vec3f, org: vec3f, vSunDirection: vec3f, nightSky: vec3f, moon: vec3f ) -> vec3f {
     let mu = dot(vSunDirection, dir);
-    var color = getAtmosphereColor(vSunDirection, dir, mu, nightSky);
+    var color = getAtmosphereColor(vSunDirection, dir, mu, nightSky) + moon;
     color = getFogColor( dir, org, vSunDirection, color.rgb );
     return color;
 }

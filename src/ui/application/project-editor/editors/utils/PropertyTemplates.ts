@@ -70,6 +70,21 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
       ...WEATHER_STATE_IDS.map((id) => ({ value: id, label: id })),
     ],
   },
+  // 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter.
+  moonPhase: {
+    label: 'Moon Phase',
+    valueType: 'float',
+    valueOptions: {
+      min: 0,
+      max: 1,
+      step: 0.01,
+      precision: 2,
+    },
+  },
+  randomMoonPhase: {
+    label: 'Random Moon Phase',
+    valueType: 'boolean',
+  },
   precipitation: {
     label: 'Precipitation',
     valueType: 'float',

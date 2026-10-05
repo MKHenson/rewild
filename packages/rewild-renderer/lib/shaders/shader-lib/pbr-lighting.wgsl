@@ -111,7 +111,7 @@ fn accumulatePbrLighting(
     }
     let L = lightVec / max(dist, 1e-4);
 
-    var attenuation = lightDistanceAttenuation(dist, light.range);
+    var attenuation = lightDistanceAttenuation(dist, light.range, light.decay);
     let isSpot = light.lightType == 2.0;
     if (isSpot) {
       let angle = acos(clamp(dot(-L, light.direction), 0.0, 1.0));

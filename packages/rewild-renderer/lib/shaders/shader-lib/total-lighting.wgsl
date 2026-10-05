@@ -9,7 +9,7 @@ struct Light {
   lightType : f32,
   innerAngle : f32,             // spot: inner cone half-angle in radians
   outerAngle : f32,             // spot: outer cone half-angle in radians
-  _pad0 : f32,
+  decay : f32,                  // point/spot: distance falloff exponent, 2 = inverse-square
   _pad1 : f32,
 }
 
@@ -24,8 +24,10 @@ struct LightingUniforms {
 // roughly "a surface pressed against a 20cm lamp".
 const LIGHT_MIN_DISTANCE: f32 = 0.1;
 
-// Distance falloff for point and spot lights: inverse-square, windowed so it
-// reaches exactly zero at `range`.
+// Distance falloff for point and spot lights: 1/d^decay, windowed so it
+// reaches exactly zero at `range`. `decay` is 2 (inverse-square) for physical
+// lights; lower values flatten the curve for lights that must carry further
+// than a fixed exposure can show, such as the player's flashlight.
 //
 // Two things have to be true at once. Radiance genuinely falls as 1/d², and the
 // `1 - dist/range` ramp this replaces got that most wrong in the near field,
@@ -41,10 +43,10 @@ const LIGHT_MIN_DISTANCE: f32 = 0.1;
 // Note this changes the shape of the falloff, not the unit intensity is
 // expressed in — that stays anchored to the sky's radiance scale. See
 // docs/milestones/lichen.md.
-fn lightDistanceAttenuation(dist: f32, range: f32) -> f32 {
-  let d2 = max(dist * dist, LIGHT_MIN_DISTANCE * LIGHT_MIN_DISTANCE);
+fn lightDistanceAttenuation(dist: f32, range: f32, decay: f32) -> f32 {
+  let falloff = pow(max(dist, LIGHT_MIN_DISTANCE), decay);
   let ratio = clamp(dist / max(range, 0.0001), 0.0, 1.0);
   let ratio2 = ratio * ratio;
   let window = 1.0 - ratio2 * ratio2;
-  return (window * window) / d2;
+  return (window * window) / falloff;
 }
