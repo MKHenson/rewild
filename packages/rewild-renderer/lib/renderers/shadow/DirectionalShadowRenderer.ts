@@ -97,9 +97,9 @@ interface MeshShadowUniforms {
 export class DirectionalShadowRenderer {
   shadowDepthTexture: GPUTexture;
   debugRenderer: ShadowDebugRenderer;
-  /** True while shadow cascade debug tint is active — read by ShadowUniforms to set debugMode uniform. */
+  /** True while shadow cascade debug tint is active — read by EnvironmentUniforms to set debugMode uniform. */
   debugMode: boolean = false;
-  /** Per-cascade light VP matrices — updated each frame, read by ShadowUniforms.prepare(). */
+  /** Per-cascade light VP matrices — updated each frame, read by EnvironmentUniforms.prepare(). */
   lightVPs: [Matrix4, Matrix4, Matrix4];
   /**
    * View-space depth at which each cascade ends, plus sun elevation in [3].
@@ -119,7 +119,7 @@ export class DirectionalShadowRenderer {
   shadowFar: number = 0;
   /**
    * Multiplier on the shader's per-cascade normal-offset bias — read by
-   * ShadowUniforms.prepare(). The offsets are tuned in metres at a
+   * EnvironmentUniforms.prepare(). The offsets are tuned in metres at a
    * NORMAL_OFFSET_REFERENCE_CASCADE_SIZE cascade and only need to clear a
    * texel or so, so they shrink as the cascade grows and its texels get finer.
    */
@@ -127,7 +127,7 @@ export class DirectionalShadowRenderer {
 
   private pipeline: GPURenderPipeline;
   private builtQualityRevision: number = -1;
-  // The atlas the previous frame sampled. ShadowUniforms rebinds one frame
+  // The atlas the previous frame sampled. EnvironmentUniforms rebinds one frame
   // after the swap, so the old texture must outlive the frame that swapped it.
   private retiredAtlas: GPUTexture | null = null;
   private instancedPipeline: GPURenderPipeline;

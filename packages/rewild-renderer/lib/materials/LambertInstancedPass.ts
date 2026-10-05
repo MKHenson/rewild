@@ -7,13 +7,13 @@ import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { Diffuse } from './uniforms/Diffuse';
 import { Lighting } from './uniforms/Lighting';
-import { ShadowUniforms } from './uniforms/ShadowUniforms';
+import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
 import { ProjectionAndInstances } from './uniforms/ProjectionAndInstances';
 
 const sharedBindgroupIndex = 0;
 const projectionAndInstancesGroup = 1;
 const lightingGroup = 2;
-const shadowGroup = 3;
+const environmentGroup = 3;
 
 export class LambertInstancedPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
@@ -31,7 +31,7 @@ export class LambertInstancedPass implements IMaterialPass {
       this.diffuse,
       new ProjectionAndInstances(projectionAndInstancesGroup),
       new Lighting(lightingGroup),
-      new ShadowUniforms(shadowGroup),
+      new EnvironmentUniforms(environmentGroup),
     ]);
   }
 

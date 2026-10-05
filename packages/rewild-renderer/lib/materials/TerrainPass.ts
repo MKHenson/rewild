@@ -15,11 +15,11 @@ import {
 import { RenderQuality } from '../utils/RenderQuality';
 import { composeShader } from '../utils/shaderDefines';
 import { Lighting } from './uniforms/Lighting';
-import { ShadowUniforms } from './uniforms/ShadowUniforms';
+import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
 
 const sharedBindgroupIndex = 1;
 const lightingGroupIndex = 2;
-const shadowGroupIndex = 3;
+const environmentGroupIndex = 3;
 
 export class TerrainPass implements IMaterialPass {
   profileCategory: SceneCategory = 'terrain';
@@ -31,18 +31,22 @@ export class TerrainPass implements IMaterialPass {
   sharedUniformsTracker: SharedUniformsTracker;
   terrainUniforms: TerrainUniforms;
   lightingUniforms: Lighting;
-  shadowUniforms: ShadowUniforms;
+  environmentUniforms: EnvironmentUniforms;
 
   constructor() {
     this.side = 'ccw';
     this.requiresRebuild = true;
     this.terrainUniforms = new TerrainUniforms(sharedBindgroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
-    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true, true);
+    this.environmentUniforms = new EnvironmentUniforms(
+      environmentGroupIndex,
+      true,
+      true
+    );
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.terrainUniforms,
       this.lightingUniforms,
-      this.shadowUniforms,
+      this.environmentUniforms,
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => [
       new ProjModelView(0),

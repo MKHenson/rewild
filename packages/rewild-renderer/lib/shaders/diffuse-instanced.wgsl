@@ -36,7 +36,7 @@ struct VertexOutput {
 @group(0) @binding(1) var myTexture: texture_2d<f32>;
 
 // Projection (binding 0) and instance transforms (binding 1) share group 1
-// to leave group 2 for lighting and group 3 for shadow — WebGPU allows 4 groups max.
+// to leave group 2 for lighting and group 3 for the environment — WebGPU allows 4 groups max.
 @group(1) @binding(0) var<uniform> uniforms : Uniforms;
 @group(1) @binding(1) var<storage, read> transforms : array<Transform>;
 

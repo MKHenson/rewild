@@ -751,10 +751,6 @@ Spray rises from breaking crests near the camera (`SeaSpray`, after GodotOceanWa
 - **Not yet.** Spray takes no shadows (cloud or terrain) and no god rays, and rises only from the
   palette's first type, the ocean.
 
-Stretch goals: sharper foam outlines, from a shorter longest cascade (about 400 m holds every wave
-the spectrum makes now) or from 512² cascades (about 4.5 × the FFT time and 125 MB of GPU memory).
-Time the ocean pass first; it has no GPU timer segment yet.
-
 ### Terrain changes
 
 The terrain shader reads the chunk's water map as well:
@@ -1177,10 +1173,16 @@ clearing, a gale, or drops on the lens.
 
 - **Terrain** is dimmed by its depth already (see [Terrain changes](#terrain-changes)).
 - **Standard and scatter materials** take the same sun and sky dimming (`water-light.wgsl`),
-  so rocks, props and seaweed under water match the bed. They are not bound to a chunk, so the
-  water is the camera's: while the camera stands over water, its level and extinction ride in
-  `IblParams`, and anything below that level is dimmed by its depth. Out of the water, or over
-  another body's water, nothing is dimmed.
+  so rocks, props and seaweed under water match the bed. They are not bound to a chunk, so they
+  read the water over them from a **water level field** around the camera (`WaterLevelField`):
+  256² water map texels (8 m, 2 km across), each with its level and coverage (`rg32float`) and
+  its extinction from the palette weights (`rgba16float`). A pixel filters the four texels
+  around it as the water maps are filtered, the level weighted by coverage, and is dimmed by
+  the depth of that water over it. Dry ground below a nearby lake's level is not dimmed, and a
+  lake's rocks keep the lake's tint seen from anywhere. Past the field nothing is dimmed. The
+  CPU fills it from the chunks' water maps over eight frames when the camera strays 128 m from
+  its centre, and a second after chunks load or water changes. The material passes bind it at
+  bindings 15–16 of the environment group.
 - **Caustics** by photon splatting (`Caustics`, `caustics.wgsl`, as in Evan Wallace's WebGL
   Water). Each frame a grid over the 7.1 m cascade's tile is drawn into a 512² `rg16float`
   texture, with mips. That cascade holds ripples 5 cm to 1.2 m long, curved enough to focus the
@@ -1205,8 +1207,8 @@ clearing, a gale, or drops on the lens.
     is over water or a drawn chunk has water.
   - **Who reads it.** The terrain bed, by its own chunk's water types; standard and scatter
     materials under the camera's water; the light shafts; and the marine snow. It acts on the
-    sun term only. The material passes and the terrain bind it in their shadow group
-    (`ShadowUniforms`, bindings 12 to 14). `setWaterCaustics({ strength, shallow, deep })` sets
+    sun term only. The material passes and the terrain bind it in their environment group
+    (`EnvironmentUniforms`, bindings 12 to 14). `setWaterCaustics({ strength, shallow, deep })` sets
     it in the console.
 - **Marine snow** (`MarineSnow`, `marine-snow.wgsl`). 2048 specks, about 8 mm across, in a 12 m
   box that wraps around the camera. Their positions are a hash of the instance, carried by a
@@ -1252,7 +1254,7 @@ clearing, a gale, or drops on the lens.
 4. **Editor and gameplay.** Water brush, edit rules and spill height, sea channels,
    saved edits, water query with probed waves, wading and swimming.
 5. **Stretch.** [Under water](#under-water) (the view, the waterline on the lens, caustics),
-   rain on surfaces and rain ripples on them and on water, sharper foam, noise-channel rivers.
+   rain on surfaces and rain ripples on them and on water, noise-channel rivers.
 
 ## Performance notes (web budget)
 
@@ -1286,19 +1288,6 @@ clearing, a gale, or drops on the lens.
   `lens`, its full-screen draw and the drops.
 - The terrain shader samples 16 textures with the caustics, the most a stage may by default.
   Another texture in it needs one taken out first.
-
-## Open questions
-
-- **Generated ground below sea level, inland.** Edited trenches fill only if they connect to the
-  ocean. Generated terrain has no such check, because a connection is not a local question. The
-  draft keeps it dry by using the continent field for coverage. Is that enough, or must generation
-  prevent inland ground below sea level?
-- **Wind mapping.** The foam table was tuned by eye at windiness 0.7 and 1. Check it against the
-  trees at 0.3 and 0.5.
-- **MSAA.** The scene depth texture is multisampled when `sampleCount > 1`. The water pass and the
-  sea spray, which reads it as a plain depth texture, must resolve it or read one sample.
-- **Palette size.** Ocean and lake only, or swamp as well in Phase 2?
-- **Level for materials under water.** Terrain reads its chunk's water map for the level. Standard
-  and scatter materials take the camera's water. A rock in a lake seen from the sea, or below
-  the level on dry land beside the camera's water, is dimmed wrongly or not at all. A level map
-  around the camera, or the chunk's map bound per draw, would fix both.
+- The water level field: 65k texel copies from the water maps over eight frames when it moves,
+  two uploads of 512 KB, and four texel loads a pixel for standard and scatter materials, a
+  fifth under water.

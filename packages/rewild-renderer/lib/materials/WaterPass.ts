@@ -8,17 +8,14 @@ import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { Lighting } from './uniforms/Lighting';
-import { ShadowUniforms } from './uniforms/ShadowUniforms';
-import {
-  WaterGridPlacement,
-  WaterUniforms,
-} from './uniforms/WaterUniforms';
+import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
+import { WaterGridPlacement, WaterUniforms } from './uniforms/WaterUniforms';
 import { WaterType } from '../renderers/terrain/Water';
 import { composeShader } from '../utils/shaderDefines';
 
 const waterGroupIndex = 1;
 const lightingGroupIndex = 2;
-const shadowGroupIndex = 3;
+const environmentGroupIndex = 3;
 
 const vertexBuffers: GPUVertexBufferLayout[] = [
   {
@@ -105,7 +102,7 @@ export class WaterPass implements IMaterialPass {
   sharedUniformsTracker: SharedUniformsTracker;
   waterUniforms: WaterUniforms;
   lightingUniforms: Lighting;
-  shadowUniforms: ShadowUniforms;
+  environmentUniforms: EnvironmentUniforms;
 
   private depth = new WaterSubPass();
   private absorb = new WaterSubPass(true, true);
@@ -113,11 +110,14 @@ export class WaterPass implements IMaterialPass {
   constructor() {
     this.waterUniforms = new WaterUniforms(waterGroupIndex, true, true);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
-    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true);
+    this.environmentUniforms = new EnvironmentUniforms(
+      environmentGroupIndex,
+      true
+    );
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.waterUniforms,
       this.lightingUniforms,
-      this.shadowUniforms,
+      this.environmentUniforms,
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => [
       new ProjModelView(0),
@@ -212,7 +212,11 @@ export class WaterPass implements IMaterialPass {
                   dstFactor: 'one-minus-src-alpha',
                   operation: 'add',
                 },
-                alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+                alpha: {
+                  srcFactor: 'zero',
+                  dstFactor: 'one',
+                  operation: 'add',
+                },
               },
             },
           ],

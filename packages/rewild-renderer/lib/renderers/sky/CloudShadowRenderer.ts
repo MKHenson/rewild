@@ -52,7 +52,7 @@ export class CloudShadowRenderer {
     // The shadow map is sized from config.resolution, not the canvas, so a
     // re-init (window resize, quality change) does not need a new one — and
     // creating one anyway is actively harmful. Terrain materials bake a view of
-    // this texture into their bind group once (ShadowUniforms.build), and
+    // this texture into their bind group once (EnvironmentUniforms.build), and
     // nothing tells them it was replaced. The pass below would then render into
     // the new texture while the terrain kept sampling the old one, which is
     // still alive and so raises no validation error: the cloud shadows simply
@@ -60,7 +60,7 @@ export class CloudShadowRenderer {
     //
     // The old texture is deliberately not destroyed on a genuine resolution
     // change: a bind group may still reference it for another frame (see the
-    // identity check in ShadowUniforms.prepare, which rebuilds one frame later).
+    // identity check in EnvironmentUniforms.prepare, which rebuilds one frame later).
     // Leaking a 2 MB texture on a config change nobody makes at runtime beats a
     // use-after-destroy.
     if (!this.shadowMap || this.shadowMap.width !== resolution) {

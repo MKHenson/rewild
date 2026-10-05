@@ -414,8 +414,8 @@ describe('remove stroke cut', () => {
 
   it('raises nothing where no water stays', () => {
     const source = new FakeSource(() => 8);
-    expect(
-      applyCutBank(source, cut(fakeWater(() => null)), discs, 1)
-    ).toEqual([]);
+    expect(applyCutBank(source, cut(fakeWater(() => null)), discs, 1)).toEqual(
+      []
+    );
   });
 });

@@ -9,11 +9,11 @@ import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { LambertMaterial } from './uniforms/LambertMaterial';
 import { Lighting } from './uniforms/Lighting';
-import { ShadowUniforms } from './uniforms/ShadowUniforms';
+import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
 
 const materialGroupIndex = 1;
 const lightingGroupIndex = 2;
-const shadowGroupIndex = 3;
+const environmentGroupIndex = 3;
 
 export class LambertPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
@@ -22,7 +22,7 @@ export class LambertPass implements IMaterialPass {
   sharedUniformsTracker: SharedUniformsTracker;
   material: LambertMaterial;
   lightingUniforms: Lighting;
-  shadowUniforms: ShadowUniforms;
+  environmentUniforms: EnvironmentUniforms;
   side: GPUFrontFace;
 
   constructor() {
@@ -30,11 +30,11 @@ export class LambertPass implements IMaterialPass {
     this.requiresRebuild = true;
     this.material = new LambertMaterial(materialGroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
-    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex);
+    this.environmentUniforms = new EnvironmentUniforms(environmentGroupIndex);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.material,
       this.lightingUniforms,
-      this.shadowUniforms,
+      this.environmentUniforms,
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => [
       new ProjModelView(0),
@@ -124,7 +124,12 @@ export class LambertPass implements IMaterialPass {
     pass.setVertexBuffer(2, geometry.normalBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
 
-    this.sharedUniformsTracker.prepareMeshUniforms(renderer, pass, camera, meshes);
+    this.sharedUniformsTracker.prepareMeshUniforms(
+      renderer,
+      pass,
+      camera,
+      meshes
+    );
 
     const tracker = this.perMeshTracker;
     const numIndices = geometry.indices!.length;

@@ -114,6 +114,8 @@ struct VertexOutput {
 @group(3) @binding(12) var causticsMap: texture_2d<f32>;
 @group(3) @binding(13) var causticsSampler: sampler;
 @group(3) @binding(14) var<uniform> caustics: CausticsParams;
+@group(3) @binding(15) var waterLevelMap: texture_2d<f32>;
+@group(3) @binding(16) var waterOpticsMap: texture_2d<f32>;
 
 fn rotateByQuat(q: vec4f, v: vec3f) -> vec3f {
   let t = 2.0 * cross(q.xyz, v);

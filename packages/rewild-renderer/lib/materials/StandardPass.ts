@@ -8,13 +8,13 @@ import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { StandardMaterial } from './uniforms/StandardMaterial';
 import { Lighting } from './uniforms/Lighting';
-import { ShadowUniforms } from './uniforms/ShadowUniforms';
+import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
 import { StandardPassBase } from './StandardPassBase';
 import { composeShader } from '../utils/shaderDefines';
 
 const materialGroupIndex = 1;
 const lightingGroupIndex = 2;
-const shadowGroupIndex = 3;
+const environmentGroupIndex = 3;
 
 // Back-to-front by view-space depth. Element 14 of the model-view matrix is the
 // mesh origin's z in view space, which the renderer has already computed this
@@ -50,17 +50,22 @@ export class StandardPass extends StandardPassBase {
   sharedUniformsTracker: SharedUniformsTracker;
   material: StandardMaterial;
   lightingUniforms: Lighting;
-  shadowUniforms: ShadowUniforms;
+  environmentUniforms: EnvironmentUniforms;
 
   constructor() {
     super();
     this.material = new StandardMaterial(materialGroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
-    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true, true);
+    this.environmentUniforms = new EnvironmentUniforms(
+      environmentGroupIndex,
+      true,
+      true,
+      true
+    );
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.material,
       this.lightingUniforms,
-      this.shadowUniforms,
+      this.environmentUniforms,
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => [
       new ProjModelView(0),

@@ -124,6 +124,8 @@ const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 @group(3) @binding(12) var causticsMap: texture_2d<f32>;
 @group(3) @binding(13) var causticsSampler: sampler;
 @group(3) @binding(14) var<uniform> caustics: CausticsParams;
+@group(3) @binding(15) var waterLevelMap: texture_2d<f32>;
+@group(3) @binding(16) var waterOpticsMap: texture_2d<f32>;
 
 fn transformVertex(
   instanceIndex: u32,
