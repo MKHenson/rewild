@@ -42,7 +42,11 @@ export interface IScatterInstanceGroup extends IVisualComponent {
    *  reach from a viewer in the group's local space, and that the frustum can
    *  see when one is given. Fills `rangeCount` runs of `rangeStarts[i]` +
    *  `rangeCounts[i]`. */
-  selectInstances(viewer: Vector3, frustum: Frustum | null): void;
+  selectInstances(
+    viewer: Vector3,
+    frustum: Frustum | null,
+    hardBand?: boolean
+  ): void;
   readonly rangeStarts: Int32Array;
   readonly rangeCounts: Int32Array;
   readonly rangeCount: number;

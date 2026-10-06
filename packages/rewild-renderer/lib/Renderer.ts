@@ -35,6 +35,7 @@ import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRende
 import { FrameCompositor } from './post-processes/FrameCompositor';
 import { RefractionCapture } from './renderers/water/RefractionCapture';
 import { QualitySettings } from './utils/QualitySettings';
+import { sortFrontToBack } from './utils/frontToBack';
 
 const _projScreenMatrix = new Matrix4();
 
@@ -603,7 +604,11 @@ export class Renderer {
       this.collectUIElements(transform.children[i]);
   }
 
-  organizeVisuals(transforms: Transform[], target: IRenderGroup[]) {
+  organizeVisuals(
+    transforms: Transform[],
+    target: IRenderGroup[],
+    frontToBack = false
+  ) {
     // Organize all meshes so that they are grouped by material as well as geometry
     // This is done to minimize the number of draw calls
 
@@ -643,7 +648,32 @@ export class Renderer {
     }
 
     target.sort(sortOpaqueFirst);
+
+    if (frontToBack) {
+      let opaqueEnd = 0;
+      while (opaqueEnd < target.length && drawRank(target[opaqueEnd]) === 0)
+        opaqueEnd++;
+      sortFrontToBack(
+        target,
+        0,
+        opaqueEnd,
+        this.camera.camera.transform.matrixWorld.elements
+      );
+    }
+
     return target;
+  }
+
+  // Drops the groups of hidden scene categories, so an ablation reaches the
+  // passes that do not draw through renderGroupings.
+  private removeHiddenCategories(groups: IRenderGroup[]): void {
+    const hidden = this.hiddenSceneCategories;
+    if (hidden.size === 0) return;
+    let kept = 0;
+    for (let i = 0; i < groups.length; i++)
+      if (!hidden.has(groups[i].pass.profileCategory ?? 'opaque'))
+        groups[kept++] = groups[i];
+    groups.length = kept;
   }
 
   renderGroupings(
@@ -885,7 +915,8 @@ export class Renderer {
 
     const renderList = this.organizeVisuals(
       this.currentRenderList.solids,
-      this.renderGroups
+      this.renderGroups,
+      true
     );
 
     // Compute modelViewMatrix for overlay transforms
@@ -940,6 +971,7 @@ export class Renderer {
         this._shadowCasters,
         this._shadowGroups
       );
+      this.removeHiddenCategories(shadowRenderList);
       metrics.end('cpu.shadowcast');
       metrics.record('counts.shadowcasters', this._shadowCasters.length);
       this.directionalShadowRenderer.render(

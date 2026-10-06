@@ -1,4 +1,10 @@
-import { Matrix4, Vector3 } from 'rewild-common';
+import {
+  Box3,
+  Frustum,
+  Matrix4,
+  Vector3,
+  WebGPUCoordinateSystem,
+} from 'rewild-common';
 import { Renderer } from '../../Renderer';
 import { PerspectiveCamera } from '../../core/PerspectiveCamera';
 import { IRenderGroup } from '../../../types/IRenderGroup';
@@ -50,6 +56,24 @@ const CSM_LAMBDA = 0.7;
 // on the near ground under tall casters at low sun; the only cost is depth range
 // (harmless at depth32float) and slightly coarser effective bias.
 const CASTER_EXTENSION_TOWARD_LIGHT = 500;
+
+const FAR_CASCADE = NUM_CASCADES - 1;
+
+// Frames between re-renders of the far cascade. Between them it keeps its depth
+// and the light matrix it was drawn with, so the shader still samples it
+// consistently.
+const FAR_CASCADE_INTERVAL = 2;
+
+// Writes depth 1.0 (fully lit) over the current viewport: a fullscreen
+// triangle at the far plane. Clears one atlas quadrant inside a pass that
+// loads the rest.
+const QUADRANT_CLEAR_SHADER = /* wgsl */ `
+@vertex
+fn vs(@builtin(vertex_index) index : u32) -> @builtin(position) vec4f {
+  let uv = vec2f(f32((index << 1u) & 2u), f32(index & 2u));
+  return vec4f(uv * 2.0 - 1.0, 1.0, 1.0);
+}
+`;
 
 // Atlas quadrant [x, y] for each cascade, in units of cascadeSize.
 // Layout: cascade 0 = top-left, cascade 1 = top-right, cascade 2 = bottom-left.
@@ -137,6 +161,17 @@ export class DirectionalShadowRenderer {
   // Scratch set reused by the per-frame stale-entry sweep (no per-frame allocation).
   private _liveMeshes = new Set<IVisualComponent>();
 
+  // Per cascade, the light frustum casters are culled against.
+  private _cascadeFrusta: [Frustum, Frustum, Frustum];
+  // Bit c set: the caster is drawn into cascade c this frame.
+  private _cascadeMasks = new Map<IVisualComponent, number>();
+  private _casterBox = new Box3();
+  // Whether a cascade's quadrant holds a render it can be sampled from.
+  private _cascadeValid = [false, false, false];
+  private _farCascadeVP = new Matrix4();
+  private _frameIndex = 0;
+  private _quadrantClearPipeline: GPURenderPipeline;
+
   // Pre-allocated per-frame math — never allocated inside render().
   private _lightViewWorld: Matrix4;
   private _lightView: Matrix4;
@@ -157,6 +192,7 @@ export class DirectionalShadowRenderer {
   constructor() {
     this.debugRenderer = new ShadowDebugRenderer();
     this.lightVPs = [new Matrix4(), new Matrix4(), new Matrix4()];
+    this._cascadeFrusta = [new Frustum(), new Frustum(), new Frustum()];
     this.cascadeSplitDistances = new Float32Array(4);
     this.meshUniforms = new Map();
     this._lightViewWorld = new Matrix4();
@@ -307,6 +343,22 @@ export class DirectionalShadowRenderer {
       },
     });
 
+    const clearModule = device.createShaderModule({
+      label: 'shadow quadrant clear shader',
+      code: QUADRANT_CLEAR_SHADER,
+    });
+    this._quadrantClearPipeline = device.createRenderPipeline({
+      label: 'shadow quadrant clear pipeline',
+      layout: 'auto',
+      vertex: { entryPoint: 'vs', module: clearModule },
+      primitive: { topology: 'triangle-list' },
+      depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: 'always',
+        format: 'depth32float',
+      },
+    });
+
     this.debugRenderer.init(renderer);
     this._buildAtlas(renderer);
   }
@@ -332,6 +384,7 @@ export class DirectionalShadowRenderer {
     this.retiredAtlas?.destroy();
     this.retiredAtlas = this.shadowDepthTexture ?? null;
 
+    this._cascadeValid.fill(false);
     const atlasSize = tier.cascadeSize * 2;
     this.shadowDepthTexture = device.createTexture({
       label: 'directional shadow depth',
@@ -376,8 +429,28 @@ export class DirectionalShadowRenderer {
     // geometry forever and the tab runs out of memory.
     this._sweepStaleMeshUniforms(renderList);
 
+    this._frameIndex++;
+    const renderFar =
+      !sunAboveHorizon ||
+      !this._cascadeValid[FAR_CASCADE] ||
+      this._frameIndex % FAR_CASCADE_INTERVAL === 0;
+    const drawMask =
+      (1 << NUM_CASCADES) - 1 - (renderFar ? 0 : 1 << FAR_CASCADE);
+
     if (sunAboveHorizon) {
       this._computeCascadeLightVPs(camera, sun.transform.position);
+
+      // A held far cascade keeps the matrix it was drawn with, so the shader
+      // samples the depth it holds with the projection that produced it.
+      if (renderFar) this._farCascadeVP.copy(this.lightVPs[FAR_CASCADE]);
+      else this.lightVPs[FAR_CASCADE].copy(this._farCascadeVP);
+
+      for (let c = 0; c < NUM_CASCADES; c++)
+        this._cascadeFrusta[c].setFromProjectionMatrix(
+          this.lightVPs[c],
+          WebGPUCoordinateSystem
+        );
+      this._cascadeMasks.clear();
 
       // Ensure per-mesh uniform buffers exist (geometry must already be built).
       for (const item of renderList) {
@@ -395,6 +468,10 @@ export class DirectionalShadowRenderer {
           const uniforms = this.meshUniforms.get(mesh);
           if (!uniforms) continue;
 
+          const mask = this._cascadeMask(mesh) & drawMask;
+          this._cascadeMasks.set(mesh, mask);
+          if (mask === 0) continue;
+
           if (uniforms.kind !== 'mesh') {
             this._writeInstancedUniforms(
               renderer,
@@ -406,6 +483,7 @@ export class DirectionalShadowRenderer {
           }
 
           for (let c = 0; c < NUM_CASCADES; c++) {
+            if ((mask & (1 << c)) === 0) continue;
             this._shadowMVP.multiplyMatrices(
               this.lightVPs[c],
               mesh.transform.matrixWorld
@@ -428,16 +506,40 @@ export class DirectionalShadowRenderer {
       depthStencilAttachment: {
         view: depthView,
         depthClearValue: 1.0,
-        depthLoadOp: 'clear',
+        depthLoadOp: renderFar ? 'clear' : 'load',
         depthStoreOp: 'store',
       },
       timestampWrites: renderer.sceneGpuTimer.writes('shadow'),
     });
 
+    // Loading keeps the held far cascade. Every other quadrant, the spot
+    // light's included, still has to start from fully lit.
+    if (!renderFar) {
+      const size = this.cascadeSize;
+      pass.setPipeline(this._quadrantClearPipeline);
+      for (let c = 0; c < NUM_CASCADES; c++) {
+        if (c === FAR_CASCADE) continue;
+        pass.setViewport(
+          CASCADE_QUADRANT_X[c] * size,
+          CASCADE_QUADRANT_Y[c] * size,
+          size,
+          size,
+          0,
+          1
+        );
+        pass.draw(3);
+      }
+      // The spot light's quadrant, bottom-right.
+      pass.setViewport(size, size, size, size, 0, 1);
+      pass.draw(3);
+    }
+
     if (sunAboveHorizon) {
       // Render all 3 cascades in a single pass — setViewport routes each into its atlas quadrant.
       const size = this.cascadeSize;
+      const cameraWorld = camera.camera.transform.matrixWorld.elements;
       for (let c = 0; c < NUM_CASCADES; c++) {
+        if ((drawMask & (1 << c)) === 0) continue;
         pass.setViewport(
           CASCADE_QUADRANT_X[c] * size,
           CASCADE_QUADRANT_Y[c] * size,
@@ -463,6 +565,8 @@ export class DirectionalShadowRenderer {
           for (const mesh of item.meshes) {
             const uniforms = this.meshUniforms.get(mesh);
             if (!uniforms) continue;
+            if (((this._cascadeMasks.get(mesh) ?? 0) & (1 << c)) === 0)
+              continue;
 
             const wanted =
               uniforms.kind === 'impostor'
@@ -484,6 +588,19 @@ export class DirectionalShadowRenderer {
             }
 
             const group = mesh as IScatterInstanceGroup;
+            // Each cascade selects the cells its own light frustum reaches.
+            // Chunk transforms only translate.
+            const world = group.transform.matrixWorld.elements;
+            this._viewerLocal.set(
+              cameraWorld[12] - world[12],
+              cameraWorld[13] - world[13],
+              cameraWorld[14] - world[14]
+            );
+            group.selectInstances(
+              this._viewerLocal,
+              this._cascadeFrusta[c],
+              true
+            );
             if (group.rangeCount === 0) continue;
             // Both scatter casters carry a uv, for their cutouts.
             pass.setVertexBuffer(1, geo.uvBuffer);
@@ -503,6 +620,30 @@ export class DirectionalShadowRenderer {
     }
 
     pass.end();
+
+    for (let c = 0; c < NUM_CASCADES; c++)
+      if (!sunAboveHorizon) this._cascadeValid[c] = false;
+      else if (drawMask & (1 << c)) this._cascadeValid[c] = true;
+  }
+
+  // Which cascades a caster's world bounds reach, as bits. A caster with no
+  // bounds goes into every cascade. Each cascade's frustum is the whole depth
+  // range it keeps, already pushed toward the light by
+  // CASTER_EXTENSION_TOWARD_LIGHT, so this drops only geometry the GPU would
+  // clip.
+  private _cascadeMask(mesh: IVisualComponent): number {
+    const all = (1 << NUM_CASCADES) - 1;
+
+    const local = mesh.localBounds ?? mesh.geometry.boundingBox;
+    if (!local) return all;
+
+    const box = this._casterBox
+      .copy(local)
+      .applyMatrix4(mesh.transform.matrixWorld);
+    let mask = 0;
+    for (let c = 0; c < NUM_CASCADES; c++)
+      if (this._cascadeFrusta[c].intersectsBox(box)) mask |= 1 << c;
+    return mask;
   }
 
   dispose(): void {

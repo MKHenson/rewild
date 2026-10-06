@@ -125,6 +125,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
   private instanceBuffer: GPUBuffer | null = null;
   private uniformBuffer: GPUBuffer | null = null;
   private bindGroup: GPUBindGroup | null = null;
+  private bindGroupPipeline: GPURenderPipeline | null = null;
   private frameUniforms = new Float32Array(SCATTER_UNIFORM_BYTES / 4);
   private nodeMatrixWritten = false;
 
@@ -168,17 +169,21 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
    * more than recomputing it.
    *
    * The scene pass selects over the faded band and its frustum; the shadow
-   * pass over the hard band and no frustum, since a caster off screen still
-   * shadows what is on it.
+   * pass over the hard band, with no frustum or a cascade's light frustum,
+   * since a caster off screen still shadows what is on it.
    */
-  selectInstances(viewer: Vector3, frustum: Frustum | null): void {
+  selectInstances(
+    viewer: Vector3,
+    frustum: Frustum | null,
+    hardBand = frustum === null
+  ): void {
     this.rangeCount = 0;
-    if (frustum) {
+    if (!hardBand) {
       this.lastSelected = performance.now();
       this.selectedCount = 0;
     }
-    const near = frustum ? this.fadeBand[0] : this.nearDistance;
-    const far = frustum ? this.fadeBand[3] : this.cullDistance;
+    const near = hardBand ? this.nearDistance : this.fadeBand[0];
+    const far = hardBand ? this.cullDistance : this.fadeBand[3];
     if (near >= far) return;
 
     const { starts, bounds } = this.cells;
@@ -300,18 +305,22 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     renderer: Renderer,
     pass: IScatterInstancePass
   ): GPUBindGroup | null {
-    if (this.bindGroup) return this.bindGroup;
+    // An 'auto' layout belongs to one pipeline, so a rebuilt pass needs a new
+    // bind group.
+    if (this.bindGroup && this.bindGroupPipeline === pass.pipeline)
+      return this.bindGroup;
 
     const instanceBuffer = this.instanceStorageBuffer(renderer);
     if (!instanceBuffer) return null;
 
     const { device } = renderer;
 
-    this.uniformBuffer = device.createBuffer({
+    this.uniformBuffer ??= device.createBuffer({
       label: 'scatter chunk uniforms',
       size: SCATTER_UNIFORM_BYTES,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    this.bindGroupPipeline = pass.pipeline;
 
     this.bindGroup = device.createBindGroup({
       layout: pass.instanceBindGroupLayout(),
@@ -365,6 +374,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     this.instanceBuffer = null;
     this.uniformBuffer = null;
     this.bindGroup = null;
+    this.bindGroupPipeline = null;
     this.instanceCount = 0;
   }
 }
