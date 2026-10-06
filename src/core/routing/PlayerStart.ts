@@ -32,6 +32,7 @@ export class PlayerStart extends Asset3D {
       player.spawnResolved = true;
       player.grounded = false;
       player.verticalVelocity = 0.0;
+      player.stopMotion();
 
       // Compute capsule body center so that the camera (center + 1.8) matches desired start Y.
       let bodyY = startPos[1] - 1.8;

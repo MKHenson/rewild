@@ -42,6 +42,7 @@ import {
   gustPushSpeed,
   headwindSpeedShare,
 } from './utils/Headwind';
+import { GroundSlide, MAX_SLOPE_CLIMB } from './utils/Sliding';
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
 const _PI_HALF = Math.PI / 2 - 0.01;
@@ -65,12 +66,6 @@ const _SPAWN_GROUND_CLEARANCE: f32 = _CAPSULE_HALF_EXTENT + 0.6;
 // Lowest the capsule centre may sit when no ground height is known — keeps its
 // base on y=0 rather than below it.
 const _MIN_CAPSULE_Y: f32 = _CAPSULE_HALF_EXTENT;
-// Steepest slope the player can walk up; also the steepest they stay glued to
-// walking down.
-const _MAX_SLOPE_CLIMB: f32 = Math.PI / 4;
-const _SNAP_SLOPE: f32 = Math.tan(_MAX_SLOPE_CLIMB);
-// Extra snap reach beyond the drop of the steepest slope over one frame's step.
-const _SNAP_MARGIN: f32 = 0.1;
 // Downward nudge applied while grounded; Rapier only snaps a movement that
 // already points down.
 const _GROUND_STICK: f32 = 0.001;
@@ -88,7 +83,11 @@ export class Player extends Node {
   capsuleBody: RigidBody;
   collider: Collider;
   verticalVelocity: f32 = 0.0;
+  /** Whether the player stands on ground gentle enough to jump from. */
   grounded: boolean = false;
+  // Whether the capsule rests on any ground, however steep.
+  private _onGround: boolean = false;
+  private _slide = new GroundSlide();
   // Set once the level's rigid bodies have been released — the world is as
   // ready as it is going to get.
   terrainLoaded: boolean = false;
@@ -213,6 +212,7 @@ export class Player extends Node {
     this.spawnResolved = false;
     this.grounded = false;
     this.verticalVelocity = 0.0;
+    this.stopMotion();
     this.swimming = false;
     this._swimHold = NaN;
     this.immersion = 0;
@@ -272,7 +272,7 @@ export class Player extends Node {
 
       this.characterController.setApplyImpulsesToDynamicBodies(true);
       this.characterController.setCharacterMass(80.0);
-      this.characterController.setMaxSlopeClimbAngle(_MAX_SLOPE_CLIMB);
+      this.characterController.setMaxSlopeClimbAngle(MAX_SLOPE_CLIMB);
     }
   }
 
@@ -321,6 +321,12 @@ export class Player extends Node {
     }
   }
 
+  /** Drops any slide and ground contact, e.g. after a teleport. */
+  stopMotion(): void {
+    this._onGround = false;
+    this._slide.reset();
+  }
+
   // The level's rigid bodies start disabled so props don't sink through
   // terrain whose colliders haven't been built yet; this releases them once the
   // world is settled (or once we know no terrain is coming).
@@ -366,6 +372,7 @@ export class Player extends Node {
         this.spawnResolved = true;
         this.verticalVelocity = 0.0;
         this.grounded = false;
+        this.stopMotion();
       }
     }
 
@@ -440,6 +447,7 @@ export class Player extends Node {
       if (this.grounded && !this.swimming) {
         this.verticalVelocity = JUMP_IMPULSE;
         this.grounded = false;
+        this._onGround = false;
       }
       this.jumpRequested = false;
     }
@@ -451,7 +459,7 @@ export class Player extends Node {
       this.verticalVelocity = 0.0;
     } else if (this.swimming) {
       this.verticalVelocity = waterDrag(this.verticalVelocity, delta);
-    } else if (!this.grounded) {
+    } else if (!this._onGround) {
       this.verticalVelocity += gravity * dt;
     } else if (this.verticalVelocity <= 0.0) {
       this.verticalVelocity = 0.0;
@@ -511,6 +519,17 @@ export class Player extends Node {
       this._gustPush = 0;
     }
 
+    this._slide.step(
+      moveX,
+      moveZ,
+      this._onGround,
+      gravityEnabled && !this.swimming,
+      dt,
+      delta
+    );
+    moveX = this._slide.moveX;
+    moveZ = this._slide.moveZ;
+
     let moveY: f32 = gravityEnabled ? this.verticalVelocity * dt : 0.0;
     if (this.swimming) {
       const eyeY = body.y + eyeHeight;
@@ -529,15 +548,15 @@ export class Player extends Node {
       moveY += swimStep(eyeY, target, delta);
     } else this._swimHold = NaN;
 
-    // Snapping keeps a grounded walker on the ground going downhill, where the
-    // step would otherwise carry them off the slope into a fall. Rapier only
-    // snaps from a grounded start, so jumps and falls are unaffected.
+    // Snapping keeps the player on the ground going downhill, where the step
+    // would otherwise carry them off the slope into a fall. Rapier only snaps
+    // from a grounded start, so jumps and falls are unaffected.
     if (this.swimming) this.characterController.disableSnapToGround();
     else {
       this.characterController.enableSnapToGround(
-        Math.hypot(moveX, moveZ) * _SNAP_SLOPE + _SNAP_MARGIN
+        this._slide.snapDistance(Math.hypot(moveX, moveZ))
       );
-      if (this.grounded) moveY -= _GROUND_STICK;
+      if (this._onGround) moveY -= _GROUND_STICK;
     }
 
     const desiredMove = new RapierVector3(moveX, moveY, moveZ);
@@ -556,16 +575,33 @@ export class Player extends Node {
       this.health -= damage;
     }
 
-    this.grounded =
+    this._onGround =
       controllerGrounded && this.verticalVelocity <= 0.0 && !this.swimming;
-    if (this.grounded && this.verticalVelocity < 0) this.verticalVelocity = 0.0;
+    if (this._onGround && this.verticalVelocity < 0)
+      this.verticalVelocity = 0.0;
 
     const currentPos = this.capsuleBody.translation();
+    const nextX = currentPos.x + correctedMovement.x;
+    const nextY = currentPos.y + correctedMovement.y;
+    const nextZ = currentPos.z + correctedMovement.z;
     this.capsuleBody.setNextKinematicTranslation({
-      x: currentPos.x + correctedMovement.x,
-      y: currentPos.y + correctedMovement.y,
-      z: currentPos.z + correctedMovement.z,
+      x: nextX,
+      y: nextY,
+      z: nextZ,
     });
+
+    if (R)
+      this._slide.probe(
+        R,
+        this.rapierWorld,
+        this.collider,
+        this.capsuleBody,
+        this._onGround,
+        nextX,
+        nextY,
+        nextZ
+      );
+    this.grounded = this._onGround && this._slide.walkable;
 
     const pos = this.capsuleBody.translation();
     const camX = pos.x;
