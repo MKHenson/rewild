@@ -65,6 +65,15 @@ const _SPAWN_GROUND_CLEARANCE: f32 = _CAPSULE_HALF_EXTENT + 0.6;
 // Lowest the capsule centre may sit when no ground height is known — keeps its
 // base on y=0 rather than below it.
 const _MIN_CAPSULE_Y: f32 = _CAPSULE_HALF_EXTENT;
+// Steepest slope the player can walk up; also the steepest they stay glued to
+// walking down.
+const _MAX_SLOPE_CLIMB: f32 = Math.PI / 4;
+const _SNAP_SLOPE: f32 = Math.tan(_MAX_SLOPE_CLIMB);
+// Extra snap reach beyond the drop of the steepest slope over one frame's step.
+const _SNAP_MARGIN: f32 = 0.1;
+// Downward nudge applied while grounded; Rapier only snaps a movement that
+// already points down.
+const _GROUND_STICK: f32 = 0.001;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
 
@@ -263,6 +272,7 @@ export class Player extends Node {
 
       this.characterController.setApplyImpulsesToDynamicBodies(true);
       this.characterController.setCharacterMass(80.0);
+      this.characterController.setMaxSlopeClimbAngle(_MAX_SLOPE_CLIMB);
     }
   }
 
@@ -518,6 +528,17 @@ export class Player extends Node {
         : this._swimHold;
       moveY += swimStep(eyeY, target, delta);
     } else this._swimHold = NaN;
+
+    // Snapping keeps a grounded walker on the ground going downhill, where the
+    // step would otherwise carry them off the slope into a fall. Rapier only
+    // snaps from a grounded start, so jumps and falls are unaffected.
+    if (this.swimming) this.characterController.disableSnapToGround();
+    else {
+      this.characterController.enableSnapToGround(
+        Math.hypot(moveX, moveZ) * _SNAP_SLOPE + _SNAP_MARGIN
+      );
+      if (this.grounded) moveY -= _GROUND_STICK;
+    }
 
     const desiredMove = new RapierVector3(moveX, moveY, moveZ);
 
