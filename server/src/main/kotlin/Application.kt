@@ -1,5 +1,7 @@
 package com.rewild
 
+import com.rewild.admin.AdminService
+import com.rewild.admin.adminRoutes
 import com.rewild.assets.AssetCleanupService
 import com.rewild.assets.AssetService
 import com.rewild.assets.S3Client
@@ -95,6 +97,7 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
     val projectService = ProjectService()
     val levelService = LevelService(assetCleanupService)
     val syncService = SyncService(projectService, levelService, assetCleanupService)
+    val adminService = AdminService(authService)
 
     val corsOrigin = environment.config.propertyOrNull("cors.allowedOrigin")?.getString()
     install(CORS) {
@@ -139,12 +142,14 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                     levelRoutes(levelService)
                     syncRoutes(syncService)
                     assetRoutes(assetService)
+                    adminRoutes(adminService)
                 }
             } else {
                 projectRoutes(projectService)
                 levelRoutes(levelService)
                 syncRoutes(syncService)
                 assetRoutes(assetService)
+                adminRoutes(adminService)
             }
         }
     }

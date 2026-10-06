@@ -737,6 +737,223 @@
                 },
                 "deprecated": false
             }
+        },
+        "/api/admin/users": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List users",
+                "description": "Returns every user account. Super admin only.",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/com.rewild.admin.UserAccount"
+                                    },
+                                    "title": "List<UserAccount>"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/admin/users/{id}": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get user",
+                "description": "Returns a user account by ID. Super admin only.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "User ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.admin.UserAccount"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "put": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Update user",
+                "description": "Updates a user's editable fields. Super admin only.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "User ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.admin.UpdateUserRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.admin.UserAccount"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/admin/users/{id}/password-reset": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Send password reset",
+                "description": "Emails the user a password reset link. Super admin only.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "User ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Reset email sent",
+                        "headers": {}
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
         }
     },
     "components": {
@@ -1722,6 +1939,81 @@
                     "storageKey"
                 ],
                 "title": "ConfirmRequest"
+            },
+            "com.rewild.admin.UserAccount": {
+                "type": "object",
+                "properties": {
+                    "createdAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    },
+                    "displayName": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "email": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "hasGoogle": {
+                        "type": "boolean",
+                        "title": "Boolean"
+                    },
+                    "hasPassword": {
+                        "type": "boolean",
+                        "title": "Boolean"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "photoUrl": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "projectCount": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    },
+                    "role": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "createdAt",
+                    "displayName",
+                    "email",
+                    "hasGoogle",
+                    "hasPassword",
+                    "id",
+                    "projectCount",
+                    "role"
+                ],
+                "title": "UserAccount"
+            },
+            "com.rewild.admin.UpdateUserRequest": {
+                "type": "object",
+                "properties": {
+                    "displayName": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "role": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "displayName",
+                    "role"
+                ],
+                "title": "UpdateUserRequest"
             }
         },
         "examples": {}

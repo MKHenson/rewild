@@ -1,5 +1,6 @@
 package com.rewild.db.tables
 
+import com.rewild.auth.UserRole
 import org.jetbrains.exposed.sql.Table
 
 object UsersTable : Table("users") {
@@ -9,6 +10,7 @@ object UsersTable : Table("users") {
     val displayName = text("display_name")
     val googleId = text("google_id").nullable().uniqueIndex()
     val photoUrl = text("photo_url").nullable()
+    val role = text("role").default(UserRole.USER)
     val createdAt = long("created_at")
 
     override val primaryKey = PrimaryKey(id)

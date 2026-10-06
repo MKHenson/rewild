@@ -18,6 +18,7 @@ type AuthState = {
     displayName: string | null;
     photoURL: string | null;
     emailVerified: boolean;
+    role: 'user' | 'super_admin';
   };
 };
 
@@ -30,6 +31,7 @@ const guestState: AuthState = {
     displayName: 'Guest',
     photoURL: null,
     emailVerified: false,
+    role: 'user',
   },
 };
 
@@ -43,6 +45,7 @@ function loggedInState(email: string): AuthState {
       displayName: email,
       photoURL: null,
       emailVerified: true,
+      role: 'user',
     },
   };
 }
@@ -592,6 +595,7 @@ describe('Auth', () => {
         displayName: null,
         photoURL: null,
         emailVerified: true,
+        role: 'user',
       });
       const auth = createAuth(loggedInState('user@example.com'));
       await auth.onMount!();

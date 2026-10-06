@@ -41,6 +41,24 @@ describe('Input', () => {
     expect(onChange).toHaveBeenCalledWith('updated');
   });
 
+  it('calls onInput on every keystroke', async () => {
+    const onInput = jest.fn();
+    const props: InputProps = { onInput };
+    const inputCmp = new Input({ props });
+
+    inputCmp._createRenderer();
+    inputCmp.render();
+
+    const input = inputCmp.shadow?.querySelector('input') as HTMLInputElement;
+    input.value = 'a';
+    await fireEvent(input, new Event('input'));
+    input.value = 'ab';
+    await fireEvent(input, new Event('input'));
+
+    expect(onInput).toHaveBeenCalledTimes(2);
+    expect(onInput).toHaveBeenLastCalledWith('ab');
+  });
+
   it('calls onClick when input is clicked', async () => {
     const onClick = jest.fn();
     const props: InputProps = { onClick, value: 'abc' };

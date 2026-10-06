@@ -8,6 +8,7 @@ const user = {
   email: 'test@example.com',
   photoURL: null,
   emailVerified: false,
+  role: 'user' as const,
 };
 
 describe('Database sync-on-login', () => {

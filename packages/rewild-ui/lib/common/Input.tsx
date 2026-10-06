@@ -9,6 +9,8 @@ interface Props {
   fullWidth?: boolean;
   className?: string;
   onChange?: (val: string) => void;
+  /** Fires on every keystroke, unlike onChange which waits for commit. */
+  onInput?: (val: string) => void;
   onClick?: (e: MouseEvent) => void;
 }
 
@@ -48,6 +50,9 @@ export class Input extends Component<Props> {
       input.onclick = onClick;
       input.onchange = this.props.onChange
         ? (e) => this.props.onChange!(input.value)
+        : null;
+      input.oninput = this.props.onInput
+        ? () => this.props.onInput!(input.value)
         : null;
 
       return elm;

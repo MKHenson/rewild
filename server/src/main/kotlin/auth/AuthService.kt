@@ -63,7 +63,7 @@ class AuthService(
         val result = BCrypt.verifyer().verify(password.toCharArray(), hash)
         if (!result.verified) return null
 
-        return issueTokenPair(user[UsersTable.id], email, user[UsersTable.displayName])
+        return issueTokenPair(user[UsersTable.id], email, user[UsersTable.displayName], user[UsersTable.photoUrl], user[UsersTable.role])
     }
 
     fun googleAuth(idToken: String): TokenPair? {
@@ -75,7 +75,7 @@ class AuthService(
         val photoUrl = claims["picture"]
         val now = Instant.now().toEpochMilli()
 
-        data class ResolvedUser(val id: String, val displayName: String, val photoUrl: String?)
+        data class ResolvedUser(val id: String, val displayName: String, val photoUrl: String?, val role: String)
 
         val resolved = transaction {
             val byGoogleId = UsersTable.selectAll()
@@ -89,7 +89,7 @@ class AuthService(
                         it[UsersTable.photoUrl] = photoUrl
                     }
                 }
-                ResolvedUser(byGoogleId[UsersTable.id], byGoogleId[UsersTable.displayName], photoUrl)
+                ResolvedUser(byGoogleId[UsersTable.id], byGoogleId[UsersTable.displayName], photoUrl, byGoogleId[UsersTable.role])
             } else {
                 val byEmail = UsersTable.selectAll()
                     .where { UsersTable.email eq email }
@@ -101,7 +101,7 @@ class AuthService(
                         it[UsersTable.googleId] = googleId
                         it[UsersTable.photoUrl] = photoUrl
                     }
-                    ResolvedUser(byEmail[UsersTable.id], byEmail[UsersTable.displayName], photoUrl)
+                    ResolvedUser(byEmail[UsersTable.id], byEmail[UsersTable.displayName], photoUrl, byEmail[UsersTable.role])
                 } else {
                     val newId = UUID.randomUUID().toString()
                     UsersTable.insert {
@@ -112,12 +112,12 @@ class AuthService(
                         it[UsersTable.photoUrl] = photoUrl
                         it[createdAt] = now
                     }
-                    ResolvedUser(newId, displayName, photoUrl)
+                    ResolvedUser(newId, displayName, photoUrl, UserRole.USER)
                 }
             }
         }
 
-        return issueTokenPair(resolved.id, email, resolved.displayName, resolved.photoUrl)
+        return issueTokenPair(resolved.id, email, resolved.displayName, resolved.photoUrl, resolved.role)
     }
 
     fun refresh(token: String): TokenPair? {
@@ -138,12 +138,13 @@ class AuthService(
         val email = row[UsersTable.email]
         val displayName = row[UsersTable.displayName]
         val photoUrl = row[UsersTable.photoUrl]
+        val role = row[UsersTable.role]
 
         transaction {
             RefreshTokensTable.deleteWhere { RefreshTokensTable.token eq token }
         }
 
-        return issueTokenPair(userId, email, displayName, photoUrl)
+        return issueTokenPair(userId, email, displayName, photoUrl, role)
     }
 
     fun revoke(token: String) {
@@ -201,11 +202,17 @@ class AuthService(
             UsersTable.selectAll().where { UsersTable.id eq userId }.firstOrNull()
         } ?: return null
 
-        return issueTokenPair(userId, user[UsersTable.email], user[UsersTable.displayName])
+        return issueTokenPair(userId, user[UsersTable.email], user[UsersTable.displayName], user[UsersTable.photoUrl], user[UsersTable.role])
     }
 
-    private fun issueTokenPair(userId: String, email: String, displayName: String, photoUrl: String? = null): TokenPair {
-        val accessToken = jwtService.generateToken(userId, email, displayName, photoUrl)
+    private fun issueTokenPair(
+        userId: String,
+        email: String,
+        displayName: String,
+        photoUrl: String? = null,
+        role: String = UserRole.USER,
+    ): TokenPair {
+        val accessToken = jwtService.generateToken(userId, email, displayName, photoUrl, role)
         val refreshToken = UUID.randomUUID().toString()
         val now = Instant.now().toEpochMilli()
 

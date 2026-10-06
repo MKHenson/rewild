@@ -15,6 +15,7 @@ type Props = {
   onStart: () => void;
   onOptions: () => void;
   onEditor: () => void;
+  onAdmin: () => void;
 };
 
 @register('x-main-menu')
@@ -66,6 +67,12 @@ export class MainMenu extends Component<Props> {
                 <Icon size="s" icon="wrench" />
                 <span>Editor</span>
               </Button>
+              {authStore.isSuperAdmin ? (
+                <Button onClick={props.onAdmin} fullWidth>
+                  <Icon size="s" icon="shield" />
+                  <span>Administration</span>
+                </Button>
+              ) : null}
             </div>
           )}
         </Modal>

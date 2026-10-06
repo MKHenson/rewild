@@ -7,6 +7,8 @@ import { ConfirmationModal } from './ConfirmationModal';
 import { ResetPassword } from './ResetPassword';
 import { SettingsPanel } from './SettingsPanel';
 import { PerfPanel } from './PerfPanel';
+import { AdminPage } from './admin/AdminPage';
+import { UserDetailPage } from './admin/UserDetailPage';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
 
 interface Props {}
@@ -28,6 +30,10 @@ export class Application extends Component<Props> {
 
     const onQuit = () => {
       navigate('/');
+    };
+
+    const onAdmin = () => {
+      navigate('/admin');
     };
 
     // App level rather than inside a route, so backquote opens it over the game
@@ -52,6 +58,7 @@ export class Application extends Component<Props> {
                 onStart={onStart}
                 onOptions={onOptions}
                 onEditor={onEditor}
+                onAdmin={onAdmin}
               />
             )}
           />
@@ -63,6 +70,21 @@ export class Application extends Component<Props> {
           <Route
             path="/editor"
             onRender={(params) => <ProjectEditorPage onQuit={onQuit} />}
+          />
+          <Route
+            path="/admin/users/:userId"
+            onRender={(params) => (
+              <UserDetailPage userId={params.userId} onBack={onAdmin} />
+            )}
+          />
+          <Route
+            path="/admin"
+            onRender={() => (
+              <AdminPage
+                onClose={onQuit}
+                onOpenUser={(userId) => navigate(`/admin/users/${userId}`)}
+              />
+            )}
           />
           <Route path="/reset-password" onRender={() => <ResetPassword />} />
         </RouterSwitch>,

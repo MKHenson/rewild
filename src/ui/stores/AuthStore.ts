@@ -1,4 +1,4 @@
-import { authService } from '../../api/auth/auth-service';
+import { authService, UserRole } from '../../api/auth/auth-service';
 import { db } from '../../database/database';
 import { Dispatcher } from 'rewild-common';
 
@@ -7,6 +7,7 @@ interface IUser {
   email: string | null;
   photoURL: string | null;
   emailVerified: boolean;
+  role: UserRole;
   type: 'guest' | 'user';
 }
 
@@ -17,6 +18,7 @@ const guestUser: IUser = {
   email: null,
   photoURL: null,
   emailVerified: false,
+  role: 'user',
   type: 'guest',
 };
 
@@ -28,6 +30,7 @@ function toStoreUser(
     email: user.email,
     emailVerified: user.emailVerified,
     photoURL: user.photoURL,
+    role: user.role,
     type: 'user',
   };
 }
@@ -38,6 +41,10 @@ export class AuthStore {
   user: IUser;
 
   readonly dispatcher = new Dispatcher<AuthStoreEvents>();
+
+  get isSuperAdmin(): boolean {
+    return this.loggedIn && this.user.role === 'super_admin';
+  }
 
   constructor() {
     const currentUser = authService.getUser();

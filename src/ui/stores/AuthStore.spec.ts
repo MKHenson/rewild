@@ -109,6 +109,7 @@ describe('AuthStore', () => {
         displayName: null,
         photoURL: null,
         emailVerified: true,
+        role: 'user',
       });
       expect(store.loggedIn).toBe(true);
       expect(store.user.email).toBe('user@example.com');
@@ -120,6 +121,7 @@ describe('AuthStore', () => {
         displayName: null,
         photoURL: null,
         emailVerified: true,
+        role: 'user',
       });
       authService.onAuthStateChanged.dispatch(null);
       expect(store.loggedIn).toBe(false);

@@ -440,6 +440,12 @@ S3_SECRET_KEY=rewild-dev
 
 Anonymous users have no JWT. `SyncEngine.run()` is a no-op if not authenticated.
 
+#### Roles
+
+`users.role` is `user` (default) or `super_admin`. The JWT carries a `role` claim, which the client uses only to decide what to show (e.g. the Administration menu entry). `/api/admin/*` routes are guarded by `SuperAdminGuard`, which checks the role in the database on every call, so a demotion takes effect immediately. There is no UI to create the first super admin; grant it directly:
+
+The user must sign in again (or wait for the next token refresh) before the menu entry appears.
+
 ---
 
 ### Ktor Server Structure
@@ -452,6 +458,9 @@ server/
       Level.kt              — Level + nested sub-types (TerrainConfig, FogConfig etc.)
       Project.kt            — Project model
       SyncModels.kt         — SyncRequest / SyncResponse envelope types
+    admin/
+      AdminRoutes.kt        — /api/admin/users (super admin only)
+      SuperAdminGuard.kt    — route plugin rejecting non super admins with 403
     auth/
       AuthRoutes.kt         — /api/auth/login, /refresh, /logout
       JwtService.kt         — token issuance and validation

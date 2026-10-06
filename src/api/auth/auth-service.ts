@@ -8,11 +8,14 @@ type GoogleAuthRequest = components['schemas']['com.rewild.auth.GoogleAuthReques
 type ForgotPasswordRequest = components['schemas']['com.rewild.auth.ForgotPasswordRequest'];
 type ResetPasswordRequest = components['schemas']['com.rewild.auth.ResetPasswordRequest'];
 
+export type UserRole = 'user' | 'super_admin';
+
 export interface IAuthUser {
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
   emailVerified: boolean;
+  role: UserRole;
 }
 
 const API_BASE_URL = process.env.API_BASE_URL ?? '';
@@ -140,15 +143,16 @@ export class AuthService {
     try {
       const payload = JSON.parse(
         atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
-      ) as { email?: string; displayName?: string; photoUrl?: string };
+      ) as { email?: string; displayName?: string; photoUrl?: string; role?: string };
       return {
         displayName: payload.displayName ?? null,
         email: payload.email ?? null,
         photoURL: payload.photoUrl ?? null,
         emailVerified: false,
+        role: payload.role === 'super_admin' ? 'super_admin' : 'user',
       };
     } catch {
-      return { displayName: null, email: null, photoURL: null, emailVerified: false };
+      return { displayName: null, email: null, photoURL: null, emailVerified: false, role: 'user' };
     }
   }
 }
