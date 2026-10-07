@@ -11,6 +11,8 @@ import { registerGltfImportCommands } from './GltfImportCommands';
 import { registerLakeDebugCommands } from './LakeDebugCommands';
 import { registerWaterDebugCommands } from './WaterDebugCommands';
 import { registerWaterEditDevCommands } from './WaterEditDevCommands';
+import { registerAudioDebugCommands } from './AudioDebugCommands';
+import { audio } from '../audio/audio';
 import {
   registerScatterDebugCommands,
   registerWindDebugCommands,
@@ -34,4 +36,5 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerWaterDebugCommands(renderer);
   registerWaterEditDevCommands(renderer, project);
   registerChunkSnapshotDevCommands(renderer, project);
+  registerAudioDebugCommands(audio);
 }

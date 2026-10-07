@@ -1,0 +1,12 @@
+{
+  "name": "rewild-audio",
+  "version": "1.0.0",
+  "description": "Web Audio engine: buses, beds and 3D emitters",
+  "main": "index.ts",
+  "scripts": {
+    "test": "jest",
+    "ts-check": "tsc --noEmit -p tsconfig.json"
+  },
+  "author": "Mathew Henson",
+  "license": "ISC"
+}

@@ -319,6 +319,30 @@ See [Understory](./milestones/understory.md).
 
 ---
 
+## Audio
+
+Registered in `AudioDebugCommands.ts`.
+
+```js
+audio(); // context state, world muffle and duck, and a table of every bus
+setAudioVolume('weather', 0.5); // bus volume, 0 to 1
+muteAudio('world'); // toggles; no argument mutes master
+soloAudio('weather'); // hear one bus; call again, or with no argument, to clear
+```
+
+The buses are `master`, `music`, `world`, `ambience`, `weather`, `effects`,
+`player` and `ui`. `ambience`, `weather` and `effects` feed `world`; the rest feed
+`master`. A solo keeps the soloed bus, the buses above it and the buses under it.
+The `effective` column in `audio()` is the bus gain times every gain above it.
+
+The context is created by the first click or key press on the page, so before
+that `audio()` reports `idle`. Volume, mute and solo changes made earlier still apply
+once it starts.
+
+See [Susurrus](./milestones/susurrus.md).
+
+---
+
 ## Perf panel
 
 Press the backquote key (`` ` ``) in the game or the editor. Press it again to

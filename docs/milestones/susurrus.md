@@ -94,8 +94,8 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
 | Logic              | **Pure mapping functions**, unit tested in jest                                    | `windiness → gain` and similar are plain functions. Jest has no Web Audio, so the engine stays a thin layer over them.                                                                                   |
 | File format        | **Ogg Vorbis**, 48 kHz                                                             | Chrome and Electron decode it. It is smaller than WAV. The dev server already serves `.ogg`.                                                                                                             |
 | Loading            | **Decode every sound**                                                             | Decoded loops join with no gap. See [Decode or stream](#decode-or-stream).                                                                                                                               |
-| Start              | **Create the context on the Start button**                                         | Chrome blocks audio until the user clicks. The Start button and the canvas click are user gestures.                                                                                                      |
-| Engine lifetime    | **Owned by `Application`**, kept across a restart                                  | Restart disposes the viewport and its `GameManager`. The engine, its context and its decoded sounds stay. The new game attaches to it.                                                                   |
+| Start              | **Start the context on the first user gesture**                                    | Chrome blocks audio until the user clicks or presses a key. The first one anywhere, such as **Start** or **Editor**, starts it, so a main menu theme can play too.                                       |
+| Engine lifetime    | **One engine for the whole session**                                               | Restart disposes the viewport and its `GameManager`. The engine, its context and its decoded sounds stay. The game and the editor attach to it and detach from it.                                       |
 
 ## The audio engine
 
@@ -226,11 +226,14 @@ The sounds come from Soundly. Every entry has a `source` and a `license`:
 
 ### Start, focus and pause
 
-- **Start.** `Application` creates the engine and its `AudioContext` from the main menu's **Start**
-  button. If the context is still `suspended`, the canvas click that takes pointer lock resumes it.
+- **Start.** `Application` calls `audio.startOnGesture(document)`. The first click, tap or key
+  press anywhere creates the `AudioContext`. On the main menu that is usually **Start** or
+  **Editor**. A gesture the browser does not accept leaves the context suspended, and the next one
+  tries again.
 - **Restart.** The engine stays. The old game's beds and voices stop, and the new game attaches.
   The decoded sounds are kept, so a restart loads nothing.
-- **Quit.** Leaving the game for the main menu stops all sound and closes the context.
+- **Quit.** Leaving the game for the main menu stops the game's sounds. The engine keeps running,
+  so the menu can have its own sound.
 - **Menu.** Opening the in-game menu ducks the world bus. **Resume** lifts it.
 - **Hidden window.** On `visibilitychange` to hidden, the engine suspends the context. It resumes
   when the window shows again. This is the first `visibilitychange` handler in the game.
@@ -807,21 +810,21 @@ it is built.
 
 - **The toggle.** A sound button in `PositionReadout`, next to the lens effects button. It saves
   its state in localStorage as `rewild.editor.sound`, in the same way. It is off by default.
-- **The first click.** The button click is a user gesture, so it creates or resumes the
-  `AudioContext`. No other start is needed in the editor.
+- **The start.** The click on **Editor** in the main menu already started the context. The toggle
+  only says whether the editor plays its sound.
 - **The listener** is the editor camera. Weather, thunder, water, biome soundscapes and calls all
   read the listener's position, so they work with no player.
 - **No player sounds.** There is no player in the editor, so no footsteps, breathing or splashes.
 - **The loop.** The editor's `RendererSync` loop calls `audio.update()` after the renderer, as
   `GameManager.onUpdate` does in the game.
-- **Leaving the editor** stops all sound and closes the context.
+- **Leaving the editor** stops the editor's sounds. The engine keeps running.
 
 ## Electron
 
 Electron is Chromium, so this design runs in it unchanged. Electron also allows:
 
-- **No autoplay block.** A command-line switch turns off the user-gesture rule. The Start button
-  path stays for the browser.
+- **No autoplay block.** `app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')` turns off the user-gesture rule, so the context runs on arrival.
+  The gesture start stays for the browser.
 - **An output device setting.** `AudioContext.setSinkId` picks a device, for example headphones.
   It works in Chrome too.
 - **Audio in the background.** The window can keep playing when it does not have focus. The
@@ -868,7 +871,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 
 | Where                        | Change                                                                                                      |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `MainMenu` / `Application`   | Create the engine and its context on **Start**. Keep it across a restart. Close it on quit.                 |
+| `Application`                | Start the engine on the first user gesture. Keep it for the whole session.                                  |
 | `GameManager.onUpdate`       | Call `audio.update()` after `renderer.onFrame()`. Stop the game's sounds when the game is disposed.         |
 | `Player.ts`                  | Own the player sound: footsteps, body, swimming, sliding, voice, the under-water mix and the death sound.   |
 | `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.                 |
@@ -934,10 +937,9 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 #### 5. Sound in the game
 
-- **Delivers.** `Application` creates the engine from the **Start** button, and the pointer-lock
-  click resumes it. `GameManager` calls `audio.update()` after `renderer.onFrame()`. The in-game
-  menu ducks the world. A hidden tab suspends the context. A restart keeps the engine and stops the
-  old game's sounds. Quitting to the main menu closes the context.
+- **Delivers.** `GameManager` calls `audio.update()` after `renderer.onFrame()`. The in-game menu
+  ducks the world. A hidden tab suspends the context. A restart keeps the engine and stops the old
+  game's sounds. Quitting to the main menu stops the game's sounds.
 - **Expect.** Press **Start** and a test bed plays. Open the menu and the world goes quieter.
   **Resume** brings it back. Switch tabs and the sound stops. Switch back and it plays again.
   Restart and the sound comes back with nothing loaded again. Quit and the sound stops.
