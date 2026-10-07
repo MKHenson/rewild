@@ -12,13 +12,15 @@ struct VSOutput {
   @location(6) texcoord : vec2f,
 };
 
-struct HealthbarData {
-  playerHealth: f32,
+struct MeterData {
+  fullColor: vec4f,
+  emptyColor: vec4f,
+  value: f32,
 }
 
 @group(0) @binding(0) var<uniform> uni: UISharedUniforms;
 @group(1) @binding(0) var<storage, read> transforms: array<UIInstanceData>;
-@group(2) @binding(0) var<uniform> healthData: HealthbarData;
+@group(2) @binding(0) var<uniform> meter: MeterData;
  
 @vertex fn vs(vert: Vertex) -> VSOutput {
   let vsOut = createVSOutput(vert, uni, transforms[vert.instanceIndex]);
@@ -38,26 +40,22 @@ fn sin_01(x: f32) -> f32 {
   let alpha = 1.0 - smoothstep(0.0, softness, dist);
   let borderMix = smoothstep(-borderSize - softness, -borderSize + softness, dist);
 
-  let healthFlashingOpacity = mix( mix(0.5, 0.9, sin_01(uni.totalTime / 50.0f)), 1.0, healthData.playerHealth );
+  let flashingOpacity = mix( mix(0.5, 0.9, sin_01(uni.totalTime / 50.0f)), 1.0, meter.value );
 
-  let healthyColor = vec4f(mix(0.0, 0.5, vsOut.uv.x), mix(0.5, 1.0, vsOut.uv.y), mix(0.0, 0.3, 1.0 - vsOut.uv.x), 0.9 );
-  let unHealthyColor = vec4f(mix(0.5, 1.0, vsOut.uv.y), 0.0, 0.0, 0.9 );
+  let shade = mix(0.6, 1.0, vsOut.uv.y);
+  let fillColor = mix( meter.emptyColor, meter.fullColor, meter.value );
+  let shadedFill = vec4f(fillColor.rgb * shade, fillColor.a);
+  let backgroundColor = vec4f(meter.emptyColor.rgb * mix(0.2, 0.5, vsOut.uv.y), 0.9 );
 
-  let originalColor = mix( unHealthyColor, healthyColor, healthData.playerHealth );
-  let backgroundColor = vec4f(mix(0.2, 0.5, vsOut.uv.y), 0.0, 0.0, 0.9 );
-
-  let localX = vsOut.localPos.x;
-  let width = vsOut.size.x;
-  let isHealth = localX < (width * healthData.playerHealth);
-
-  let mixedHealthAndBg = select( backgroundColor, originalColor, isHealth );
+  let isFilled = vsOut.localPos.x < (vsOut.size.x * meter.value);
+  let mixedFillAndBg = select( backgroundColor, shadedFill, isFilled );
 
   let borderColor = vsOut.borderColor;
-  let finalColor = mix(mixedHealthAndBg, borderColor, borderMix);
+  let finalColor = mix(mixedFillAndBg, borderColor, borderMix);
 
   if (alpha <= 0.0) {
     discard;
   }
 
-  return vec4f( finalColor.xyz, healthFlashingOpacity * alpha );
+  return vec4f( finalColor.xyz, flashingOpacity * alpha );
 }

@@ -1,11 +1,11 @@
 import { Component, Loading, Pane3D, register } from 'rewild-ui';
 import { Renderer } from 'rewild-renderer';
 import { Player } from 'src/core/routing/Player';
-import { InGameUI } from './InGameUI';
 import { GameManager } from 'src/core/GameManager';
 
 interface Props {
   onUnlock: () => void;
+  onDeath: () => void;
 }
 
 @register('x-viewport-statemachine')
@@ -16,12 +16,12 @@ export class ViewportStateMachine extends Component<Props> {
   init() {
     this.player = new Player('Player');
     this.gameManager = new GameManager(this.player, this.props.onUnlock);
+    this.player.onDeath = () => this.props.onDeath();
 
     // Covers physics init, renderer setup and the initial level load.
     const [loading, setLoading] = this.useState(true);
 
     const onFrame = () => {
-      inGame.update();
       this.gameManager.onUpdate();
 
       if (!this.gameManager.renderer.disposed)
@@ -56,12 +56,10 @@ export class ViewportStateMachine extends Component<Props> {
     };
 
     const canvas = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
-    const inGame = (<InGameUI player={this.player} />) as InGameUI;
     const loadingOverlay = (<Loading overlay label="Loading" />) as Loading;
     const toReturn = (
       <div class="container">
         {canvas}
-        {inGame}
       </div>
     ) as HTMLDivElement;
 

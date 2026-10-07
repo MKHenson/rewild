@@ -2,6 +2,7 @@ import { Modal, Button, Typography, Component, register } from 'rewild-ui';
 
 type Props = {
   open: boolean;
+  onRestartClick: () => void;
   onQuitClick: () => void;
 };
 
@@ -10,10 +11,13 @@ export class GameOverMenu extends Component<Props> {
   init() {
     return () => (
       <Modal hideConfirmButtons open={this.props.open} withBackground>
-        <Typography variant="h2">GAME OVER</Typography>
+        <Typography variant="h2">YOU DIED</Typography>
         <div>
+          <Button onClick={this.props.onRestartClick} fullWidth>
+            Restart
+          </Button>
           <Button onClick={this.props.onQuitClick} fullWidth>
-            Quit
+            Main Menu
           </Button>
         </div>
       </Modal>

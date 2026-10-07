@@ -9,7 +9,7 @@ import { WireframePass } from '../materials/WireframePass';
 import { Renderer } from '../Renderer';
 import { IMaterialsTemplate, IStandardMaterialTemplate } from './types';
 import { UIElementPass } from '../materials/UIElementPass';
-import { UIElementHealthPass } from '../materials/UIElementHealthPass';
+import { UIElementMeterPass } from '../materials/UIElementMeterPass';
 import { StandardPass } from '../materials/StandardPass';
 import { StandardInstancedPass } from '../materials/StandardInstancedPass';
 import { ScatterInstancedPass } from '../materials/ScatterInstancedPass';
@@ -47,7 +47,10 @@ export class MaterialManager {
     if (this.initialized) return;
 
     this.addMaterial('ui-material', new UIElementPass());
-    this.addMaterial('ui-health-material', new UIElementHealthPass());
+    this.addMaterial('ui-health-material', new UIElementMeterPass());
+    const hunger = new UIElementMeterPass();
+    hunger.meter.setColors(0.95, 0.6, 0.1, 0.55, 0.2, 0.0);
+    this.addMaterial('ui-hunger-material', hunger);
 
     templates.materials.forEach((t) => {
       let materialPass: IMaterialPass;

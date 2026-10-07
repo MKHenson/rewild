@@ -1,5 +1,5 @@
 import { Geometry } from '../geometry/Geometry';
-import shader from '../shaders/gui-instanced-healthbar.wgsl';
+import shader from '../shaders/gui-instanced-meter.wgsl';
 import { Renderer } from '..';
 import { PerMeshTracker } from './PerMeshTracker';
 import { SharedUniformsTracker } from './SharedUniformsTracker';
@@ -7,10 +7,11 @@ import { Camera } from '../core/Camera';
 import { UIElementShared } from './uniforms/UIElementShared';
 import { UIElementInstanceData } from './uniforms/UIElementInstanceData';
 import { UIElement } from '../core/UIElement';
-import { UIElementHealth } from './uniforms/UIElementHealth';
+import { UIElementMeter } from './uniforms/UIElementMeter';
 import { IUIElementPass } from './IUIElementPass';
 
-export class UIElementHealthPass implements IUIElementPass {
+/** Draws UI elements as horizontal bars filled to a shared level. */
+export class UIElementMeterPass implements IUIElementPass {
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
@@ -23,13 +24,13 @@ export class UIElementHealthPass implements IUIElementPass {
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       new UIElementShared(0),
       new UIElementInstanceData(1),
-      new UIElementHealth(2),
+      new UIElementMeter(2),
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => []);
   }
 
-  get healthUniforms(): UIElementHealth {
-    return this.sharedUniformsTracker.uniforms[2] as UIElementHealth;
+  get meter(): UIElementMeter {
+    return this.sharedUniformsTracker.uniforms[2] as UIElementMeter;
   }
 
   init(renderer: Renderer): void {
@@ -42,7 +43,7 @@ export class UIElementHealthPass implements IUIElementPass {
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'gui healthpass pipeline',
+      label: 'gui meter pipeline',
       layout: 'auto',
       vertex: {
         entryPoint: 'vs',

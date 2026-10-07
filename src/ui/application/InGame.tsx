@@ -17,7 +17,24 @@ export class InGame extends Component<Props> {
 
     const onResume = () => {
       setModalOpen(false);
-      (viewport as ViewportStateMachine).gameManager.lock();
+      viewport.gameManager.lock();
+    };
+
+    const onDeath = () => {
+      setActiveMenu('gameOverMenu');
+      setModalOpen(true);
+    };
+
+    const createViewport = () =>
+      (
+        <ViewportStateMachine onUnlock={onUnlock} onDeath={onDeath} />
+      ) as ViewportStateMachine;
+
+    const onRestart = () => {
+      viewport.dispose();
+      viewport = createViewport();
+      setModalOpen(false);
+      setActiveMenu('ingameMenu');
     };
 
     const onSettings = () => setActiveMenu('settings');
@@ -32,7 +49,7 @@ export class InGame extends Component<Props> {
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || activeMenu() === 'gameOverMenu') return;
 
       if (!modalOpen()) {
         setModalOpen(true);
@@ -50,7 +67,9 @@ export class InGame extends Component<Props> {
     /** The one panel the overlay is showing, if any. */
     const renderMenu = () => {
       if (activeMenu() === 'gameOverMenu')
-        return <GameOverMenu onQuitClick={onQuit} open />;
+        return (
+          <GameOverMenu onRestartClick={onRestart} onQuitClick={onQuit} open />
+        );
 
       if (activeMenu() === 'settings')
         return <SettingsPanel onClose={onSettingsClose} />;
@@ -67,10 +86,10 @@ export class InGame extends Component<Props> {
 
     this.onCleanup = () => {
       document.removeEventListener('keydown', onKeyDown);
-      (viewport as ViewportStateMachine).dispose();
+      viewport.dispose();
     };
 
-    const viewport = <ViewportStateMachine onUnlock={onUnlock} />;
+    let viewport = createViewport();
 
     return () => (
       <div>

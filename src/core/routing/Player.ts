@@ -20,7 +20,7 @@ import {
   Collider,
 } from '@dimforge/rapier3d-compat';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
-import { UIElementHealthPass } from 'node_modules/rewild-renderer/lib/materials/UIElementHealthPass';
+import { UIElementMeterPass } from 'node_modules/rewild-renderer/lib/materials/UIElementMeterPass';
 import {
   clamp,
   Color,
@@ -69,6 +69,9 @@ const _MIN_CAPSULE_Y: f32 = _CAPSULE_HALF_EXTENT;
 // Downward nudge applied while grounded; Rapier only snaps a movement that
 // already points down.
 const _GROUND_STICK: f32 = 0.001;
+// Hunger empties over ten minutes; once it has, starvation drains health over one.
+const _HUNGER_DRAIN_PER_SEC: f32 = 50 / 600;
+const _STARVATION_DAMAGE_PER_SEC: f32 = 100 / 60;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
 
@@ -110,7 +113,11 @@ export class Player extends Node {
   private _waterQuery: WaterQuery | null = null;
   // Metres a second the wind's gusts shove the player downwind.
   private _gustPush: f32 = 0;
-  uiHealthBar: UIElementHealthPass;
+  uiHealthBar: UIElementMeterPass;
+  uiHungerBar: UIElementMeterPass;
+  /** Called once when health reaches zero. */
+  onDeath: (() => void) | null = null;
+  private _dead: boolean = false;
 
   // Pointer-lock / mouse-look state
   private _yaw: f32 = 0;
@@ -168,6 +175,7 @@ export class Player extends Node {
   }
 
   requestLock() {
+    if (this._dead) return;
     document.body.requestPointerLock();
   }
 
@@ -184,23 +192,35 @@ export class Player extends Node {
     const stateData = this.stateMachine?.data as StateMachineData;
 
     if (!this.uiHealthBar) {
-      this.uiHealthBar = stateData.renderer.materialManager.get(
+      const { materialManager, guiManager, ui } = stateData.renderer;
+      this.uiHealthBar = materialManager.get(
         'ui-health-material'
-      ) as UIElementHealthPass;
-      const healthBar = stateData.renderer.guiManager.createElement(
-        this.uiHealthBar
-      );
-      // stateData.renderer.ui.addChild(healthBar.transform);
+      ) as UIElementMeterPass;
+      const healthBar = guiManager.createElement(this.uiHealthBar);
+      ui.addChild(healthBar.transform);
       healthBar.borderRadius = 20;
       healthBar.width = 0.4;
       healthBar.height = 0.05;
       healthBar.x = 0.3;
       healthBar.y = 0.92;
       healthBar.percentageBasedCalculation = true;
+
+      this.uiHungerBar = materialManager.get(
+        'ui-hunger-material'
+      ) as UIElementMeterPass;
+      const hungerBar = guiManager.createElement(this.uiHungerBar);
+      ui.addChild(hungerBar.transform);
+      hungerBar.borderRadius = 12;
+      hungerBar.width = 0.4;
+      hungerBar.height = 0.03;
+      hungerBar.x = 0.3;
+      hungerBar.y = 0.88;
+      hungerBar.percentageBasedCalculation = true;
     }
 
-    this._hunger = 100.0;
-    this._health = 100.0;
+    this.hunger = 100.0;
+    this.health = 100.0;
+    this._dead = false;
     this.cameraController.camera.transform.position.set(0, 0, -10);
     this.cameraController.camera.lookAt(0, 0, 0);
     this.syncLookFromCamera();
@@ -282,6 +302,11 @@ export class Player extends Node {
 
   set hunger(value: f32) {
     this._hunger = clamp(value, 0.0, 100.0);
+    this.uiHungerBar.meter.value = this._hunger / 100.0;
+  }
+
+  get dead(): boolean {
+    return this._dead;
   }
 
   get health(): f32 {
@@ -290,7 +315,7 @@ export class Player extends Node {
 
   set health(value: f32) {
     this._health = clamp(value, 0.0, 100.0);
-    this.uiHealthBar.healthUniforms.health = this._health / 100.0;
+    this.uiHealthBar.meter.value = this._health / 100.0;
   }
 
   unMount(): void {
@@ -327,6 +352,18 @@ export class Player extends Node {
     this._slide.reset();
   }
 
+  private _die(): void {
+    this._dead = true;
+    this.stopMotion();
+    this._movingForward = false;
+    this._movingBackward = false;
+    this._movingLeft = false;
+    this._movingRight = false;
+    this._sprinting = false;
+    this.onDeath?.();
+    if (document.pointerLockElement) document.exitPointerLock();
+  }
+
   // The level's rigid bodies start disabled so props don't sink through
   // terrain whose colliders haven't been built yet; this releases them once the
   // world is settled (or once we know no terrain is coming).
@@ -342,6 +379,8 @@ export class Player extends Node {
   }
 
   onUpdate(delta: f32, total: u32): void {
+    if (this._dead) return;
+
     // Apply mouse look to camera
     _euler.set(this._pitch, this._yaw, 0, EulerRotationOrder.YXZ);
     this.cameraController.camera.transform.quaternion.setFromEuler(
@@ -575,6 +614,11 @@ export class Player extends Node {
       this.health -= damage;
     }
 
+    if (this.spawnResolved) {
+      if (this._hunger > 0) this.hunger -= _HUNGER_DRAIN_PER_SEC * delta;
+      else this.health -= _STARVATION_DAMAGE_PER_SEC * delta;
+    }
+
     this._onGround =
       controllerGrounded && this.verticalVelocity <= 0.0 && !this.swimming;
     if (this._onGround && this.verticalVelocity < 0)
@@ -624,6 +668,8 @@ export class Player extends Node {
         camZ - cosYaw * cosPitch
       );
     }
+
+    if (this._health <= 0) this._die();
   }
 
   private _handleMouseMove(e: MouseEvent) {
@@ -670,6 +716,6 @@ export class Player extends Node {
   }
 
   private _handleCanvasClick() {
-    if (!this._isLocked) document.body.requestPointerLock();
+    if (!this._isLocked && !this._dead) document.body.requestPointerLock();
   }
 }
