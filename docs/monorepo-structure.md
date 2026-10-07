@@ -8,6 +8,7 @@
 | `rewild-renderer` | WebGPU 3D engine: shaders, materials, textures, geometry, input           |
 | `rewild-common`   | Shared constants, event dispatcher, enums                                 |
 | `rewild-routing`  | Game state machine and routing types                                      |
+| `rewild-audio`    | Web Audio engine: the audio context, bus graph and mixer                  |
 
 ## Build & Dev Commands
 

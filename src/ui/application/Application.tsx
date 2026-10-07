@@ -9,12 +9,15 @@ import { SettingsPanel } from './SettingsPanel';
 import { PerfPanel } from './PerfPanel';
 import { AdminPage } from './admin/AdminPage';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
+import { audio } from '../../core/audio/audio';
 
 interface Props {}
 
 @register('x-application')
 export class Application extends Component<Props> {
   init() {
+    audio.startOnGesture(document);
+
     const onStart = async () => {
       navigate('/game');
     };

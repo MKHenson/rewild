@@ -58,6 +58,7 @@
     "packages/rewild-routing",
     "packages/rewild-common",
     "packages/rewild-renderer",
+    "packages/rewild-audio",
     "tools/scatter-forge"
   ]
 }
