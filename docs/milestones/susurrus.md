@@ -29,8 +29,14 @@ The work has four parts:
 1. **The audio engine.** A small engine on the Web Audio API: buses, a sound manifest, beds,
    3D emitters, the listener, settings and debug commands.
 2. **Weather sound.** Wind, rain, snow and thunder.
-3. **Water and the player.** Under-water sound, swimming, splashes, surf and footsteps.
-4. **The land.** Biome soundscapes with weather rules, day and night, and wildlife calls in 3D.
+3. **The player.** Under-water sound, swimming, splashes, footsteps, sliding, breath and death.
+4. **The land.** Surf, biome soundscapes with weather rules, day and night, and wildlife calls in
+   3D.
+
+The engine is a library and knows nothing about the game. The game systems own their own sound
+as plain classes that use the engine. The `Player` owns every player sound, because it already
+knows its own state. The soundscape owns the weather and the land. A system can drive its sound
+from its own update or from an event, whichever fits.
 
 There are no animals yet. Wildlife sound comes from biome beds and from one-shot calls placed in
 3D around the player. The emitter API is the one creatures will use when they arrive.
@@ -38,7 +44,7 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
 ## Goals
 
 - One **audio engine** on Web Audio, owned by the game and updated once each frame.
-- A **mixer** with buses: master, ambience, weather, effects and UI. Each bus has a volume setting.
+- A **mixer** with buses: master, music, world (ambience, weather, effects), player and UI.
 - **3D sound.** A `PannerNode` per emitter and an `AudioListener` that follows the camera.
 - **Beds**: looping layers whose volume and tone follow a game value smoothly, with no clicks.
 - A **sound manifest** in `templates/sounds.json`, in the same pattern as `materials.json`.
@@ -52,13 +58,14 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
 - **Footsteps** from the ground material under the foot, with rules for wet ground, wading,
   sprinting and crouching. Landings from the fall speed.
 - **Sound in the editor**, turned on and off with a button in the editor's position readout.
-- An **Audio tab** in the settings panel. Settings persist like `QualitySettings`.
+- An **Audio tab** in the settings panel, with a few sliders that cover every bus. Settings persist
+  like `QualitySettings`.
 - **Debug commands** for the audio state, volumes and test sounds.
-- Stay in the browser's CPU and memory budget. Run unchanged in Chrome and in Electron.
+- Run unchanged in Chrome and in Electron.
 
 ## Non-goals (deferred)
 
-- **Music.** The bus exists, but no music system or score is in this milestone.
+- **Music.** The music bus and its slider exist, but no music system or score is in this milestone.
 - **Creatures.** No animal entities exist. Their sound waits for the creatures milestone.
 - **Occlusion and sound propagation.** No ray casts against terrain or trees in this milestone.
 - **Reverb from the terrain.** Valleys and cliffs that echo are a stretch goal (step 23).
@@ -70,23 +77,25 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
 | Audio API          | **Web Audio**, used directly                                                       | The target is Chrome and later Electron, which is Chromium. Web Audio behaves the same in both.                                                                                                          |
 | Middleware         | **None**                                                                           | FMOD and Wwise add licences, a large WASM download and an authoring tool. The goals do not need them.                                                                                                    |
 | Custom DSP         | **None in this milestone**                                                         | Panners, filters, convolvers and gains are native nodes on the audio thread. JS only sets their parameters.                                                                                              |
-| Where it lives     | **`AudioEngine`** in `packages/rewild-audio`, **soundscape** in `src/core/audio/`  | The engine knows nothing about the game. The soundscape reads the player, the sky and the water.                                                                                                         |
+| Where it lives     | **`AudioEngine`** in `packages/rewild-audio`, **soundscape** in `src/core/audio/`  | The engine knows nothing about the game. The soundscape reads the listener, the sky and the water.                                                                                                       |
+| Player sound       | **Owned by `Player`**, as plain classes it holds                                   | The player already has its slide, crouch, immersion, health and death. Its sound reads them directly, with no getters and no parallel copy of its state.                                                 |
 | Biome sound        | **Soundscape profiles** with **weather rules**, in `templates/soundscapes.json`    | A forest in a gale sounds different from a calm forest. Rules add, replace or scale layers. See [Soundscapes](#soundscapes).                                                                             |
 | Rule engine        | **One shared `RuleSet`** in `packages/rewild-audio`, for soundscapes and footsteps | Biome sound and footsteps both need "when the world is like this, change these sounds". One engine, one format, one test suite.                                                                          |
 | Rule conditions    | **Ranges on weather values**, and weather states eased over seconds                | The weather knobs ease and wander. A range follows them, so a layer fades in as the wind rises, not at a state change.                                                                                   |
 | Update point       | **`GameManager.onUpdate`**, after `renderer.onFrame()`                             | The player has moved, the sky has its new weather sample and the camera matrix is current.                                                                                                               |
-| Reading game state | **Polling each frame**                                                             | This matches the codebase. Weather, the player and water have no events. Polling a few numbers costs nothing.                                                                                            |
+| Reading game state | **Polling each frame**, events where they exist                                    | Weather and water have no events, and polling a few numbers costs nothing. Where an event exists, such as `Player.onDeath`, the sound can use it.                                                        |
 | Lightning          | **A strike queue** on `LightningController`, drained by the audio each frame       | Thunder needs the exact strike time and position. Polling `boltVisible` can miss chained strikes. A callback would run inside `sky.update`. A queue lets the audio read strikes at its own update point. |
 | Parameter changes  | **`setTargetAtTime`** on every `AudioParam`                                        | Writing `.value` each frame makes zipper noise and clicks. A time constant gives smooth changes at any frame rate.                                                                                       |
 | Beds               | **2D, no panner**                                                                  | Rain, wind and biome life are all around the player. A panner would make them come from one point.                                                                                                       |
 | Player sounds      | **2D, no panner**                                                                  | Footsteps and breathing are at the listener. A panner there gives nothing and costs CPU.                                                                                                                 |
 | 3D emitters        | **`PannerNode`, HRTF**, from a fixed pool                                          | HRTF gives above, below and behind. A pool caps the CPU cost and needs no allocation per sound.                                                                                                          |
 | Far sounds         | **Gain and tone set by the game**, panner only for direction                       | Thunder is 700 to 1,900 m away. The game sets the distance curve. The panner sits 50 m out in the right direction.                                                                                       |
-| Under water        | **A low-pass insert** on the world buses                                           | One filter makes every world sound muffled. No sound needs its own under-water version.                                                                                                                  |
+| Under water        | **A low-pass insert** on the world bus, driven by the player                       | One filter makes every world sound muffled. No sound needs its own under-water version. `Player.cameraUnderWater` sets it.                                                                               |
 | Logic              | **Pure mapping functions**, unit tested in jest                                    | `windiness → gain` and similar are plain functions. Jest has no Web Audio, so the engine stays a thin layer over them.                                                                                   |
 | File format        | **Ogg Vorbis**, 48 kHz                                                             | Chrome and Electron decode it. It is smaller than WAV. The dev server already serves `.ogg`.                                                                                                             |
-| Loading            | **Decode every sound**, budget the beds                                            | `decodeAudioData` stores float PCM. 30 s of stereo is about 11.5 MB. See [Memory](#memory).                                                                                                              |
+| Loading            | **Decode every sound**                                                             | Decoded loops join with no gap. See [Decode or stream](#decode-or-stream).                                                                                                                               |
 | Start              | **Create the context on the Start button**                                         | Chrome blocks audio until the user clicks. The Start button and the canvas click are user gestures.                                                                                                      |
+| Engine lifetime    | **Owned by `Application`**, kept across a restart                                  | Restart disposes the viewport and its `GameManager`. The engine, its context and its decoded sounds stay. The new game attaches to it.                                                                   |
 
 ## The audio engine
 
@@ -97,6 +106,7 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
 emitters, beds  ─────────┼─▶ weather  ─┼─▶ world ─▶ under-water low-pass ─▶ menu duck ─┐
                          └─▶ effects  ─┘                                              ├─▶ master ─▶ compressor ─▶ out
 player sounds   ──────────▶ player ──────────────────────────────────────────────────┤
+music           ──────────▶ music ───────────────────────────────────────────────────┤
 UI sounds       ──────────▶ ui ──────────────────────────────────────────────────────┘
 ```
 
@@ -104,8 +114,10 @@ UI sounds       ──────────▶ ui ─────────
   and its gain drops. The player's own sounds skip it, so a swim stroke stays clear.
 - **menu duck** lowers the world when the in-game menu is open. The game keeps running behind the
   menu, so silence would sound wrong. A duck of about 12 dB is enough.
+- **music** skips the world, so music is never muffled under water. Nothing plays on it yet.
 - **compressor** is a `DynamicsCompressorNode` that keeps a close thunderclap from clipping.
-- Each bus is a `GainNode`. The settings set the bus gains.
+- Each bus is a `GainNode`. The settings set the master, music, world, player and UI gains. The
+  ambience, weather and effects gains are for tuning the mix, through debug commands.
 
 ### Beds
 
@@ -168,7 +180,13 @@ and come back with `npm run assets:pull`, like every other shared asset.
 ```json
 {
   "sounds": [
-    { "name": "wind-air", "files": ["audio/wind/air-01.ogg"], "loop": true },
+    {
+      "name": "wind-air",
+      "files": ["audio/wind/air-01.ogg"],
+      "loop": true,
+      "source": "Soundly: Wind Gentle Pine Forest 01",
+      "license": "soundly"
+    },
     {
       "name": "footstep-grass",
       "files": [
@@ -191,10 +209,28 @@ A `SoundBank` fetches and decodes the manifest at game start, with `Promise.all`
 player spawns. Beds for climates the world does not use are not loaded. An arid world never
 loads the forest bed.
 
+#### Sources and licences
+
+The sounds come from Soundly. Every entry has a `source` and a `license`:
+
+- **`source`** is the original file name in Soundly, so the sound can be found again.
+- **`license`** is `"soundly"` for a sound from Soundly's own library or a partner library. For a
+  Freesound result found through Soundly, it is that sound's own licence, such as `"CC0"` or
+  `"CC-BY-4.0"`, and `source` also names the author.
+- A CC-BY sound needs a credit in the game. `scripts/list-sound-credits.js` reads the manifest
+  and prints every credit that is needed.
+- A non-commercial licence, such as CC-BY-NC, is not allowed. The script fails on one.
+- Soundly's licence allows the sounds in a game but not passing them on as sound effects. The
+  bucket holds only the game's own Ogg encodes, trimmed, looped and mixed for the game. Each file
+  is public, like every other asset, but the bucket cannot be listed.
+
 ### Start, focus and pause
 
-- **Start.** The engine creates its `AudioContext` from the main menu's **Start** button. If the
-  context is still `suspended`, the canvas click that takes pointer lock resumes it.
+- **Start.** `Application` creates the engine and its `AudioContext` from the main menu's **Start**
+  button. If the context is still `suspended`, the canvas click that takes pointer lock resumes it.
+- **Restart.** The engine stays. The old game's beds and voices stop, and the new game attaches.
+  The decoded sounds are kept, so a restart loads nothing.
+- **Quit.** Leaving the game for the main menu stops all sound and closes the context.
 - **Menu.** Opening the in-game menu ducks the world bus. **Resume** lifts it.
 - **Hidden window.** On `visibilitychange` to hidden, the engine suspends the context. It resumes
   when the window shows again. This is the first `visibilitychange` handler in the game.
@@ -277,12 +313,19 @@ comes next. `forecast(1)` already says what comes next.
 **Manual strikes.** `triggerLightning` in the console also goes through `beginStrike`, so it pushes to the queue, so thunder can be
 tested on demand.
 
-## Water and the player
+## The player
+
+`Player` owns every player sound. It holds a few small classes, for example `Footsteps`, `Voice`
+and `BodySound`, and updates them from its own update. They read the player's private state
+directly: `_slide`, `_onGround`, `_crouching`, `immersion`, `health` and the rest. So the player
+needs no getters for sound, and the sound keeps no copy of the player's state.
+
+The player sounds play on the player bus, in 2D. The editor has no player, so it has none of
+these sounds.
 
 ### Under water
 
-`terrainRenderer.underWater` switches the mix. It follows the camera, not the player, so it works
-in the editor too. In the game the camera is the player's eye.
+`Player.cameraUnderWater` switches the mix. The camera is the player's eye.
 
 - The world bus low-pass falls to about 600 Hz over 0.1 s and its gain drops.
 - An **under-water bed** fades in: a low hum and the sound of moving water.
@@ -303,40 +346,34 @@ small step into deep water makes a small splash. A fall from a cliff makes a big
 | **Diving**   | `cameraUnderWater` and movement | Slower, muffled strokes and bubbles.            |
 | **Floating** | `swimming`, no movement         | Water lapping at the head, from wave height.    |
 
-### Surf and lapping
-
-- **Ocean surf.** A bed whose gain follows the distance to the shore from `ShoreField` and the sea
-  state from `windiness`. A calm sea is a soft wash. A storm sea is a heavy crash. Its emitter
-  sits on the nearest shore point, so the surf comes from the beach.
-- **Lake lapping.** Quieter and shorter. It follows the lake's `lapping` value from the water
-  palette.
-- `WaterQuery.sample` gives the water's kind through `typeWeights`, so ocean and lake can blend at
-  a lagoon.
-
 ### The body
 
-| Event            | Read from                                    | Sound                                     |
-| ---------------- | -------------------------------------------- | ----------------------------------------- |
-| **Jump**         | `jumpRequested` when it is accepted          | A soft push off.                          |
-| **Landing**      | `onGround` false to true, `verticalVelocity` | A thud that gets heavier with fall speed. |
-| **Hard landing** | the fall damage at `verticalVelocity < -15`  | A heavy thud and a grunt.                 |
-| **Flashlight**   | the F key                                    | A click.                                  |
+| Event            | Read from                                     | Sound                                     |
+| ---------------- | --------------------------------------------- | ----------------------------------------- |
+| **Jump**         | `jumpRequested` when it is accepted           | A soft push off.                          |
+| **Landing**      | `_onGround` false to true, `verticalVelocity` | A thud that gets heavier with fall speed. |
+| **Hard landing** | the fall damage at `verticalVelocity < -15`   | A heavy thud and a grunt.                 |
+| **Flashlight**   | the F key                                     | A click.                                  |
 
-A landing also plays a footstep on the surface below, so a jump onto snow sounds like snow.
+- A landing also plays a footstep on the surface below, so a jump onto snow sounds like snow.
+- A landing is `_onGround` changing from false to true. It is not `grounded`, because `grounded`
+  also changes when the player moves from steep ground to walkable ground with no fall.
 
 ### Death
 
-Today `health` stops at 0 and nothing else happens. The audio does not wait for a death state:
+When `health` reaches 0, `Player._die()` stops the player, calls `onDeath` and releases pointer
+lock. `InGame` then opens the **Game Over** menu. Its **Restart** disposes the viewport and builds
+a new one.
 
-- **When.** `health` goes from above 0 to 0. The soundscape watches for that change, as it does
-  for a landing.
-- **The sound.** A one-shot death sound on the player bus. If a fall caused the death, the hard
-  landing plays first and the death sound follows it.
+- **The sound.** `_die()` plays a one-shot death sound on the player bus. If a fall caused the
+  death, the hard landing plays first and the death sound follows it.
 - **The mix.** The world bus fades and its low-pass falls over about 2 s, so the world goes
-  distant and dull. It is the same filter as under water, with a slower curve.
-- **Back to life.** When `health` rises above 0 again, the world bus comes back over about 1 s.
-
-What happens after a death, such as a respawn or a menu, is game logic. It is not in this milestone.
+  distant and dull. It is the same filter as under water, with a slower curve. The player bus
+  stops, so the heartbeat and breathing end.
+- **The Game Over menu.** The world stays faded behind it. It does not take the in-game menu's
+  duck as well.
+- **Restart.** The old game's sounds stop. The new game lifts the world bus over about 1 s as it
+  starts.
 
 ### Breath and voice
 
@@ -392,8 +429,9 @@ A higher sound cuts in over a lower one with a short fade. The lower one comes b
 
 ### Sliding
 
-The player already slides. `GroundSlide` (`src/core/routing/utils/Sliding.ts`) reads the ground
-normal under the player each frame and keeps a slide velocity:
+The player slides down slopes that are too steep to stand on, and can slide off a cliff edge.
+`GroundSlide` (`src/core/routing/utils/Sliding.ts`) reads the ground normal under the player each
+frame and keeps a slide velocity:
 
 - From `SLIDE_START` (35°) the ground pulls the player downhill. From `SLIDE_FULL` (45°) the full
   share of gravity pulls. The slide stops at `SLIDE_MAX_SPEED` (14 m/s).
@@ -403,40 +441,33 @@ normal under the player each frame and keeps a slide velocity:
 - `Player.grounded` is false on ground steeper than `MAX_SLOPE_CLIMB` (45°), even when the player
   stands on it. The real contact is the private `_onGround`.
 
-`_slide` is private, so `Player.ts` adds read-only getters for the sound:
+The player's sound reads the slide state directly:
 
-- **`onGround`**: the real ground contact, `_onGround`.
-- **`slideSpeed`**: `Math.hypot(_slide.velocityX, _slide.velocityZ)`, in m/s.
-- **`sliding`**: `onGround` and `slideSpeed` above about 1 m/s. A slide in the air makes no sound.
-- **`steep`**: `onGround` and not `_slide.walkable`. The player is on ground too steep to climb.
+- **Slide speed**: `Math.hypot(_slide.velocityX, _slide.velocityZ)`, in m/s.
+- **Sliding**: `_onGround` and a slide speed above about 1 m/s. A slide in the air makes no sound.
+- **Steep**: `_onGround` and not `_slide.walkable`. The player is on ground too steep to climb.
 
-The sound depends on the ground, so it comes from the footstep system. Each surface in
-`footsteps.json` gets a `slide` loop:
+A slide sounds like the ground giving way: crumbling dirt, grit and loose stones moving under the
+player. It is the same on every surface except snow, which hisses and crunches instead. A surface
+in `footsteps.json` can name its own `slide` loop. One that does not uses `slide-crumble`:
 
 ```json
-"rock": { "sound": "step-rock", "slide": "slide-scree", "tags": ["hard"] },
-"snow": { "sound": "step-snow", "slide": "slide-snow", "tags": ["soft"] },
-"sand": { "sound": "step-sand", "slide": "slide-sand", "tags": ["soft"] }
+"snow": { "sound": "step-snow", "slide": "slide-snow", "tags": ["soft"] }
 ```
 
-- **The loop.** While `sliding`, the surface's slide loop plays. Its gain and pitch rise with
-  `slideSpeed`. It fades out when the slide stops. It is a bed, so the change is smooth.
-- **The slip.** A short slip one-shot plays when `sliding` starts: a scuff and a few loose stones.
-- **The rock slide.** On a `hard` surface, loose stones roll ahead of the player. One-shot stone
+- **The loop.** While sliding, the slide loop plays. Its gain and pitch rise with the slide speed,
+  so a fast slide crumbles harder. It fades out when the slide stops. It is a bed, so the change
+  is smooth.
+- **The slip.** A short slip one-shot plays when a slide starts: the ground breaking away under the
+  feet.
+- **Falling debris.** Dirt and stones break loose ahead of the player. One-shot crumbles and stone
   rattles play on 3D emitters 3 to 10 m downhill, every 0.2 to 0.6 s. Faster slides send more.
-- **Scrabbling.** While `steep` and the player pushes uphill, short scrabble one-shots play: feet
-  that cannot get a grip. They stop when the player stops pushing.
-- **The end.** When the slide stops, the steps start again with no gap. A slide off a ledge keeps
-  its speed in the air, and plays the landing as normal.
-- Footsteps do not play while `sliding`.
-
-**Player changes.** `Player.ts` keeps most movement state private. It needs a few read-only
-getters: horizontal speed, `sprinting`, `crouching`, and the slide getters `onGround`,
-`slideSpeed`, `sliding` and `steep`. See [Sliding](#sliding).
-
-A landing is `onGround` changing from false to true. It is not `grounded`, because `grounded` also
-changes when the player moves from steep ground to walkable ground with no fall. A death is
-`health` reaching 0. So neither needs a new event.
+- **Over the edge.** A slide off a cliff sends a last burst of crumbling dirt and stones from the
+  edge. The player falls in silence and plays the landing as normal.
+- **Scrabbling.** While on steep ground and the player pushes uphill, short scrabble one-shots
+  play: feet that cannot get a grip. They stop when the player stops pushing.
+- **The end.** When the slide stops, the steps start again with no gap.
+- Footsteps do not play while sliding.
 
 ### Footsteps
 
@@ -444,19 +475,19 @@ Footsteps have two kinds of input:
 
 - **The ground under the foot.** Snow on a mountain is where the snow material is, from height and
   slope. Sand is where the beach material is. This is local, and the terrain already knows it.
-- **What is true everywhere.** Wading in water, wet ground after rain, sprinting and crouching.
-  These change any surface in the same way.
+- **What is true everywhere.** Wading in water, wet ground after rain, speed and crouching. These
+  change any surface in the same way.
 
-So the **footstep system** uses the ground material for the first and rules for the second. The
+So `Footsteps` uses the ground material for the first and rules for the second. The
 rules are the same `RuleSet` as the soundscapes.
 
 #### When a step plays
 
-- The player takes a step every so many metres moved, not every so many seconds. A sprint gives
-  faster steps and a crouch gives slower ones.
-- Steps play only while `grounded`, not `sliding` and not `swimming`. A swimmer makes strokes,
-  not steps. On steep ground `grounded` is false, so steps stop there by themselves.
-- The footstep system works out the sound once for each step, not each frame.
+- The player takes a step every so many metres moved, not every so many seconds. A sprint is only
+  a speed multiplier, so it gives faster steps by itself. A crouch gives slower ones.
+- Steps play only while `grounded`, not sliding and not `swimming`. A swimmer makes strokes, not
+  steps. On steep ground `grounded` is false, so steps stop there by themselves.
+- `Footsteps` works out the sound once for each step, not each frame.
 
 #### The ground material
 
@@ -529,14 +560,27 @@ The weights are over the climate's material palette.
 
 The footstep rules read the soundscape signals, plus these:
 
-| Signal      | Range  | From                            |
-| ----------- | ------ | ------------------------------- |
-| `immersion` | metres | `Player.immersion`              |
-| `speed`     | m/s    | The new horizontal speed getter |
-| `sprinting` | 0 or 1 | The new `sprinting` getter      |
-| `crouching` | 0 or 1 | The new `crouching` getter      |
+| Signal      | Range  | From                          |
+| ----------- | ------ | ----------------------------- |
+| `immersion` | metres | `Player.immersion`            |
+| `speed`     | m/s    | The player's horizontal speed |
+| `crouching` | 0 or 1 | `Player._crouching`           |
+
+A sprint has no signal of its own. It raises `speed`, and the `sprint` rule follows `speed`.
 
 ## The land
+
+### Surf and lapping
+
+Surf and lapping are world sounds, read at the listener, so they play in the editor too.
+
+- **Ocean surf.** A bed whose gain follows the distance to the shore from `ShoreField` and the sea
+  state from `windiness`. A calm sea is a soft wash. A storm sea is a heavy crash. Its emitter
+  sits on the nearest shore point, so the surf comes from the beach.
+- **Lake lapping.** Quieter and shorter. It follows the lake's `lapping` value from the water
+  palette.
+- `WaterQuery.sample` gives the water's kind through `typeWeights`, so ocean and lake can blend at
+  a lagoon.
 
 ### Where the player is
 
@@ -785,15 +829,19 @@ Electron is Chromium, so this design runs in it unchanged. Electron also allows:
 
 ## Settings
 
-A new **Audio** tab in `SettingsPanel.tsx`, next to **Display**:
+A new **Audio** tab in `SettingsPanel.tsx`, next to **Display**. A few sliders cover every bus:
 
-| Setting                     | Default |
-| --------------------------- | ------- |
-| Master volume               | 80%     |
-| Ambience volume             | 100%    |
-| Weather volume              | 100%    |
-| Effects volume              | 100%    |
-| Mute when in the background | On      |
+| Setting                     | Bus    | Default |
+| --------------------------- | ------ | ------- |
+| Master volume               | master | 80%     |
+| Music volume                | music  | 100%    |
+| World volume                | world  | 100%    |
+| Player volume               | player | 100%    |
+| Interface volume            | ui     | 100%    |
+| Mute when in the background |        | On      |
+
+The world slider covers ambience, weather and effects together. A new bus joins one of these
+sliders, not a new one.
 
 An `AudioSettings` class stores them in localStorage under `rewild.audio`, in the same way as
 `QualitySettings`. A change takes effect at once, with no Apply.
@@ -812,33 +860,34 @@ The minimum set of files. Each loop must loop with no gap or click.
 | Footsteps  | 4 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                         | One-shots |
 | Body       | jump, 3 landings, hard landing, flashlight click, death                                                                                 | Mixed     |
 | Voice      | 3 pain sizes, 3 gasps, strain, calm, hard and panting breath loops, swim breaths, heat panting, cold shivers, heartbeat, stomach growls | Mixed     |
-| Sliding    | a slide loop each for rock, snow, sand and dirt, 3 slips, 4 stone rattles, 3 scrabbles                                                  | Mixed     |
+| Sliding    | crumbling dirt and snow slide loops, 3 slips, 4 crumbles, 4 stone rattles, 3 scrabbles                                                  | Mixed     |
 | Biome beds | the layers and the `add` and `replace` sounds in each profile                                                                           | Loops     |
 | Calls      | 3 to 6 per biome                                                                                                                        | One-shots |
 
 ## Code changes outside the audio code
 
-| Where                        | Change                                                                                                                                   |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `GameManager.onUpdate`       | Call `audio.update()` after `renderer.onFrame()`. Dispose it with the game.                                                              |
-| `MainMenu` / `Application`   | Create the audio context on **Start**.                                                                                                   |
-| `Player.ts`                  | Read-only getters for horizontal speed, `sprinting` and `crouching`. `onGround`, `slideSpeed`, `sliding` and `steep` from `GroundSlide`. |
-| `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.                                              |
-| `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle.                                                                                   |
-| `RendererSync.ts`            | Call `audio.update()` in the editor loop while the toggle is on.                                                                         |
-| `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point.                                                                                  |
-| `InGame.tsx`                 | Duck and lift the world bus when the menu opens and closes.                                                                              |
-| `SettingsPanel.tsx`          | The Audio tab.                                                                                                                           |
-| `src/core/debug/`            | `AudioDebugCommands.ts`, registered in `registerDebugCommands`.                                                                          |
-| `templates/sounds.json`      | The manifest.                                                                                                                            |
-| `templates/soundscapes.json` | The biome soundscape profiles.                                                                                                           |
-| `templates/footsteps.json`   | The material to surface map, the surfaces and the footstep rules.                                                                        |
-| `esbuild.js`                 | Copy nothing new. `templates/` is already copied.                                                                                        |
+| Where                        | Change                                                                                                      |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `MainMenu` / `Application`   | Create the engine and its context on **Start**. Keep it across a restart. Close it on quit.                 |
+| `GameManager.onUpdate`       | Call `audio.update()` after `renderer.onFrame()`. Stop the game's sounds when the game is disposed.         |
+| `Player.ts`                  | Own the player sound: footsteps, body, swimming, sliding, voice, the under-water mix and the death sound.   |
+| `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.                 |
+| `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle.                                                      |
+| `RendererSync.ts`            | Call `audio.update()` in the editor loop while the toggle is on.                                            |
+| `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point.                                                     |
+| `InGame.tsx`                 | Duck and lift the world bus when the menu opens and closes. No duck over the Game Over menu.                |
+| `SettingsPanel.tsx`          | The Audio tab.                                                                                              |
+| `src/core/debug/`            | `AudioDebugCommands.ts`, registered in `registerDebugCommands`.                                             |
+| `templates/sounds.json`      | The manifest.                                                                                               |
+| `templates/soundscapes.json` | The biome soundscape profiles.                                                                              |
+| `templates/footsteps.json`   | The material to surface map, the surfaces and the footstep rules.                                           |
+| `scripts/`                   | `list-sound-credits.js`, which prints the credits the manifest needs and fails on a non-commercial licence. |
+| `esbuild.js`                 | Copy nothing new. `templates/` is already copied.                                                           |
 
 ## Steps
 
 Each step below becomes one issue. A step is done when its **Expect** list is true in the game.
-The steps run in order inside a phase. A step lists the earlier steps it needs.
+The steps run in order.
 
 Every step that plays a sound also adds those sounds to `templates/sounds.json` and pushes the
 files to the bucket with `npm run assets:push`. Every step adds its debug commands to
@@ -849,22 +898,21 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 #### 1. The audio package and the mixer
 
 - **Delivers.** `packages/rewild-audio` with `AudioEngine`: the `AudioContext`, its start, suspend
-  and resume, the bus graph (master, world, ambience, weather, effects, player, UI), the
+  and resume, the bus graph (master, world, ambience, weather, effects, player, music, UI), the
   under-water and menu-duck inserts, and the master compressor. The debug commands `audio()`,
   `setAudioVolume`, `muteAudio` and `soloAudio`.
 - **Expect.** The package builds with `npm run ts-check` and `node ./esbuild.js`. Jest tests cover
   the bus gain math. `audio()` logs the context state and the bus gains. Nothing plays yet.
-- **Needs.** Nothing.
 
 #### 2. The sound bank and the manifest
 
 - **Delivers.** `SoundBank`: it reads `templates/sounds.json`, loads files through
   `resolveAssetUrl`, decodes them, and picks a random file, pitch and gain for each play. The
-  `source` and `license` fields on each entry. 2D one-shots. The `playSound(name)` command. A first
-  test sound in the bucket.
+  `source` and `license` fields on each entry, and `scripts/list-sound-credits.js`. 2D one-shots.
+  The `playSound(name)` command. A first test sound in the bucket.
 - **Expect.** `playSound('test')` plays the test sound. Called again, it picks a different file or
-  pitch. A missing file logs one clear error and does not stop the game.
-- **Needs.** Step 1.
+  pitch. A missing file logs one clear error and does not stop the game. The credits script lists
+  the test sound's credit, and fails on an entry with a non-commercial licence.
 
 #### 3. Beds
 
@@ -874,7 +922,6 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 - **Expect.** `holdBed('test-loop', 0.5)` fades the loop in with no click. `holdBed('test-loop', 0)`
   fades it out, and `audio()` shows its source stopped a few seconds later. Moving the gain each
   frame makes no zipper noise.
-- **Needs.** Step 2.
 
 #### 4. 3D emitters and the listener
 
@@ -884,27 +931,24 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 - **Expect.** A sound played 20 m to the left is heard on the left, and moves to the right when the
   camera turns around. A sound above is heard above. Playing 40 sounds at once keeps 24 and drops
   the quietest. `audio()` shows the voices in use.
-- **Needs.** Step 2.
 
 #### 5. Sound in the game
 
-- **Delivers.** `GameManager` creates the engine and calls `audio.update()` after
-  `renderer.onFrame()`. The context starts from the **Start** button, and the pointer-lock click
-  resumes it. The in-game menu ducks the world. A hidden tab suspends the context. The game
-  disposes the engine when it ends.
+- **Delivers.** `Application` creates the engine from the **Start** button, and the pointer-lock
+  click resumes it. `GameManager` calls `audio.update()` after `renderer.onFrame()`. The in-game
+  menu ducks the world. A hidden tab suspends the context. A restart keeps the engine and stops the
+  old game's sounds. Quitting to the main menu closes the context.
 - **Expect.** Press **Start** and a test bed plays. Open the menu and the world goes quieter.
-  **Resume** brings it back. Switch tabs and the sound stops. Switch back and it plays again. Leave
-  the game and the sound stops.
-- **Needs.** Steps 3 and 4.
+  **Resume** brings it back. Switch tabs and the sound stops. Switch back and it plays again.
+  Restart and the sound comes back with nothing loaded again. Quit and the sound stops.
 
 #### 6. Audio settings
 
 - **Delivers.** `AudioSettings`, saved in localStorage as `rewild.audio`. An **Audio** tab in
-  `SettingsPanel.tsx` with master, ambience, weather and effects sliders and **Mute when in the
-  background**.
+  `SettingsPanel.tsx` with master, music, world, player and interface sliders and **Mute when in
+  the background**.
 - **Expect.** Each slider changes its bus at once, with no Apply. The values are still there after
   a reload. With the mute setting on, clicking out of the window mutes the game.
-- **Needs.** Step 5.
 
 #### 7. Sound in the editor
 
@@ -913,7 +957,6 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
   The editor camera is the listener.
 - **Expect.** The editor is silent until the button is clicked. Then the test bed plays. Click again
   and it stops. The button keeps its state after a reload. Leaving the editor stops all sound.
-- **Needs.** Step 5.
 
 ### Phase 2: Weather
 
@@ -925,7 +968,6 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 - **Expect.** `setWeather` from calm to storm takes the wind from a soft hiss to a harsh roar. Turn
   into the wind in a gale: the roar rises as the lens blurs. Turn away: both drop. Gusts are heard
   as the trees bend. The roar comes from upwind.
-- **Needs.** Steps 3, 4 and 5.
 
 #### 9. Rain, snow and drips
 
@@ -934,7 +976,6 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
   base profile.
 - **Expect.** Rain fades in with the rain particles and gets heavier with them. When the rain stops,
   drips go on for a while and fade as the ground dries. In snow the rain bed is silent.
-- **Needs.** Step 3.
 
 #### 10. Thunder
 
@@ -945,7 +986,6 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 - **Expect.** `triggerLightning()`: the flash, then the thunder 2 to 5.5 s later. A far strike is
   quieter and deeper than a near one. The thunder comes from where the bolt was. A chain gives one
   rumble with extra cracks, not two rumbles. With the editor sound off, strikes do not pile up.
-- **Needs.** Steps 4 and 5.
 
 ### Phase 3: Rules
 
@@ -958,58 +998,45 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 - **Expect.** Jest tests cover each condition and each action, the rule order, two muffles on one
   layer, and a base rule turned off with `without`. An evaluation each frame allocates nothing.
   There is no new sound yet.
-- **Needs.** Nothing. It can run beside Phase 2.
 
-### Phase 4: Water and the player
+### Phase 4: The player
 
 #### 12. Under water
 
-- **Delivers.** `terrainRenderer.underWater` drives the world low-pass and gain. The under-water
+- **Delivers.** `Player.cameraUnderWater` drives the world low-pass and gain. The under-water
   bed. The plunge, scaled by `verticalVelocity`, and the splash on surfacing.
 - **Expect.** Dive and the world goes dull and quiet, and the under-water hum comes in. Thunder
   under water is a deep thud. Jump off a cliff into a lake for a big plunge, step in for a small
-  one. Surface for a splash. The same happens with the editor camera.
-- **Needs.** Steps 3 and 5.
+  one. Surface for a splash.
 
-#### 13. Surf and lapping
+#### 13. Footsteps
 
-- **Delivers.** The surf emitter on the nearest shore point from `ShoreField`, with calm and storm
-  layers from the sea state. Lake lapping from the palette's `lapping` value. The water's kind from
-  `typeWeights`.
-- **Expect.** The surf gets louder as you walk to the beach and comes from the beach. A storm sea
-  crashes, a calm sea washes. A lake laps quietly, and more in wind. A lagoon blends the two.
-- **Needs.** Step 4.
-
-#### 14. Footsteps
-
-- **Delivers.** `TerrainRenderer.sampleSplat`. The new `Player.ts` getters for speed, `sprinting`
-  and `crouching`. `templates/footsteps.json` with the material map, the surfaces and the rules for
-  wet ground, wading, sprinting and crouching. Steps by distance moved.
+- **Delivers.** `TerrainRenderer.sampleSplat`. `Footsteps`, owned by `Player`.
+  `templates/footsteps.json` with the material map, the surfaces and the rules for wet ground,
+  wading, speed and crouching. Steps by distance moved.
 - **Expect.** Walk from grass onto rock, then onto snow on a mountain: each step sounds like the
   ground under it. Patchy snow sounds like snow and rock. Sprint for louder, faster steps, crouch
   for soft ones. After rain the steps sound wet. Wade in and the steps splash, then become only
   splashes. A new material with no map entry plays the fallback.
-- **Needs.** Steps 2 and 11.
 
-#### 15. Jumps, landings and swimming
+#### 14. Jumps, landings and swimming
 
-- **Delivers.** The `onGround` getter. Jump, landing and hard landing sounds, with a footstep on
-  the surface landed on. Swim strokes, diving strokes and bubbles. The flashlight click.
+- **Delivers.** Jump, landing and hard landing sounds, with a footstep on the surface landed on.
+  Swim strokes, diving strokes and bubbles. The flashlight click.
 - **Expect.** A jump pushes off, a landing thuds, and a long fall thuds hard. Walking off a steep
   slope onto flat ground plays no landing. Swimming makes a stroke for each stroke, and under
   water the strokes are muffled. F clicks.
-- **Needs.** Step 14.
 
-#### 16. Sliding
+#### 15. Sliding
 
-- **Delivers.** The `slideSpeed`, `sliding` and `steep` getters. A slide loop for each surface,
-  the slip when a slide starts, rock rattles downhill, and scrabbling on steep ground.
-- **Expect.** Slide down scree: a slip, a loop that gets louder and higher as the slide speeds up,
-  and stones rattling below. Slide down snow and it sounds like snow. Push uphill on ground that is
-  too steep and the feet scrabble. A slide off a ledge goes quiet in the air, then lands.
-- **Needs.** Steps 14 and 15.
+- **Delivers.** The crumbling slide loop and the snow slide loop, the slip when a slide starts,
+  crumbles and stone rattles downhill, the burst over a cliff edge, and scrabbling on steep ground.
+- **Expect.** Slide down a steep slope: the ground gives way under the feet, the crumbling gets
+  louder and higher as the slide speeds up, and dirt and stones fall away below. Slide down snow
+  and it sounds like snow. Slide off a cliff: a last spill of dirt from the edge, silence in the
+  air, then the landing. Push uphill on ground that is too steep and the feet scrabble.
 
-#### 17. Breath and voice
+#### 16. Breath and voice
 
 - **Delivers.** The body values (`effort`, `breathHeld`, `heat`, `cold`, `hurt`), the one-mouth
   voice with its priorities, the breathing rules, the gasp and the strain, pain grunts, the
@@ -1018,17 +1045,26 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
   breath. Stay under water for 20 s for the strain, then surface for a big gasp. Stand in the
   desert sun for panting, in snow for shivers. A fall that hurts gives a grunt sized to the damage.
   Below 25 health, the heartbeat comes in. No two voice sounds play at once.
-- **Needs.** Steps 11, 12 and 15.
 
-#### 18. Death
+#### 17. Death
 
-- **Delivers.** The death sound, after the hard landing if a fall caused it. The world fades and
-  goes dull over 2 s, and comes back when health returns.
+- **Delivers.** The death sound from `Player._die()`, after the hard landing if a fall caused it.
+  The world fades and goes dull over 2 s and stays that way behind the Game Over menu. Restart
+  brings the world back.
 - **Expect.** Fall to death: a hard landing, the death sound, then the world fades away. The
-  heartbeat stops. When health comes back, the world comes back over about 1 s.
-- **Needs.** Step 17.
+  heartbeat and breathing stop. The Game Over menu does not duck the world further. Press
+  **Restart** and the new game's world comes back over about 1 s.
 
 ### Phase 5: The land
+
+#### 18. Surf and lapping
+
+- **Delivers.** The surf emitter on the nearest shore point from `ShoreField`, with calm and storm
+  layers from the sea state. Lake lapping from the palette's `lapping` value. The water's kind from
+  `typeWeights`.
+- **Expect.** The surf gets louder as you walk to the beach and comes from the beach. A storm sea
+  crashes, a calm sea washes. A lake laps quietly, and more in wind. A lagoon blends the two. The
+  same happens with the editor camera.
 
 #### 19. The biome probe
 
@@ -1036,7 +1072,6 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
   readout uses it. The soundscape runs it at 5 Hz at the listener.
 - **Expect.** The editor readout shows the same biomes as before. Jest tests cover the probe.
   There is no new sound yet.
-- **Needs.** Nothing. It can run beside Phase 4.
 
 #### 20. Soundscapes
 
@@ -1047,7 +1082,6 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
   roar, the trees creak and the birds go quiet. Rain: drops on the canopy, and the birds stop. A
   storm: no birds at all. After the storm the birds come back loud. At night the owls replace the
   birds. Snow makes everything dull. `reloadSoundscapes()` applies an edit with no reload.
-- **Needs.** Steps 3, 11 and 19.
 
 #### 21. The first six profiles
 
@@ -1055,7 +1089,6 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 - **Expect.** Walk from a plain into a forest and the sound crossfades as the ground changes. Each
   biome has its own day and night. The desert keeps its cicadas in wind. The mountain whistles in
   a gale. An arid world loads no temperate sounds.
-- **Needs.** Step 20.
 
 #### 22. Wildlife calls in 3D
 
@@ -1063,7 +1096,6 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
   emitter 20 to 80 m from the listener.
 - **Expect.** A woodpecker knocks from somewhere in the trees, from a new place each time. Owls
   call at night only. Calls stop in rain and storms. Turn toward a call and it is in front of you.
-- **Needs.** Steps 4 and 20.
 
 ### Phase 6: Stretch
 
@@ -1076,7 +1108,7 @@ Each of these is its own issue, and none of them blocks the milestone.
 - **25. Output device.** An output device setting from `AudioContext.setSinkId`. Expect the game to
   play through the chosen device, in Chrome and in Electron.
 
-## Performance notes (web budget)
+## Performance notes
 
 - **Main thread.** Each frame sets about 30 `AudioParam` targets and reads a few numbers. The
   biome probe runs at 5 Hz, as in the editor. This is well under 0.1 ms.
@@ -1086,33 +1118,16 @@ Each of these is its own issue, and none of them blocks the milestone.
 - **No allocation per frame.** Emitters come from a pool. Mapping functions write into existing
   objects.
 
-### Memory
+### Decode or stream
 
-Decoded audio is float PCM at the context's sample rate. That is about 0.38 MB per second of stereo
-at 48 kHz.
+There are two ways to play a loop. **Decode** unpacks the whole file into float PCM in memory
+before it plays, about 0.38 MB per second of stereo at 48 kHz. It loops with no gap. **Stream**
+plays the file through an `<audio>` element and unpacks it a little at a time. It costs almost no
+memory, but Chrome can leave a short gap or click where the loop joins. A gap in a wind or rain bed
+is easy to hear. So every sound is decoded. Streaming is for one long sound, such as music.
 
-| Content                | Size estimate                                  |
-| ---------------------- | ---------------------------------------------- |
-| One-shots              | About 120 mono files of 1 s on average: ~25 MB |
-| Weather and water beds | 12 loops of 20 s stereo: ~90 MB                |
-| Biome beds             | 6 biomes × day and night × 20 s: ~90 MB        |
-
-That is too much in one world. So:
-
-- Load only the beds for the world's climate. A temperate world uses 3 biomes, not 6.
-- Make beds **mono** where width does not matter. That halves them.
-- Keep loops at 20 s or less, and mix variety from layers rather than from length.
-- Each `replace` and `add` sound is another bed in memory. A profile with many weather variants
-  costs more. Prefer `scale` where it gives the effect.
-
-The target is under 100 MB decoded for one world.
-
-**Decode or stream?** There are two ways to play a loop. **Decode** unpacks the whole file into
-memory before it plays. It loops with no gap, and it costs the memory above. **Stream** plays the
-file through an `<audio>` element and unpacks it a little at a time. It costs almost no memory,
-but Chrome can leave a short gap or click where the loop joins. A gap in a wind or rain bed is easy
-to hear. So every sound is decoded. Streaming is the fallback for one long sound, such as music,
-if the budget is ever too small.
+Memory has no budget in this milestone. `audio()` logs the decoded size of the bank, so the cost
+of each sound is visible while the sounds are chosen.
 
 ## Debugger / console functions
 
@@ -1133,8 +1148,3 @@ They follow the conventions in [Debugger & Console Commands](../debug-commands.m
 
 - **Body stats.** Heat, cold and effort are sound only here. Should they become gameplay, for
   example heat that drains health? That belongs to its own milestone, but the voice is ready for it.
-- **Sound licences.** The sounds are a mix of recorded, bought and free sounds. The proposal is a
-  `source` and a `license` field on each manifest entry, for example `"license": "CC0"` or
-  `"license": "Sonniss GDC 2024"`. A small script then lists every sound that needs a credit. Some
-  free licences, such as CC-BY, need a credit in the game. Bought packs can forbid sharing the raw
-  files, which matters if the asset bucket is ever public.
