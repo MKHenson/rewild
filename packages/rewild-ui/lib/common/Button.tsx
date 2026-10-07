@@ -3,11 +3,14 @@ import { theme } from '../theme';
 
 export type ButtonVariant = 'contained' | 'outlined' | 'text' | 'ghost';
 export type ButtonColor = 'primary' | 'secondary' | 'error';
+export type ButtonSize = 's' | 'm';
 
 interface Props {
   disabled?: boolean;
   variant?: ButtonVariant;
   color?: ButtonColor;
+  /** `s` for secondary actions inline with text or in dense rows. Defaults to `m`. */
+  size?: ButtonSize;
   fullWidth?: boolean;
   /**
    * Toggle state, for buttons that stay pressed (tool pickers, segmented
@@ -29,6 +32,7 @@ export class Button extends Component<Props> {
     return () => {
       this.setAttribute('id', this.props.id || '');
       this.toggleAttribute('fullwidth', this.props.fullWidth || false);
+      this.toggleAttribute('small', this.props.size === 's');
       this.disabled = this._props.disabled || false;
       // Passed through undefined-and-all, so an action button stays a plain
       // button rather than reporting itself as an unpressed toggle.
@@ -68,9 +72,11 @@ const StyledButtons = cssStylesheet(css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
+    gap: ${theme.space.s};
+    box-sizing: border-box;
+    min-height: ${theme.sizes.control};
+    padding: 0 ${theme.space.m};
+    border-radius: ${theme.sizes.radius};
     /* Transparent rather than none, so contained and outlined buttons are the
        same size and sit level next to each other in a group. */
     border: 1px solid transparent;
@@ -89,6 +95,12 @@ const StyledButtons = cssStylesheet(css`
   }
   :host([fullwidth]) {
     display: flex;
+  }
+  :host([small]) {
+    gap: ${theme.space.xs};
+    min-height: ${theme.sizes.controlSmall};
+    padding: 0 ${theme.space.s};
+    font-size: 13px;
   }
 
   /* Every variant dips on press. Cheap, and it does most of the work of making

@@ -5,7 +5,10 @@ interface Props {
   label: string;
 }
 
-/** A label beside its value. Stacked rows line their labels up in one column. */
+/**
+ * A label beside its value. Rows are at least one control tall, so a row of
+ * plain text lines up with a row holding an input or button.
+ */
 @register('x-property-row')
 export class PropertyRow extends Component<Props> {
   init() {
@@ -31,18 +34,17 @@ const StyledPropertyRow = cssStylesheet(css`
 
   .row {
     display: grid;
-    grid-template-columns: minmax(8rem, 14rem) 1fr;
-    gap: 1rem;
+    grid-template-columns: 10rem 1fr;
+    column-gap: ${theme.space.l};
     align-items: center;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid ${theme.colors.onSurfaceBorder};
+    min-height: ${theme.sizes.control};
     font-family: var(--font-family);
   }
 
   .label {
+    font-size: 13px;
     font-weight: 500;
-    font-size: 0.9rem;
-    color: ${theme.colors.onSubtle};
+    color: ${theme.colors.onSurfaceLight};
   }
 
   .value {
@@ -50,7 +52,9 @@ const StyledPropertyRow = cssStylesheet(css`
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    font-size: 0.875rem;
+    gap: ${theme.space.s};
+    font-size: ${theme.colors.fontSizeMedium};
+    font-weight: 400;
+    color: ${theme.colors.onSurface};
   }
 `);

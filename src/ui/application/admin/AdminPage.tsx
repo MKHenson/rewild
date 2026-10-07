@@ -1,13 +1,29 @@
-import { Component, InfoBox, Modal, register, Tab, Tabs } from 'rewild-ui';
+import {
+  Component,
+  InfoBox,
+  Modal,
+  navigate,
+  register,
+  Route,
+  RouterSwitch,
+  Tab,
+  Tabs,
+} from 'rewild-ui';
 import { authStore } from '../../stores/AuthStore';
+import { UserDetailPage } from './UserDetailPage';
 import { UserList } from './UserList';
 
 type Props = {
   onClose: () => void;
-  onOpenUser: (userId: string) => void;
 };
 
-/** The `/admin` route. Each admin section is a tab; content renders only for super admins. */
+const USERS_PATH = '/admin';
+
+/**
+ * The `/admin` route and everything under it. Each admin section is a tab whose
+ * list and item views are nested routes, so the modal stays open while moving
+ * between them. Content renders only for super admins.
+ */
 @register('x-admin-page')
 export class AdminPage extends Component<Props> {
   init() {
@@ -34,7 +50,25 @@ export class AdminPage extends Component<Props> {
         sections = (
           <Tabs orientation="vertical">
             <Tab label="User Management">
-              <UserList onSelect={(user) => this.props.onOpenUser(user.id)} />
+              <RouterSwitch>
+                <Route
+                  path="/admin/users/:userId"
+                  onRender={(params) => (
+                    <UserDetailPage
+                      userId={params.userId}
+                      onBack={() => navigate(USERS_PATH)}
+                    />
+                  )}
+                />
+                <Route
+                  path={USERS_PATH}
+                  onRender={() => (
+                    <UserList
+                      onSelect={(user) => navigate(`/admin/users/${user.id}`)}
+                    />
+                  )}
+                />
+              </RouterSwitch>
             </Tab>
           </Tabs>
         );
@@ -60,17 +94,22 @@ export const AdminAccessDenied = () => (
 
 const StyledAdminPage = cssStylesheet(css`
   x-tabs {
-    height: 70vh;
+    height: 80vh;
   }
   x-tab {
     padding: 0 0 0 1.5rem;
+  }
+  x-router-switch,
+  x-route[active] {
+    display: block;
+    height: 100%;
   }
 `);
 
 const AdminModalOverrides = css`
   :host .modal {
-    width: 1100px;
-    max-width: 92vw;
+    width: 1400px;
+    max-width: 94vw;
   }
   :host .content {
     overflow: hidden;

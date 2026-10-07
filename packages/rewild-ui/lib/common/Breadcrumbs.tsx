@@ -77,7 +77,7 @@ const StyledBreadcrumbs = cssStylesheet(css`
   }
 
   x-icon {
-    margin: 0 0.25rem;
+    margin: 0 ${theme.space.xs};
     color: ${theme.colors.onSurfaceLight};
   }
 
@@ -85,9 +85,10 @@ const StyledBreadcrumbs = cssStylesheet(css`
     appearance: none;
     background: none;
     border: none;
-    padding: 0.25rem;
-    border-radius: 4px;
+    padding: ${theme.space.xs};
+    border-radius: ${theme.sizes.radius};
     font: inherit;
+    font-weight: 400;
     color: ${theme.colors.primary400};
     cursor: pointer;
   }
@@ -101,7 +102,8 @@ const StyledBreadcrumbs = cssStylesheet(css`
   }
 
   span {
-    padding: 0.25rem;
+    padding: ${theme.space.xs};
+    font-weight: 400;
     color: ${theme.colors.onSubtle};
     overflow: hidden;
     text-overflow: ellipsis;

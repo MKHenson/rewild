@@ -178,7 +178,7 @@ const StyledSettingsPanel = cssStylesheet(css`
     margin: 0 0 1.25rem 0;
   }
   .section x-typography {
-    margin: -0.25rem 0 0 0;
+    margin: 6px 0 0 0;
   }
 
   .divider {

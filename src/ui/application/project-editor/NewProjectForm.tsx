@@ -12,7 +12,7 @@ export class NewProjectForm extends Component<Props> {
     let project = { ...this.props.project };
 
     return () => (
-      <div>
+      <div style="display: flex; flex-direction: column; gap: 16px">
         <Field label="Name" required>
           <Input
             autoFocus

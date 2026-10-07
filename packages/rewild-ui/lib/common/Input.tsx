@@ -65,10 +65,12 @@ export class Input extends Component<Props> {
 }
 
 const StyledInput = cssStylesheet(css`
+  :host {
+    display: block;
+  }
+
   :host > div {
     width: 200px;
-    /* Keeps a caption below the field off its border. */
-    margin-bottom: 0.6rem;
   }
 
   :host > div.fullwidth {
@@ -77,14 +79,16 @@ const StyledInput = cssStylesheet(css`
 
   input {
     width: 100%;
-    height: 100%;
-    padding: 0.6rem;
+    height: ${theme.sizes.control};
+    padding: 0 ${theme.space.s};
+    font-size: ${theme.colors.fontSizeMedium};
+    font-weight: 400;
     outline: none;
     box-sizing: border-box;
     font-family: var(--font-family);
     transition: all 0.25s;
     border: 1px solid ${theme.colors.onSurfaceBorder};
-    border-radius: 4px;
+    border-radius: ${theme.sizes.radius};
     background: ${theme.colors.surface};
     color: ${theme.colors.onField};
   }

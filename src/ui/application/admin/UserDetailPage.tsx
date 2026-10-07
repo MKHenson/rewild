@@ -7,19 +7,17 @@ import {
   InfoBox,
   Input,
   Loading,
+  PropertyGroup,
   PropertyRow,
   register,
   Select,
   theme,
-  Typography,
 } from 'rewild-ui';
 import { DetailPage } from './DetailPage';
 import { UserAccount, UpdateUserRequest } from '../../../api/admin';
 import { authService } from '../../../api/auth/auth-service';
 import { adminStore, roleLabel, USER_ROLES } from '../../stores/AdminStore';
-import { authStore } from '../../stores/AuthStore';
 import { confirmationStore } from '../../stores/ConfirmationStore';
-import { AdminAccessDenied } from './AdminPage';
 
 type Props = {
   userId: string;
@@ -30,15 +28,13 @@ type Props = {
 type Notice = { variant: 'info' | 'error'; title: string; text: string };
 
 /**
- * The `/admin/users/:userId` route. Edits are held locally and only sent when
+ * The `/admin/users/:userId` view inside the User Management tab. Edits are held locally and only sent when
  * Update is pressed. The page is built once and patched in place so typing
  * never rebuilds the inputs or the Update button mid-click.
  */
 @register('x-admin-user-detail')
 export class UserDetailPage extends Component<Props> {
   init() {
-    this.on(authStore.dispatcher);
-
     const userId = this.props.userId;
     const isSelf = authService.getUserId() === userId;
 
@@ -141,60 +137,66 @@ export class UserDetailPage extends Component<Props> {
       return (
         <div class="form">
           <div class="summary">
-            <Avatar src={current.photoUrl ?? undefined} size="l" />
+            <Avatar src={current.photoUrl ?? undefined} size="m" />
             <div>
-              <Typography variant="h3">{current.displayName}</Typography>
-              <Typography variant="light">{roleLabel(current.role)}</Typography>
+              <div class="name">{current.displayName}</div>
+              <div class="meta">
+                {current.email} · {roleLabel(current.role)}
+              </div>
             </div>
           </div>
 
-          <PropertyRow label="Email">
-            <span class="text">{current.email}</span>
-            <Button variant="outlined" onClick={onPasswordReset}>
-              <Icon icon="lock" size="s" />
-              <span>Send password reset</span>
-            </Button>
-          </PropertyRow>
-          <PropertyRow label="Display name">
-            <Input
-              value={draft.displayName}
-              fullWidth
-              onInput={(value) => {
-                draft.displayName = value;
-                syncActions();
-              }}
-            />
-          </PropertyRow>
-          <PropertyRow label="Role">
-            <Select
-              value={draft.role}
-              options={USER_ROLES}
-              disabled={isSelf}
-              onChange={(value) => {
-                draft.role = value;
-                syncActions();
-              }}
-            />
-            {isSelf ? (
-              <Typography variant="info">
-                You cannot change your own role.
-              </Typography>
-            ) : null}
-          </PropertyRow>
-          <PropertyRow label="Sign-in methods">
-            <span class="text">
+          <PropertyGroup title="Profile">
+            <PropertyRow label="Display name">
+              <Input
+                value={draft.displayName}
+                fullWidth
+                onInput={(value) => {
+                  draft.displayName = value;
+                  syncActions();
+                }}
+              />
+            </PropertyRow>
+            <PropertyRow label="Role">
+              {isSelf ? (
+                [
+                  <span>{roleLabel(current.role)}</span>,
+                  <span class="hint">You cannot change your own role</span>,
+                ]
+              ) : (
+                <Select
+                  value={draft.role}
+                  options={USER_ROLES}
+                  onChange={(value) => {
+                    draft.role = value;
+                    syncActions();
+                  }}
+                />
+              )}
+            </PropertyRow>
+          </PropertyGroup>
+
+          <PropertyGroup title="Account">
+            <PropertyRow label="Email">
+              <span class="text">{current.email}</span>
+              <Button variant="text" size="s" onClick={onPasswordReset}>
+                <Icon icon="mail" size="s" />
+                <span>Send password reset</span>
+              </Button>
+            </PropertyRow>
+            <PropertyRow label="Sign-in methods">
               {signInMethods.length ? signInMethods.join(', ') : 'None'}
-            </span>
-          </PropertyRow>
-          <PropertyRow label="Projects">
-            <span class="text">{String(current.projectCount)}</span>
-          </PropertyRow>
-          <PropertyRow label="Joined">
-            <DateView date={current.createdAt} />
-          </PropertyRow>
-          <PropertyRow label="User ID">
-            <span class="text mono">{current.id}</span>
-          </PropertyRow>
+            </PropertyRow>
+            <PropertyRow label="Projects">
+              {String(current.projectCount)}
+            </PropertyRow>
+            <PropertyRow label="Joined">
+              <DateView date={current.createdAt} withTime={false} />
+            </PropertyRow>
+            <PropertyRow label="User ID">
+              <span class="text mono">{current.id}</span>
+            </PropertyRow>
+          </PropertyGroup>
         </div>
       );
     };
@@ -208,15 +210,8 @@ export class UserDetailPage extends Component<Props> {
         {formHost}
       </DetailPage>
     ) as DetailPage;
-    const granted = <div class="shell">{page}</div>;
-    const denied = (
-      <div class="shell">
-        <AdminAccessDenied />
-      </div>
-    );
 
     return () => {
-      if (!authStore.isSuperAdmin) return denied;
       if (!requested) load();
 
       const current = user();
@@ -224,7 +219,6 @@ export class UserDetailPage extends Component<Props> {
       page.props = {
         ...page.props,
         breadcrumbs: [
-          { label: 'Administration', onClick: this.props.onBack },
           { label: 'User Management', onClick: this.props.onBack },
           { label: current?.displayName ?? 'User' },
         ],
@@ -258,7 +252,7 @@ export class UserDetailPage extends Component<Props> {
       }
 
       syncActions();
-      return granted;
+      return page;
     };
   }
 
@@ -268,37 +262,45 @@ export class UserDetailPage extends Component<Props> {
 }
 
 const StyledUserDetailPage = cssStylesheet(css`
-  .shell {
-    position: fixed;
-    inset: 2rem;
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 1.5rem;
-    box-sizing: border-box;
-    border-radius: 5px;
-    background: ${theme.colors.surface};
-    box-shadow: 2px 2px 2px 4px rgba(0, 0, 0, 0.1);
+  :host {
+    display: block;
+    height: 100%;
   }
 
   .summary {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin: 0 0 1rem 0;
+    gap: ${theme.space.m};
+    margin: 0 0 ${theme.space.xl} 0;
+    font-family: var(--font-family);
   }
 
-  .summary x-typography {
-    display: block;
+  .name {
+    font-size: ${theme.colors.fontSizeLarge};
+    font-weight: 500;
+    color: ${theme.colors.onSurface};
+  }
+
+  .meta {
+    margin-top: 2px;
+    font-size: 13px;
+    font-weight: 400;
+    color: ${theme.colors.onSurfaceLight};
   }
 
   .notice x-info-box {
     display: block;
-    margin: 0 0 1rem 0;
+    margin: 0 0 ${theme.space.l} 0;
   }
 
   .form x-input {
     flex: 1;
     max-width: 360px;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: ${theme.colors.onSurfaceLight};
   }
 
   .text {
@@ -307,13 +309,6 @@ const StyledUserDetailPage = cssStylesheet(css`
 
   .mono {
     font-family: monospace;
-  }
-
-  x-button x-icon {
-    margin: 0 4px 0 0;
-  }
-
-  x-button span {
-    vertical-align: middle;
+    font-size: 13px;
   }
 `);

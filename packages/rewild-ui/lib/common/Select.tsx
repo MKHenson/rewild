@@ -222,8 +222,11 @@ const StyledOption = cssStylesheet(css`
   /* Padding and size track .select's so each label stays put as the list
      opens over the control. */
   :host {
-    display: block;
-    padding: 0.6rem;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    min-height: ${theme.sizes.control};
+    padding: 0 ${theme.space.s};
     font-weight: 400;
     font-size: ${theme.colors.fontSizeMedium};
     background-color: ${theme.colors.surface};
@@ -284,10 +287,6 @@ const StyledSelect = cssStylesheet(css`
   :host {
     position: relative;
     display: block;
-    /* Keeps a caption below the field off its border. On the host rather than
-       on .select so it stays outside getBoundingClientRect — positionOptions
-       anchors the dropdown to rect.bottom, which must be the border edge. */
-    margin-bottom: 0.6rem;
   }
 
   /* Deliberately mirrors Input's box: the two sit next to each other in forms,
@@ -298,12 +297,13 @@ const StyledSelect = cssStylesheet(css`
     justify-content: space-between;
     gap: 0.5rem;
     box-sizing: border-box;
-    padding: 0.6rem;
+    height: ${theme.sizes.control};
+    padding: 0 ${theme.space.s};
     font-size: ${theme.colors.fontSizeMedium};
     background: ${theme.colors.surface};
     color: ${theme.colors.onField};
     border: 1px solid ${theme.colors.onSurfaceBorder};
-    border-radius: 4px;
+    border-radius: ${theme.sizes.radius};
     transition: all 0.25s;
     /* The whole row is a button, so it must not look like selectable text —
        a caret over the arrow reads as "this does nothing". */

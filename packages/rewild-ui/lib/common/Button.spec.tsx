@@ -18,6 +18,18 @@ describe('Button', () => {
     expect(button.hasAttribute('disabled')).toBe(false);
   });
 
+  it('reflects size s as the small attribute only', () => {
+    const small = new Button({ props: { size: 's' } });
+    small._createRenderer();
+    small.render();
+    expect(small.hasAttribute('small')).toBe(true);
+
+    const medium = new Button({ props: { size: 'm' } });
+    medium._createRenderer();
+    medium.render();
+    expect(medium.hasAttribute('small')).toBe(false);
+  });
+
   it('applies props to class name and attributes', async () => {
     const onClick = jest.fn();
     const props: ButtonProps = {

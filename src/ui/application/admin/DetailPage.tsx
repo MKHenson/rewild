@@ -50,21 +50,22 @@ const StyledDetailPage = cssStylesheet(css`
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0 0 0.75rem 0;
-    border-bottom: 1px solid ${theme.colors.onSurfaceBorder};
+    gap: ${theme.space.l};
+    min-height: ${theme.sizes.control};
+    padding: 0 0 ${theme.space.m} 0;
+    border-bottom: 1px solid ${theme.colors.subtle500};
   }
 
   .actions {
     flex: none;
     display: flex;
-    gap: 0.5rem;
+    gap: ${theme.space.s};
   }
 
   .content {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 1rem 0 0 0;
+    padding: ${theme.space.xl} 0 0 0;
   }
 `);

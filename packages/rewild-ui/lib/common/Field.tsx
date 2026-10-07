@@ -1,4 +1,3 @@
-import { Typography } from "./Typography";
 import { Component, register } from "../Component";
 import { theme } from "../theme";
 
@@ -7,15 +6,16 @@ interface Props {
   required?: boolean;
 }
 
+/** A label stacked above its control. Spacing between fields belongs to the container. */
 @register("x-field")
 export class Field extends Component<Props> {
   init() {
     return () => (
       <div class="field">
-        <Typography variant="label">
+        <label>
           {this.props.label}
           {this.props.required ? <span class="required">*</span> : ""}
-        </Typography>
+        </label>
         <slot></slot>
       </div>
     );
@@ -30,12 +30,23 @@ const StyledField = cssStylesheet(css`
   :host {
     width: 100%;
     display: block;
-    margin: 0 0 1rem 0;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.xs};
+  }
+
+  label {
+    font-family: var(--font-family);
+    font-size: 13px;
+    font-weight: 500;
+    color: ${theme.colors.onSurfaceLight};
   }
 
   .required {
-    color: ${theme!.colors.error400};
-    font-weight: 400;
-    margin: 0 0 0 4px;
+    color: ${theme.colors.error400};
+    margin: 0 0 0 ${theme.space.xs};
   }
 `);

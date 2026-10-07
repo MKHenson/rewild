@@ -21,6 +21,7 @@ export * from './common/Modal';
 export * from './common/Pane3D';
 export * from './common/SplitPane';
 export * from './common/Popup';
+export * from './common/PropertyGroup';
 export * from './common/PropertyRow';
 export * from './common/Route';
 export * from './common/RouterProvider';

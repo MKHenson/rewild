@@ -59,6 +59,17 @@
 
   --font-family: Roboto, sans-serif;
 
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --control-height: 32px;
+  --control-height-s: 26px;
+  --radius: 4px;
+
   --shadow-short-1: 2px 2px 4px rgb(0 0 0 / 25%);
   --shadow-short-2: 2px 2px 4px rgb(0 0 0 / 50%);
 

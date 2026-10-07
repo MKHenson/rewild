@@ -44,4 +44,19 @@ export const theme = {
     shadowShort1: 'var(--shadow-short-1)',
     shadowShort2: 'var(--shadow-short-2)',
   },
+  /** Spacing scale. Use these for padding, margins and gaps rather than ad hoc values. */
+  space: {
+    xs: 'var(--space-1, 4px)',
+    s: 'var(--space-2, 8px)',
+    m: 'var(--space-3, 12px)',
+    l: 'var(--space-4, 16px)',
+    xl: 'var(--space-5, 24px)',
+    xxl: 'var(--space-6, 32px)',
+  },
+  /** Shared control metrics, so buttons, inputs and selects line up in a row. */
+  sizes: {
+    control: 'var(--control-height, 32px)',
+    controlSmall: 'var(--control-height-s, 26px)',
+    radius: 'var(--radius, 4px)',
+  },
 };

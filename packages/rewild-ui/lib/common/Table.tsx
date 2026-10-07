@@ -111,21 +111,27 @@ const StyledTable = cssStylesheet(css`
     z-index: 1;
     background: ${theme.colors.surface};
     text-align: left;
+    font-size: 13px;
     font-weight: 500;
-    color: ${theme.colors.onSubtle};
-    border-bottom: 1px solid ${theme.colors.onSurfaceBorder};
+    color: ${theme.colors.onSurfaceLight};
+    border-bottom: 1px solid ${theme.colors.subtle600};
   }
 
   th,
   td {
-    padding: 0.6rem 0.75rem;
+    padding: ${theme.space.s} ${theme.space.m};
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  td {
+    font-weight: 400;
+    color: ${theme.colors.onSurface};
+  }
+
   tbody tr {
-    border-bottom: 1px solid ${theme.colors.onSurfaceBorder};
+    border-bottom: 1px solid ${theme.colors.subtle500};
   }
 
   tr.clickable {
@@ -144,7 +150,7 @@ const StyledTable = cssStylesheet(css`
 
   tr.message td {
     text-align: center;
-    padding: 2rem 0.75rem;
+    padding: ${theme.space.xxl} ${theme.space.m};
     color: ${theme.colors.onSurfaceLight};
   }
 `);
