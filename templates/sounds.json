@@ -5,8 +5,13 @@
       "files": ["audio/test/test-01.ogg", "audio/test/test-02.ogg"],
       "pitch": [0.9, 1.1],
       "gain": [0.8, 1],
-      "source": "Generated test tones",
-      "license": "own"
+      "source": "Generated test tones"
+    },
+    {
+      "name": "test-loop",
+      "files": ["audio/test/test-loop.ogg"],
+      "loop": true,
+      "source": "Generated pink noise"
     }
   ]
 }

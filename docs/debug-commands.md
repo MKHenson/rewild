@@ -332,6 +332,8 @@ soloAudio('weather'); // hear one bus; call again, or with no argument, to clear
 playSound('test'); // plays a sound from templates/sounds.json once, in 2D
 playSound('test', 'ui'); // on another bus; the default is effects
 playSound(); // lists the sound names
+holdBed('test-loop', 0.5); // holds a looping sound at a gain, on the ambience bus
+holdBed('test-loop', 0); // fades it out; its source stops a few seconds later
 ```
 
 The buses are `master`, `music`, `world`, `ambience`, `weather`, `effects`,
@@ -343,7 +345,8 @@ The context is created by the first click or key press on the page, so before
 that `audio()` reports `idle`. Volume, mute and solo changes made earlier still apply
 once it starts.
 
-`audio()` also counts the sound files loaded, pending and failed, and the decoded
+`audio()` lists every bed with its gain, blend and state, so `holdBed(name, 0)`
+can be watched going from `playing` to `stopped`. It also counts the sound files loaded, pending and failed, and the decoded
 size of the bank. Decoded audio is float PCM, so this is the real memory cost,
 several times the size of the files. A file that fails to load logs its own
 error with the sound's name and URL.
