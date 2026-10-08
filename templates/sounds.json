@@ -12,6 +12,13 @@
       "files": ["audio/test/test-loop.ogg"],
       "loop": true,
       "source": "Generated pink noise"
+    },
+    {
+      "name": "meadow",
+      "files": ["audio/ambient/modern/meadow.ogg"],
+      "loop": true,
+      "source": "Soundly: meadow",
+      "license": "soundly"
     }
   ]
 }
