@@ -325,7 +325,7 @@ menu too, not only after a game or the editor has loaded.
 
 ```js
 audio(); // context state, world muffle and duck, sounds loaded, and a table of every bus
-setAudioVolume('weather', 0.5); // bus volume, 0 to 1
+setAudioVolume('weather', 0.5); // bus gain, 0 to 1; not saved, unlike the Audio tab
 muteAudio('world'); // toggles; no argument mutes master
 soloAudio('weather'); // hear one bus; call again, or with no argument, to clear
 playSound('test'); // plays a sound from templates/sounds.json once, in 2D

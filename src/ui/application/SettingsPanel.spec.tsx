@@ -1,9 +1,15 @@
 import 'rewild-ui/compiler/jsx';
 import { QualitySettings } from 'rewild-renderer/lib/utils/QualitySettings';
 import { QUALITY_ASPECTS } from 'rewild-renderer/lib/utils/RenderQuality';
-import { Select, Tab } from 'rewild-ui';
+import { Select, Slider, Switch, Tab } from 'rewild-ui';
 import { flushMicrotasks } from 'rewild-ui/lib/test-utils';
 import { SettingsPanel } from './SettingsPanel';
+import {
+  AUDIO_SETTINGS_KEY,
+  DEFAULT_VOLUMES,
+  VOLUME_SETTINGS,
+} from 'rewild-audio';
+import { audioSettings } from '../../core/audio/audio';
 
 // No viewport is mounted, so getQualitySettings() falls back to a standalone
 // QualitySettings — which reads and writes localStorage. That is what these
@@ -168,6 +174,56 @@ describe('SettingsPanel', () => {
       const { panel } = createPanel();
 
       expect(selectsOf(panel)[0].props.value).toBe('ultra');
+    });
+  });
+
+  describe('Audio tab', () => {
+    afterEach(() => {
+      for (const setting of VOLUME_SETTINGS)
+        audioSettings.setVolume(setting, DEFAULT_VOLUMES[setting]);
+      audioSettings.muteInBackground = true;
+    });
+
+    const slidersOf = (panel: SettingsPanel) =>
+      Array.from(panel.shadow!.querySelectorAll('x-slider')) as Slider[];
+
+    const storedAudio = () =>
+      JSON.parse(localStorage.getItem(AUDIO_SETTINGS_KEY)!);
+
+    it('renders an Audio tab after Display', () => {
+      const { panel } = createPanel();
+
+      const tabs = Array.from(panel.shadow!.querySelectorAll('x-tab')) as Tab[];
+      expect(tabs.map((tab) => tab.props.label)).toEqual(['Display', 'Audio']);
+    });
+
+    it('renders a slider per volume, at the current setting', () => {
+      audioSettings.setVolume('music', 0.35);
+
+      const { panel } = createPanel();
+
+      const sliders = slidersOf(panel);
+      expect(sliders.length).toBe(VOLUME_SETTINGS.length);
+      expect(sliders[VOLUME_SETTINGS.indexOf('music')].props.value).toBe(35);
+    });
+
+    it('applies and stores a volume as the slider moves, without Apply', () => {
+      const { panel } = createPanel();
+
+      slidersOf(panel)[VOLUME_SETTINGS.indexOf('world')].props.onChange!(40);
+
+      expect(audioSettings.volume('world')).toBe(0.4);
+      expect(storedAudio().volumes.world).toBe(0.4);
+    });
+
+    it('toggles muting in the background', () => {
+      const { panel } = createPanel();
+
+      const toggle = panel.shadow!.querySelector('x-switch') as Switch;
+      toggle.props.onClick!(new MouseEvent('click'));
+
+      expect(audioSettings.muteInBackground).toBe(false);
+      expect(storedAudio().muteInBackground).toBe(false);
     });
   });
 });

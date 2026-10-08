@@ -5,6 +5,8 @@ import {
   Modal,
   register,
   Select,
+  Slider,
+  Switch,
   Tab,
   Tabs,
   Typography,
@@ -17,6 +19,8 @@ import {
   RenderQuality,
 } from 'rewild-renderer/lib/utils/RenderQuality';
 import { getQualitySettings } from '../utils/getQualitySettings';
+import { VOLUME_SETTINGS, VolumeSetting } from 'rewild-audio';
+import { audioSettings } from '../../core/audio/audio';
 
 type Props = {
   /** Leave the settings, discarding anything not applied. */
@@ -71,6 +75,50 @@ const ASPECTS: Record<QualityAspect, { label: string; description: string }> = {
       'out they carry. The waves themselves are the same on every setting.',
   },
 };
+
+const VOLUMES: Record<VolumeSetting, { label: string; description: string }> = {
+  master: { label: 'Master', description: 'Everything the game plays.' },
+  music: { label: 'Music', description: 'The score.' },
+  world: {
+    label: 'World',
+    description:
+      'Wind, rain, thunder, water, wildlife and everything else outdoors.',
+  },
+  player: {
+    label: 'Player',
+    description: 'Your footsteps, breathing and voice.',
+  },
+  ui: { label: 'Interface', description: 'Menus and buttons.' },
+};
+
+/** A volume slider and its percentage, wired straight to the audio settings. */
+function volumeRow(setting: VolumeSetting) {
+  const percent = (v: number) => `${Math.round(v * 100)}%`;
+  const value = (
+    <span class="value">{percent(audioSettings.volume(setting))}</span>
+  ) as HTMLSpanElement;
+  return (
+    <div class="section">
+      <Field label={VOLUMES[setting].label}>
+        <div class="volume">
+          <Slider
+            min={0}
+            max={100}
+            step={1}
+            fullWidth
+            value={Math.round(audioSettings.volume(setting) * 100)}
+            onChange={(v: number) => {
+              audioSettings.setVolume(setting, v / 100);
+              value.textContent = percent(v / 100);
+            }}
+          />
+          {value}
+        </div>
+      </Field>
+      <Typography variant="light">{VOLUMES[setting].description}</Typography>
+    </div>
+  );
+}
 
 /**
  * The game's settings screen — the `/settings` route from the main menu, and the
@@ -156,6 +204,30 @@ export class SettingsPanel extends Component<Props> {
                 on the next frame.
               </Typography>
             </Tab>
+            <Tab label="Audio">
+              <div class="volumes">{VOLUME_SETTINGS.map(volumeRow)}</div>
+
+              <Divider />
+
+              <div class="section">
+                <Field label="Mute when in the background">
+                  <Switch
+                    checked={audioSettings.muteInBackground}
+                    onClick={() =>
+                      (audioSettings.muteInBackground =
+                        !audioSettings.muteInBackground)
+                    }
+                  />
+                </Field>
+                <Typography variant="light">
+                  Silences the game while another window has focus.
+                </Typography>
+              </div>
+
+              <Typography variant="info">
+                Audio changes apply straight away, without Apply.
+              </Typography>
+            </Tab>
           </Tabs>
         </Modal>
       );
@@ -183,6 +255,19 @@ const StyledSettingsPanel = cssStylesheet(css`
 
   .divider {
     margin: 0 0 1.25rem 0;
+  }
+
+  .volume {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .volume x-slider {
+    flex: 1;
+  }
+  .volume .value {
+    width: 3rem;
+    text-align: right;
   }
 `);
 

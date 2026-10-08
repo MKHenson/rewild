@@ -192,6 +192,25 @@ describe('AudioEngine.suspendWhenHidden', () => {
     expect(engine.state).toBe('running');
   });
 
+  it('keeps playing while hidden when its condition says no', async () => {
+    const doc = fakeDocument();
+    let allow = false;
+    engine.suspendWhenHidden(doc as unknown as Document, () => allow);
+
+    doc.visibilityState = 'hidden';
+    doc.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+    expect(engine.state).toBe('running');
+
+    allow = true;
+    doc.visibilityState = 'visible';
+    doc.dispatchEvent(new Event('visibilitychange'));
+    doc.visibilityState = 'hidden';
+    doc.dispatchEvent(new Event('visibilitychange'));
+    await flush();
+    expect(engine.state).toBe('suspended');
+  });
+
   it('stops listening when its cleanup is called', async () => {
     const doc = fakeDocument();
     const cleanup = engine.suspendWhenHidden(doc as unknown as Document);

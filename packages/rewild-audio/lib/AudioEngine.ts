@@ -22,6 +22,7 @@ export { MENU_DUCK_DB, OPEN_CUTOFF_HZ };
 
 const PARAM_TIME_CONSTANT = 0.02;
 const LISTENER_TIME_CONSTANT = 0.02;
+const BACKGROUND_TIME_CONSTANT = 0.05;
 
 /** Events that count as a user gesture for the browser's autoplay policy. */
 const GESTURE_EVENTS = ['pointerdown', 'pointerup', 'keydown'] as const;
@@ -76,6 +77,7 @@ export class AudioEngine {
   private _muffleCutoff = OPEN_CUTOFF_HZ;
   private _muffleLevel = 1;
   private _ducked = false;
+  private _backgroundMuted = false;
   private readonly _pick = createSoundPick();
   private readonly _beds = new Set<Bed>();
   private _voices: VoicePool | null = null;
@@ -399,11 +401,17 @@ export class AudioEngine {
       target.addEventListener(type, onGesture, { capture: true });
   }
 
-  /** Suspends the context while `doc` is hidden, such as in a background tab. */
-  suspendWhenHidden(doc: Document): () => void {
+  /**
+   * Suspends the context while `doc` is hidden, such as in a background tab,
+   * if `when` allows it at that moment. Showing the document always resumes.
+   */
+  suspendWhenHidden(
+    doc: Document,
+    when: () => boolean = () => true
+  ): () => void {
     const onChange = () => {
-      if (doc.visibilityState === 'hidden') this.suspend();
-      else this.resume();
+      if (doc.visibilityState !== 'hidden') this.resume();
+      else if (when()) this.suspend();
     };
     doc.addEventListener('visibilitychange', onChange);
     return () => doc.removeEventListener('visibilitychange', onChange);
@@ -442,6 +450,20 @@ export class AudioEngine {
     this._applyBusGains();
   }
 
+  /**
+   * Silences the master while the game is in the background, apart from the
+   * mute and volume the mixer holds, so neither undoes the other.
+   */
+  setBackgroundMuted(muted: boolean): void {
+    if (muted === this._backgroundMuted) return;
+    this._backgroundMuted = muted;
+    this._applyBusGains(BACKGROUND_TIME_CONSTANT);
+  }
+
+  get backgroundMuted(): boolean {
+    return this._backgroundMuted;
+  }
+
   /** Low-pass and gain on the world bus, for under water and death. */
   muffleWorld(cutoffHz: number, level: number, timeConstant: number): void {
     this._muffleCutoff = cutoffHz;
@@ -469,7 +491,7 @@ export class AudioEngine {
     const buses = {} as Record<BusName, GainNode>;
     for (const name of BUS_NAMES) {
       buses[name] = ctx.createGain();
-      buses[name].gain.value = this.mix.gain(name);
+      buses[name].gain.value = this._busGain(name);
     }
     this._buses = buses;
 
@@ -521,14 +543,19 @@ export class AudioEngine {
     this.bank.decode(ctx);
   }
 
-  private _applyBusGains(): void {
+  private _applyBusGains(timeConstant: number = PARAM_TIME_CONSTANT): void {
     if (!this._ctx || !this._buses) return;
     const t = this._ctx.currentTime;
     for (const name of BUS_NAMES)
       this._buses[name].gain.setTargetAtTime(
-        this.mix.gain(name),
+        this._busGain(name),
         t,
-        PARAM_TIME_CONSTANT
+        timeConstant
       );
+  }
+
+  private _busGain(name: BusName): number {
+    if (name === 'master' && this._backgroundMuted) return 0;
+    return this.mix.gain(name);
   }
 }
