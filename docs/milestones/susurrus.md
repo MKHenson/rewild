@@ -205,9 +205,16 @@ and come back with `npm run assets:pull`, like every other shared asset.
 }
 ```
 
-A `SoundBank` fetches and decodes the manifest at game start, with `Promise.all`, before the
-player spawns. Beds for climates the world does not use are not loaded. An arid world never
-loads the forest bed.
+A `SoundBank` holds the manifest's sounds. `Application` fetches the manifest when the app loads,
+and the bank starts downloading every file at once. The files decode as soon as the
+`AudioContext` exists, so by the time a game or the editor has loaded they are ready. A decoded
+buffer outlives its context, so each file decodes once per session. Beds for climates the world
+does not use are not loaded. An arid world never loads the forest bed.
+
+- **A failed file** logs one error naming the sound and the URL. The sound plays its other files.
+  A sound with no loaded files does not play. Nothing throws.
+- **Variation.** Each play picks a file at random, never the one it played last, and a pitch and
+  gain from the entry's ranges. Both default to 1.
 
 #### Sources and licences
 
@@ -216,10 +223,9 @@ The sounds come from Soundly. Every entry has a `source` and a `license`:
 - **`source`** is the original file name in Soundly, so the sound can be found again.
 - **`license`** is `"soundly"` for a sound from Soundly's own library or a partner library. For a
   Freesound result found through Soundly, it is that sound's own licence, such as `"CC0"` or
-  `"CC-BY-4.0"`, and `source` also names the author.
-- A CC-BY sound needs a credit in the game. `scripts/list-sound-credits.js` reads the manifest
-  and prints every credit that is needed.
-- A non-commercial licence, such as CC-BY-NC, is not allowed. The script fails on one.
+  `"CC-BY-4.0"`, and `source` also names the author. A sound made for the game is `"own"`.
+- A CC-BY sound needs a credit in the game.
+- A non-commercial licence, such as CC-BY-NC, is not allowed.
 - Soundly's licence allows the sounds in a game but not passing them on as sound effects. The
   bucket holds only the game's own Ogg encodes, trimmed, looped and mixed for the game. Each file
   is public, like every other asset, but the bucket cannot be listed.
@@ -869,23 +875,22 @@ The minimum set of files. Each loop must loop with no gap or click.
 
 ## Code changes outside the audio code
 
-| Where                        | Change                                                                                                      |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `Application`                | Start the engine on the first user gesture. Keep it for the whole session.                                  |
-| `GameManager.onUpdate`       | Call `audio.update()` after `renderer.onFrame()`. Stop the game's sounds when the game is disposed.         |
-| `Player.ts`                  | Own the player sound: footsteps, body, swimming, sliding, voice, the under-water mix and the death sound.   |
-| `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.                 |
-| `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle.                                                      |
-| `RendererSync.ts`            | Call `audio.update()` in the editor loop while the toggle is on.                                            |
-| `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point.                                                     |
-| `InGame.tsx`                 | Duck and lift the world bus when the menu opens and closes. No duck over the Game Over menu.                |
-| `SettingsPanel.tsx`          | The Audio tab.                                                                                              |
-| `src/core/debug/`            | `AudioDebugCommands.ts`, registered in `registerDebugCommands`.                                             |
-| `templates/sounds.json`      | The manifest.                                                                                               |
-| `templates/soundscapes.json` | The biome soundscape profiles.                                                                              |
-| `templates/footsteps.json`   | The material to surface map, the surfaces and the footstep rules.                                           |
-| `scripts/`                   | `list-sound-credits.js`, which prints the credits the manifest needs and fails on a non-commercial licence. |
-| `esbuild.js`                 | Copy nothing new. `templates/` is already copied.                                                           |
+| Where                        | Change                                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `Application`                | Start the engine on the first user gesture. Keep it for the whole session.                                |
+| `GameManager.onUpdate`       | Call `audio.update()` after `renderer.onFrame()`. Stop the game's sounds when the game is disposed.       |
+| `Player.ts`                  | Own the player sound: footsteps, body, swimming, sliding, voice, the under-water mix and the death sound. |
+| `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.               |
+| `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle.                                                    |
+| `RendererSync.ts`            | Call `audio.update()` in the editor loop while the toggle is on.                                          |
+| `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point.                                                   |
+| `InGame.tsx`                 | Duck and lift the world bus when the menu opens and closes. No duck over the Game Over menu.              |
+| `SettingsPanel.tsx`          | The Audio tab.                                                                                            |
+| `src/core/debug/`            | `AudioDebugCommands.ts`, registered by `Application` when the app starts.                                 |
+| `templates/sounds.json`      | The manifest.                                                                                             |
+| `templates/soundscapes.json` | The biome soundscape profiles.                                                                            |
+| `templates/footsteps.json`   | The material to surface map, the surfaces and the footstep rules.                                         |
+| `esbuild.js`                 | Copy nothing new. `templates/` is already copied.                                                         |
 
 ## Steps
 
@@ -911,11 +916,10 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 - **Delivers.** `SoundBank`: it reads `templates/sounds.json`, loads files through
   `resolveAssetUrl`, decodes them, and picks a random file, pitch and gain for each play. The
-  `source` and `license` fields on each entry, and `scripts/list-sound-credits.js`. 2D one-shots.
-  The `playSound(name)` command. A first test sound in the bucket.
+  `source` and `license` fields on each entry. 2D one-shots. The `playSound(name)` command. A
+  first test sound in the bucket.
 - **Expect.** `playSound('test')` plays the test sound. Called again, it picks a different file or
-  pitch. A missing file logs one clear error and does not stop the game. The credits script lists
-  the test sound's credit, and fails on an entry with a non-commercial licence.
+  pitch. A missing file logs one clear error and does not stop the game.
 
 #### 3. Beds
 

@@ -1,4 +1,10 @@
 import { BUS_NAMES, BUS_PARENT, BusMix, BusName, dbToGain } from './Buses';
+import {
+  FileLoader,
+  SoundBank,
+  SoundManifest,
+  createSoundPick,
+} from './SoundBank';
 
 export const MENU_DUCK_DB = -12;
 export const OPEN_CUTOFF_HZ = 20000;
@@ -20,6 +26,7 @@ export type AudioEngineState = AudioContextState | 'idle';
  */
 export class AudioEngine {
   readonly mix = new BusMix();
+  readonly bank: SoundBank;
 
   private _ctx: AudioContext | null = null;
   private _buses: Record<BusName, GainNode> | null = null;
@@ -31,6 +38,12 @@ export class AudioEngine {
   private _muffleCutoff = OPEN_CUTOFF_HZ;
   private _muffleLevel = 1;
   private _ducked = false;
+  private readonly _pick = createSoundPick();
+
+  /** `resolveUrl` turns a manifest file path into the URL to fetch. */
+  constructor(resolveUrl?: (path: string) => string, loadFile?: FileLoader) {
+    this.bank = new SoundBank(resolveUrl, loadFile);
+  }
 
   get context(): AudioContext | null {
     return this._ctx;
@@ -55,6 +68,28 @@ export class AudioEngine {
   /** Bus input node for sources to connect to. Null before `start()`. */
   bus(name: BusName): GainNode | null {
     return this._buses ? this._buses[name] : null;
+  }
+
+  /** Downloads the manifest's files now and decodes them once the context exists. */
+  loadSounds(manifest: SoundManifest): Promise<void> {
+    this.bank.setManifest(manifest);
+    return this._ctx ? this.bank.decode(this._ctx) : Promise.resolve();
+  }
+
+  /** Plays a sound once, in 2D, on a bus. False if the context or the sound is not ready. */
+  play(name: string, bus: BusName = 'effects', gain: number = 1): boolean {
+    const ctx = this._ctx;
+    if (!ctx || !this._buses || !this.bank.pick(name, this._pick)) return false;
+
+    const source = ctx.createBufferSource();
+    source.buffer = this._pick.buffer;
+    source.playbackRate.value = this._pick.pitch;
+    const amp = ctx.createGain();
+    amp.gain.value = this._pick.gain * gain;
+    source.connect(amp).connect(this._buses[bus]);
+    source.onended = () => amp.disconnect();
+    source.start();
+    return true;
   }
 
   async start(): Promise<void> {
@@ -170,6 +205,8 @@ export class AudioEngine {
       .connect(buses.master);
 
     buses.master.connect(this._compressor).connect(ctx.destination);
+
+    this.bank.decode(ctx);
   }
 
   private _applyBusGains(): void {

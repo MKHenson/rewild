@@ -305,3 +305,91 @@ describe('AudioEngine.startOnGesture', () => {
     expect(FakeAudioContext.instances).toHaveLength(1);
   });
 });
+
+describe('AudioEngine sounds', () => {
+  const manifest = {
+    sounds: [
+      {
+        name: 'blip',
+        files: ['blip.ogg'],
+        pitch: [0.5, 1.5] as [number, number],
+        gain: [0.2, 0.6] as [number, number],
+        source: 'test',
+        license: 'own',
+      },
+    ],
+  };
+  const loadFile = async () => new ArrayBuffer(8);
+
+  function engineWithSounds() {
+    const engine = new AudioEngine(undefined, loadFile);
+    engine.bank.random = () => 0.5;
+    return engine;
+  }
+
+  it('cannot play before the context starts', () => {
+    const engine = engineWithSounds();
+    engine.loadSounds(manifest);
+    expect(engine.play('blip')).toBe(false);
+  });
+
+  it('decodes a manifest set before start once the context exists', async () => {
+    const engine = engineWithSounds();
+    engine.loadSounds(manifest);
+    await engine.start();
+    await engine.bank.decode(engine.context!);
+    expect(engine.bank.isLoaded('blip')).toBe(true);
+  });
+
+  it('decodes a manifest set after start straight away', async () => {
+    const engine = engineWithSounds();
+    await engine.start();
+    await engine.loadSounds(manifest);
+    expect(engine.bank.isLoaded('blip')).toBe(true);
+  });
+
+  it('plays a one-shot through its own gain into the bus', async () => {
+    const engine = engineWithSounds();
+    await engine.start();
+    await engine.loadSounds(manifest);
+
+    expect(engine.play('blip', 'ui', 0.5)).toBe(true);
+    const source = context(engine).sources[0];
+    expect(source.buffer).not.toBeNull();
+    expect(source.loop).toBe(false);
+    expect(source.playbackRate.value).toBeCloseTo(1, 10);
+    expect(source.startedAt).toBe(0);
+
+    const amp = source.outputs[0] as FakeGainNode;
+    expect(amp.gain.value).toBeCloseTo(0.4 * 0.5, 10);
+    expect(amp.outputs).toEqual([bus(engine, 'ui')]);
+  });
+
+  it('plays on the effects bus by default', async () => {
+    const engine = engineWithSounds();
+    await engine.start();
+    await engine.loadSounds(manifest);
+    engine.play('blip');
+    const amp = context(engine).sources[0].outputs[0];
+    expect(amp.outputs).toEqual([bus(engine, 'effects')]);
+  });
+
+  it('disconnects a one-shot when it ends', async () => {
+    const engine = engineWithSounds();
+    await engine.start();
+    await engine.loadSounds(manifest);
+    engine.play('blip');
+    const source = context(engine).sources[0];
+    const amp = source.outputs[0];
+    source.end();
+    expect(amp.outputs).toHaveLength(0);
+  });
+
+  it('does not play an unknown sound', async () => {
+    const engine = engineWithSounds();
+    await engine.start();
+    await engine.loadSounds(manifest);
+    expect(engine.play('nope')).toBe(false);
+    expect(context(engine).sources).toHaveLength(0);
+  });
+});
