@@ -1,4 +1,5 @@
 import { Matrix4, Vector3 } from 'rewild-common';
+import { AudioScope } from './AudioScope';
 import { Bed, BedSpec } from './Bed';
 import { Emitter, EmitterSpec } from './Emitter';
 import { BUS_NAMES, BUS_PARENT, BusMix, BusName, dbToGain } from './Buses';
@@ -26,6 +27,12 @@ const LISTENER_TIME_CONSTANT = 0.02;
 const GESTURE_EVENTS = ['pointerdown', 'pointerup', 'keydown'] as const;
 
 export type AudioEngineState = AudioContextState | 'idle';
+
+interface OneShot {
+  source: AudioBufferSourceNode;
+  amp: GainNode;
+  owner: number;
+}
 
 export interface PlayOptions {
   /** World position. Without it the sound plays in 2D. */
@@ -95,7 +102,10 @@ export class AudioEngine {
     offset: 0,
     fadeIn: 0,
     priority: 1,
+    owner: 0,
   };
+  private readonly _oneShots = new Set<OneShot>();
+  private _nextScope = 1;
   private readonly _emitters: Emitter[] = [];
 
   /** `resolveUrl` turns a manifest file path into the URL to fetch. */
@@ -154,8 +164,8 @@ export class AudioEngine {
    * Plays a sound once: in 3D on a pooled voice when `at` is given, else in 2D.
    * False if the context or the sound is not ready, or every voice is louder.
    */
-  play(name: string, options?: PlayOptions): boolean {
-    if (options?.at) return this._start3d(name, options, false) !== 0;
+  play(name: string, options?: PlayOptions, owner: number = 0): boolean {
+    if (options?.at) return this._start3d(name, options, false, owner) !== 0;
 
     const ctx = this._ctx;
     if (!ctx || !this._buses || !this.bank.pick(name, this._pick)) return false;
@@ -166,14 +176,45 @@ export class AudioEngine {
     const amp = ctx.createGain();
     amp.gain.value = this._pick.gain * (options?.gain ?? 1);
     source.connect(amp).connect(this._buses[options?.bus ?? 'effects']);
-    source.onended = () => amp.disconnect();
+    const shot: OneShot = { source, amp, owner };
+    this._oneShots.add(shot);
+    source.onended = () => {
+      amp.disconnect();
+      this._oneShots.delete(shot);
+    };
     source.start(ctx.currentTime + Math.max(0, options?.delay ?? 0));
     return true;
   }
 
   /** Loops a sound at a world position until `stop`. Returns its id, or 0 if it did not start. */
-  loop(name: string, options: PlayOptions & { at: Vector3 }): number {
-    return this._start3d(name, options, true);
+  loop(
+    name: string,
+    options: PlayOptions & { at: Vector3 },
+    owner: number = 0
+  ): number {
+    return this._start3d(name, options, true, owner);
+  }
+
+  /** A group of sounds that stop together. See `AudioScope`. */
+  createScope(): AudioScope {
+    return new AudioScope(this, this._nextScope++);
+  }
+
+  /** Fades out every sound started with this owner. Used by `AudioScope.dispose`. */
+  stopOwner(owner: number, fade: number): void {
+    this._voices?.stopOwner(owner, fade);
+    const ctx = this._ctx;
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    for (const shot of this._oneShots) {
+      if (shot.owner !== owner) continue;
+      shot.amp.gain.setTargetAtTime(0, now, Math.max(fade, 0.005) / 3);
+      shot.source.stop(now + fade);
+    }
+  }
+
+  get oneShotsPlaying(): number {
+    return this._oneShots.size;
   }
 
   /** Moves a 3D sound. False once it has ended or lost its voice. */
@@ -279,7 +320,12 @@ export class AudioEngine {
     return this._listenerUp;
   }
 
-  private _start3d(name: string, options: PlayOptions, loop: boolean): number {
+  private _start3d(
+    name: string,
+    options: PlayOptions,
+    loop: boolean,
+    owner: number
+  ): number {
     if (!this._voices || !this._buses || !this.bank.pick(name, this._pick))
       return 0;
     const at = options.at!;
@@ -296,6 +342,7 @@ export class AudioEngine {
     s.offset = options.offset ?? 0;
     s.fadeIn = options.fadeIn ?? 0;
     s.priority = options.priority ?? 1;
+    s.owner = owner;
     return this._voices.start(name, s);
   }
 
@@ -352,6 +399,16 @@ export class AudioEngine {
       target.addEventListener(type, onGesture, { capture: true });
   }
 
+  /** Suspends the context while `doc` is hidden, such as in a background tab. */
+  suspendWhenHidden(doc: Document): () => void {
+    const onChange = () => {
+      if (doc.visibilityState === 'hidden') this.suspend();
+      else this.resume();
+    };
+    doc.addEventListener('visibilitychange', onChange);
+    return () => doc.removeEventListener('visibilitychange', onChange);
+  }
+
   async suspend(): Promise<void> {
     if (this._ctx?.state === 'running') await this._ctx.suspend();
   }
@@ -366,6 +423,7 @@ export class AudioEngine {
     this._buses = null;
     this._voices = null;
     this._listenerParams = [];
+    this._oneShots.clear();
     if (ctx && ctx.state !== 'closed') await ctx.close();
   }
 

@@ -37,6 +37,8 @@ export interface VoiceStart {
   fadeIn: number;
   /** Multiplies the loudness used to rank voices, so a high priority is stolen last. */
   priority: number;
+  /** The scope that started it, or 0. See `stopOwner`. */
+  owner: number;
 }
 
 interface Voice {
@@ -52,6 +54,7 @@ interface Voice {
   picked: number;
   rolloff: number;
   priority: number;
+  owner: number;
   x: number;
   y: number;
   z: number;
@@ -106,6 +109,7 @@ export class VoicePool {
         picked: 1,
         rolloff: 1,
         priority: 1,
+        owner: 0,
         x: 0,
         y: 0,
         z: 0,
@@ -155,6 +159,7 @@ export class VoicePool {
     voice.picked = s.pick.gain;
     voice.rolloff = s.rolloff;
     voice.priority = s.priority;
+    voice.owner = s.owner;
 
     voice.filter.frequency.cancelScheduledValues(now);
     voice.filter.frequency.value = s.cutoff;
@@ -225,6 +230,12 @@ export class VoicePool {
     }
     voice.level = 0;
     return true;
+  }
+
+  /** Fades out every voice started by `owner`. */
+  stopOwner(owner: number, fade: number): void {
+    for (const v of this._voices)
+      if (v.id && v.owner === owner) this.stop(v.id, fade);
   }
 
   isPlaying(id: number): boolean {

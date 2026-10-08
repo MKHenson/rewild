@@ -75,6 +75,7 @@ export class Bed {
   private _blend = 0;
   private _state: BedState = 'stopped';
   private _waiting = 0;
+  private _disposed = false;
   private _stopTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly _pick = createSoundPick();
 
@@ -101,11 +102,16 @@ export class Bed {
     return this._blend;
   }
 
+  get disposed(): boolean {
+    return this._disposed;
+  }
+
   get state(): BedState {
     return this._state;
   }
 
   set(gain: number, cutoff?: number): void {
+    if (this._disposed) return;
     if (!this._ensureNodes()) {
       this._gain = gain;
       if (cutoff !== undefined) this._cutoff = cutoff;
@@ -147,6 +153,7 @@ export class Bed {
 
   /** Moves the crossfade across the layers. See `layerWeights`. */
   setBlend(blend: number): void {
+    if (this._disposed) return;
     if (blend === this._blend) return;
     this._blend = blend;
     layerWeights(blend, this._layers.length, this._weights);
@@ -157,14 +164,31 @@ export class Bed {
       this._layers[i].gain.gain.setTargetAtTime(this._weights[i], now, tc);
   }
 
-  dispose(): void {
+  /** Stops the bed for good, fading out over `fade` seconds. */
+  dispose(fade: number = 0): void {
+    if (this._disposed) return;
+    this._disposed = true;
     this._cancelStop();
-    this._stopSources();
-    this._out?.disconnect();
+    this._engine.forgetBed(this);
+
+    const ctx = this._ctx;
+    const out = this._out;
+    if (ctx && out && fade > 0 && this._state === 'playing') {
+      const now = ctx.currentTime;
+      out.gain.setTargetAtTime(0, now, fade / 3);
+      for (const layer of this._layers) {
+        layer.source?.stop(now + fade);
+        layer.source = null;
+      }
+      setTimeout(() => out.disconnect(), fade * 1000);
+    } else {
+      this._stopSources();
+      out?.disconnect();
+    }
+    this._state = 'stopped';
     this._ctx = null;
     this._out = null;
     this._filter = null;
-    this._engine.forgetBed(this);
   }
 
   private _ensureNodes(): boolean {

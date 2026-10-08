@@ -41,6 +41,7 @@ export class Emitter {
   private _gain: number;
   private _cutoff: number;
   private _voice = 0;
+  private _disposed = false;
   private readonly _options: PlayOptions & { at: Vector3 };
 
   constructor(private readonly _engine: AudioEngine, spec: EmitterSpec) {
@@ -66,6 +67,10 @@ export class Emitter {
 
   get gain(): number {
     return this._gain;
+  }
+
+  get disposed(): boolean {
+    return this._disposed;
   }
 
   get state(): EmitterState {
@@ -101,6 +106,7 @@ export class Emitter {
 
   /** Takes or gives back a voice as it moves in and out of earshot. Called by `AudioEngine.update`. */
   update(): void {
+    if (this._disposed) return;
     if (this._voice && !this._engine.isPlaying(this._voice)) this._voice = 0;
 
     const heard = this.heard;
@@ -112,14 +118,17 @@ export class Emitter {
     }
   }
 
-  dispose(): void {
-    this._giveBack();
+  /** Stops the emitter for good, fading out over `fade` seconds. */
+  dispose(fade: number = EMITTER_FADE): void {
+    if (this._disposed) return;
+    this._disposed = true;
+    this._giveBack(fade);
     this._engine.forgetEmitter(this);
   }
 
-  private _giveBack(): void {
+  private _giveBack(fade: number = EMITTER_FADE): void {
     if (!this._voice) return;
-    this._engine.stop(this._voice, EMITTER_FADE);
+    this._engine.stop(this._voice, fade);
     this._voice = 0;
   }
 }

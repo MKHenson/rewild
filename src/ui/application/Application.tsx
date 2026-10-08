@@ -18,6 +18,7 @@ interface Props {}
 export class Application extends Component<Props> {
   init() {
     audio.startOnGesture(document);
+    audio.suspendWhenHidden(document);
     loadSoundManifest();
     registerAudioDebugCommands(audio);
 

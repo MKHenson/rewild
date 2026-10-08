@@ -292,19 +292,42 @@ The sounds come from Soundly. Every entry has a `source` and a `license`:
   bucket holds only the game's own Ogg encodes, trimmed, looped and mixed for the game. Each file
   is public, like every other asset, but the bucket cannot be listed.
 
+### Scopes
+
+A **scope** is a group of sounds that end together, such as one game session.
+
+```ts
+const sound = audio.createScope();
+sound.play('splash-small');
+sound.loop('engine', { at: position });
+sound.createBed(spec);
+sound.createEmitter(spec);
+sound.dispose(); // fades out and stops everything above over 0.3 s
+```
+
+- Disposing a scope stops its 2D one-shots, its 3D sounds and loops, its beds and its emitters.
+  Sounds outside it, such as a menu theme, carry on.
+- A disposed scope plays nothing, so a late call from a system that is shutting down is harmless.
+- Beds and emitters also take a fade on their own `dispose(fade)`.
+- Each `GameManager` opens a **scene scope** for its game and closes it when it is disposed.
+  `sceneScope()` in `src/core/audio/audio.ts` returns the running game's scope, or null.
+
 ### Start, focus and pause
 
 - **Start.** `Application` calls `audio.startOnGesture(document)`. The first click, tap or key
   press anywhere creates the `AudioContext`. On the main menu that is usually **Start** or
   **Editor**. A gesture the browser does not accept leaves the context suspended, and the next one
   tries again.
-- **Restart.** The engine stays. The old game's beds and voices stop, and the new game attaches.
-  The decoded sounds are kept, so a restart loads nothing.
-- **Quit.** Leaving the game for the main menu stops the game's sounds. The engine keeps running,
-  so the menu can have its own sound.
-- **Menu.** Opening the in-game menu ducks the world bus. **Resume** lifts it.
-- **Hidden window.** On `visibilitychange` to hidden, the engine suspends the context. It resumes
-  when the window shows again. This is the first `visibilitychange` handler in the game.
+- **Restart.** The engine stays. The old game's scene scope fades out, and the new game opens its
+  own. The decoded sounds are kept, so a restart loads nothing.
+- **Quit.** Leaving the game for the main menu fades out the game's scene scope and lifts the
+  menu duck. The engine keeps running, so the menu can have its own sound.
+- **Menu.** Opening the in-game menu, with Escape or by losing pointer lock, ducks the world bus.
+  **Resume** lifts it. The settings panel opened from the menu keeps the duck. The Game Over menu
+  does not duck.
+- **Hidden window.** `Application` calls `audio.suspendWhenHidden(document)`. On
+  `visibilitychange` to hidden, the engine suspends the context. It resumes when the window shows
+  again.
 - **Lost focus.** An Audio setting, **Mute when in the background**, mutes the master on `blur`.
   This matters most in Electron.
 
@@ -937,22 +960,22 @@ The minimum set of files. Each loop must loop with no gap or click.
 
 ## Code changes outside the audio code
 
-| Where                        | Change                                                                                                    |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `Application`                | Start the engine on the first user gesture. Keep it for the whole session.                                |
-| `GameManager.onUpdate`       | Call `audio.update()` after `renderer.onFrame()`. Stop the game's sounds when the game is disposed.       |
-| `Player.ts`                  | Own the player sound: footsteps, body, swimming, sliding, voice, the under-water mix and the death sound. |
-| `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.               |
-| `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle.                                                    |
-| `RendererSync.ts`            | Call `audio.update()` in the editor loop while the toggle is on.                                          |
-| `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point.                                                   |
-| `InGame.tsx`                 | Duck and lift the world bus when the menu opens and closes. No duck over the Game Over menu.              |
-| `SettingsPanel.tsx`          | The Audio tab.                                                                                            |
-| `src/core/debug/`            | `AudioDebugCommands.ts`, registered by `Application` when the app starts.                                 |
-| `templates/sounds.json`      | The manifest.                                                                                             |
-| `templates/soundscapes.json` | The biome soundscape profiles.                                                                            |
-| `templates/footsteps.json`   | The material to surface map, the surfaces and the footstep rules.                                         |
-| `esbuild.js`                 | Copy nothing new. `templates/` is already copied.                                                         |
+| Where                        | Change                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `Application`                | Start the engine on the first user gesture. Keep it for the whole session.                                          |
+| `GameManager`                | Set the listener and call `audio.update()` after `renderer.onFrame()`. Open a scene scope, and close it on dispose. |
+| `Player.ts`                  | Own the player sound: footsteps, body, swimming, sliding, voice, the under-water mix and the death sound.           |
+| `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.                         |
+| `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle.                                                              |
+| `RendererSync.ts`            | Call `audio.update()` in the editor loop while the toggle is on.                                                    |
+| `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point.                                                             |
+| `InGame.tsx`                 | Duck and lift the world bus when the menu opens and closes. No duck over the Game Over menu.                        |
+| `SettingsPanel.tsx`          | The Audio tab.                                                                                                      |
+| `src/core/debug/`            | `AudioDebugCommands.ts`, registered by `Application` when the app starts.                                           |
+| `templates/sounds.json`      | The manifest.                                                                                                       |
+| `templates/soundscapes.json` | The biome soundscape profiles.                                                                                      |
+| `templates/footsteps.json`   | The material to surface map, the surfaces and the footstep rules.                                                   |
+| `esbuild.js`                 | Copy nothing new. `templates/` is already copied.                                                                   |
 
 ## Steps
 
@@ -1006,11 +1029,13 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 #### 5. Sound in the game
 
-- **Delivers.** The in-game menu ducks the world. A hidden tab suspends the context. A restart keeps the engine and stops the old
-  game's sounds. Quitting to the main menu stops the game's sounds.
-- **Expect.** Press **Start** and a test bed plays. Open the menu and the world goes quieter.
-  **Resume** brings it back. Switch tabs and the sound stops. Switch back and it plays again.
-  Restart and the sound comes back with nothing loaded again. Quit and the sound stops.
+- **Delivers.** `AudioScope`, and a scene scope for each game. The in-game menu ducks the world. A
+  hidden tab suspends the context. A restart keeps the engine and fades out the old game's sounds.
+  Quitting to the main menu fades out the game's sounds. Console sounds started in a game belong to
+  its scope.
+- **Expect.** In a game, `holdBed('test-loop', 0.5)` plays. Open the menu and the world goes
+  quieter. **Resume** brings it back. Switch tabs and the sound stops. Switch back and it plays
+  again. Restart and the bed fades out, with nothing loaded again. Quit and the sound fades out.
 
 #### 6. Audio settings
 

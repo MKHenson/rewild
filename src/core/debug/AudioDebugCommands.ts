@@ -1,9 +1,13 @@
 import { Vector3 } from 'rewild-common';
 import { AudioEngine, BUS_NAMES, Bed, isBusName } from 'rewild-audio';
+import { sceneScope } from '../audio/audio';
 
 export function registerAudioDebugCommands(audio: AudioEngine) {
   const busList = BUS_NAMES.join(' | ');
   const held = new Map<string, Bed>();
+  // Sounds started here belong to the running game, so a restart or quit
+  // stops them as it would the game's own.
+  const owner = () => sceneScope() ?? audio;
 
   (window as any).audio = () => {
     const ctx = audio.context;
@@ -130,8 +134,8 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
       console.warn(`Sound "${name}" has no loaded files yet`);
 
     let bed = held.get(name);
-    if (!bed) {
-      bed = audio.createBed({
+    if (!bed || bed.disposed) {
+      bed = owner().createBed({
         sounds: [name],
         bus: 'ambience',
         attack: 1,
@@ -187,7 +191,7 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
       );
       return;
     }
-    if (!audio.play(name, { at, bus })) explainNotPlayed(name);
+    if (!owner().play(name, { at, bus })) explainNotPlayed(name);
   };
 
   (window as any).setPanning = (model?: string) => {
@@ -223,7 +227,7 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
       return;
     }
     const at = nearListener(v);
-    if (audio.play(name, { at })) console.log(`${name} at ${vec(at)}`);
+    if (owner().play(name, { at })) console.log(`${name} at ${vec(at)}`);
     else explainNotPlayed(name);
   };
 
@@ -232,7 +236,7 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
       console.warn(`No sound "${name}" in templates/sounds.json`);
       return;
     }
-    audio.createEmitter({ sound: name, at });
+    owner().createEmitter({ sound: name, at });
     console.log(
       `Emitter ${name} at ${vec(at)}. It plays while it can be heard; ` +
         'audio() shows its state.'
