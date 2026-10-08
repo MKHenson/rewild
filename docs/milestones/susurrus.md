@@ -126,21 +126,29 @@ frame, through a mapping function.
 
 ```ts
 interface BedSpec {
-  sound: string;                       // name in sounds.json
+  sounds: string[];                    // one name in sounds.json per layer
   bus: BusName;
   filter?: BiquadFilterType;           // for example 'lowpass' to darken light rain
   attack: number;                      // seconds to rise
   release: number;                     // seconds to fall
 }
 
+const bed = audio.createBed(spec);
 bed.set(gain, cutoff?);                // called each frame; uses setTargetAtTime
+bed.setBlend(value);                   // 0 is the first layer, 1 the second, and so on
+bed.dispose();
 ```
 
-- A bed with gain 0 for a few seconds **stops its source**. It starts again, at a random offset,
-  when its gain rises. So a silent desert bed costs nothing in the forest.
+- A bed whose gain stays at 0 for 3 s, or three times its release if that is longer, **stops its
+  sources**. They start again, at a random offset, when its gain rises. So a silent desert bed
+  costs nothing in the forest.
 - A random start offset stops two beds of the same sound from playing in phase.
-- **Layers.** A bed can hold two or three loops with crossfade weights, for example light rain and
-  heavy rain. One value moves across the layers.
+- **Layers.** A bed can hold two or three loops, for example light rain and heavy rain. `setBlend`
+  moves one value across them with an equal-power crossfade, so the loudness holds steady through
+  the fade.
+- A layer whose sound has not loaded yet starts on the first `set` after it loads.
+- Setting the same gain again adds no automation, so calling `set` every frame costs nothing when
+  the value holds still.
 
 ### Emitters
 

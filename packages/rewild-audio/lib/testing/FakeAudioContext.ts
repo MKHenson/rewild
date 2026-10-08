@@ -72,13 +72,20 @@ export class FakeAudioBufferSourceNode extends FakeAudioNode {
   readonly playbackRate = new FakeAudioParam(1);
   onended: (() => void) | null = null;
   startedAt: number | null = null;
+  offset = 0;
+  stopped = false;
 
   constructor() {
     super('bufferSource');
   }
 
-  start(when: number = 0) {
+  start(when: number = 0, offset: number = 0) {
     this.startedAt = when;
+    this.offset = offset;
+  }
+
+  stop() {
+    this.stopped = true;
   }
 
   /** Ends playback, as the audio thread would when the buffer runs out. */

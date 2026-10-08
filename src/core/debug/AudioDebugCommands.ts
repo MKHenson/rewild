@@ -1,7 +1,8 @@
-import { AudioEngine, BUS_NAMES, isBusName } from 'rewild-audio';
+import { AudioEngine, BUS_NAMES, Bed, isBusName } from 'rewild-audio';
 
 export function registerAudioDebugCommands(audio: AudioEngine) {
   const busList = BUS_NAMES.join(' | ');
+  const held = new Map<string, Bed>();
 
   (window as any).audio = () => {
     const ctx = audio.context;
@@ -32,6 +33,16 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
         ])
       )
     );
+    if (audio.beds.size)
+      console.table(
+        [...audio.beds].map((bed) => ({
+          sounds: bed.spec.sounds.join(' + '),
+          bus: bed.spec.bus,
+          gain: +bed.gain.toFixed(3),
+          blend: bed.blend,
+          state: bed.state,
+        }))
+      );
   };
 
   (window as any).setAudioVolume = (bus?: string, value?: number) => {
@@ -70,6 +81,41 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
     }
     audio.setSolo(bus);
     console.log(`Solo → ${bus}`);
+  };
+
+  (window as any).holdBed = (name?: string, gain?: number) => {
+    if (name === undefined || gain === undefined) {
+      console.log(
+        `holdBed(name, gain) — holds a looping sound at a gain; 0 fades it out.` +
+          (held.size ? ` Held: ${[...held.keys()].join(', ')}` : '')
+      );
+      return;
+    }
+    if (!Number.isFinite(gain) || gain < 0) {
+      console.warn(`Gain must be a number >= 0, got ${gain}`);
+      return;
+    }
+    if (!audio.bank.has(name)) {
+      console.warn(`No sound "${name}" in templates/sounds.json`);
+      return;
+    }
+    if (audio.state !== 'running')
+      console.warn(`Audio is ${audio.state} — it plays after a click`);
+    else if (!audio.bank.isLoaded(name))
+      console.warn(`Sound "${name}" has no loaded files yet`);
+
+    let bed = held.get(name);
+    if (!bed) {
+      bed = audio.createBed({
+        sounds: [name],
+        bus: 'ambience',
+        attack: 1,
+        release: 1,
+      });
+      held.set(name, bed);
+    }
+    bed.set(gain);
+    console.log(`${name} → ${gain}`);
   };
 
   (window as any).playSound = (name?: string, bus: string = 'effects') => {

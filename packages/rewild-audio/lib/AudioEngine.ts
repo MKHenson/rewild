@@ -1,3 +1,4 @@
+import { Bed, BedSpec } from './Bed';
 import { BUS_NAMES, BUS_PARENT, BusMix, BusName, dbToGain } from './Buses';
 import {
   FileLoader,
@@ -39,6 +40,7 @@ export class AudioEngine {
   private _muffleLevel = 1;
   private _ducked = false;
   private readonly _pick = createSoundPick();
+  private readonly _beds = new Set<Bed>();
 
   /** `resolveUrl` turns a manifest file path into the URL to fetch. */
   constructor(resolveUrl?: (path: string) => string, loadFile?: FileLoader) {
@@ -74,6 +76,22 @@ export class AudioEngine {
   loadSounds(manifest: SoundManifest): Promise<void> {
     this.bank.setManifest(manifest);
     return this._ctx ? this.bank.decode(this._ctx) : Promise.resolve();
+  }
+
+  createBed(spec: BedSpec): Bed {
+    const bed = new Bed(this, spec);
+    this._beds.add(bed);
+    return bed;
+  }
+
+  /** Every bed not yet disposed. */
+  get beds(): ReadonlySet<Bed> {
+    return this._beds;
+  }
+
+  /** Called by `Bed.dispose`. */
+  forgetBed(bed: Bed): void {
+    this._beds.delete(bed);
   }
 
   /** Plays a sound once, in 2D, on a bus. False if the context or the sound is not ready. */
