@@ -46,6 +46,8 @@ import {
   MountainSnow,
   TrendingUpDown,
   CloudRainWind,
+  Volume2,
+  VolumeX,
   type IconNode,
 } from 'lucide';
 
@@ -99,6 +101,8 @@ const icons = {
   wrench: Wrench,
   x: X,
   box: Box,
+  'volume-2': Volume2,
+  'volume-x': VolumeX,
 } satisfies Record<string, IconNode>;
 
 export type IconType = keyof typeof icons;

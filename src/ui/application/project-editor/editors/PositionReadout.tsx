@@ -21,12 +21,15 @@ import {
 } from 'rewild-renderer/lib/renderers/terrain/Lakes';
 import { fromFloat16 } from 'rewild-renderer/lib/utils/float16';
 
+import { EditorSound } from 'src/core/audio/EditorSound';
+
 interface Props {
   renderer: Renderer;
 }
 
 const STORAGE_KEY = 'rewild.editor.positionReadout';
 const WEATHER_KEY = 'rewild.editor.lensEffects';
+const SOUND_KEY = 'rewild.editor.sound';
 const REFRESH_MS = 200;
 // Lakes are searched this far around the camera, and searched again once the
 // camera has moved a share of it.
@@ -212,12 +215,15 @@ function describePainted(painted: PaintedWater): string {
 // nearest lake, painted or generated, and the weather state and the ones
 // coming. The panel opens to the left of the toggles. Under it, a toggle for the lens
 // effects (Renderer.lensEffects), the blur and drops: off gives a clear view
-// to edit in.
+// to edit in. Under that, a toggle for the editor's sound (EditorSound), off by
+// default.
 @register('x-position-readout')
 export class PositionReadout extends Component<Props> {
   init() {
     const [shown, setShown] = this.useState(readFlag(STORAGE_KEY, false));
     const [weather, setWeather] = this.useState(readFlag(WEATHER_KEY, true));
+    const [sound, setSound] = this.useState(readFlag(SOUND_KEY, false));
+    let editorSound: EditorSound | null = null;
 
     const position = new Vector3();
     const lakeSpace = new Float64Array(2);
@@ -405,6 +411,19 @@ export class PositionReadout extends Component<Props> {
     (weatherToggle as unknown as HTMLElement).title =
       'Lens effects: blur and drops';
 
+    const soundToggle = (
+      <Button
+        variant="ghost"
+        onClick={() => {
+          const next = !sound();
+          writeFlag(SOUND_KEY, next);
+          setSound(next);
+        }}>
+        <StyledIcon icon="volume-2" size="s" />
+      </Button>
+    ) as unknown as Button;
+    (soundToggle as unknown as HTMLElement).title = 'Sound';
+
     const panel = (
       <div class="panel">
         <div class="row">
@@ -448,12 +467,14 @@ export class PositionReadout extends Component<Props> {
         <div class="toggles">
           <div class="toggle">{toggle}</div>
           <div class="toggle">{weatherToggle}</div>
+          <div class="toggle">{soundToggle}</div>
         </div>
       </div>
     );
 
     this.onMount = () => {
       this.props.renderer.lensEffects = weather();
+      editorSound = new EditorSound(this.props.renderer, sound());
       if (shown()) start();
     };
     // The game shares the renderer, so leaving the editor gives the lens
@@ -461,11 +482,15 @@ export class PositionReadout extends Component<Props> {
     this.onCleanup = () => {
       stop();
       this.props.renderer.lensEffects = true;
+      editorSound?.dispose();
+      editorSound = null;
     };
 
     return () => {
       toggle.selected = shown();
       weatherToggle.selected = weather();
+      soundToggle.selected = sound();
+      if (editorSound) editorSound.enabled = sound();
       this.props.renderer.lensEffects = weather();
       panel.hidden = !shown();
       if (shown() && this.isConnected) start();

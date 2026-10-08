@@ -175,25 +175,25 @@ describe('background mute', () => {
   it('silences the master on blur and restores it on focus', async () => {
     const { engine, target, master } = await setup(true);
     target.dispatchEvent(new Event('blur'));
-    expect(engine.backgroundMuted).toBe(true);
+    expect(engine.isSilenced('background')).toBe(true);
     expect(master.gain.lastTarget!.value).toBe(0);
 
     target.dispatchEvent(new Event('focus'));
-    expect(engine.backgroundMuted).toBe(false);
+    expect(engine.isSilenced('background')).toBe(false);
     expect(master.gain.lastTarget!.value).toBeCloseTo(0.64, 10);
   });
 
   it('keeps playing in the background when the setting is off', async () => {
     const { engine, target } = await setup(false);
     target.dispatchEvent(new Event('blur'));
-    expect(engine.backgroundMuted).toBe(false);
+    expect(engine.isSilenced('background')).toBe(false);
   });
 
   it('unmutes when the setting is turned off while muted', async () => {
     const { engine, settings, target } = await setup(true);
     target.dispatchEvent(new Event('blur'));
     settings.muteInBackground = false;
-    expect(engine.backgroundMuted).toBe(false);
+    expect(engine.isSilenced('background')).toBe(false);
   });
 
   it('does not undo a mute from the mixer on focus', async () => {
@@ -207,7 +207,7 @@ describe('background mute', () => {
 
   it('applies a background mute set before the engine starts', async () => {
     const engine = new AudioEngine();
-    engine.setBackgroundMuted(true);
+    engine.setSilenced('background', true);
     await engine.start();
     const master = engine.bus('master') as unknown as FakeGainNode;
     expect(master.gain.value).toBe(0);
@@ -216,10 +216,23 @@ describe('background mute', () => {
     );
   });
 
+  it('stays silent while another reason holds', async () => {
+    const { engine, target, master } = await setup(true);
+    engine.setSilenced('editor', true);
+    target.dispatchEvent(new Event('blur'));
+    target.dispatchEvent(new Event('focus'));
+    expect(engine.isSilenced('background')).toBe(false);
+    expect(engine.isSilenced()).toBe(true);
+    expect(master.gain.lastTarget!.value).toBe(0);
+
+    engine.setSilenced('editor', false);
+    expect(master.gain.lastTarget!.value).toBeCloseTo(0.64, 10);
+  });
+
   it('stops listening once unbound', async () => {
     const { engine, target, unbind } = await setup(true);
     unbind();
     target.dispatchEvent(new Event('blur'));
-    expect(engine.backgroundMuted).toBe(false);
+    expect(engine.isSilenced('background')).toBe(false);
   });
 });
