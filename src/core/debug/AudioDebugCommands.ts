@@ -23,6 +23,9 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
         )} Hz at ${audio.muffleLevel.toFixed(2)}` +
         `, ${audio.ducked ? 'ducked' : 'not ducked'}` +
         (audio.mix.solo ? `\nSolo: ${audio.mix.solo}` : '') +
+        (audio.isSilenced()
+          ? `\nSilenced by: ${audio.silencedBy.join(', ')}`
+          : '') +
         `\n${describeBank(audio)}` +
         `\n3D voices: ${audio.voicesInUse}/${audio.voiceCount} in use, ${audio.panningModel} panning` +
         `\nListener: at ${vec(audio.listenerPosition)}, forward ${vec(

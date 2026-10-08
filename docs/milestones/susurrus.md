@@ -312,6 +312,19 @@ sound.dispose(); // fades out and stops everything above over 0.3 s
 - Each `GameManager` opens a **scene scope** for its game and closes it when it is disposed.
   `sceneScope()` in `src/core/audio/audio.ts` returns the running game's scope, or null.
 
+### Silencing
+
+`audio.setSilenced(reason, on)` silences the master for a named reason. The master is silent while
+any reason holds, and the mixer's own volumes and mutes are untouched, so nothing undoes anything
+else.
+
+| Reason         | Set by                                       |
+| -------------- | -------------------------------------------- |
+| `'background'` | The window losing focus, with the setting on |
+| `'editor'`     | The editor's sound toggle being off          |
+
+`audio()` lists the reasons in force.
+
 ### Start, focus and pause
 
 - **Start.** `Application` calls `audio.startOnGesture(document)`. The first click, tap or key
@@ -899,16 +912,24 @@ same `audio.play(name, { at })` call from their own position.
 The editor viewport plays the same soundscape, so a level's weather and biomes can be heard while
 it is built.
 
-- **The toggle.** A sound button in `PositionReadout`, next to the lens effects button. It saves
+- **The toggle.** A speaker button in `PositionReadout`, under the lens effects button. It saves
   its state in localStorage as `rewild.editor.sound`, in the same way. It is off by default.
+- **`EditorSound`** in `src/core/audio/` does the work. The readout creates it on mount and
+  disposes it on cleanup.
+- **Off is silent, not stopped.** Off silences the master with the `'editor'` reason, so beds and
+  emitters keep their state and come back as they were. See [Silencing](#silencing).
 - **The start.** The click on **Editor** in the main menu already started the context. The toggle
   only says whether the editor plays its sound.
 - **The listener** is the editor camera. Weather, thunder, water, biome soundscapes and calls all
   read the listener's position, so they work with no player.
 - **No player sounds.** There is no player in the editor, so no footsteps, breathing or splashes.
-- **The loop.** The editor's `RendererSync` loop calls `audio.update()` after the renderer, as
-  `GameManager.onUpdate` does in the game.
-- **Leaving the editor** stops the editor's sounds. The engine keeps running.
+- **The loop.** The editor renders on the renderer's own animation frame, which has no hook. While
+  sound is on, `EditorSound` runs its own animation frame that sets the listener from the editor
+  camera and calls `audio.update()`, as `GameManager.onUpdate` does in the game. While it is off,
+  the loop does not run.
+- **The scope.** `EditorSound` opens a scene scope, so console sounds in the editor belong to it.
+- **Leaving the editor** fades out the editor's scope and lifts the `'editor'` silence. The engine
+  keeps running.
 
 ## Electron
 
@@ -948,9 +969,9 @@ instance, `audioSettings`, next to the engine.
 - **The volume curve.** A slider position becomes a bus gain by squaring it, so half way is about
   -12 dB and the slider's travel sounds even. `setAudioVolume` in the console sets a bus gain
   directly, with no curve.
-- **Background mute.** `audioSettings.bindBackgroundMute(window)` fades the master out on `blur`
-  while the setting is on, and back on `focus`. It is separate from the mixer's mute, so neither
-  undoes the other. The same setting decides whether a hidden tab suspends the context; see
+- **Background mute.** `audioSettings.bindBackgroundMute(window)` silences the master with the
+  `'background'` reason on `blur` while the setting is on, and lifts it on `focus`. The same
+  setting decides whether a hidden tab suspends the context; see
   [Start, focus and pause](#start-focus-and-pause).
 
 ## Sound list (steps 1 to 22)
@@ -979,8 +1000,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 | `GameManager`                | Set the listener and call `audio.update()` after `renderer.onFrame()`. Open a scene scope, and close it on dispose. |
 | `Player.ts`                  | Own the player sound: footsteps, body, swimming, sliding, voice, the under-water mix and the death sound.           |
 | `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.                         |
-| `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle.                                                              |
-| `RendererSync.ts`            | Call `audio.update()` in the editor loop while the toggle is on.                                                    |
+| `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle, which owns an `EditorSound`.                                 |
 | `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point.                                                             |
 | `InGame.tsx`                 | Duck and lift the world bus when the menu opens and closes. No duck over the Game Over menu.                        |
 | `SettingsPanel.tsx`          | The Audio tab.                                                                                                      |
@@ -1060,11 +1080,13 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 #### 7. Sound in the editor
 
-- **Delivers.** A sound button in `PositionReadout`, next to the lens effects button, saved as
-  `rewild.editor.sound` and off by default. `RendererSync` calls `audio.update()` while it is on.
-  The editor camera is the listener.
-- **Expect.** The editor is silent until the button is clicked. Then the test bed plays. Click again
-  and it stops. The button keeps its state after a reload. Leaving the editor stops all sound.
+- **Delivers.** A sound button in `PositionReadout`, saved as `rewild.editor.sound` and off by
+  default. `EditorSound`: a scene scope for the editor, the `'editor'` silence, and a frame loop
+  that follows the editor camera and calls `audio.update()` while sound is on. Named silencers in
+  the engine.
+- **Expect.** With sound off, `holdBed('meadow', 0.5)` is silent. Click the button and it plays.
+  Click again and it is silent. The button keeps its state after a reload. Leaving the editor fades
+  the sound out.
 
 ### Phase 2: Weather
 

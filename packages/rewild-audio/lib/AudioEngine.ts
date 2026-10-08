@@ -22,7 +22,7 @@ export { MENU_DUCK_DB, OPEN_CUTOFF_HZ };
 
 const PARAM_TIME_CONSTANT = 0.02;
 const LISTENER_TIME_CONSTANT = 0.02;
-const BACKGROUND_TIME_CONSTANT = 0.05;
+const SILENCE_TIME_CONSTANT = 0.05;
 
 /** Events that count as a user gesture for the browser's autoplay policy. */
 const GESTURE_EVENTS = ['pointerdown', 'pointerup', 'keydown'] as const;
@@ -77,7 +77,7 @@ export class AudioEngine {
   private _muffleCutoff = OPEN_CUTOFF_HZ;
   private _muffleLevel = 1;
   private _ducked = false;
-  private _backgroundMuted = false;
+  private readonly _silencers = new Set<string>();
   private readonly _pick = createSoundPick();
   private readonly _beds = new Set<Bed>();
   private _voices: VoicePool | null = null;
@@ -451,17 +451,26 @@ export class AudioEngine {
   }
 
   /**
-   * Silences the master while the game is in the background, apart from the
-   * mute and volume the mixer holds, so neither undoes the other.
+   * Silences the master for a named reason, such as 'background' or 'editor',
+   * apart from the mixer's volume and mute so neither undoes the other. The
+   * master is silent while any reason holds.
    */
-  setBackgroundMuted(muted: boolean): void {
-    if (muted === this._backgroundMuted) return;
-    this._backgroundMuted = muted;
-    this._applyBusGains(BACKGROUND_TIME_CONSTANT);
+  setSilenced(reason: string, silenced: boolean): void {
+    if (silenced === this._silencers.has(reason)) return;
+    if (silenced) this._silencers.add(reason);
+    else this._silencers.delete(reason);
+    this._applyBusGains(SILENCE_TIME_CONSTANT);
   }
 
-  get backgroundMuted(): boolean {
-    return this._backgroundMuted;
+  /** Whether `reason` silences the master, or with no reason, whether any does. */
+  isSilenced(reason?: string): boolean {
+    return reason === undefined
+      ? this._silencers.size > 0
+      : this._silencers.has(reason);
+  }
+
+  get silencedBy(): string[] {
+    return [...this._silencers];
   }
 
   /** Low-pass and gain on the world bus, for under water and death. */
@@ -555,7 +564,7 @@ export class AudioEngine {
   }
 
   private _busGain(name: BusName): number {
-    if (name === 'master' && this._backgroundMuted) return 0;
+    if (name === 'master' && this._silencers.size > 0) return 0;
     return this.mix.gain(name);
   }
 }

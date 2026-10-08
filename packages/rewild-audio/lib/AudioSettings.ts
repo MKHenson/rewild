@@ -86,16 +86,16 @@ export class AudioSettings {
   set muteInBackground(value: boolean) {
     if (value === this._muteInBackground) return;
     this._muteInBackground = value;
-    if (!value) this._engine.setBackgroundMuted(false);
+    if (!value) this._engine.setSilenced('background', false);
     this._write();
   }
 
   /** Mutes the engine while `target` is blurred, if the setting is on. */
   bindBackgroundMute(target: EventTarget): () => void {
     const onBlur = () => {
-      if (this._muteInBackground) this._engine.setBackgroundMuted(true);
+      if (this._muteInBackground) this._engine.setSilenced('background', true);
     };
-    const onFocus = () => this._engine.setBackgroundMuted(false);
+    const onFocus = () => this._engine.setSilenced('background', false);
     target.addEventListener('blur', onBlur);
     target.addEventListener('focus', onFocus);
     return () => {
