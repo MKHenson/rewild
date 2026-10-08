@@ -1,20 +1,50 @@
+import { Matrix4, Vector3 } from 'rewild-common';
 import { Bed, BedSpec } from './Bed';
+import { Emitter, EmitterSpec } from './Emitter';
 import { BUS_NAMES, BUS_PARENT, BusMix, BusName, dbToGain } from './Buses';
+import { MENU_DUCK_DB, OPEN_CUTOFF_HZ } from './constants';
 import {
   FileLoader,
   SoundBank,
   SoundManifest,
   createSoundPick,
 } from './SoundBank';
+import {
+  REF_DISTANCE,
+  VoiceInfo,
+  VoicePool,
+  VoiceStart,
+  inverseDistanceGain,
+} from './VoicePool';
 
-export const MENU_DUCK_DB = -12;
-export const OPEN_CUTOFF_HZ = 20000;
+export { MENU_DUCK_DB, OPEN_CUTOFF_HZ };
+
 const PARAM_TIME_CONSTANT = 0.02;
+const LISTENER_TIME_CONSTANT = 0.02;
 
 /** Events that count as a user gesture for the browser's autoplay policy. */
 const GESTURE_EVENTS = ['pointerdown', 'pointerup', 'keydown'] as const;
 
 export type AudioEngineState = AudioContextState | 'idle';
+
+export interface PlayOptions {
+  /** World position. Without it the sound plays in 2D. */
+  at?: Vector3;
+  bus?: BusName;
+  gain?: number;
+  /** Seconds from now, on the audio clock. */
+  delay?: number;
+  /** Low-pass cutoff in Hz. 3D only. */
+  cutoff?: number;
+  /** How fast a 3D sound fades with distance. 0 leaves the distance curve to the caller. */
+  rolloff?: number;
+  /** Where to start, as a share of the sound's length from 0 to 1. 3D only. */
+  offset?: number;
+  /** Seconds to fade in. 3D only. */
+  fadeIn?: number;
+  /** Multiplies its loudness when voices are ranked, so it is stolen last. 3D only. */
+  priority?: number;
+}
 
 /**
  * Owns the AudioContext and the bus graph:
@@ -41,6 +71,32 @@ export class AudioEngine {
   private _ducked = false;
   private readonly _pick = createSoundPick();
   private readonly _beds = new Set<Bed>();
+  private _voices: VoicePool | null = null;
+  private readonly _listenerPosition = new Vector3(0, 0, 0);
+  private readonly _listenerForward = new Vector3(0, 0, -1);
+  private readonly _listenerUp = new Vector3(0, 1, 0);
+  private readonly _listenerVectors = [
+    this._listenerPosition,
+    this._listenerForward,
+    this._listenerUp,
+  ];
+  private _listenerParams: AudioParam[] = [];
+  private readonly _voiceStart: VoiceStart = {
+    pick: this._pick,
+    bus: null as unknown as AudioNode,
+    x: 0,
+    y: 0,
+    z: 0,
+    gain: 1,
+    cutoff: OPEN_CUTOFF_HZ,
+    rolloff: 1,
+    delay: 0,
+    loop: false,
+    offset: 0,
+    fadeIn: 0,
+    priority: 1,
+  };
+  private readonly _emitters: Emitter[] = [];
 
   /** `resolveUrl` turns a manifest file path into the URL to fetch. */
   constructor(resolveUrl?: (path: string) => string, loadFile?: FileLoader) {
@@ -94,8 +150,13 @@ export class AudioEngine {
     this._beds.delete(bed);
   }
 
-  /** Plays a sound once, in 2D, on a bus. False if the context or the sound is not ready. */
-  play(name: string, bus: BusName = 'effects', gain: number = 1): boolean {
+  /**
+   * Plays a sound once: in 3D on a pooled voice when `at` is given, else in 2D.
+   * False if the context or the sound is not ready, or every voice is louder.
+   */
+  play(name: string, options?: PlayOptions): boolean {
+    if (options?.at) return this._start3d(name, options, false) !== 0;
+
     const ctx = this._ctx;
     if (!ctx || !this._buses || !this.bank.pick(name, this._pick)) return false;
 
@@ -103,11 +164,167 @@ export class AudioEngine {
     source.buffer = this._pick.buffer;
     source.playbackRate.value = this._pick.pitch;
     const amp = ctx.createGain();
-    amp.gain.value = this._pick.gain * gain;
-    source.connect(amp).connect(this._buses[bus]);
+    amp.gain.value = this._pick.gain * (options?.gain ?? 1);
+    source.connect(amp).connect(this._buses[options?.bus ?? 'effects']);
     source.onended = () => amp.disconnect();
-    source.start();
+    source.start(ctx.currentTime + Math.max(0, options?.delay ?? 0));
     return true;
+  }
+
+  /** Loops a sound at a world position until `stop`. Returns its id, or 0 if it did not start. */
+  loop(name: string, options: PlayOptions & { at: Vector3 }): number {
+    return this._start3d(name, options, true);
+  }
+
+  /** Moves a 3D sound. False once it has ended or lost its voice. */
+  move(id: number, at: Vector3): boolean {
+    return !!this._voices?.move(id, at.x, at.y, at.z);
+  }
+
+  /** Moves a 3D sound's gain and cutoff over `timeConstant` seconds. */
+  setVoiceLevel(
+    id: number,
+    gain: number,
+    cutoff: number,
+    timeConstant: number
+  ): boolean {
+    return !!this._voices?.setLevel(id, gain, cutoff, timeConstant);
+  }
+
+  /** A 3D sound that belongs to a place. See `Emitter`. */
+  createEmitter(spec: EmitterSpec): Emitter {
+    const emitter = new Emitter(this, spec);
+    this._emitters.push(emitter);
+    return emitter;
+  }
+
+  get emitters(): readonly Emitter[] {
+    return this._emitters;
+  }
+
+  /** Called by `Emitter.dispose`. */
+  forgetEmitter(emitter: Emitter): void {
+    const i = this._emitters.indexOf(emitter);
+    if (i >= 0) this._emitters.splice(i, 1);
+  }
+
+  /** Call once a frame, after the listener moves. Lets emitters take and give back voices. */
+  update(): void {
+    const emitters = this._emitters;
+    for (let i = 0; i < emitters.length; i++) emitters[i].update();
+  }
+
+  /** The distance curve at the listener for a 3D sound at this point. */
+  distanceGain(at: Vector3, rolloff: number): number {
+    const d = this._listenerPosition.distanceTo(at);
+    return inverseDistanceGain(d, REF_DISTANCE, rolloff);
+  }
+
+  /** Fades a 3D sound out over `fade` seconds. */
+  stop(id: number, fade: number = 0.05): boolean {
+    return !!this._voices?.stop(id, fade);
+  }
+
+  isPlaying(id: number): boolean {
+    return !!this._voices?.isPlaying(id);
+  }
+
+  get voiceCount(): number {
+    return this._voices?.size ?? 0;
+  }
+
+  get voicesInUse(): number {
+    return this._voices?.inUse ?? 0;
+  }
+
+  /** 'equalpower' pans by level only: a sound to the side plays in one speaker. */
+  setPanningModel(model: PanningModelType): void {
+    this._voices?.setPanningModel(model);
+  }
+
+  get panningModel(): PanningModelType {
+    return this._voices?.panningModel ?? 'HRTF';
+  }
+
+  voices(): VoiceInfo[] {
+    return this._voices?.voices() ?? [];
+  }
+
+  /** Listener position, forward and up, in world space. */
+  setListener(position: Vector3, forward: Vector3, up: Vector3): void {
+    this._listenerPosition.copy(position);
+    this._listenerForward.copy(forward);
+    this._listenerUp.copy(up);
+    this._listenerMoved();
+  }
+
+  /** Sets the listener from a world matrix, such as a camera's `matrixWorld`. */
+  setListenerFromMatrix(m: Matrix4): void {
+    const e = m.elements;
+    this._listenerPosition.setFromMatrixPosition(m);
+    this._listenerForward.set(-e[8], -e[9], -e[10]);
+    this._listenerUp.set(e[4], e[5], e[6]);
+    this._listenerMoved();
+  }
+
+  get listenerPosition(): Readonly<Vector3> {
+    return this._listenerPosition;
+  }
+
+  get listenerForward(): Readonly<Vector3> {
+    return this._listenerForward;
+  }
+
+  get listenerUp(): Readonly<Vector3> {
+    return this._listenerUp;
+  }
+
+  private _start3d(name: string, options: PlayOptions, loop: boolean): number {
+    if (!this._voices || !this._buses || !this.bank.pick(name, this._pick))
+      return 0;
+    const at = options.at!;
+    const s = this._voiceStart;
+    s.bus = this._buses[options.bus ?? 'effects'];
+    s.x = at.x;
+    s.y = at.y;
+    s.z = at.z;
+    s.gain = options.gain ?? 1;
+    s.cutoff = options.cutoff ?? OPEN_CUTOFF_HZ;
+    s.rolloff = options.rolloff ?? 1;
+    s.delay = options.delay ?? 0;
+    s.loop = loop;
+    s.offset = options.offset ?? 0;
+    s.fadeIn = options.fadeIn ?? 0;
+    s.priority = options.priority ?? 1;
+    return this._voices.start(name, s);
+  }
+
+  private _listenerMoved(): void {
+    const p = this._listenerPosition;
+    this._voices?.setListenerPosition(p.x, p.y, p.z);
+    if (this._ctx) this._applyListener(false);
+  }
+
+  /** Writes position, forward and up to the context's listener, in that order. */
+  private _applyListener(jump: boolean): void {
+    const now = this._ctx!.currentTime;
+    const params = this._listenerParams;
+    for (let i = 0; i < 3; i++) {
+      const v = this._listenerVectors[i];
+      this._setListenerParam(params[i * 3], v.x, now, jump);
+      this._setListenerParam(params[i * 3 + 1], v.y, now, jump);
+      this._setListenerParam(params[i * 3 + 2], v.z, now, jump);
+    }
+  }
+
+  private _setListenerParam(
+    param: AudioParam,
+    value: number,
+    now: number,
+    jump: boolean
+  ): void {
+    if (jump) param.value = value;
+    else param.setTargetAtTime(value, now, LISTENER_TIME_CONSTANT);
   }
 
   async start(): Promise<void> {
@@ -147,6 +364,8 @@ export class AudioEngine {
     const ctx = this._ctx;
     this._ctx = null;
     this._buses = null;
+    this._voices = null;
+    this._listenerParams = [];
     if (ctx && ctx.state !== 'closed') await ctx.close();
   }
 
@@ -223,6 +442,23 @@ export class AudioEngine {
       .connect(buses.master);
 
     buses.master.connect(this._compressor).connect(ctx.destination);
+
+    const listener = ctx.listener;
+    this._listenerParams = [
+      listener.positionX,
+      listener.positionY,
+      listener.positionZ,
+      listener.forwardX,
+      listener.forwardY,
+      listener.forwardZ,
+      listener.upX,
+      listener.upY,
+      listener.upZ,
+    ];
+    this._applyListener(true);
+    this._voices = new VoicePool(ctx);
+    const p = this._listenerPosition;
+    this._voices.setListenerPosition(p.x, p.y, p.z);
 
     this.bank.decode(ctx);
   }
