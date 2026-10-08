@@ -325,11 +325,11 @@ sound.dispose(); // fades out and stops everything above over 0.3 s
 - **Menu.** Opening the in-game menu, with Escape or by losing pointer lock, ducks the world bus.
   **Resume** lifts it. The settings panel opened from the menu keeps the duck. The Game Over menu
   does not duck.
-- **Hidden window.** `Application` calls `audio.suspendWhenHidden(document)`. On
-  `visibilitychange` to hidden, the engine suspends the context. It resumes when the window shows
-  again.
-- **Lost focus.** An Audio setting, **Mute when in the background**, mutes the master on `blur`.
-  This matters most in Electron.
+- **Hidden window.** `Application` calls `audio.suspendWhenHidden(document, () => audioSettings.muteInBackground)`. On `visibilitychange` to hidden, the engine suspends the
+  context if the setting is on. It resumes when the window shows again.
+- **Lost focus.** While **Mute when in the background** is on, the master fades out on `blur`.
+  With it off, the game keeps playing on `blur` and in a hidden tab. This matters most in
+  Electron.
 
 ## Weather sound
 
@@ -937,8 +937,21 @@ A new **Audio** tab in `SettingsPanel.tsx`, next to **Display**. A few sliders c
 The world slider covers ambience, weather and effects together. A new bus joins one of these
 sliders, not a new one.
 
-An `AudioSettings` class stores them in localStorage under `rewild.audio`, in the same way as
-`QualitySettings`. A change takes effect at once, with no Apply.
+`AudioSettings` in `packages/rewild-audio` holds them. `src/core/audio/audio.ts` creates the one
+instance, `audioSettings`, next to the engine.
+
+- **Storage.** It stores them as JSON in localStorage under `rewild.audio`, in the same way as
+  `QualitySettings`. The constructor restores them and keeps only known settings with valid values,
+  so a stale or hand-edited entry falls back to its default.
+- **No Apply.** A slider change takes effect at once and is stored at once. The modal's Apply and
+  Cancel buttons are for the Display tab only.
+- **The volume curve.** A slider position becomes a bus gain by squaring it, so half way is about
+  -12 dB and the slider's travel sounds even. `setAudioVolume` in the console sets a bus gain
+  directly, with no curve.
+- **Background mute.** `audioSettings.bindBackgroundMute(window)` fades the master out on `blur`
+  while the setting is on, and back on `focus`. It is separate from the mixer's mute, so neither
+  undoes the other. The same setting decides whether a hidden tab suspends the context; see
+  [Start, focus and pause](#start-focus-and-pause).
 
 ## Sound list (steps 1 to 22)
 

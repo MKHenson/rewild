@@ -1,8 +1,16 @@
-import { AudioEngine, AudioScope, SoundManifest } from 'rewild-audio';
+import {
+  AudioEngine,
+  AudioScope,
+  AudioSettings,
+  SoundManifest,
+} from 'rewild-audio';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
 
 /** The one audio engine, shared by the game and the editor. */
 export const audio = new AudioEngine(resolveAssetUrl);
+
+/** The player's volumes and background mute, restored from localStorage. */
+export const audioSettings = new AudioSettings(audio);
 
 let scene: AudioScope | null = null;
 
