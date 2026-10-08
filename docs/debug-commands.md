@@ -347,6 +347,10 @@ The buses are `master`, `music`, `world`, `ambience`, `weather`, `effects`,
 `master`. A solo keeps the soloed bus, the buses above it and the buses under it.
 The `effective` column in `audio()` is the bus gain times every gain above it.
 
+Sounds started from the console during a game belong to that game, so a restart
+or quitting to the menu fades them out like the game's own. Outside a game they
+belong to no one and play until stopped.
+
 The context is created by the first click or key press on the page, so before
 that `audio()` reports `idle`. Volume, mute and solo changes made earlier still apply
 once it starts.

@@ -9,7 +9,8 @@ import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRende
 import { ScatterColliderStreamer } from './physics/ScatterColliderStreamer';
 import { registerScatterColliderCommands } from './debug/ScatterDebugCommands';
 import { bindScreenshotHotkey } from './ScreenshotHotkey';
-import { audio } from './audio/audio';
+import { audio, closeSceneScope, openSceneScope } from './audio/audio';
+import { AudioScope } from 'rewild-audio';
 
 export class GameManager {
   renderer: Renderer;
@@ -17,6 +18,8 @@ export class GameManager {
   hasInitialized: boolean;
   player: Player;
   clock: Clock;
+  /** Every sound this game plays; it fades out when the game is disposed. */
+  sound: AudioScope;
   RAPIER: typeof import('@dimforge/rapier3d-compat');
   physicsWorld: World;
   onUnlock: () => void;
@@ -33,6 +36,7 @@ export class GameManager {
     this.player = player;
     this.clock = new Clock();
     this.onUnlock = onUnlock;
+    this.sound = openSceneScope();
     this._onPointerlockChange = this._handlePointerlockChange.bind(this);
     this.TerrainEventDelegate = this.onTerrainEvent.bind(this);
     this.terrainRapierBodyMap = new Map();
@@ -170,6 +174,7 @@ export class GameManager {
   }
 
   dispose() {
+    closeSceneScope(this.sound);
     this.stateMachine?.dispose();
     this.scatterColliders?.dispose();
     this.renderer.dispose();

@@ -3,6 +3,7 @@ import { GameOverMenu } from './GameOverMenu';
 import { SettingsPanel } from './SettingsPanel';
 import { Component, register } from 'rewild-ui';
 import { ViewportStateMachine } from './ViewportStateMachine';
+import { audio } from '../../core/audio/audio';
 
 interface Props {
   onQuit: () => void;
@@ -17,12 +18,14 @@ export class InGame extends Component<Props> {
 
     const onResume = () => {
       setModalOpen(false);
+      audio.duckWorld(false);
       viewport.gameManager.lock();
     };
 
     const onDeath = () => {
       setActiveMenu('gameOverMenu');
       setModalOpen(true);
+      audio.duckWorld(false);
     };
 
     const createViewport = () =>
@@ -53,15 +56,18 @@ export class InGame extends Component<Props> {
 
       if (!modalOpen()) {
         setModalOpen(true);
+        audio.duckWorld(true);
       } else if (activeMenu() === 'settings') {
         setActiveMenu('ingameMenu');
       } else {
         setModalOpen(false);
+        audio.duckWorld(false);
       }
     };
 
     const onUnlock = () => {
       setModalOpen(true);
+      audio.duckWorld(activeMenu() !== 'gameOverMenu');
     };
 
     /** The one panel the overlay is showing, if any. */
