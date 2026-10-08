@@ -11,12 +11,13 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
           ? `, ${ctx.sampleRate} Hz, latency ${(ctx.baseLatency * 1000).toFixed(
               1
             )} ms`
-          : ' — starts from the Start button') +
+          : ' — starts on the first click or key press') +
         `\nWorld: muffle ${Math.round(
           audio.muffleCutoff
         )} Hz at ${audio.muffleLevel.toFixed(2)}` +
         `, ${audio.ducked ? 'ducked' : 'not ducked'}` +
-        (audio.mix.solo ? `\nSolo: ${audio.mix.solo}` : '')
+        (audio.mix.solo ? `\nSolo: ${audio.mix.solo}` : '') +
+        `\n${describeBank(audio)}`
     );
     console.table(
       Object.fromEntries(
@@ -70,4 +71,34 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
     audio.setSolo(bus);
     console.log(`Solo → ${bus}`);
   };
+
+  (window as any).playSound = (name?: string, bus: string = 'effects') => {
+    if (name === undefined) {
+      console.log(
+        `playSound(name, bus?) — sounds: ${audio.bank.names().join(', ')}`
+      );
+      return;
+    }
+    if (!isBusName(bus)) {
+      console.warn(`Unknown bus "${bus}". Expected one of: ${busList}`);
+      return;
+    }
+    if (audio.play(name, bus)) return;
+
+    if (audio.state !== 'running')
+      console.warn(`Audio is ${audio.state} — click the page first`);
+    else if (!audio.bank.has(name))
+      console.warn(`No sound "${name}" in templates/sounds.json`);
+    else console.warn(`Sound "${name}" has no loaded files yet`);
+  };
+}
+
+function describeBank(audio: AudioEngine): string {
+  const s = audio.bank.stats();
+  return (
+    `Sounds: ${s.sounds}, files ${s.loaded}/${s.files} loaded` +
+    (s.pending ? `, ${s.pending} pending` : '') +
+    (s.failed ? `, ${s.failed} failed` : '') +
+    `, ${(s.bytes / (1024 * 1024)).toFixed(1)} MB decoded`
+  );
 }

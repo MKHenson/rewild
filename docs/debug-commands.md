@@ -321,13 +321,17 @@ See [Understory](./milestones/understory.md).
 
 ## Audio
 
-Registered in `AudioDebugCommands.ts`.
+Registered in `AudioDebugCommands.ts` when the app starts, so they work on the main
+menu too, not only after a game or the editor has loaded.
 
 ```js
-audio(); // context state, world muffle and duck, and a table of every bus
+audio(); // context state, world muffle and duck, sounds loaded, and a table of every bus
 setAudioVolume('weather', 0.5); // bus volume, 0 to 1
 muteAudio('world'); // toggles; no argument mutes master
 soloAudio('weather'); // hear one bus; call again, or with no argument, to clear
+playSound('test'); // plays a sound from templates/sounds.json once, in 2D
+playSound('test', 'ui'); // on another bus; the default is effects
+playSound(); // lists the sound names
 ```
 
 The buses are `master`, `music`, `world`, `ambience`, `weather`, `effects`,
@@ -338,6 +342,11 @@ The `effective` column in `audio()` is the bus gain times every gain above it.
 The context is created by the first click or key press on the page, so before
 that `audio()` reports `idle`. Volume, mute and solo changes made earlier still apply
 once it starts.
+
+`audio()` also counts the sound files loaded, pending and failed, and the decoded
+size of the bank. Decoded audio is float PCM, so this is the real memory cost,
+several times the size of the files. A file that fails to load logs its own
+error with the sound's name and URL.
 
 See [Susurrus](./milestones/susurrus.md).
 

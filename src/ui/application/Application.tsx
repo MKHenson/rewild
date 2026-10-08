@@ -9,7 +9,8 @@ import { SettingsPanel } from './SettingsPanel';
 import { PerfPanel } from './PerfPanel';
 import { AdminPage } from './admin/AdminPage';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
-import { audio } from '../../core/audio/audio';
+import { audio, loadSoundManifest } from '../../core/audio/audio';
+import { registerAudioDebugCommands } from '../../core/debug/AudioDebugCommands';
 
 interface Props {}
 
@@ -17,6 +18,8 @@ interface Props {}
 export class Application extends Component<Props> {
   init() {
     audio.startOnGesture(document);
+    loadSoundManifest();
+    registerAudioDebugCommands(audio);
 
     const onStart = async () => {
       navigate('/game');
