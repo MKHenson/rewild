@@ -89,6 +89,7 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
 | Beds               | **2D, no panner**                                                                  | Rain, wind and biome life are all around the player. A panner would make them come from one point.                                                                                                       |
 | Player sounds      | **2D, no panner**                                                                  | Footsteps and breathing are at the listener. A panner there gives nothing and costs CPU.                                                                                                                 |
 | 3D emitters        | **`PannerNode`, HRTF**, from a fixed pool                                          | HRTF gives above, below and behind. A pool caps the CPU cost and needs no allocation per sound.                                                                                                          |
+| Places that sound  | **`Emitter`s with virtual voices**                                                 | A waterfall must still sound when the player comes back. An emitter always exists, but holds a voice only while it can be heard, and takes one again by itself.                                          |
 | Far sounds         | **Gain and tone set by the game**, panner only for direction                       | Thunder is 700 to 1,900 m away. The game sets the distance curve. The panner sits 50 m out in the right direction.                                                                                       |
 | Under water        | **A low-pass insert** on the world bus, driven by the player                       | One filter makes every world sound muffled. No sound needs its own under-water version. `Player.cameraUnderWater` sets it.                                                                               |
 | Logic              | **Pure mapping functions**, unit tested in jest                                    | `windiness → gain` and similar are plain functions. Jest has no Web Audio, so the engine stays a thin layer over them.                                                                                   |
@@ -150,34 +151,87 @@ bed.dispose();
 - Setting the same gain again adds no automation, so calling `set` every frame costs nothing when
   the value holds still.
 
-### Emitters
+### 3D sounds
 
-An **emitter** plays a sound at a world position, through a `PannerNode` from a pool.
+A **3D sound** plays at a world position, through a `PannerNode` from a pool. Positions,
+directions and matrices in the audio API are `Vector3` and `Matrix4` from `rewild-common`, as in the
+renderer.
 
 ```ts
 audio.play('thunder-close', {
-  at: [x, y, z],
+  at: strike, // a Vector3 from rewild-common
   delay: 3.2,
   gain: 0.8,
   cutoff: 2500,
 });
 audio.play('splash-small'); // no position: a 2D player sound
-const id = audio.loop('surf', { at: [x, y, z] }); // an emitter that stays
-audio.move(id, x, y, z);
+const id = audio.loop('splash-trail', { at: position }); // lasts while its voice does
+audio.move(id, position);
 audio.stop(id, 0.5); // fade out over 0.5 s
 ```
 
-- **Voice pool.** A fixed number of 3D voices, for example 24. When the pool is full, a new
-  sound takes the quietest voice, or does not play if it is quieter than all of them.
+- **Voice pool.** 24 voices, each a low-pass, a gain and an HRTF `PannerNode`, built once when
+  the context starts. A play creates only its buffer source. When the pool is full, a new sound
+  takes the voice heard quietest, or does not play if it would be quieter than all of them.
+  "Heard" is the voice's gain times the panner's distance curve from the listener.
+- **Return values.** `play` returns whether the sound started. `loop` returns an id for `move` and
+  `stop`, or 0. An id goes stale when its sound ends or its voice is taken, and `move` and `stop`
+  then return false.
+- **Distance.** Panners use the inverse model with a reference distance of 2 m. `rolloff: 0` turns
+  the curve off, for far sounds such as thunder whose gain the game sets itself.
+- **Movement.** `move` glides the panner over about 20 ms, so a moving sound does not click.
+- **A stopping loop** counts as silent, so it is the first voice a new sound takes.
 - **Delay** uses the context clock (`ctx.currentTime + delay`). The frame rate does not change it.
+  2D sounds take a delay too.
 - **Variation.** A manifest entry can list several files and a pitch and gain range. Each play
   picks one at random, so ten footsteps do not sound the same.
+- **Priority** multiplies a sound's loudness when voices are ranked, so a sound with a high
+  priority is stolen last. Its real gain does not change.
+
+### Emitters that belong to a place
+
+A `loop` lasts only as long as its voice. If a louder sound takes the voice, it is gone. A sound
+that belongs to a place, such as a waterfall, the surf or a campfire, is an **emitter** instead.
+
+```ts
+const falls = audio.createEmitter({
+  sound: 'waterfall',
+  at: position,      // a Vector3
+  gain: 1,          // optional, like bus, cutoff, rolloff and priority
+});
+falls.move(position);
+falls.set(gain, cutoff?);
+falls.dispose();
+
+audio.update();     // once a frame, after the listener moves
+```
+
+- **Always there, sometimes playing.** An emitter keeps its sound, position and gain all the time.
+  It holds one of the 24 voices only while it can be heard. Otherwise it is **virtual**: silent,
+  and costing only a few numbers.
+- **Out of earshot.** When its heard gain, its gain times the distance curve, falls below
+  -46 dB, it fades out over 0.25 s and gives its voice back. Nothing has to steal it.
+- **Back in earshot.** `audio.update()` checks every emitter. A virtual one heard above -40 dB
+  takes a free voice, or the quietest one if it beats it. It starts at a random point in its loop
+  and fades in over 0.25 s, so the gap does not show. The 6 dB between the two levels stops an
+  emitter at the edge from flickering on and off.
+- **Stolen.** If a louder sound takes its voice, the emitter goes virtual and takes a voice again
+  as soon as one is free or quieter.
+- **Owners do not track voices.** A system creates its emitters, moves them and disposes them. It
+  never checks whether one is playing.
+- **The bus** is ambience unless the spec says otherwise.
+- `set(0)` sends an emitter virtual on the next update, which turns it off without disposing it.
+
+Use a bed for a sound with no place, such as rain. Use an emitter for a sound that comes from a
+place. Use `play` or `loop` for short sounds that do not need to come back.
 
 ### The listener
 
-Each frame the listener takes the camera's position, forward and up from
-`camera.transform.matrixWorld`. Forward is `(-m[8], -m[9], -m[10])` and up is
-`(m[4], m[5], m[6])`, the same as `SkyRenderer` and `WaterLens`.
+Each frame `GameManager` calls `audio.setListenerFromMatrix(camera.transform.matrixWorld)`
+after the renderer. It takes the position from `m[12..14]`, forward from `(-m[8], -m[9], -m[10])`
+and up from `(m[4], m[5], m[6])`, the same as `SkyRenderer` and `WaterLens`. The listener's
+parameters glide over about 20 ms, as emitters do. A listener set before the context exists is
+applied when it starts.
 
 ### The sound manifest
 
@@ -591,9 +645,9 @@ A sprint has no signal of its own. It raises `speed`, and the `sprint` rule foll
 
 Surf and lapping are world sounds, read at the listener, so they play in the editor too.
 
-- **Ocean surf.** A bed whose gain follows the distance to the shore from `ShoreField` and the sea
-  state from `windiness`. A calm sea is a soft wash. A storm sea is a heavy crash. Its emitter
-  sits on the nearest shore point, so the surf comes from the beach.
+- **Ocean surf.** An emitter on the nearest shore point from `ShoreField`, moved as the listener
+  walks, so the surf comes from the beach. Its gain follows the sea state from `windiness`. A calm
+  sea is a soft wash. A storm sea is a heavy crash.
 - **Lake lapping.** Quieter and shorter. It follows the lake's `lapping` value from the water
   palette.
 - `WaterQuery.sample` gives the water's kind through `typeWeights`, so ocean and lake can blend at
@@ -940,17 +994,19 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 #### 4. 3D emitters and the listener
 
-- **Delivers.** The emitter pool: 24 HRTF `PannerNode` voices, `play`, `loop`, `move` and `stop`,
-  delays on the context clock, and voice stealing by loudness. The listener, set from the camera's
-  world matrix each frame. `playSound(name, [x, y, z])`.
+- **Delivers.** The voice pool: 24 HRTF `PannerNode` voices, `play`, `loop`, `move` and `stop`,
+  delays on the context clock, priority, and voice stealing by loudness. Emitters with virtual
+  voices, and `audio.update()` in `GameManager.onUpdate`. The listener, set from the camera's
+  world matrix each frame. `playSound`, `playSoundNear`, `addEmitter`, `addEmitterNear`,
+  `clearEmitters` and `setPanning`.
 - **Expect.** A sound played 20 m to the left is heard on the left, and moves to the right when the
-  camera turns around. A sound above is heard above. Playing 40 sounds at once keeps 24 and drops
-  the quietest. `audio()` shows the voices in use.
+  camera turns around. Playing 40 sounds at once keeps 24 and drops the quietest. An emitter goes
+  virtual as the player walks away and plays again on the way back. `audio()` shows the voices
+  and the emitters.
 
 #### 5. Sound in the game
 
-- **Delivers.** `GameManager` calls `audio.update()` after `renderer.onFrame()`. The in-game menu
-  ducks the world. A hidden tab suspends the context. A restart keeps the engine and stops the old
+- **Delivers.** The in-game menu ducks the world. A hidden tab suspends the context. A restart keeps the engine and stops the old
   game's sounds. Quitting to the main menu stops the game's sounds.
 - **Expect.** Press **Start** and a test bed plays. Open the menu and the world goes quieter.
   **Resume** brings it back. Switch tabs and the sound stops. Switch back and it plays again.

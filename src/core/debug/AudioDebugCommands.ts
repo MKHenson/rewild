@@ -1,3 +1,4 @@
+import { Vector3 } from 'rewild-common';
 import { AudioEngine, BUS_NAMES, Bed, isBusName } from 'rewild-audio';
 
 export function registerAudioDebugCommands(audio: AudioEngine) {
@@ -18,7 +19,11 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
         )} Hz at ${audio.muffleLevel.toFixed(2)}` +
         `, ${audio.ducked ? 'ducked' : 'not ducked'}` +
         (audio.mix.solo ? `\nSolo: ${audio.mix.solo}` : '') +
-        `\n${describeBank(audio)}`
+        `\n${describeBank(audio)}` +
+        `\n3D voices: ${audio.voicesInUse}/${audio.voiceCount} in use, ${audio.panningModel} panning` +
+        `\nListener: at ${vec(audio.listenerPosition)}, forward ${vec(
+          audio.listenerForward
+        )}, up ${vec(audio.listenerUp)}`
     );
     console.table(
       Object.fromEntries(
@@ -33,6 +38,26 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
         ])
       )
     );
+    if (audio.voicesInUse)
+      console.table(
+        audio.voices().map((v) => ({
+          id: v.id,
+          sound: v.name,
+          at: vec(v.at),
+          loudness: +v.loudness.toFixed(3),
+          priority: v.priority,
+        }))
+      );
+    if (audio.emitters.length)
+      console.table(
+        audio.emitters.map((e) => ({
+          sound: e.sound,
+          at: vec(e.at),
+          gain: e.gain,
+          heard: +e.heard.toFixed(4),
+          state: e.state,
+        }))
+      );
     if (audio.beds.size)
       console.table(
         [...audio.beds].map((bed) => ({
@@ -118,24 +143,126 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
     console.log(`${name} → ${gain}`);
   };
 
-  (window as any).playSound = (name?: string, bus: string = 'effects') => {
+  const explainNotPlayed = (name: string) => {
+    if (audio.state !== 'running')
+      console.warn(`Audio is ${audio.state} — click the page first`);
+    else if (!audio.bank.has(name))
+      console.warn(`No sound "${name}" in templates/sounds.json`);
+    else if (!audio.bank.isLoaded(name))
+      console.warn(`Sound "${name}" has no loaded files yet`);
+    else console.warn(`Every 3D voice is louder than "${name}" would be`);
+  };
+
+  // The console takes positions as [x, y, z] arrays, which are easier to type.
+  const toVector = (v: unknown): Vector3 | null =>
+    Array.isArray(v) && v.length === 3 && v.every(Number.isFinite)
+      ? new Vector3(v[0], v[1], v[2])
+      : null;
+
+  (window as any).playSound = (
+    name?: string,
+    position?: number[] | string,
+    bus: string = 'effects'
+  ) => {
     if (name === undefined) {
       console.log(
-        `playSound(name, bus?) — sounds: ${audio.bank.names().join(', ')}`
+        `playSound(name, [x, y, z]?, bus?) — sounds: ${audio.bank
+          .names()
+          .join(', ')}`
       );
       return;
+    }
+    if (typeof position === 'string') {
+      bus = position;
+      position = undefined;
     }
     if (!isBusName(bus)) {
       console.warn(`Unknown bus "${bus}". Expected one of: ${busList}`);
       return;
     }
-    if (audio.play(name, bus)) return;
+    const at = position === undefined ? undefined : toVector(position);
+    if (at === null) {
+      console.warn(
+        `Position must be [x, y, z], got ${JSON.stringify(position)}`
+      );
+      return;
+    }
+    if (!audio.play(name, { at, bus })) explainNotPlayed(name);
+  };
 
-    if (audio.state !== 'running')
-      console.warn(`Audio is ${audio.state} — click the page first`);
-    else if (!audio.bank.has(name))
+  (window as any).setPanning = (model?: string) => {
+    if (model !== 'HRTF' && model !== 'equalpower') {
+      console.log(
+        `Panning: ${audio.panningModel} — setPanning('HRTF' | 'equalpower')`
+      );
+      return;
+    }
+    audio.setPanningModel(model);
+    console.log(`Panning → ${model}`);
+  };
+
+  // Relative to the listener, which is easier to aim than a world position:
+  // [3, 0, 0] is 3 m to the right, [0, 0, 20] is 20 m ahead.
+  const nearListener = (offset: Vector3): Vector3 => {
+    const forward = audio.listenerForward;
+    const up = audio.listenerUp;
+    const right = new Vector3().crossVectors(forward, up);
+    const at = new Vector3().copy(audio.listenerPosition);
+    at.addScaledVector(right, offset.x);
+    at.addScaledVector(up, offset.y);
+    at.addScaledVector(forward, offset.z);
+    return at;
+  };
+
+  (window as any).playSoundNear = (name?: string, offset?: number[]) => {
+    const v = toVector(offset);
+    if (name === undefined || !v) {
+      console.log(
+        'playSoundNear(name, [right, up, ahead]) — metres from the listener'
+      );
+      return;
+    }
+    const at = nearListener(v);
+    if (audio.play(name, { at })) console.log(`${name} at ${vec(at)}`);
+    else explainNotPlayed(name);
+  };
+
+  const addEmitter = (name: string, at: Vector3) => {
+    if (!audio.bank.has(name)) {
       console.warn(`No sound "${name}" in templates/sounds.json`);
-    else console.warn(`Sound "${name}" has no loaded files yet`);
+      return;
+    }
+    audio.createEmitter({ sound: name, at });
+    console.log(
+      `Emitter ${name} at ${vec(at)}. It plays while it can be heard; ` +
+        'audio() shows its state.'
+    );
+  };
+
+  (window as any).addEmitter = (name?: string, position?: number[]) => {
+    const at = toVector(position);
+    if (name === undefined || !at) {
+      console.log('addEmitter(name, [x, y, z]) — a looping sound at a place');
+      return;
+    }
+    addEmitter(name, at);
+  };
+
+  (window as any).addEmitterNear = (name?: string, offset?: number[]) => {
+    const v = toVector(offset);
+    if (name === undefined || !v) {
+      console.log(
+        'addEmitterNear(name, [right, up, ahead]) — metres from the listener'
+      );
+      return;
+    }
+    addEmitter(name, nearListener(v));
+  };
+
+  (window as any).clearEmitters = () => {
+    const count = audio.emitters.length;
+    while (audio.emitters.length) audio.emitters[0].dispose();
+    console.log(`Removed ${count} emitter(s)`);
   };
 }
 
@@ -147,4 +274,8 @@ function describeBank(audio: AudioEngine): string {
     (s.failed ? `, ${s.failed} failed` : '') +
     `, ${(s.bytes / (1024 * 1024)).toFixed(1)} MB decoded`
   );
+}
+
+function vec(v: Readonly<Vector3>): string {
+  return `[${v.x.toFixed(1)}, ${v.y.toFixed(1)}, ${v.z.toFixed(1)}]`;
 }

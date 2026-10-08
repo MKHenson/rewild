@@ -288,8 +288,7 @@ cull distance for a before/after on frame time.
 one chunk, one layer, one tier. `drawn` is whether the draw was issued;
 `band` is the distance range that tier keeps; `distance` is how far the
 viewer was from that chunk's instances when the cull last ran. A chunk with no
-rows never generated scatter (see `showScatterChunks`); a row with `drawn:
-false` and a `distance` inside its `band` means the cull has not re-run since
+rows never generated scatter (see `showScatterChunks`); a row with `drawn: false` and a `distance` inside its `band` means the cull has not re-run since
 the camera moved.
 
 `showColliderBands` reads the physics side. A scatter instance holds a Rapier
@@ -331,7 +330,14 @@ muteAudio('world'); // toggles; no argument mutes master
 soloAudio('weather'); // hear one bus; call again, or with no argument, to clear
 playSound('test'); // plays a sound from templates/sounds.json once, in 2D
 playSound('test', 'ui'); // on another bus; the default is effects
+playSound('test', [10, 2, -30]); // in 3D at a world position
+playSoundNear('test', [-20, 0, 0]); // in 3D, 20 m to the listener's left
+playSoundNear('test', [0, 10, 0]); // 10 m above; [right, up, ahead] in metres
 playSound(); // lists the sound names
+addEmitter('test-loop', [10, 2, -30]); // a looping sound at a place; plays while it can be heard
+addEmitterNear('test-loop', [0, 0, 50]); // 50 m ahead of the listener
+clearEmitters(); // removes every emitter
+setPanning('equalpower'); // 3D voices pan by level only; 'HRTF' (the default) to switch back
 holdBed('test-loop', 0.5); // holds a looping sound at a gain, on the ambience bus
 holdBed('test-loop', 0); // fades it out; its source stops a few seconds later
 ```
@@ -345,11 +351,20 @@ The context is created by the first click or key press on the page, so before
 that `audio()` reports `idle`. Volume, mute and solo changes made earlier still apply
 once it starts.
 
-`audio()` lists every bed with its gain, blend and state, so `holdBed(name, 0)`
+`audio()` shows the listener and panning mode, and lists the 3D voices in use with their position and loudness, every emitter with its heard gain and state (`playing` or `virtual`), and every bed with its gain, blend and state, so `holdBed(name, 0)`
 can be watched going from `playing` to `stopped`. It also counts the sound files loaded, pending and failed, and the decoded
 size of the bank. Decoded audio is float PCM, so this is the real memory cost,
 several times the size of the files. A file that fails to load logs its own
 error with the sound's name and URL.
+
+`setPanning('equalpower')` puts a sound at your side in one speaker only, whatever
+its pitch, so it is the quickest check that left and right are wired the right way.
+HRTF is built for headphones: through speakers, and with a pure tone, its sense of
+direction is weak.
+
+An emitter takes a voice when its heard gain is above -40 dB and gives it back
+below -46 dB. With the default distance curve, a gain-1 emitter plays inside
+about 200 m and goes virtual beyond about 400 m.
 
 See [Susurrus](./milestones/susurrus.md).
 

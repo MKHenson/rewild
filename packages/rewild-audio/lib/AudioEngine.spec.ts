@@ -353,7 +353,7 @@ describe('AudioEngine sounds', () => {
     await engine.start();
     await engine.loadSounds(manifest);
 
-    expect(engine.play('blip', 'ui', 0.5)).toBe(true);
+    expect(engine.play('blip', { bus: 'ui', gain: 0.5 })).toBe(true);
     const source = context(engine).sources[0];
     expect(source.buffer).not.toBeNull();
     expect(source.loop).toBe(false);

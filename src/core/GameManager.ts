@@ -9,6 +9,7 @@ import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRende
 import { ScatterColliderStreamer } from './physics/ScatterColliderStreamer';
 import { registerScatterColliderCommands } from './debug/ScatterDebugCommands';
 import { bindScreenshotHotkey } from './ScreenshotHotkey';
+import { audio } from './audio/audio';
 
 export class GameManager {
   renderer: Renderer;
@@ -162,6 +163,10 @@ export class GameManager {
 
     this.stateMachine?.OnLoop(delta, total);
     this.renderer.onFrame();
+    audio.setListenerFromMatrix(
+      this.renderer.camera.camera.transform.matrixWorld
+    );
+    audio.update();
   }
 
   dispose() {

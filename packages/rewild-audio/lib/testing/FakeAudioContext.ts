@@ -17,6 +17,11 @@ export class FakeAudioParam {
     return this;
   }
 
+  cancelScheduledValues(_time: number) {
+    this.targets.length = 0;
+    return this;
+  }
+
   get lastTarget(): ParamTarget | undefined {
     return this.targets[this.targets.length - 1];
   }
@@ -74,6 +79,7 @@ export class FakeAudioBufferSourceNode extends FakeAudioNode {
   startedAt: number | null = null;
   offset = 0;
   stopped = false;
+  stoppedAt: number | null = null;
 
   constructor() {
     super('bufferSource');
@@ -84,14 +90,42 @@ export class FakeAudioBufferSourceNode extends FakeAudioNode {
     this.offset = offset;
   }
 
-  stop() {
+  stop(when: number = 0) {
     this.stopped = true;
+    this.stoppedAt = when;
   }
 
   /** Ends playback, as the audio thread would when the buffer runs out. */
   end() {
     this.onended?.();
   }
+}
+
+export class FakePannerNode extends FakeAudioNode {
+  panningModel: PanningModelType = 'equalpower';
+  distanceModel: DistanceModelType = 'inverse';
+  refDistance = 1;
+  maxDistance = 10000;
+  rolloffFactor = 1;
+  readonly positionX = new FakeAudioParam(0);
+  readonly positionY = new FakeAudioParam(0);
+  readonly positionZ = new FakeAudioParam(0);
+
+  constructor() {
+    super('panner');
+  }
+}
+
+export class FakeAudioListener {
+  readonly positionX = new FakeAudioParam(0);
+  readonly positionY = new FakeAudioParam(0);
+  readonly positionZ = new FakeAudioParam(0);
+  readonly forwardX = new FakeAudioParam(0);
+  readonly forwardY = new FakeAudioParam(0);
+  readonly forwardZ = new FakeAudioParam(-1);
+  readonly upX = new FakeAudioParam(0);
+  readonly upY = new FakeAudioParam(1);
+  readonly upZ = new FakeAudioParam(0);
 }
 
 /** A decoded buffer with one sample per input byte, so tests can size files by byte length. */
@@ -119,6 +153,8 @@ export class FakeAudioContext {
   readonly sampleRate = 48000;
   readonly baseLatency = 0.01;
   readonly destination = new FakeAudioNode('destination');
+  readonly listener = new FakeAudioListener();
+  readonly panners: FakePannerNode[] = [];
   readonly calls = { resume: 0, suspend: 0, close: 0, decode: 0 };
   readonly sources: FakeAudioBufferSourceNode[] = [];
 
@@ -136,6 +172,12 @@ export class FakeAudioContext {
 
   createDynamicsCompressor() {
     return new FakeDynamicsCompressorNode();
+  }
+
+  createPanner() {
+    const panner = new FakePannerNode();
+    this.panners.push(panner);
+    return panner;
   }
 
   createBufferSource() {
