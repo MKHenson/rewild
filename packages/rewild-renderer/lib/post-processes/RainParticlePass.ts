@@ -15,7 +15,8 @@ const PARTICLE_STRIDE = 32;
 // [8]      iTime
 // [9]      spawnRadius
 // [10]     spawnHeight
-// [11-15]  padding (5×f32 fills to byte 64)
+// [11]     precipitation
+// [12-15]  padding (4×f32 fills to byte 64)
 // [16-31]  viewProj    (mat4x4 — 16 f32s, align=16 @ byte 64)
 // [32-47]  invViewProj (mat4x4 — 16 f32s, align=16 @ byte 128)
 const CU = 48;
@@ -27,7 +28,10 @@ const CU = 48;
 // [20,21]  windDir     (vec2, align=8)
 // [22]     windSpeed   (gust-adjusted effective speed)
 // [23]     precipitation
-// [24-27]  padding
+// [24]     sunUpDot
+// [25]     light
+// [26]     pixelAngle
+// [27]     padding
 const RU = 28;
 
 export interface RainParticleParams {
@@ -43,6 +47,8 @@ export interface RainParticleParams {
   temperature:  number;         // 0 = snow, 1 = rain
   precipitation: number;        // 0–1
   sunUpDot:     number;         // sun elevation dot product: -1=night, 0=horizon, +1=zenith
+  light:        number;         // 0–1: how bright the sky lights the drops (rainLight)
+  pixelAngle:   number;         // radians a screen pixel spans
   spawnRadius?: number;         // half-width of spawn box in XZ (default 60 m)
   spawnHeight?: number;         // height of spawn box above camera (default 40 m)
 }
@@ -164,7 +170,8 @@ export class RainParticlePass {
     cu[8]  = renderer.totalDeltaTime / 1000;
     cu[9]  = params.spawnRadius ?? 60.0;
     cu[10] = params.spawnHeight ?? 40.0;
-    // [11-15] remain 0 (padding to byte 64)
+    cu[11] = params.precipitation;
+    // [12-15] remain 0 (padding to byte 64)
     cu.set(params.viewProj,    16); // viewProj    at f32 index 16 (byte 64)
     cu.set(params.viewProjInv, 32); // invViewProj at f32 index 32 (byte 128)
 
@@ -193,7 +200,9 @@ export class RainParticlePass {
     ru[22] = params.windSpeedEff;
     ru[23] = params.precipitation;
     ru[24] = params.sunUpDot;
-    // [25-27] remain 0 (padding)
+    ru[25] = params.light;
+    ru[26] = params.pixelAngle;
+    // [27] remains 0 (padding)
 
     renderer.device.queue.writeBuffer(this.renderUniformBuf, 0, ru.buffer, 0, RU * 4);
 

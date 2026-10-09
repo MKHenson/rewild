@@ -59,6 +59,27 @@
       "gain": [0.8, 1],
       "source": "Soundly: wind mix",
       "license": "soundly"
+    },
+    {
+      "name": "rain-light",
+      "files": ["audio/rain/rain-light.ogg"],
+      "loop": true,
+      "source": "Soundly: rain mix",
+      "license": "soundly"
+    },
+    {
+      "name": "rain-heavy",
+      "files": ["audio/rain/rain-heavy.ogg"],
+      "loop": true,
+      "source": "Soundly: rain mix",
+      "license": "soundly"
+    },
+    {
+      "name": "rain-drips",
+      "files": ["audio/rain/rain-drips.ogg"],
+      "loop": true,
+      "source": "Soundly: rain mix",
+      "license": "soundly"
     }
   ]
 }

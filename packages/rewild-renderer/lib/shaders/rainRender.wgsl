@@ -21,7 +21,10 @@ struct Particle {
 //   offset  80: windDir      (vec2,   align=8)
 //   offset  88: windSpeed    (f32) — gust-adjusted effective speed
 //   offset  92: precipitation(f32)
-//   offset  96-111: padding
+//   offset  96: sunUpDot     (f32)
+//   offset 100: light        (f32) — 0–1, how bright the sky lights the drops
+//   offset 104: pixelAngle   (f32) — radians a screen pixel spans
+//   offset 108: padding
 //   struct size = 112 bytes
 struct RenderUniforms {
     viewProj:     mat4x4<f32>,
@@ -31,10 +34,23 @@ struct RenderUniforms {
     windSpeed:    f32,
     precipitation: f32,
     sunUpDot:     f32,  // sun elevation: -1=night, 0=horizon, +1=zenith
-    _pad1:        f32,
-    _pad2:        f32,
+    light:        f32,
+    pixelAngle:   f32,
     _pad3:        f32,
 }
+
+// Keep in step with rainCompute.wgsl.
+const RAIN_FALL_LIGHT: f32 = 7.0;
+const RAIN_FALL_HEAVY: f32 = 12.0;
+const SNOW_FALL: f32 = 1.0;
+
+// A drop or flake is drawn at least MIN_PIXELS wide, with its alpha cut by the
+// square root of the share of that width it really covers, so far rain thins
+// to a haze instead of solid one-pixel flecks but stays in view.
+const MIN_PIXELS: f32 = 1.5;
+// Metres over which particles fade out toward the edge of the spawn volume.
+const FAR_FADE_FROM: f32 = 45.0;
+const FAR_FADE_TO: f32 = 80.0;
 
 @group(0) @binding(0) var<storage, read> particles:  array<Particle>;
 @group(0) @binding(1) var<uniform>        u:          RenderUniforms;
@@ -42,7 +58,7 @@ struct RenderUniforms {
 struct VertexOutput {
     @builtin(position) clipPos:   vec4f,
     @location(0)       uv:        vec2f,  // [0,1]² over the quad
-    @location(1)       nearFade:  f32,    // fade out very close particles
+    @location(1)       fade:      f32,    // near/far fade times pixel coverage
 }
 
 // Six vertices per quad (two triangles, CCW).
@@ -68,7 +84,8 @@ fn vs(
     // ── Rain streak geometry ──────────────────────────────────────────────
     // Use the particle's stored velocity for streak direction so bounce arcs
     // show an upward streak rather than a downward one.
-    let fallSpeed  = mix(1.0, 9.5, rainFactor);
+    let rainFall   = mix(RAIN_FALL_LIGHT, RAIN_FALL_HEAVY, saturate(u.precipitation));
+    let fallSpeed  = mix(SNOW_FALL, rainFall, rainFactor);
     let windVel    = vec3f(u.windDir.x * u.windSpeed, 0.0, u.windDir.y * u.windSpeed);
     let pvLen      = length(p.velocity);
     var velDir: vec3f;
@@ -79,6 +96,8 @@ fn vs(
     }
 
     let toCamera = normalize(u.cameraPos - p.position);
+    let camDist  = length(u.cameraPos - p.position);
+    let minWidth = camDist * u.pixelAngle * MIN_PIXELS;
 
     // Right vector: perp to velocity and to camera direction, giving the quad width
     var rainRight = cross(velDir, toCamera);
@@ -88,11 +107,12 @@ fn vs(
     rainRight = normalize(rainRight);
 
     // head (uv.y=0) = current drop position; tail (uv.y=1) = where it was.
-    // Faster drops streak longer: still-air rain falls at 9.5 m/s, and a drop
+    // Faster drops streak longer than a drop at 9.5 m/s: a downpour a little, and a drop
     // driven by a gale stretches up to 2.5 times as long.
     let rainWidth   = 0.016;
+    let rainDrawn   = max(rainWidth, minWidth);
     let rainLength  = 0.40 * clamp(pvLen / 9.5, 1.0, 2.5);
-    let rainOffset  = rainRight * ((lUV.x - 0.5) * rainWidth)
+    let rainOffset  = rainRight * ((lUV.x - 0.5) * rainDrawn)
                     - velDir   * ((lUV.y - 0.5) * rainLength);
 
     // ── Snow flake geometry ───────────────────────────────────────────────
@@ -106,21 +126,25 @@ fn vs(
 
     // Vary flake size slightly per particle for a natural look
     let snowSize   = mix(0.05, 0.10, p.seed);
-    let snowOffset = snowRight * ((lUV.x - 0.5) * snowSize)
-                   + snowUp   * ((lUV.y - 0.5) * snowSize);
+    let snowDrawn  = max(snowSize, minWidth);
+    let snowOffset = snowRight * ((lUV.x - 0.5) * snowDrawn)
+                   + snowUp   * ((lUV.y - 0.5) * snowDrawn);
 
     // ── Blend and output ──────────────────────────────────────────────────
     let worldOffset = mix(snowOffset, rainOffset, rainFactor);
     let worldPos    = p.position + worldOffset;
 
-    // Fade out particles very close to the camera (avoids sudden pop-in clipping)
-    let camDist  = length(u.cameraPos - p.position);
+    // Fade out particles very close to the camera (avoids sudden pop-in
+    // clipping) and toward the edge of the spawn volume.
     let nearFade = smoothstep(0.5, 2.0, camDist);
+    let farFade  = 1.0 - smoothstep(FAR_FADE_FROM, FAR_FADE_TO, camDist);
+    let snowCover = (snowSize / snowDrawn) * (snowSize / snowDrawn);
+    let coverage = mix(snowCover, sqrt(rainWidth / rainDrawn), rainFactor);
 
     var out: VertexOutput;
     out.clipPos  = u.viewProj * vec4f(worldPos, 1.0);
     out.uv       = lUV;
-    out.nearFade = nearFade;
+    out.fade     = nearFade * farFade * coverage;
     return out;
 }
 
@@ -138,8 +162,8 @@ fn fs(in: VertexOutput) -> @location(0) vec4f {
     let snowDist  = length(in.uv - vec2f(0.5)) * 2.0;          // 0=center, 1=edge
     let snowAlpha = smoothstep(1.0, 0.2, snowDist) * 0.9;
 
-    // ── Blend, apply precipitation & near-fade ────────────────────────────
-    let alpha = mix(snowAlpha, rainAlpha, rainFactor) * in.nearFade;
+    // ── Blend, apply the fades and pixel coverage ─────────────────────────
+    let alpha = mix(snowAlpha, rainAlpha, rainFactor) * in.fade;
 
     let rainColor = vec3f(0.76, 0.83, 0.91);
     let snowColor = vec3f(0.95, 0.97, 1.00);
@@ -158,5 +182,9 @@ fn fs(in: VertexOutput) -> @location(0) vec4f {
         tint = vec3f(1.0, 1.0, 1.0);
     }
 
-    return vec4f(color * tint, alpha);
+    // Cloud dims rain toward the storm grey; snow stays white, so the cold
+    // end of the snow-to-rain range takes none of it.
+    let light = mix(1.0, u.light, rainFactor);
+
+    return vec4f(color * tint * light, alpha);
 }

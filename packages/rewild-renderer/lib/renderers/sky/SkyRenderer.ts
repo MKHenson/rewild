@@ -49,9 +49,22 @@ const COLD_LIFT = 1.12;
 /** The wind the rain is blown by, in m/s, at `windiness` 0..1: 10 m/s a unit
  *  in light wind, climbing to 24 m/s in a gale, near the ocean's (22 m/s), so
  *  rain is driven as hard as the trees thrash. */
+/** Rain drops under a full storm sky, as a share of their brightness in a clear one. */
+export const RAIN_STORM_LIGHT = 0.6;
+/** Cloudiness from which the sky starts to dim the rain. */
+const RAIN_LIGHT_CLOUD_FROM = 0.5;
+
 export function rainWindSpeed(windiness: number): number {
   const w = Math.min(1, Math.max(0, windiness));
   return 10 * w + 14 * w * w * w;
+}
+
+/** How bright rain drops look under the sky they fall from, 0..1: dimmed as
+ *  the cloud thickens to a storm, and lit up by a lightning `flash` 0..1. */
+export function rainLight(cloudiness: number, flash: number): number {
+  const overcast = smoothstep(cloudiness, RAIN_LIGHT_CLOUD_FROM, 1);
+  const light = 1 - (1 - RAIN_STORM_LIGHT) * overcast;
+  return light + (1 - light) * Math.min(1, Math.max(0, flash));
 }
 
 export class SkyRenderer {
@@ -148,6 +161,8 @@ export class SkyRenderer {
   private lastCameraPos: [number, number, number] = [0, 0, 0];
 
   private pendingRainParams: RainParticleParams | null = null;
+  /** Radians a screen pixel spans, from the last update. */
+  private pixelAngle = 0.001;
 
   uniformBuffer: GPUBuffer;
   uniformData: Float32Array;
@@ -517,6 +532,7 @@ export class SkyRenderer {
     // 1 / tan(fovY / 2), so a pixel spans about 2 / (projection[5] * height).
     const moonRadius = degToRad(moon.size);
     const pixelAngle = 2 / (camera.projectionMatrix.elements[5] * height);
+    this.pixelAngle = pixelAngle;
     const moonPixels = (2 * moonRadius) / pixelAngle;
     uniformData[52] = moon.direction.x;
     uniformData[53] = moon.direction.y;
@@ -704,6 +720,8 @@ export class SkyRenderer {
         temperature: this.temperature,
         precipitation: this.precipitation,
         sunUpDot: this.upDot,
+        light: rainLight(this.cloudiness, this.lightningFlashIntensity),
+        pixelAngle: this.pixelAngle,
       };
       this.rainPass.simulate(renderer, rainParams, renderer.delta);
       this.pendingRainParams = rainParams;

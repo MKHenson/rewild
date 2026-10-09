@@ -390,11 +390,21 @@ create one in their scene scope and call `update(renderer, seconds)` once a fram
 
 ### Rain and snow
 
+`RainSound` in `src/core/audio/` plays it, as part of `WorldSound`.
+
 | Layer     | Sound                           | Driven by                                                           |
 | --------- | ------------------------------- | ------------------------------------------------------------------- |
 | **Rain**  | Light rain and heavy rain loops | `rainShare(precipitation, temperature)`. Crossfades light to heavy. |
-| **Drips** | Slow drips after the rain       | `rainWetness` while precipitation is low. The world drips dry.      |
+| **Drips** | Slow drips after the rain       | `rainWetness.film` while the rain is light. The world drips dry.    |
 | **Snow**  | Almost silence                  | The base profile's `snow-dampens` rule muffles every biome layer.   |
+
+- **The rain bed.** Its gain rises with `rainShare` and is full from 0.4, the strength at which
+  the world is fully wet. The light loop crossfades into the heavy one from 0.25 to 0.7. Its
+  low-pass opens from 5 kHz in a drizzle to 20 kHz in a downpour.
+- **Drips.** The drips bed follows the wet film on the world, which runs off over about a minute
+  after the rain. Rain above 0.15 hides the drips.
+- **Snow.** `rainShare` falls to 0 as `temperature` falls to 0, so the rain bed falls silent in
+  snow by itself. At `temperature` 0.25, half snow, it plays at half strength.
 
 - Rain on leaves, on sand or on rock is biome sound. A forest adds canopy rain with a rule.
 - Rain on open water could be its own layer later. In Phase 2, the rain bed covers it.
