@@ -645,17 +645,27 @@ rules are the same `RuleSet` as the soundscapes.
 
 #### When a step plays
 
-- The player takes a step every so many metres moved, not every so many seconds. A sprint is only
-  a speed multiplier, so it gives faster steps by itself. A crouch gives slower ones.
+- The player takes a step every stride moved across the ground, not every so many seconds. A
+  sprint is only a speed multiplier, so it gives faster steps by itself. A crouch gives slower
+  ones.
+- The stride lengthens with speed, from 2.1 m at 3 m/s to 4.7 m at 15 m/s, as a runner's does.
+  The player is about twice human size and walks at about 6 m/s, so a walk is about two steps a
+  second, a sprint about three and a crouch under one and a half.
+- From rest, the first step comes after about half a stride.
+- **Layers.** A step plays each layer with a gain as its own one-shot, all at once. The wet and
+  the splash are layers over the ground step, so their files hold only the squelch or the splash,
+  with no footfall of their own.
 - Steps play only while `grounded`, not sliding and not `swimming`. A swimmer makes strokes, not
   steps. On steep ground `grounded` is false, so steps stop there by themselves.
-- `Footsteps` works out the sound once for each step, not each frame.
+- `Footsteps` works out the sound once for each step, not each frame. Each step plays on the
+  player bus, in 2D.
 
 #### The ground material
 
-A new `TerrainRenderer.sampleSplat(x, z, out)` reads the splat weights under the foot from
-`TerrainChunk.splatData`. That data is on the main thread already, and it includes painted edits.
-The weights are over the climate's material palette.
+`TerrainRenderer.sampleSplat(x, z, out)` reads the splat weights under the foot from
+`TerrainChunk.splatData`, blended between texels. That data is on the main thread already, and it
+includes painted edits. The weights are over `TerrainRenderer.splatPalette`, the climate's
+material palette.
 
 `templates/footsteps.json` maps each material to a **surface**:
 
@@ -690,7 +700,8 @@ The weights are over the climate's material palette.
       "id": "wet-ground",
       "when": { "wetness": [0.2, 0.7] },
       "add": "step-wet",
-      "gain": 0.6
+      "gain": 0.3,
+      "tags": ["ground"]
     },
     {
       "id": "wade",
@@ -703,32 +714,38 @@ The weights are over the climate's material palette.
       "scale": "#ground",
       "by": 0
     },
-    { "id": "sprint", "when": { "speed": [3, 7.5] }, "scale": "*", "by": 1.4 },
+    { "id": "sprint", "when": { "speed": [7, 14] }, "scale": "*", "by": 1.4 },
     { "id": "crouch", "when": { "crouching": [0, 1] }, "scale": "*", "by": 0.4 }
   ]
 }
 ```
 
 - **Blends.** Where two materials meet, the weights of their surfaces add. The strongest surface
-  plays. A second surface plays as well if its weight is 0.3 or more. So patchy snow over rock
-  sounds like both.
+  plays at full gain. A second surface plays as well if its weight is 0.3 or more, at its weight
+  over the strongest's. So patchy snow over rock sounds like both.
 - **Tags.** Each surface layer also has the tag `ground`, so a rule can act on whatever the ground
   is.
-- **A material not in the map** uses `fallback`. A new material is never silent.
+- **A material not in the map** uses `fallback`. A new material is never silent. Ground with no
+  splat yet, or no terrain, uses it too.
+- **Wet ground.** The wet layer has the `ground` tag, so deep water silences it with the ground.
 - **Wading.** As `immersion` rises, a splash joins the step. In deeper water, the splash replaces
   it.
+- **Checks.** `Footsteps` throws on a `fallback` or a material that names no surface, and on a bad
+  rule. The player then logs the error and has no footsteps.
 
 #### Player signals
 
-The footstep rules read the soundscape signals, plus these:
+The footstep rules read these signals:
 
-| Signal      | Range  | From                          |
-| ----------- | ------ | ----------------------------- |
-| `immersion` | metres | `Player.immersion`            |
-| `speed`     | m/s    | The player's horizontal speed |
-| `crouching` | 0 or 1 | `Player._crouching`           |
+| Signal      | Range  | From                                                  |
+| ----------- | ------ | ----------------------------------------------------- |
+| `wetness`   | 0 to 1 | `rainWetness.soak`, which lingers long after the rain |
+| `immersion` | metres | `Player.immersion`                                    |
+| `speed`     | m/s    | The distance the player moved across the ground       |
+| `crouching` | 0 or 1 | `Player._crouching`                                   |
 
-A sprint has no signal of its own. It raises `speed`, and the `sprint` rule follows `speed`.
+A sprint has no signal of its own. It raises `speed`, and the `sprint` rule follows `speed`. Speed
+is in real metres a second: a walk is about 6 and a sprint about 15.
 
 ## The land
 
@@ -1076,7 +1093,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 | Thunder    | 3 close cracks with rumble, 3 far rumbles, 6 short chain cracks                                                                         | One-shots |
 | Water      | under-water bed, ocean surf calm and storm, lake lapping                                                                                | Loops     |
 | Swimming   | 4 strokes, 3 under-water strokes, 2 bubbles, small and big plunge, surface                                                              | One-shots |
-| Footsteps  | 4 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                         | One-shots |
+| Footsteps  | 6 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                         | One-shots |
 | Body       | jump, 3 landings, hard landing, flashlight click, death                                                                                 | Mixed     |
 | Voice      | 3 pain sizes, 3 gasps, strain, calm, hard and panting breath loops, swim breaths, heat panting, cold shivers, heartbeat, stomach growls | Mixed     |
 | Sliding    | crumbling dirt and snow slide loops, 3 slips, 4 crumbles, 4 stone rattles, 3 scrabbles                                                  | Mixed     |
@@ -1362,6 +1379,7 @@ of each sound is visible while the sounds are chosen.
 | `holdBed(name, gain)`         | Holds one bed at a gain, to hear it alone.                                                 |
 | `soundscape()`                | Logs the biome weights, the signals, each rule's weight, and each layer's gain and cutoff. |
 | `reloadSoundscapes()`         | Loads `soundscapes.json` again, to tune rules with no reload of the game.                  |
+| `footsteps()`                 | Logs the footstep signals, the surfaces under the last step, and each layer's gain.        |
 
 They follow the conventions in [Debugger & Console Commands](../debug-commands.md).
 

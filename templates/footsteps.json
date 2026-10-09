@@ -1,0 +1,48 @@
+{
+  "materials": {
+    "snow_field_aerial": "snow",
+    "aerial_grass_rock": "grass",
+    "grass_path_02_1k": "grass",
+    "forest_leaves_02": "leaves",
+    "forest_leaves_03_1k": "leaves",
+    "sand_01": "sand",
+    "aerial_beach_01": "sand",
+    "aerial_beach_02": "sand",
+    "mud_cracked_dry_03": "dirt",
+    "aerial_rocks_01": "rock",
+    "marble_cliff_05": "rock",
+    "cliff_side_1k": "rock",
+    "tiger_rock_1k": "rock"
+  },
+  "surfaces": {
+    "grass": { "sound": "step-grass", "tags": ["soft"] },
+    "leaves": { "sound": "step-leaves", "tags": ["soft"] },
+    "snow": { "sound": "step-snow", "tags": ["soft"] },
+    "sand": { "sound": "step-sand", "tags": ["soft"] },
+    "dirt": { "sound": "step-dirt", "tags": ["soft"] },
+    "rock": { "sound": "step-rock", "tags": ["hard"] }
+  },
+  "fallback": "dirt",
+  "rules": [
+    {
+      "id": "wet-ground",
+      "when": { "wetness": [0.2, 0.7] },
+      "add": "step-wet",
+      "gain": 0.9,
+      "tags": ["ground"]
+    },
+    {
+      "id": "wade",
+      "when": { "immersion": [0.05, 0.4] },
+      "add": "step-splash"
+    },
+    {
+      "id": "wade-deep",
+      "when": { "immersion": [0.3, 0.9] },
+      "scale": "#ground",
+      "by": 0
+    },
+    { "id": "sprint", "when": { "speed": [7, 14] }, "scale": "*", "by": 1.4 },
+    { "id": "crouch", "when": { "crouching": [0, 1] }, "scale": "*", "by": 0.4 }
+  ]
+}

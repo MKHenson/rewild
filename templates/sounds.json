@@ -122,9 +122,7 @@
     },
     {
       "name": "under-water",
-      "files": [
-        "audio/water/under-water.ogg"
-      ],
+      "files": ["audio/water/under-water.ogg"],
       "loop": true,
       "source": "Soundly: water mix",
       "license": "soundly"
@@ -163,6 +161,126 @@
       "pitch": [0.92, 1.08],
       "gain": [0.85, 1],
       "source": "Soundly: water mix",
+      "license": "soundly"
+    },
+    {
+      "name": "step-grass",
+      "files": [
+        "audio/steps/grass-01.ogg",
+        "audio/steps/grass-02.ogg",
+        "audio/steps/grass-03.ogg",
+        "audio/steps/grass-04.ogg",
+        "audio/steps/grass-05.ogg",
+        "audio/steps/grass-06.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.2, 0.3],
+      "source": "Soundly: footsteps mix",
+      "license": "soundly"
+    },
+    {
+      "name": "step-leaves",
+      "files": [
+        "audio/steps/leaves-01.ogg",
+        "audio/steps/leaves-02.ogg",
+        "audio/steps/leaves-03.ogg",
+        "audio/steps/leaves-04.ogg",
+        "audio/steps/leaves-05.ogg",
+        "audio/steps/leaves-06.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.2, 0.3],
+      "source": "Soundly: footsteps mix",
+      "license": "soundly"
+    },
+    {
+      "name": "step-dirt",
+      "files": [
+        "audio/steps/dirt-01.ogg",
+        "audio/steps/dirt-02.ogg",
+        "audio/steps/dirt-03.ogg",
+        "audio/steps/dirt-04.ogg",
+        "audio/steps/dirt-05.ogg",
+        "audio/steps/dirt-06.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.2, 0.3],
+      "source": "Soundly: footsteps mix",
+      "license": "soundly"
+    },
+    {
+      "name": "step-rock",
+      "files": [
+        "audio/steps/rock-01.ogg",
+        "audio/steps/rock-02.ogg",
+        "audio/steps/rock-03.ogg",
+        "audio/steps/rock-04.ogg",
+        "audio/steps/rock-05.ogg",
+        "audio/steps/rock-06.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.2, 0.3],
+      "source": "Soundly: footsteps mix",
+      "license": "soundly"
+    },
+    {
+      "name": "step-sand",
+      "files": [
+        "audio/steps/sand-01.ogg",
+        "audio/steps/sand-02.ogg",
+        "audio/steps/sand-03.ogg",
+        "audio/steps/sand-04.ogg",
+        "audio/steps/sand-05.ogg",
+        "audio/steps/sand-06.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.2, 0.3],
+      "source": "Soundly: footsteps mix",
+      "license": "soundly"
+    },
+    {
+      "name": "step-snow",
+      "files": [
+        "audio/steps/snow-01.ogg",
+        "audio/steps/snow-02.ogg",
+        "audio/steps/snow-03.ogg",
+        "audio/steps/snow-04.ogg",
+        "audio/steps/snow-05.ogg",
+        "audio/steps/snow-06.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.2, 0.3],
+      "source": "Soundly: footsteps mix",
+      "license": "soundly"
+    },
+    {
+      "name": "step-wet",
+      "files": [
+        "audio/steps/wet-01.ogg",
+        "audio/steps/wet-02.ogg",
+        "audio/steps/wet-03.ogg",
+        "audio/steps/wet-04.ogg",
+        "audio/steps/wet-05.ogg",
+        "audio/steps/wet-06.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.2, 0.3],
+      "source": "Soundly: footsteps mix",
+      "license": "soundly"
+    },
+    {
+      "name": "step-splash",
+      "files": [
+        "audio/steps/splash-01.ogg",
+        "audio/steps/splash-02.ogg",
+        "audio/steps/splash-03.ogg",
+        "audio/steps/splash-04.ogg",
+        "audio/steps/splash-05.ogg",
+        "audio/steps/splash-06.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.8, 1],
+      "source": "Soundly: footsteps mix",
       "license": "soundly"
     }
   ]

@@ -15,6 +15,7 @@ import { TerrainWorkerPool } from './TerrainWorkerPool';
 import {
   ClimateConfig,
   DEFAULT_CLIMATE_PRESET,
+  getClimatePalette,
   resolveClimatePreset,
 } from './Biomes';
 import { ChunkSnapshotProvider } from './ChunkSnapshot';
@@ -24,7 +25,7 @@ import { WaterBodyProvider } from './WaterBodies';
 import { WaterBodyRules } from './WaterBodyRules';
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { ScatterInstances, ScatterPick, pickScatterInstance } from './Scatter';
-import { generateSplatMap } from './Splat';
+import { generateSplatMap, sampleSplatMap } from './Splat';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ScatterModels } from './ScatterModels';
 import {
@@ -180,6 +181,8 @@ export class TerrainRenderer implements WaterQuerySource {
 
   private _seed: number = 100;
   private _climatePreset: string = DEFAULT_CLIMATE_PRESET;
+  private _splatPalette: readonly string[] = [];
+  private _splatPalettePreset: string | null = null;
   private _seaLevel: number = 0;
   // Injected by the host app (game/editor); looks up a chunk's saved snapshot
   // heights on the asset path. Saved ⇒ meshed from storage, absent ⇒ generated.
@@ -661,6 +664,40 @@ export class TerrainRenderer implements WaterQuerySource {
     const heights = this.terrainChunks.get(`${cx},${cy}`)?.heights;
     if (!heights) return null;
     return this.chunkHeight(heights, cx, cy, x, z);
+  }
+
+  /**
+   * Writes the splat weights at world (x, z) into `out`, `MAX_SPLAT_LAYERS` of
+   * them, 0..1, over `splatPalette`; painted edits included. False, with `out`
+   * untouched, when the owning chunk has no splat yet.
+   */
+  sampleSplat(x: number, z: number, out: Float32Array): boolean {
+    const span = this.chunkSize;
+    if (!span) return false;
+    const cx = Math.round(x / span);
+    const cy = Math.round(z / span);
+    const splat = this.terrainChunks.get(`${cx},${cy}`)?.splatData;
+    if (!splat) return false;
+    const mps = this.metersPerSample;
+    sampleSplatMap(
+      splat,
+      this.mapChunkSizeLod,
+      (x - cx * span + span / 2) / mps,
+      (cy * span + span / 2 - z) / mps,
+      out
+    );
+    return true;
+  }
+
+  /** The material of each splat channel, for the climate preset in force. */
+  get splatPalette(): readonly string[] {
+    if (this._splatPalettePreset !== this._climatePreset) {
+      this._splatPalettePreset = this._climatePreset;
+      this._splatPalette = getClimatePalette(
+        resolveClimatePreset(this._climatePreset)
+      );
+    }
+    return this._splatPalette;
   }
 
   /** The water map of chunk (cx, cy); null where it has none or is not
