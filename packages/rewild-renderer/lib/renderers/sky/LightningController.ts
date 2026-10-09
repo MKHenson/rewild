@@ -1,4 +1,5 @@
 import { Vector3 } from 'rewild-common';
+import { StrikeQueue } from './StrikeQueue';
 
 export interface LightningStrike {
   flashIntensity: number;
@@ -37,6 +38,8 @@ const BASE_DISPLACEMENT = 80;
 // Minimum and maximum gap (ms) between chained lightning strikes
 const CHAIN_GAP_MS: [number, number] = [50, 200];
 const MIN_LIGHTNING_DISTANCE = 700;
+// Metres at which a flash has fallen to half its strength
+const FLASH_FALLOFF = 2000;
 const MAX_LIGHTNING_DISTANCE = 1200;
 
 // Max point counts after N midpoint-subdivision levels: 2^N + 1
@@ -49,6 +52,9 @@ function seededRand(seed: number): number {
 }
 
 export class LightningController {
+  /** Every strike, for the thunder to drain. */
+  readonly strikes = new StrikeQueue();
+
   private phase: Phase = 'idle';
   private phaseTimer = 0;
   private nextStrikeIn = 8000;
@@ -123,8 +129,8 @@ export class LightningController {
       const dy = cameraPos.y - this.strikePos[1];
       const dz = cameraPos.z - this.strikePos[2];
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      // 1.0 at 0m, 0.5 at 1000m, 0.2 at 2500m, 0.1 at 4000m, never below 0.05
-      flashAttenuation = Math.max(0.05, 1 / (1 + dist / 1000));
+      // 1.0 at 0m, 0.74 at 700m, 0.51 at 1900m, 0.33 at 4000m, never below 0.05
+      flashAttenuation = Math.max(0.05, 1 / (1 + dist / FLASH_FALLOFF));
     }
 
     switch (this.phase) {
@@ -209,6 +215,7 @@ export class LightningController {
       this.hasPendingPos = false;
     }
     this.nextStrikeIn = 0;
+    this.chainCount = 0;
     if (this.phase !== 'idle') {
       this.phase = 'idle';
       this.phaseTimer = 0;
@@ -247,6 +254,7 @@ export class LightningController {
     this.strikePos[1] = CLOUD_BASE_Y;
     this.strikePos[2] = strikeZ;
     this.hasStrikePos = true;
+    this.strikes.push(strikeX, CLOUD_BASE_Y, strikeZ, this.chainCount);
 
     const seed = ++this.seed;
     const endX = strikeX + (Math.random() - 0.5) * 20;

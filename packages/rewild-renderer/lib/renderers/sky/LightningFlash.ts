@@ -17,9 +17,9 @@ export interface LightningFlashSettings {
 }
 
 export const DEFAULT_LIGHTNING_FLASH: LightningFlashSettings = {
-  light: 60,
-  sky: 12,
-  glare: 0.15,
+  light: 100,
+  sky: 60,
+  glare: 0.25,
   linger: 1,
 };
 

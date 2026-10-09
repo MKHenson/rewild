@@ -113,6 +113,10 @@ UI sounds       ──────────▶ ui ─────────
 
 - **world** holds everything outside the player. Under water, its low-pass falls to about 600 Hz
   and its gain drops. The player's own sounds skip it, so a swim stroke stays clear.
+- **Bus ducks.** Ambience, weather and effects each pass through a duck before the world.
+  `audio.duckBus(bus, level)` lowers one under a louder sound, apart from its volume, mute and
+  solo. Thunder plays on effects and ducks ambience and weather, so it cuts through the rain and
+  the wind.
 - **menu duck** lowers the world when the in-game menu is open. The game keeps running behind the
   menu, so silence would sound wrong. A duck of about 12 dB is enough.
 - **music** skips the world, so music is never muffled under water. Nothing plays on it yet.
@@ -414,39 +418,51 @@ create one in their scene scope and call `update(renderer, seconds)` once a fram
 ### Thunder
 
 `LightningController.beginStrike` places each strike 700 to 1,900 m away, within 45° of the
-camera's forward. This milestone adds a **strike queue** to it.
+camera's forward. Its **strike queue**, `LightningController.strikes`, is a `StrikeQueue` in
+the sky renderer.
 
 - **`beginStrike` pushes** a record: the strike position, the index in a chain, and the time of
-  the strike (`performance.now()`).
-- **The audio pops** every record in the queue in `audio.update()`, oldest first, and plays the
-  thunder for each.
+  the strike, in seconds on the queue's clock (`performance.now()`).
+- **`ThunderSound` pops** every record in the queue each frame, oldest first, and plays the
+  thunder for each. `WorldSound` owns it, so it runs in the game and in the editor.
 - **A fixed ring buffer** of 8 records holds the queue. The records are reused, so a strike
   allocates nothing.
 - **When the buffer is full**, a new strike replaces the oldest one. Nothing drains the queue while
-  the sound is off, so it never grows past 8. When the sound comes back on, the audio drops records
-  older than a few seconds. Their thunder would be long gone.
+  the sound is off, so it never grows past 8. When the sound comes back on, the audio drops a
+  record whose thunder arrived more than 1 s ago.
 - **One reader.** The audio is the only reader, so it pops. If another system needs strikes later,
   each reader keeps its own read position in the buffer instead.
 
 On each strike:
 
-1. Find the distance `d` from the listener to the ground under the strike.
+1. Find the distance `d` across the ground from the listener to the strike.
 2. Delay the sound by `d / 343` seconds from the strike's own time, less the time since it. At
    700 m that is 2 s, at 1,900 m it is 5.5 s. The player sees the flash, then counts to the
    thunder. A late pop does not make late thunder.
-3. Pick the sound by distance: a **crack and rumble** below about 1 km, a **rumble** above.
-4. Set the gain and the low-pass cutoff from `d`. Far thunder is quieter and deeper.
+3. Pick the sound by distance: a **crack and rumble** (`thunder-close`) below 1 km, a
+   **rumble** (`thunder-far`) above.
+4. Set the gain and the low-pass cutoff from `d`. Far thunder is quieter and deeper: the gain is
+   2.5 to 700 m and falls as `2.5 × (700 / d)^0.8`, to about 1.1 at 1,900 m. The cutoff falls from
+   9 kHz at 700 m to 1.2 kHz at 1,900 m. Thunder is the loudest thing in the world, so its gain
+   goes above 1, and the master compressor keeps it from clipping.
 5. Play it on a panner 50 m out in the strike's direction, so the direction is correct but the
    game owns the distance curve.
 
-**Chains.** A chained strike 50 to 200 ms later plays a shorter crack only. Its rumble is already
-in the first one.
+**Chains.** A chained strike 50 to 200 ms later plays a shorter crack only (`thunder-chain`), as
+loud as the first. Its rumble is already in the first one.
 
-**Distant storms.** In `FrontApproaching`, a rare low rumble with no bolt warns of the storm that
-comes next. `forecast(1)` already says what comes next.
+**The duck.** Thunder plays on the effects bus. As each one arrives, it ducks the weather and
+ambience buses, so the rain, the wind and the land drop away under it. The nearest thunder ducks
+them by 12 dB, and far thunder by less, in step with its gain. The duck holds while the thunder
+sounds, 3 s for a close one, 4 s for a far one and 0.8 s for a chained crack, then lets go by e
+every 1.5 s. When thunders overlap, the deepest duck wins.
 
-**Manual strikes.** `triggerLightning` in the console also goes through `beginStrike`, so it pushes to the queue, so thunder can be
-tested on demand.
+**Distant storms.** While the weather is in `FrontApproaching`, a low rumble with no bolt plays
+every 30 to 90 s, from upwind, where the storm is. It is `thunder-far` at a low gain, with its
+cutoff at 500 Hz.
+
+**Manual strikes.** `triggerLightning` in the console also goes through `beginStrike`, so it
+pushes to the queue and thunder can be tested on demand. A manual strike is never a chained one.
 
 ## The player
 
@@ -1010,7 +1026,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------- |
 | Wind       | 3 air loops calm to windy, ears roar, 2 gust swells                                                                                     | Mixed     |
 | Rain       | light rain, heavy rain, drips                                                                                                           | Loops     |
-| Thunder    | 3 close cracks with rumble, 3 far rumbles, 2 short chain cracks                                                                         | One-shots |
+| Thunder    | 3 close cracks with rumble, 3 far rumbles, 6 short chain cracks                                                                         | One-shots |
 | Water      | under-water bed, ocean surf calm and storm, lake lapping                                                                                | Loops     |
 | Swimming   | 4 strokes, 3 under-water strokes, 2 bubbles, small and big plunge, surface                                                              | One-shots |
 | Footsteps  | 4 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                         | One-shots |
