@@ -891,12 +891,17 @@ editor too:
 | Action    | Effect, with rule weight `w`                                                                | Use it for                                     |
 | --------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `add`     | Plays a new sound at gain `w`.                                                              | Creaking trees, canopy rain, a ridge whistle   |
-| `replace` | Crossfades a layer to a new sound: the old one at `1 − w`, the new one at `w`.              | Calm leaves becoming gale leaves               |
+| `replace` | Crossfades a layer to a new sound: the old one at `1 − w` of its gain, the new one at `w`.  | Calm leaves becoming gale leaves               |
 | `scale`   | Multiplies a layer's gain by a value between 1 and `by`, moved by `w`. `by: 0` silences it. | Birds quiet in rain, louder at dawn            |
 | `muffle`  | Moves a layer's low-pass cutoff from fully open toward `cutoff` Hz, moved by `w`.           | Snow dampening the land, fog dulling far calls |
 
 - Rules apply in list order. A `scale` after a `replace` scales the new sound too.
-- Each action can take a `gain` for the sound it adds, for example `"gain": 0.6`.
+- `add` and `replace` take a `gain` for the sound they bring in, for example `"gain": 0.6`.
+- **A replaced layer carries over.** The new sound takes the layer's id, tags, gain and cutoff, so
+  a night layer replaced in the rain is still silent by day, and later rules on the layer act on
+  the new sound too.
+- **An added sound** takes the rule's `id` as its layer id, and the rule's `tags`, if any. Rules
+  after it in the list can act on it.
 - When two `muffle` rules act on one layer, the lower cutoff wins. Two muffles do not stack.
 - A target is a layer id, a tag (`"#birds"`), `"*"` for every layer, or a list of them.
 - **Replace or add?** Use `replace` when the calm and the windy sound are the same thing in two
@@ -905,11 +910,42 @@ editor too:
   every biome. `muffle` changes chosen layers in a place, because of the weather. Every bed has a
   low-pass for this. A biquad filter is cheap, and it is fully open when no rule acts on it.
 
+#### The rule engine
+
+`RuleSet` in `packages/rewild-audio` runs the rules for the soundscapes, the footsteps and the
+voice.
+
+```ts
+const signals = new RuleSignals({
+  numbers: ['windiness', 'rain', 'sun'],
+  states: { state: WEATHER_STATE_IDS },
+});
+const forest = new RuleSet(signals, profiles.forest, profiles['*']);
+
+signals.set('windiness', sky.windiness); // each frame
+signals.setState('state', atmosphere.state);
+signals.update(seconds); // eases the state weights
+forest.evaluate(); // fills forest.gains and forest.cutoffs
+```
+
+- **Slots.** The layers, then the sounds the rules bring in, in order. `slotIds`, `slotSounds`
+  and `slotTags` describe them, and `gains` and `cutoffs` hold the result. `ruleIds` and
+  `ruleWeights` show each rule's weight, for debugging.
+- **Compiling.** The constructor compiles the profile over the base's rules into flat arrays. It
+  throws on an unknown signal, state value, layer id or `without` id, and on a rule without
+  exactly one action. A tag or `*` may match no layer, as a base rule does in a biome without it.
+- **Layer gains.** `evaluate(layerGains)` scales each layer first, for layers whose level the
+  caller sets. Footsteps use it for the share of each surface under the foot.
+- **States.** A state's weight rises from 0 to 1 over 4 s after it begins and falls back after it
+  ends, eased. `settle()` snaps the weights, as on a load.
+- **Cost.** `evaluate` reads signals by index and writes into the set's own arrays. It allocates
+  nothing.
+
 #### How it is worked out
 
 1. The `BiomeProbe` gives the biome weights at the player.
-2. For each biome with weight, `evaluateSoundscape(profile, signals, out)` gives a gain and a
-   cutoff for each sound. It is a pure function, so jest tests it with no Web Audio.
+2. For each biome with weight, its `RuleSet` gives a gain and a cutoff for each sound. It uses no
+   Web Audio, so jest tests it.
 3. Each gain is multiplied by the biome weight. A sound in two biomes sums.
 4. The soundscape sends each gain and cutoff to its bed with `setTargetAtTime`. The bed's attack and release
    smooth it further.
