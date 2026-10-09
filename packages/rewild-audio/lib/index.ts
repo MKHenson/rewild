@@ -6,3 +6,6 @@ export * from './Emitter';
 export * from './AudioScope';
 export * from './AudioSettings';
 export * from './AudioEngine';
+export * from './RuleTypes';
+export * from './RuleSignals';
+export * from './RuleSet';
