@@ -615,6 +615,16 @@ export class OrbitController implements IController {
     this.update();
   }
 
+  /** Shift + vertical swipe pans up and down. Browsers on macOS often move a
+   *  Shift scroll from `deltaY` to `deltaX`, so read the larger of the two. */
+  _handleWheelPanVertical(event: WheelEvent) {
+    const lineScale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1;
+    const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+    // Negate so the scene follows the fingers, the same as a pan drag.
+    this._pan(0, -delta * lineScale * this.panSpeed);
+    this.update();
+  }
+
   /** Lock each wheel gesture to its dominant axis on the first event. A swipe
    *  that drifts off-axis then does not pan and zoom at the same time. */
   _wheelGestureAxis(event: WheelEvent): 'x' | 'y' {
@@ -972,6 +982,14 @@ export class OrbitController implements IController {
 
   onMouseWheel(event: WheelEvent) {
     if (!this.enabled || this.state !== _STATE.NONE) return;
+
+    // Shift + swipe pans up and down instead of zooming.
+    if (event.shiftKey && !event.ctrlKey) {
+      if (!this.enablePan) return;
+      event.preventDefault();
+      this._handleWheelPanVertical(event);
+      return;
+    }
 
     // A trackpad pinch arrives as a Ctrl wheel event and always zooms.
     const axis = event.ctrlKey ? 'y' : this._wheelGestureAxis(event);
