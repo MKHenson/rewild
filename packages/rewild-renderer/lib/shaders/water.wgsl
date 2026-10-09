@@ -610,8 +610,19 @@ fn sceneAbove(input: VertexOutput, below: FromBelow) -> vec4f {
 // water more than 1 m deep straight down. Deep water reads white. View 2, the
 // palette weights as read, before they are normalised: red, green, blue for
 // types 0, 1, 2; yellow where all four sum to under 0.5. View 3, the share of
-// the light behind that passes through (waterTransmittance), as grey.
+// the light behind that passes through (waterTransmittance), as grey. View 4,
+// how far the drawn surface stands from the lens patch (under-water.wgsl):
+// red above it, green below, full at 2 cm; blue past the patch.
 fn refractionDebug(input: VertexOutput, water: WaterSample, NoV: f32, view: f32) -> vec3f {
+  if (view > 3.5) {
+    let offset = (underWater.viewToWorld * vec4f(input.viewPosition, 0.0)).xyz;
+    let at = (offset.xz - underWater.lens.zw) / underWater.lens.y;
+    let inside = all(at >= vec2f(0.0)) && all(at <= vec2f(f32(LENS_PATCH_SIDE - 1)));
+    let gap = underWater.camera.y + offset.y - lensPatchHeight(offset.xz);
+    let shown = saturate(abs(gap) / 0.02);
+    let colour = select(vec3f(0.0, shown, 0.0), vec3f(shown, 0.0, 0.0), gap > 0.0);
+    return select(vec3f(0.0, 0.0, 0.3), colour, inside) * 4.0;
+  }
   if (view > 2.5) {
     return waterTransmittance(water, NoV) * 4.0;
   }

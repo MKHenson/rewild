@@ -7,9 +7,9 @@ import { fromFloat16 } from '../../utils/float16';
 // The map part is exact and immediate. The waves arrive a few frames late.
 
 /** Points the probe follows at once. */
-export const PROBE_POINTS = 16;
+export const PROBE_POINTS = 32;
 /** Floats per point in the probe's input: ProbePoint in water-probe.wgsl. */
-export const PROBE_POINT_FLOATS = 8;
+export const PROBE_POINT_FLOATS = 12;
 /** Floats per point in the probe's results. */
 export const PROBE_RESULT_FLOATS = 4;
 
@@ -176,6 +176,7 @@ export class WaterQuery {
   private generation = new Uint32Array(PROBE_POINTS);
   private nextGeneration = 1;
   private requested = new Uint8Array(PROBE_POINTS);
+  private atRest = new Uint8Array(PROBE_POINTS);
   private known = new Uint8Array(PROBE_POINTS);
   private height = new Float64Array(PROBE_POINTS);
   private worldX = new Float64Array(PROBE_POINTS);
@@ -186,14 +187,18 @@ export class WaterQuery {
 
   constructor(private source: WaterQuerySource) {}
 
-  /** Takes a probe to read the waves with; -1 when every probe is taken. */
-  acquireProbe(): number {
+  /** Takes a probe to read the waves with; -1 when every probe is taken.
+   *  An `atRest` probe reads the water that rests at its point, wherever the
+   *  waves move it, as a vertex of the drawn grid does; otherwise it reads
+   *  the water now over the point. */
+  acquireProbe(atRest = false): number {
     for (let i = 0; i < PROBE_POINTS; i++)
       if (this.generation[i] === 0) {
         this.generation[i] = this.nextGeneration++;
         if (this.nextGeneration > 0xffffffff) this.nextGeneration = 1;
         this.known[i] = 0;
         this.requested[i] = 0;
+        this.atRest[i] = atRest ? 1 : 0;
         return i;
       }
     return -1;
@@ -288,6 +293,8 @@ export class WaterQuery {
       points[o + 3] = this.level[i];
       for (let c = 0; c < MAX_WATER_TYPES; c++)
         points[o + 4 + c] = this.weights[i * MAX_WATER_TYPES + c];
+      points[o + 8] = this.atRest[i];
+      points.fill(0, o + 9, o + PROBE_POINT_FLOATS);
     }
     return any;
   }

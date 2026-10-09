@@ -47,6 +47,14 @@ export function isSwimming(
   return immersion >= (wasSwimming ? depth - SWIM_LEAVE_MARGIN : depth);
 }
 
+/** Whether a swimmer over water `depth` metres deep, bed to surface, swims
+ *  on: they stand once a standing player whose eye is `eyeAboveFeet` metres
+ *  above the feet would wade there, less SWIM_LEAVE_MARGIN so a wave does not
+ *  flicker it. */
+export function keepsSwimming(depth: number, eyeAboveFeet: number): boolean {
+  return depth >= swimDepth(eyeAboveFeet) - SWIM_LEAVE_MARGIN;
+}
+
 /** Share of the walking speed left wading `immersion` metres deep. */
 export function wadeSpeedShare(
   immersion: number,

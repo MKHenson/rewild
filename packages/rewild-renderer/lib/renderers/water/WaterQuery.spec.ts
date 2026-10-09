@@ -174,6 +174,17 @@ describe('WaterQuery probes', () => {
     expect(out.surface).toBeCloseTo(11.75);
   });
 
+  it('marks a probe that reads the water at rest', () => {
+    const query = new WaterQuery(makeSource(makeMap(), 9));
+    const over = query.acquireProbe();
+    const atRest = query.acquireProbe(true);
+    query.sample(0, 0, createWaterQuerySample(), over);
+    query.sample(0, 0, createWaterQuerySample(), atRest);
+    query.stage(0, 0, points, generations);
+    expect(points[over * PROBE_POINT_FLOATS + 8]).toBe(0);
+    expect(points[atRest * PROBE_POINT_FLOATS + 8]).toBe(1);
+  });
+
   it('stages nothing when no probe asked since the last stage', () => {
     const query = new WaterQuery(makeSource(makeMap(), 9));
     const probe = query.acquireProbe();

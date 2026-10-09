@@ -4,10 +4,11 @@ import { toFloat16 } from '../../utils/float16';
 import {
   UNDER_WATER_FLOATS,
   UNDER_WATER_PROBE_OFFSETS,
-  LENS_PROBE_STEP,
+  LENS_PATCH_SIDE,
   UnderWater,
   WAVE_REACH,
   blendWaterOptics,
+  clipNear,
   refractedSunCosine,
 } from './UnderWater';
 import { WaterQuery } from './WaterQuery';
@@ -69,12 +70,14 @@ function makeQuery(water: WaterMap | null) {
 (globalThis as Record<string, unknown>).GPUBufferUsage ??= {
   UNIFORM: 0x40,
   COPY_DST: 0x08,
+  COPY_SRC: 0x04,
 };
 
 const SUN = [0, 1, 0];
 const RADIANCE = [10, 10, 10];
 const NEAR = 0.1;
 const MATRIX = Array.from({ length: 16 }, (_, i) => i);
+const SPACING = 2;
 
 describe('refractedSunCosine', () => {
   it('is 1 for a sun overhead and 0 for one that is down', () => {
@@ -118,7 +121,8 @@ describe('UnderWater.update', () => {
       SUN,
       RADIANCE,
       NEAR,
-      MATRIX
+      MATRIX,
+      SPACING
     );
     expect(underWater.covered).toBe(true);
     expect(underWater.possible).toBe(true);
@@ -132,7 +136,8 @@ describe('UnderWater.update', () => {
       SUN,
       RADIANCE,
       NEAR,
-      MATRIX
+      MATRIX,
+      SPACING
     );
     expect(underWater.possible).toBe(false);
   });
@@ -150,7 +155,8 @@ describe('UnderWater.update', () => {
       SUN,
       RADIANCE,
       NEAR,
-      MATRIX
+      MATRIX,
+      SPACING
     );
     expect(underWater.covered).toBe(false);
     expect(underWater.possible).toBe(false);
@@ -164,33 +170,41 @@ describe('UnderWater.update', () => {
       device,
       makeQuery(flatMap()),
       [OCEAN],
-      0,
+      3,
       2,
-      0,
+      -1,
       SUN,
       RADIANCE,
       NEAR,
-      MATRIX
+      MATRIX,
+      SPACING
     );
-    // The probes, from the second vec4 to the fourth, are the GPU's.
-    const probes = UNDER_WATER_PROBE_OFFSETS[0] / 4;
+    // The probes are the GPU's.
+    const probes = new Set<number>();
+    for (const offset of UNDER_WATER_PROBE_OFFSETS)
+      for (let c = 0; c < 4; c++) probes.add(offset / 4 + c);
+    expect(probes.size).toBe((1 + LENS_PATCH_SIDE * LENS_PATCH_SIDE) * 4);
     for (let i = 0; i < UNDER_WATER_FLOATS; i++)
-      if (i >= probes && i < probes + 12) expect(uniform[i]).toBeNaN();
+      if (probes.has(i)) expect(uniform[i]).toBeNaN();
       else expect(uniform[i]).not.toBeNaN();
     expect(uniform[0]).toBe(1);
     expect(uniform[1]).toBe(2);
     expect(uniform[2]).toBeCloseTo(LEVEL);
     expect(uniform[3]).toBeCloseTo(LEVEL - 20);
-    expect(uniform[16]).toBeCloseTo(OCEAN.absorption[0] + OCEAN.turbidity);
-    expect(uniform[20]).toBeCloseTo(OCEAN.inScatter[0]);
+    expect(uniform[8]).toBeCloseTo(OCEAN.absorption[0] + OCEAN.turbidity);
+    expect(uniform[12]).toBeCloseTo(OCEAN.inScatter[0]);
     // An overhead sun goes straight down, at its full radiance less the share
     // the surface reflects.
-    expect(uniform[24]).toBeCloseTo(9.8);
-    expect(uniform[27]).toBeCloseTo(1);
-    expect(uniform[29]).toBeCloseTo(1);
-    expect(uniform[32]).toBeCloseTo(NEAR);
-    expect(uniform[33]).toBeCloseTo(LENS_PROBE_STEP);
-    expect(Array.from(uniform.subarray(36, 52))).toEqual(MATRIX);
+    expect(uniform[16]).toBeCloseTo(9.8);
+    expect(uniform[19]).toBeCloseTo(1);
+    expect(uniform[21]).toBeCloseTo(1);
+    expect(uniform[24]).toBeCloseTo(NEAR);
+    expect(uniform[25]).toBe(SPACING);
+    // The patch starts a vertex before the camera's cell: x 3 lies in 2..4,
+    // z -1 in -2..0.
+    expect(uniform[26]).toBe(0 - 3);
+    expect(uniform[27]).toBe(-4 + 1);
+    expect(Array.from(uniform.subarray(28, 44))).toEqual(MATRIX);
   });
 
   it('takes the camera out of the water when cleared', () => {
@@ -200,17 +214,30 @@ describe('UnderWater.update', () => {
       device,
       makeQuery(flatMap()),
       [OCEAN],
-      0,
+      3,
       2,
-      0,
+      -1,
       SUN,
       RADIANCE,
       NEAR,
-      MATRIX
+      MATRIX,
+      SPACING
     );
     underWater.clear(device);
     expect(underWater.possible).toBe(false);
     expect(underWater.covered).toBe(false);
     expect(uniform[0]).toBe(0);
+  });
+});
+
+describe('clipNear', () => {
+  it('is twice the near plane for a far plane well past it', () => {
+    const n = 0.1;
+    const f = 4000;
+    const projection = new Array(16).fill(0);
+    projection[10] = -(f + n) / (f - n);
+    projection[14] = (-2 * f * n) / (f - n);
+    expect(clipNear(projection)).toBeCloseTo((2 * f * n) / (f + n));
+    expect(clipNear(projection)).toBeCloseTo(0.2, 4);
   });
 });
