@@ -33,6 +33,7 @@ import {
   SWIM_SPEED_SHARE,
   holdHeight,
   isSwimming,
+  keepsSwimming,
   swimStep,
   wadeSpeedShare,
   waterDrag,
@@ -43,6 +44,8 @@ import {
   headwindSpeedShare,
 } from './utils/Headwind';
 import { GroundSlide, MAX_SLOPE_CLIMB } from './utils/Sliding';
+import { audio } from '../audio/audio';
+import { UnderWaterSound } from '../audio/UnderWaterSound';
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
 const _PI_HALF = Math.PI / 2 - 0.01;
@@ -55,8 +58,20 @@ const _CROUCH_EYE_HEIGHT: f32 = 0.9;
 // Flashlight hangs below the camera eye line (chest/hip level) to create natural shadow offset.
 const _FLASHLIGHT_BODY_DROP: f32 = 0.8;
 const _DEG2RAD = Math.PI / 180;
-// Distance from the capsule's centre to its base (0.9 half-height + 0.5 radius).
-const _CAPSULE_HALF_EXTENT: f32 = 1.4;
+const _CAPSULE_HALF_HEIGHT: f32 = 0.9;
+const _CAPSULE_RADIUS: f32 = 0.5;
+// Distance from the capsule's centre to its base.
+const _CAPSULE_HALF_EXTENT: f32 = _CAPSULE_HALF_HEIGHT + _CAPSULE_RADIUS;
+// A swimmer's capsule is half as long, so they can dive close to the bed.
+const _SWIM_HALF_HEIGHT: f32 = 0.2;
+const _SWIM_HALF_EXTENT: f32 = _SWIM_HALF_HEIGHT + _CAPSULE_RADIUS;
+// How far the capsule centre moves up as the swimmer's capsule shrinks to it.
+const _SWIM_CENTRE_SHIFT: f32 = _CAPSULE_HALF_EXTENT - _SWIM_HALF_EXTENT;
+// A swimmer's eye over their capsule centre: as far above its top as standing.
+const _SWIM_EYE_HEIGHT: f32 = _STANDING_EYE_HEIGHT - _SWIM_CENTRE_SHIFT;
+const _SWIM_EYE_ABOVE_FEET: f32 = _SWIM_HALF_EXTENT + _SWIM_EYE_HEIGHT;
+// Metres the feet keep above the bed as a swimmer stands up.
+const _STAND_BED_CLEARANCE: f32 = 0.02;
 // The standing eye's height above the feet; water depths are measured by it.
 const _EYE_ABOVE_FEET: f32 = _CAPSULE_HALF_EXTENT + _STANDING_EYE_HEIGHT;
 // Where the capsule centre goes when spawning onto a known ground height: just
@@ -74,6 +89,7 @@ const _HUNGER_DRAIN_PER_SEC: f32 = 50 / 600;
 const _STARVATION_DAMAGE_PER_SEC: f32 = 100 / 60;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
+const _resizeTranslation = { x: 0, y: 0, z: 0 };
 
 export class Player extends Node {
   cameraController: ICameraController;
@@ -106,6 +122,7 @@ export class Player extends Node {
   immersion: f32 = 0;
   /** Whether the camera's eye is below the water's surface. */
   cameraUnderWater: boolean = false;
+  private _underWaterSound: UnderWaterSound | null = null;
   private _water = createWaterQuerySample();
   // World height a submerged swimmer holds their eye at; NaN while floating.
   private _swimHold: f32 = NaN;
@@ -234,10 +251,14 @@ export class Player extends Node {
     this.verticalVelocity = 0.0;
     this.stopMotion();
     this.swimming = false;
+    this.collider?.setHalfHeight(_CAPSULE_HALF_HEIGHT);
     this._swimHold = NaN;
     this.immersion = 0;
     this.cameraUnderWater = false;
     this._waterQuery = stateData.renderer.terrainRenderer.waterQuery;
+    this._underWaterSound?.dispose();
+    const scope = stateData.gameManager?.sound;
+    this._underWaterSound = scope ? new UnderWaterSound(audio, scope) : null;
     if (this._waterProbe < 0)
       this._waterProbe = this._waterQuery.acquireProbe();
 
@@ -280,7 +301,10 @@ export class Player extends Node {
 
       this.capsuleBody = this.rapierWorld.createRigidBody(rigidBodyDesc);
 
-      const capsuleDesc = ColliderDesc.capsule(0.9, 0.5);
+      const capsuleDesc = ColliderDesc.capsule(
+        _CAPSULE_HALF_HEIGHT,
+        _CAPSULE_RADIUS
+      );
       this.collider = this.rapierWorld.createCollider(
         capsuleDesc,
         this.capsuleBody
@@ -341,9 +365,38 @@ export class Player extends Node {
     this._waterProbe = -1;
     this._waterQuery = null;
 
+    this._underWaterSound?.dispose();
+    this._underWaterSound = null;
+
     if (this.rapierWorld && this.characterController) {
       this.rapierWorld.removeCharacterController(this.characterController);
     }
+  }
+
+  /**
+   * Shrinks the capsule to the swimmer's as they start to swim, keeping its
+   * top and the eye where they are, and grows it back as they stand, reaching
+   * down as far as the bed under `feet` allows so the eye rises no more than
+   * it must.
+   */
+  private _resizeForSwimming(
+    swimming: boolean,
+    feet: number,
+    bed: number
+  ): void {
+    const p = this.capsuleBody.translation();
+    let shift = _SWIM_CENTRE_SHIFT;
+    if (!swimming) {
+      const room = feet - (bed + _STAND_BED_CLEARANCE);
+      shift -= Math.min(2 * _SWIM_CENTRE_SHIFT, Math.max(0, room));
+    }
+    this.collider.setHalfHeight(
+      swimming ? _SWIM_HALF_HEIGHT : _CAPSULE_HALF_HEIGHT
+    );
+    _resizeTranslation.x = p.x;
+    _resizeTranslation.y = p.y + shift;
+    _resizeTranslation.z = p.z;
+    this.capsuleBody.setTranslation(_resizeTranslation, true);
   }
 
   /** Drops any slide and ground contact, e.g. after a teleport. */
@@ -463,8 +516,9 @@ export class Player extends Node {
 
     // The water over the feet, with the waves the probe last reported.
     const water = this._water;
-    const body = this.capsuleBody.translation();
-    const feet = body.y - _CAPSULE_HALF_EXTENT;
+    let body = this.capsuleBody.translation();
+    const feet =
+      body.y - (this.swimming ? _SWIM_HALF_EXTENT : _CAPSULE_HALF_EXTENT);
     const inWater =
       hasTerrain &&
       terrainRenderer!.waterQuery.sample(
@@ -475,9 +529,22 @@ export class Player extends Node {
       ) &&
       water.coverage > 0;
     this.immersion = inWater ? Math.max(0, water.surface - feet) : 0;
+    const entryVelocity = this.verticalVelocity;
+    const wasSwimming = this.swimming;
     this.swimming =
       gravityEnabled &&
-      isSwimming(this.swimming, this.immersion, _EYE_ABOVE_FEET);
+      inWater &&
+      (wasSwimming
+        ? keepsSwimming(water.surface - water.ground, _EYE_ABOVE_FEET)
+        : isSwimming(false, this.immersion, _EYE_ABOVE_FEET));
+    if (this.swimming !== wasSwimming) {
+      this._resizeForSwimming(
+        this.swimming,
+        feet,
+        inWater ? water.ground : feet
+      );
+      body = this.capsuleBody.translation();
+    }
     if (this.swimming) this._crouching = false;
 
     // Jump
@@ -507,10 +574,11 @@ export class Player extends Node {
     // Compute horizontal movement from key state (yaw-relative, XZ plane only)
     const sinYaw = Math.sin(this._yaw);
     const cosYaw = Math.cos(this._yaw);
-    const eyeHeight =
-      this._crouching && !this.swimming
-        ? _CROUCH_EYE_HEIGHT
-        : _STANDING_EYE_HEIGHT;
+    const eyeHeight = this.swimming
+      ? _SWIM_EYE_HEIGHT
+      : this._crouching
+      ? _CROUCH_EYE_HEIGHT
+      : _STANDING_EYE_HEIGHT;
     const speed =
       _MOVE_SPEED *
       (this._sprinting ? _RUN_MULTIPLIER : 1.0) *
@@ -579,7 +647,7 @@ export class Player extends Node {
         this._upHeld,
         delta,
         water.level,
-        water.ground + _EYE_ABOVE_FEET + BED_CLEARANCE
+        water.ground + _SWIM_EYE_ABOVE_FEET + BED_CLEARANCE
       );
       const target = Number.isNaN(this._swimHold)
         ? water.surface + SWIM_EYE_ABOVE
@@ -653,6 +721,13 @@ export class Player extends Node {
     const camZ = pos.z;
     this.cameraController.camera.transform.position.set(camX, camY, camZ);
     this.cameraUnderWater = inWater && camY < water.surface;
+    this._underWaterSound?.update(
+      this.immersion,
+      inWater ? water.surface - water.ground : 0,
+      this.cameraUnderWater,
+      entryVelocity,
+      delta
+    );
 
     if (this._flashlight) {
       const flashY = camY - _FLASHLIGHT_BODY_DROP;

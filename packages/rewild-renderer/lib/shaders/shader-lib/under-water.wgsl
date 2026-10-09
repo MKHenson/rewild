@@ -4,20 +4,24 @@
 //
 // The lens is the camera's near plane. The water between the eye and the lens
 // is clipped away, so a pixel is in water when its ray meets the lens below
-// the surface. The lens spans centimetres, so the surface over it is taken as
-// the plane through the probes at the camera and a step along x and along z.
+// the drawn surface. A pixel spans a fraction of a millimetre of the lens, so
+// the surface is the drawn grid's own triangles, rebuilt from its vertices
+// around the camera, not the smooth waves between them.
+
+// Vertices per side of the patch (LENS_PATCH_SIDE).
+const LENS_PATCH_SIDE: i32 = 4;
+const LENS_SOLVE_STEPS: i32 = 6;
+// Metres from the surface past which the lens is surely on one side of it.
+const LENS_CLEAR: f32 = 1.0;
 
 struct UnderWater {
   // x: 1 while the camera may be under water. y: the camera's world height.
   // z: world height of the water's level at rest there. w: world height of
   // the ground under it.
   camera : vec4f,
-  // The probes at the camera, a step along +x and a step along +z: x metres
-  // the surface stands above the level, y the surface's world height, which
-  // is below -1e29 where a probe found no water.
+  // The probe at the camera: x metres the surface stands above the level, y
+  // the surface's world height, which is below -1e29 where it found no water.
   probe : vec4f,
-  probeX : vec4f,
-  probeZ : vec4f,
   // rgb: extinction per metre, absorption plus turbidity.
   extinction : vec4f,
   // rgb: the palette's in-water glow, the share of the light the water
@@ -28,10 +32,15 @@ struct UnderWater {
   sun : vec4f,
   // xyz: the way toward the refracted sun in the water, world space.
   sunDirection : vec4f,
-  // x: metres from the eye to the lens. y: metres between the probes.
+  // x: metres from the eye to the lens. y: metres between the patch's
+  // vertices. zw: world xz of its first vertex less the eye's.
   lens : vec4f,
   // The camera's world matrix.
   viewToWorld : mat4x4f,
+  // The drawn grid's vertices around the camera, +x first, as the probe gives
+  // them: y the world height, below -1e29 where it found no water, zw the
+  // sideways move.
+  grid : array<vec4f, 16>,
 }
 
 fn cameraInWater() -> bool {
@@ -48,25 +57,53 @@ fn cameraBedBelow() -> f32 {
   return max(underWater.camera.y - underWater.camera.w, 0.0);
 }
 
-// The surface's rise per metre along x and z over the lens; flat where a
-// neighbouring probe found no water.
-fn lensSlope() -> vec2f {
-  let step = underWater.lens.y;
-  let centre = underWater.probe.y;
-  let x = select(0.0, (underWater.probeX.y - centre) / step, underWater.probeX.y > -1e29);
-  let z = select(0.0, (underWater.probeZ.y - centre) / step, underWater.probeZ.y > -1e29);
-  return vec2f(x, z);
+// Patch vertex (i, j): x, z its sideways move in metres, y its world height.
+// One without water sits at the camera's surface, unmoved.
+fn lensPatchVertex(i: i32, j: i32) -> vec3f {
+  let v = underWater.grid[j * LENS_PATCH_SIDE + i];
+  return select(vec3f(0.0, underWater.probe.y, 0.0), v.zyw, v.y > -1e29);
 }
 
-// Metres the surface stands above the lens where the world view direction
-// `dir` meets it: positive in water, negative in air.
+// The patch's vertices interpolated at `at`, in vertices from the first, over
+// the triangles the grid draws: each quad splits from its (0, 1) corner to its
+// (1, 0) corner (WaterGrid).
+fn lensPatchAt(at: vec2f) -> vec3f {
+  let p = clamp(at, vec2f(0.0), vec2f(f32(LENS_PATCH_SIDE - 1)));
+  let cell = min(vec2i(floor(p)), vec2i(LENS_PATCH_SIDE - 2));
+  let f = p - vec2f(cell);
+  let a = lensPatchVertex(cell.x, cell.y);
+  let b = lensPatchVertex(cell.x + 1, cell.y);
+  let c = lensPatchVertex(cell.x, cell.y + 1);
+  if (f.x + f.y <= 1.0) {
+    return a + (b - a) * f.x + (c - a) * f.y;
+  }
+  let d = lensPatchVertex(cell.x + 1, cell.y + 1);
+  return d + (c - d) * (1.0 - f.x) + (b - d) * (1.0 - f.y);
+}
+
+// Metres the drawn surface stands above the lens where the world view
+// direction `dir` meets it: positive in water, negative in air.
 fn lensWaterDepth(dir: vec3f) -> f32 {
-  let eye = underWater.viewToWorld[3].xyz;
   let forward = -underWater.viewToWorld[2].xyz;
-  let lens = eye + dir * (underWater.lens.x / max(dot(dir, forward), 1e-3));
-  let slope = lensSlope();
-  let surface = underWater.probe.y + slope.x * (lens.x - eye.x) + slope.y * (lens.z - eye.z);
-  return surface - lens.y;
+  let offset = dir * (underWater.lens.x / max(dot(dir, forward), 1e-3));
+  let lensY = underWater.camera.y + offset.y;
+  if (abs(underWater.probe.y - lensY) > LENS_CLEAR) {
+    return underWater.probe.y - lensY;
+  }
+  return lensPatchHeight(offset.xz) - lensY;
+}
+
+// World height of the drawn surface over the point `offset` metres from the
+// eye along x and z, by the patch. The water there rested elsewhere: a few
+// fixed-point steps find where, as the probe does for the smooth waves.
+fn lensPatchHeight(offset: vec2f) -> f32 {
+  let spacing = underWater.lens.y;
+  let goal = (offset - underWater.lens.zw) / spacing;
+  var surface = lensPatchAt(goal);
+  for (var i = 0; i < LENS_SOLVE_STEPS; i++) {
+    surface = lensPatchAt(goal - surface.xz / spacing);
+  }
+  return surface.y;
 }
 
 // Whether the pixel looking along world direction `dir` sees from in the

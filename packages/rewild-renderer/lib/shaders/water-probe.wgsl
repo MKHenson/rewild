@@ -1,7 +1,8 @@
 // Water probe (WaterProbe): where the drawn surface stands over a few points.
 // The waves move water sideways as well as up, so the water over a point
 // rested somewhere else. A few fixed-point steps find that rest position, and
-// the point takes its height.
+// the point takes its height. A point read at rest skips them: it is a vertex
+// of the drawn grid, and reports how the waves move it.
 
 #include "./shader-lib/water-waves.wgsl"
 #include "./shader-lib/shore-waves.wgsl"
@@ -16,12 +17,15 @@ struct ProbePoint {
   place : vec4f,
   // Palette weights summing to 1.
   weights : vec4f,
+  // x: 1 to read the water resting at the point.
+  mode : vec4f,
 }
 
 @group(0) @binding(0) var<uniform> waves : Waves;
 @group(0) @binding(1) var<storage, read> points : array<ProbePoint>;
 // Per point: x metres the surface stands above the level, y the surface's
-// world height, zw the sideways move of the water now over the point. A point
+// world height, zw the sideways move of the water now over the point, or of
+// the water resting at it. A point
 // nobody asked for has no surface: y is NO_SURFACE.
 @group(0) @binding(2) var<storage, read_write> results : array<vec4f>;
 @group(0) @binding(3) var oceanDisplacement : texture_2d_array<f32>;
@@ -48,7 +52,8 @@ fn probe(@builtin(global_invocation_id) id : vec3u) {
 
   var rest = goal;
   var surface = surfaceDisplacement(rest, depth, weights, surfaceSpacing(rest, level));
-  for (var i = 0; i < SOLVE_STEPS; i++) {
+  let steps = select(SOLVE_STEPS, 0, point.mode.x > 0.5);
+  for (var i = 0; i < steps; i++) {
     rest = goal - surface.displacement.xz;
     surface = surfaceDisplacement(rest, depth, weights, surfaceSpacing(rest, level));
   }

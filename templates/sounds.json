@@ -119,6 +119,51 @@
       "gain": [0.85, 1],
       "source": "Soundly: thunder mix",
       "license": "soundly"
+    },
+    {
+      "name": "under-water",
+      "files": [
+        "audio/water/under-water.ogg"
+      ],
+      "loop": true,
+      "source": "Soundly: water mix",
+      "license": "soundly"
+    },
+    {
+      "name": "plunge-small",
+      "files": [
+        "audio/water/plunge-small-01.ogg",
+        "audio/water/plunge-small-02.ogg",
+        "audio/water/plunge-small-03.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: water mix",
+      "license": "soundly"
+    },
+    {
+      "name": "plunge-big",
+      "files": [
+        "audio/water/plunge-big-01.ogg",
+        "audio/water/plunge-big-02.ogg",
+        "audio/water/plunge-big-03.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: water mix",
+      "license": "soundly"
+    },
+    {
+      "name": "surface",
+      "files": [
+        "audio/water/surface-01.ogg",
+        "audio/water/surface-02.ogg",
+        "audio/water/surface-03.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: water mix",
+      "license": "soundly"
     }
   ]
 }

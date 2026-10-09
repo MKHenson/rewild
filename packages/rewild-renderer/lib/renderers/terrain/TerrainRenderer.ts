@@ -37,7 +37,7 @@ import { underWaterQuality, waterDetailBias } from '../water/WaterQuality';
 import { OceanFFT } from '../water/OceanFFT';
 import { SeaSpray } from '../water/SeaSpray';
 import { WaterProbe } from '../water/WaterProbe';
-import { UnderWater } from '../water/UnderWater';
+import { UnderWater, clipNear } from '../water/UnderWater';
 import { UnderWaterFog } from '../water/UnderWaterFog';
 import { WaterLens, lensRain } from '../water/WaterLens';
 import { CAUSTIC_CASCADE, Caustics } from '../water/Caustics';
@@ -1175,8 +1175,9 @@ export class TerrainRenderer implements WaterQuerySource {
       eye.z,
       toSun,
       this.sunRadiance,
-      (camera as { near?: number }).near ?? 0.1,
-      camera.transform.matrixWorld.elements
+      clipNear(camera.projectionMatrix.elements),
+      camera.transform.matrixWorld.elements,
+      finest
     );
     const eyeWorld = camera.transform.matrixWorld.elements;
     this.caustics.update(

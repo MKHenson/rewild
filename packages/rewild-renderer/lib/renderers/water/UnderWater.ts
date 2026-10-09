@@ -10,29 +10,35 @@ import {
 // The water around the camera, for everything that draws differently under
 // it: the UnderWater uniform (under-water.wgsl), and what materials need to
 // dim the light under it (IblParams). The CPU reads the water map at the
-// camera and asks the probe for the waves there and a step along x and z; the
-// probe's results are copied into the uniform on the GPU the same frame, so
-// the view switches the moment the surface crosses the lens.
+// camera and asks the probe for the waves there and at the drawn grid's
+// vertices around it; the probe's results are copied into the uniform on the
+// GPU the same frame, so the view switches the moment the drawn surface
+// crosses the lens.
 
+/** Vertices per side of the patch of the drawn grid around the camera. */
+export const LENS_PATCH_SIDE = 4;
+const PATCH_VERTICES = LENS_PATCH_SIDE * LENS_PATCH_SIDE;
+const CAMERA_PROBE_OFFSET = 4;
+const OPTICS_OFFSET = 8;
+const EXTINCTION_OFFSET = 8;
+const IN_SCATTER_OFFSET = 12;
+const SUN_OFFSET = 16;
+const SUN_DIRECTION_OFFSET = 20;
+const LENS_OFFSET = 24;
+const VIEW_TO_WORLD_OFFSET = 28;
+const PATCH_OFFSET = 44;
 /** Floats in the UnderWater uniform. */
-export const UNDER_WATER_FLOATS = 52;
-/** Byte offsets of the probes at the camera, a step along +x and a step
- *  along +z in the UnderWater uniform. The GPU copies them in. */
-export const UNDER_WATER_PROBE_OFFSETS = [16, 32, 48] as const;
-const OPTICS_OFFSET = 16;
-const EXTINCTION_OFFSET = 16;
-const IN_SCATTER_OFFSET = 20;
-const SUN_OFFSET = 24;
-const SUN_DIRECTION_OFFSET = 28;
-const LENS_OFFSET = 32;
-const VIEW_TO_WORLD_OFFSET = 36;
+export const UNDER_WATER_FLOATS = PATCH_OFFSET + PATCH_VERTICES * 4;
+/** Byte offsets of the probes in the UnderWater uniform: the camera's, then
+ *  the patch's vertices, +x first. The GPU copies them in. */
+export const UNDER_WATER_PROBE_OFFSETS: readonly number[] = [
+  CAMERA_PROBE_OFFSET * 4,
+  ...Array.from({ length: PATCH_VERTICES }, (_, i) => (PATCH_OFFSET + i * 4) * 4),
+];
 
 /** Metres above the water's level the camera can be and still have a wave
  *  over it: within it the probe decides. */
 export const WAVE_REACH = 15;
-/** Metres between the camera's probe and the two beside it, which give the
- *  surface's slope over the lens. */
-export const LENS_PROBE_STEP = 0.25;
 /** Metres from the surface, by the last readback, within which the surface
  *  may cross the lens. */
 export const LENS_REACH = 1;
@@ -40,6 +46,12 @@ export const LENS_REACH = 1;
 const AIR_TO_WATER = 0.75;
 /** Share of the sun's light the surface lets in. */
 const SUN_ENTERS = 0.98;
+
+/** Metres from the eye to where `projection` clips the near side. Its depth
+ *  runs -1..1 as OpenGL's, and WebGPU clips at 0, past the camera's near. */
+export function clipNear(projection: ArrayLike<number>): number {
+  return projection[14] / projection[10];
+}
 
 /** The cosine from straight up of the sun refracted into the water, for a sun
  *  whose cosine in the air is `sunUp`; 0 while it is down. */
@@ -90,7 +102,7 @@ export class UnderWater {
   /** The cosine from straight up of the sun refracted into the water. */
   sunCosine = 0;
   /** The probe results to copy into the uniform each frame: the camera's,
-   *  then the ones a step along x and z. */
+   *  then the patch's. */
   readonly probeCopies: ProbeCopy[] = UNDER_WATER_PROBE_OFFSETS.map(
     (targetOffset) => ({
       sourceOffset: 0,
@@ -98,8 +110,8 @@ export class UnderWater {
       targetOffset,
     })
   );
-  private probes = [-1, -1, -1];
-  private beside = createWaterQuerySample();
+  private probes = UNDER_WATER_PROBE_OFFSETS.map(() => -1);
+  private vertex = createWaterQuerySample();
   private data = new Float32Array(UNDER_WATER_FLOATS);
   private gpu: GPUBuffer | null = null;
 
@@ -110,17 +122,40 @@ export class UnderWater {
       this.gpu = device.createBuffer({
         label: 'under water',
         size: UNDER_WATER_FLOATS * 4,
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        usage:
+          GPUBufferUsage.UNIFORM |
+          GPUBufferUsage.COPY_DST |
+          GPUBufferUsage.COPY_SRC,
       });
     return this.gpu;
+  }
+
+  /** The uniform as the GPU holds it, for debugging. */
+  async read(device: GPUDevice): Promise<Float32Array> {
+    const size = UNDER_WATER_FLOATS * 4;
+    const staging = device.createBuffer({
+      label: 'under water read',
+      size,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
+    const encoder = device.createCommandEncoder();
+    encoder.copyBufferToBuffer(this.buffer(device), 0, staging, 0, size);
+    device.queue.submit([encoder.finish()]);
+    await staging.mapAsync(GPUMapMode.READ);
+    const data = new Float32Array(staging.getMappedRange().slice(0));
+    staging.unmap();
+    staging.destroy();
+    return data;
   }
 
   /**
    * Reads the water at the camera (`eyeX`, `eyeY`, `eyeZ`) and writes the
    * uniform. `toSun` is the world direction toward the sun and `sunRadiance`
-   * its radiance in the air, rgb. `near` is the metres to the near plane and
-   * `viewToWorld` the camera's world matrix. Call before the probe
-   * dispatches, so its copies into the uniform land after this write.
+   * its radiance in the air, rgb. `near` is the metres to the near plane,
+   * `viewToWorld` the camera's world matrix and `spacing` the metres between
+   * the drawn grid's vertices around the camera (waterGridBands). Call
+   * before the probe dispatches, so its copies into the uniform land after
+   * this write.
    */
   update(
     device: GPUDevice,
@@ -132,18 +167,29 @@ export class UnderWater {
     toSun: ArrayLike<number>,
     sunRadiance: ArrayLike<number>,
     near: number,
-    viewToWorld: ArrayLike<number>
+    viewToWorld: ArrayLike<number>,
+    spacing: number
   ): void {
     const probes = this.probes;
     for (let i = 0; i < probes.length; i++)
-      if (probes[i] < 0) probes[i] = query.acquireProbe();
+      if (probes[i] < 0) probes[i] = query.acquireProbe(i > 0);
     const sample = this.sample;
     const loaded = query.sample(eyeX, eyeZ, sample, probes[0]);
-    query.sample(eyeX + LENS_PROBE_STEP, eyeZ, this.beside, probes[1]);
-    query.sample(eyeX, eyeZ + LENS_PROBE_STEP, this.beside, probes[2]);
     const covered = loaded && sample.coverage > 0;
     this.covered = covered;
     this.possible = covered && eyeY < sample.level + WAVE_REACH;
+    // Grid vertices lie on multiples of `spacing` (WaterGrid). The patch
+    // reaches a vertex past the camera's cell each way.
+    const firstX = (Math.floor(eyeX / spacing) - 1) * spacing;
+    const firstZ = (Math.floor(eyeZ / spacing) - 1) * spacing;
+    if (this.possible)
+      for (let i = 0; i < PATCH_VERTICES; i++)
+        query.sample(
+          firstX + (i % LENS_PATCH_SIDE) * spacing,
+          firstZ + Math.floor(i / LENS_PATCH_SIDE) * spacing,
+          this.vertex,
+          probes[i + 1]
+        );
     this.submerged = covered && eyeY < sample.surface;
     this.nearSurface =
       covered && Math.abs(eyeY - sample.surface) < LENS_REACH + near;
@@ -183,7 +229,9 @@ export class UnderWater {
     d[SUN_DIRECTION_OFFSET + 1] = mu;
     d[SUN_DIRECTION_OFFSET + 2] = toSun[2] * AIR_TO_WATER;
     d[LENS_OFFSET] = near;
-    d[LENS_OFFSET + 1] = LENS_PROBE_STEP;
+    d[LENS_OFFSET + 1] = spacing;
+    d[LENS_OFFSET + 2] = firstX - eyeX;
+    d[LENS_OFFSET + 3] = firstZ - eyeZ;
     for (let i = 0; i < 16; i++) d[VIEW_TO_WORLD_OFFSET + i] = viewToWorld[i];
     // The probes are left for the GPU copies.
     device.queue.writeBuffer(buffer, 0, d, 0, 4);
@@ -192,7 +240,7 @@ export class UnderWater {
       OPTICS_OFFSET * 4,
       d,
       OPTICS_OFFSET,
-      UNDER_WATER_FLOATS - OPTICS_OFFSET
+      PATCH_OFFSET - OPTICS_OFFSET
     );
   }
 

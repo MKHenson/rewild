@@ -476,16 +476,27 @@ these sounds.
 
 ### Under water
 
-`Player.cameraUnderWater` switches the mix. The camera is the player's eye.
+`UnderWaterSound` in `src/core/audio/`, owned by `Player`, plays it. `Player.cameraUnderWater`
+switches the mix. The camera is the player's eye.
 
-- The world bus low-pass falls to about 600 Hz over 0.1 s and its gain drops.
-- An **under-water bed** fades in: a low hum and the sound of moving water.
+- The world bus low-pass falls to 600 Hz over 0.1 s and its gain halves.
+- An **under-water bed** (`under-water`) fades in: a low hum and the sound of moving water. It
+  plays on the player bus, so the muffle does not dull it twice.
+- **The splashes** play on the effects bus, in the world. A surfacing splash still ringing when a
+  wave takes the head under again goes dull with everything else, and a plunge's tail goes dull
+  as the head goes under.
 - Thunder still plays, very deep and soft, through the low-pass.
+- Disposing the sound, as the player unmounts on a restart or a quit, lifts the muffle.
 
-**Going in.** A plunge sound, scaled by `verticalVelocity` when the player hits the water. A
-small step into deep water makes a small splash. A fall from a cliff makes a big one.
+**Going in.** A plunge when the feet first touch the water, from `verticalVelocity` before the
+water slows it. Speeds are in its units, in which a jump on flat ground lands at about 10.5 and a
+fall hurts from 15. Below 2, as when wading in, there is none. A step off a ledge or a jump makes a
+small plunge (`plunge-small`). From 14, a fall from well above a jump, into water at least 1.5 m
+deep, it is a big one (`plunge-big`). Its gain rises with the speed from 0.4 to 1 by 20, and falls
+to 0.4 of that into the shallowest water.
 
-**Coming out.** A splash when the camera leaves the water, and a gasp from the voice. See
+**Coming out.** A splash (`surface`) when the camera leaves the water after at least 0.5 s under,
+so a wave over the eye does not splash. The gasp from the voice comes with
 [Breath and voice](#breath-and-voice). The lens drops begin at the same time in `WaterLens`.
 
 ### Swimming and wading

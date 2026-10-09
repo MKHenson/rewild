@@ -9,6 +9,7 @@ import {
   WADE_START,
   holdHeight,
   isSwimming,
+  keepsSwimming,
   swimDepth,
   swimStep,
   wadeSpeedShare,
@@ -29,6 +30,20 @@ describe('isSwimming', () => {
 
   it('floats deeper than it starts to swim, so floating keeps it swimming', () => {
     expect(EYE - SWIM_EYE_ABOVE).toBeGreaterThan(DEPTH);
+  });
+});
+
+describe('keepsSwimming', () => {
+  it('swims on until the water is shallow enough to stand and wade', () => {
+    expect(keepsSwimming(DEPTH, EYE)).toBe(true);
+    expect(keepsSwimming(DEPTH - SWIM_LEAVE_MARGIN, EYE)).toBe(true);
+    expect(keepsSwimming(DEPTH - SWIM_LEAVE_MARGIN - 0.01, EYE)).toBe(false);
+  });
+
+  it('stands a swimmer up where a standing player would not swim again', () => {
+    const depth = DEPTH - SWIM_LEAVE_MARGIN - 0.01;
+    expect(keepsSwimming(depth, EYE)).toBe(false);
+    expect(isSwimming(false, depth, EYE)).toBe(false);
   });
 });
 

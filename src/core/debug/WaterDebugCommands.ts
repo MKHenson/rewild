@@ -83,6 +83,7 @@ export function registerWaterDebugCommands(renderer: Renderer) {
       'three yes/no facts per water pixel. Red: the water map has the ground over 1 m below the surface. Green: the refraction capture has the scene over 0.5 m behind the surface. Blue: the capture makes the water over 1 m deep. Deep water reads white; a missing colour names the fact that fails',
       'the palette weights as read: red, green, blue for types 0, 1, 2; yellow where the four sum to under 0.5',
       'the share of the light behind the water that passes through it, as grey',
+      'how far the drawn surface stands from the lens patch near the camera: red above it, green below, full at 2 cm; blue past the patch. Black means they agree',
     ];
     console.log(
       `setWaterRefractionDebug(${mode}) — ${views[mode] ?? 'unknown view'}.`
@@ -116,6 +117,76 @@ export function registerWaterDebugCommands(renderer: Renderer) {
       );
     };
     tick();
+  };
+
+  // Reads back the UnderWater uniform and finds, down the screen's centre
+  // column, the row where the lens test (under-water.wgsl) crosses the
+  // waterline, by the drawn-grid patch and by the camera probe's level alone.
+  (window as any).lensWaterline = async () => {
+    const terrain = renderer.terrainRenderer;
+    const u = await terrain.underWater.read(renderer.device);
+    const side = 4;
+    const eyeY = u[1];
+    const probeY = u[5];
+    const [near, spacing, firstX, firstZ] = [u[24], u[25], u[26], u[27]];
+    const m = u.subarray(28, 44);
+    const up = [m[4], m[5], m[6]];
+    const forward = [-m[8], -m[9], -m[10]];
+    const vertex = (i: number, j: number) => {
+      const o = 44 + (j * side + i) * 4;
+      return u[o + 1] > -1e29 ? [u[o + 2], u[o + 1], u[o + 3]] : [0, probeY, 0];
+    };
+    const patchAt = (x: number, z: number) => {
+      const px = Math.min(Math.max(x, 0), side - 1);
+      const pz = Math.min(Math.max(z, 0), side - 1);
+      const cx = Math.min(Math.floor(px), side - 2);
+      const cz = Math.min(Math.floor(pz), side - 2);
+      const fx = px - cx;
+      const fz = pz - cz;
+      const a = vertex(cx, cz);
+      const b = vertex(cx + 1, cz);
+      const c = vertex(cx, cz + 1);
+      if (fx + fz <= 1)
+        return a.map((v, k) => v + (b[k] - v) * fx + (c[k] - v) * fz);
+      const d = vertex(cx + 1, cz + 1);
+      return d.map((v, k) => v + (c[k] - v) * (1 - fx) + (b[k] - v) * (1 - fz));
+    };
+    const rows = renderer.canvas.height;
+    const tanHalf = Math.tan((renderer.camera.fov * Math.PI) / 360);
+    let patchRow = -1;
+    let probeRow = -1;
+    let lastPatch = NaN;
+    let lastProbe = NaN;
+    const depths: { row: number; patch: number; probe: number }[] = [];
+    for (let row = 0; row < rows; row++) {
+      const ndc = 1 - (2 * (row + 0.5)) / rows;
+      const offset = forward.map((f, k) => (f + up[k] * ndc * tanHalf) * near);
+      const lensY = eyeY + offset[1];
+      const gx = (offset[0] - firstX) / spacing;
+      const gz = (offset[2] - firstZ) / spacing;
+      let s = patchAt(gx, gz);
+      for (let i = 0; i < 6; i++)
+        s = patchAt(gx - s[0] / spacing, gz - s[2] / spacing);
+      const patch = s[1] - lensY;
+      const probe = probeY - lensY;
+      if (patchRow < 0 && lastPatch <= 0 && patch > 0) patchRow = row;
+      if (probeRow < 0 && lastProbe <= 0 && probe > 0) probeRow = row;
+      lastPatch = patch;
+      lastProbe = probe;
+      if (row % Math.round(rows / 8) === 0) depths.push({ row, patch, probe });
+    }
+    const heights: number[][] = [];
+    for (let j = 0; j < side; j++)
+      heights.push(
+        Array.from({ length: side }, (_, i) => +vertex(i, j)[1].toFixed(4))
+      );
+    console.log(
+      `lensWaterline — ${rows} rows. Waterline row by the patch: ${patchRow}, by the camera probe's level: ${probeRow}. Eye ${eyeY.toFixed(4)}, probe surface ${probeY.toFixed(4)}, near ${near}, spacing ${spacing}, first vertex ${firstX.toFixed(3)}, ${firstZ.toFixed(3)} from the eye.`,
+      '\nPatch vertex heights, +x across, +z down:',
+      heights,
+      '\nMetres of water over the lens down the centre column:',
+      depths
+    );
   };
 
   (window as any).setWaterLens = (override = {}) => {
