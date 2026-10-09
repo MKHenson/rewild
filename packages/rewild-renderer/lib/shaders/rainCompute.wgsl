@@ -22,7 +22,8 @@ struct Particle {
 //   offset  32: iTime       (f32)
 //   offset  36: spawnRadius (f32)
 //   offset  40: spawnHeight (f32)
-//   offset  44-63: _pad0-_pad4 (5×f32)
+//   offset  44: precipitation (f32)
+//   offset  48-63: _pad1-_pad4 (4×f32)
 //   offset  64: viewProj    (mat4x4, align=16, size=64)
 //   offset 128: invViewProj (mat4x4, align=16, size=64)
 //   struct size = 192 bytes
@@ -35,7 +36,7 @@ struct ComputeUniforms {
     iTime:       f32,
     spawnRadius: f32,
     spawnHeight: f32,
-    _pad0:       f32,
+    precipitation: f32,
     _pad1:       f32,
     _pad2:       f32,
     _pad3:       f32,
@@ -63,6 +64,11 @@ fn hf(n: u32) -> f32 {
 // adds to it at its height there.
 const GALE_WIND: f32 = 24.0;
 const GALE_GUST: f32 = 0.9;
+// Metres a second rain falls in a drizzle and in a downpour: heavier rain has
+// bigger, faster drops. Keep in step with rainRender.wgsl.
+const RAIN_FALL_LIGHT: f32 = 7.0;
+const RAIN_FALL_HEAVY: f32 = 12.0;
+const SNOW_FALL: f32 = 1.0;
 // Snow takes SNOW_CALM_SHARE of the wind, rising to all of it between wind
 // speeds SNOW_LEVEL_FROM and SNOW_LEVEL_AT m/s: windiness 0.55 and 0.85 by
 // SkyRenderer's rainWindSpeed.
@@ -102,7 +108,8 @@ fn computeMain(@builtin(global_invocation_id) id: vec3<u32>) {
     // Match rainRender.wgsl: snow→rain transition lives in temperature 0–0.5,
     // above 0.5 is pure rain. Keep this remap identical in both shaders.
     let rainFactor = saturate(u.temperature * 2.0);
-    let fallSpeed  = mix(1.0, 9.5, rainFactor);
+    let rainFall   = mix(RAIN_FALL_LIGHT, RAIN_FALL_HEAVY, saturate(u.precipitation));
+    let fallSpeed  = mix(SNOW_FALL, rainFall, rainFactor);
     let gustAmp    = sin(u.iTime * 0.41) * 0.5
                    + sin(u.iTime * 1.17) * 0.3
                    + sin(u.iTime * 2.73) * 0.2;
