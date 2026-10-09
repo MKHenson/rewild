@@ -6,7 +6,7 @@ The weather has two halves. The **atmosphere system** (`AtmosphereSystem`, in `r
 
 ## Atmosphere System
 
-The Sky's **Dynamic Day & Weather** switch turns it on, in the editor and in the game. The Sky's knobs are where it starts: the sun elevation, the wind direction and the five weather knobs. **Starting Weather** picks the first state, or `Auto` for the state whose middle looks most like the knobs. Any edit to the Sky restarts it from the knobs. `applyAtmosphere` (`src/core/AtmosphereSync.ts`) does this for the game loader and the editor.
+The Sky's **Dynamic Day & Weather** switch turns it on, in the editor and in the game. The Sky's knobs are where it starts: the sun elevation, the wind direction and the five weather knobs. **Starting Weather** picks the first state: `Random`, the default, for a state picked by the climate's `stateWeights` each time the system starts (`randomWeatherState`), so a climate never starts in a state it never has; `Auto` for the state whose middle looks most like the knobs; or a named state. A Sky saved with no choice is `Random`. It is hidden while the switch is off, because there is no weather to start; the knobs alone set the sky. **Moon Phase** is hidden the same way while **Random Moon Phase** is on. A switch always sits above the field it hides, so the switch never moves under the pointer, and a hidden field keeps its value for when it comes back. A property template's `shownWhen` sets this up. Any edit to the Sky restarts it from the knobs. `applyAtmosphere` (`src/core/AtmosphereSync.ts`) does this for the game loader and the editor.
 
 `Sky` owns it as `renderer.sky.atmosphere`. Each frame `Sky.update` calls `atmosphere.update(dt)` and copies the sample to the `SkyRenderer` before anything reads the wind.
 

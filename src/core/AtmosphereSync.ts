@@ -1,12 +1,29 @@
 import { PropValue } from 'models';
 import {
+  ClimateProfile,
   isWeatherStateId,
+  randomWeatherState,
   Renderer,
   resolveClimatePreset,
   resolveWeatherClimate,
+  WeatherStateId,
 } from 'rewild-renderer';
 
 export type AtmosphereProps = Partial<Record<string, PropValue>>;
+
+/**
+ * The weather the system starts in: a named state, a random one for
+ * `'random'` (also the default when none is saved), or undefined for `'auto'`,
+ * the state nearest the knobs.
+ */
+function startingState(
+  choice: PropValue | undefined,
+  climate: ClimateProfile
+): WeatherStateId | undefined {
+  if (isWeatherStateId(choice)) return choice;
+  if (choice === 'auto') return undefined;
+  return randomWeatherState(climate);
+}
 
 /** Rolled once per load, so editing other settings keeps the same moon. */
 const randomMoonPhase = Math.random();
@@ -50,8 +67,6 @@ export function applyAtmosphere(renderer: Renderer, atmosphere: AtmosphereProps)
     precipitation: sky.precipitation,
     fog: sky.foginess,
     temperature: sky.temperature,
-    state: isWeatherStateId(atmosphere.weatherState)
-      ? atmosphere.weatherState
-      : undefined,
+    state: startingState(atmosphere.weatherState, climate),
   });
 }

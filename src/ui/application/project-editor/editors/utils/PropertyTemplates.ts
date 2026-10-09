@@ -62,10 +62,13 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
     label: 'Dynamic Day & Weather',
     valueType: 'boolean',
   },
+  // Starts the weather system, so it means nothing while the cycle is off.
   weatherState: {
     label: 'Starting Weather',
     valueType: 'enum',
+    shownWhen: { property: 'dayNightCycle', is: true },
     options: [
+      { value: 'random', label: 'Random' },
       { value: 'auto', label: 'Auto (nearest the knobs)' },
       ...WEATHER_STATE_IDS.map((id) => ({ value: id, label: id })),
     ],
@@ -73,6 +76,7 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
   // 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter.
   moonPhase: {
     label: 'Moon Phase',
+    shownWhen: { property: 'randomMoonPhase', is: false },
     valueType: 'float',
     valueOptions: {
       min: 0,

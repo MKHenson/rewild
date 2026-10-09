@@ -7,13 +7,13 @@ import {
   Vector3,
 } from 'models';
 import {
-  theme,
   Component,
   register,
   Switch,
   Select,
   Vec3,
   NumberInput,
+  underlineField,
 } from 'rewild-ui';
 import { CameraCapture } from './custom-value-editors/CameraCapture';
 
@@ -34,6 +34,10 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
     const getEditor = (type: PropValueType) => {
       const value = this.props.value;
       const onChange = this.props.onChange;
+      // A text field reports only an edit, not every time it loses focus.
+      const commit = (text: string) => {
+        if (text !== ((value as string) || '')) onChange?.(text as T);
+      };
 
       if (this.props.customEditor === 'camera-capture') {
         return (
@@ -52,12 +56,9 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
               class="input-val"
               readOnly={this.props.readonly}
               value={(value as string) || ''}
-              onblur={(e) => {
-                onChange?.(e.currentTarget.value as T);
-              }}
+              onblur={(e) => commit(e.currentTarget.value)}
               onkeydown={(e) => {
-                if (!onChange) return;
-                if (e.key === 'Enter') onChange(e.currentTarget.value as T);
+                if (e.key === 'Enter') commit(e.currentTarget.value);
               }}
             />
           );
@@ -70,6 +71,7 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
               step={this.props.valueOptions?.step}
               precision={this.props.valueOptions?.precision}
               disabled={this.props.readonly}
+              fullWidth
               value={(value as number) || 0}
               onChange={(e) => {
                 onChange?.(e as T);
@@ -91,6 +93,7 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
             <Select
               options={this.props.options || []}
               value={value as string}
+              disabled={this.props.readonly}
               onChange={(e) => {
                 if (!onChange) return;
                 onChange(e as T);
@@ -134,15 +137,20 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
 }
 
 const StyledPropValue = cssStylesheet(css`
-  .input-val {
-    width: 100%;
-    outline: none;
-    border: none;
-    box-sizing: border-box;
-    height: 100%;
+  :host {
+    display: block;
   }
 
-  :host([readonly]) {
-    background: ${theme.colors.subtle400};
+  .input-val {
+    width: 100%;
+  }
+
+  ${underlineField('.input-val', '.input-val:focus', '.input-val:disabled')}
+
+  /* Read-only values read as plain text: no line to suggest they can be edited. */
+  .input-val[readonly],
+  .input-val[readonly]:hover {
+    border-bottom-color: transparent;
+    box-shadow: none;
   }
 `);

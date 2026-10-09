@@ -45,7 +45,7 @@ export class PaneManager extends Component<Props> {
         pane2={
           <SplitPane
             mode="vertical"
-            initalRatio="70%"
+            initalRatio="80%"
             pane1={
               <SplitPane
                 mode="vertical"

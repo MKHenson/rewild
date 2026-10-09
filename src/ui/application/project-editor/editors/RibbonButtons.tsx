@@ -6,6 +6,7 @@ import {
   ButtonGroup,
   Card,
   Button,
+  IconType,
 } from 'rewild-ui';
 import { projectStore } from '../../../stores/ProjectStore';
 import { sculptStore } from '../../../stores/SculptStore';
@@ -31,100 +32,85 @@ export class RibbonButtons extends Component<Props> {
 
     const [terrainOpen, setTerrainOpen] = this.useState(false);
 
+    // Built once and updated in place. Rebuilding on every store change would
+    // swap a button out between its mousedown and mouseup whenever the press
+    // itself triggers a change, such as a property field saving on blur, and
+    // the click would be lost.
+    const iconButton = (icon: IconType, onClick: () => void) =>
+      (
+        <Button variant="text" onClick={onClick}>
+          <StyledIcon icon={icon} size="s" />
+        </Button>
+      ) as unknown as Button & HTMLElement;
+
+    /** The terrain brushes all own left-drag, so arming one disarms the others. */
+    const brushes = [
+      sculptStore,
+      biomePaintStore,
+      scatterPaintStore,
+      waterBrushStore,
+    ];
+    const toggleBrush = (store: typeof brushes[number]) => {
+      if (!store.enabled)
+        for (const other of brushes)
+          if (other !== store) other.setEnabled(false);
+      store.setEnabled(!store.enabled);
+    };
+
+    const home = iconButton('house', () => this.props.onHome());
+    const save = iconButton('save', () => projectStore.updateProject());
+    const publish = iconButton('upload', () => projectStore.publish());
+    const terrain = iconButton('mountain-snow', () => setTerrainOpen(true));
+    const brushButtons = brushes.map((store, i) =>
+      iconButton(
+        (['trending-up-down', 'paintbrush', 'trees', 'droplets'] as const)[i],
+        () => toggleBrush(store)
+      )
+    );
+
+    const dialogSlot = (<div />) as HTMLDivElement;
+    let dialog: HTMLElement | null = null;
+
+    const elm = (
+      <Card stretched>
+        <ButtonGroup>
+          {home}
+          {save}
+          {publish}
+          {terrain}
+          {brushButtons[0]}
+          {brushButtons[1]}
+          {brushButtons[2]}
+          {brushButtons[3]}
+        </ButtonGroup>
+        {dialogSlot}
+      </Card>
+    );
+
     return () => {
       const { loading, dirty } = projectStore;
+      const noTerrain = loading || !projectStore.project?.sceneGraph?.terrain;
 
-      return (
-        <Card stretched>
-          <ButtonGroup>
-            <Button
-              variant="text"
-              onClick={this.props.onHome}
-              disabled={loading}>
-              <StyledIcon icon="house" size="s" />
-            </Button>
-            <Button
-              variant="text"
-              disabled={!dirty || loading}
-              onClick={() => projectStore.updateProject()}>
-              <StyledIcon icon="save" size="s" />
-            </Button>
-            <Button
-              variant="text"
-              disabled={loading}
-              onClick={() => projectStore.publish()}>
-              <StyledIcon icon="upload" size="s" />
-            </Button>
-            <Button
-              variant="text"
-              disabled={loading || !projectStore.project?.sceneGraph?.terrain}
-              onClick={() => setTerrainOpen(true)}>
-              <StyledIcon icon="mountain-snow" size="s" />
-            </Button>
-            <Button
-              variant="text"
-              class={sculptStore.enabled ? 'sculpt-active' : ''}
-              disabled={loading || !projectStore.project?.sceneGraph?.terrain}
-              onClick={() => {
-                // The terrain brushes all own left-drag, so arming one must
-                // disarm the others.
-                if (!sculptStore.enabled) {
-                  biomePaintStore.setEnabled(false);
-                  scatterPaintStore.setEnabled(false);
-                  waterBrushStore.setEnabled(false);
-                }
-                sculptStore.setEnabled(!sculptStore.enabled);
-              }}>
-              <StyledIcon icon="trending-up-down" size="s" />
-            </Button>
-            <Button
-              variant="text"
-              class={biomePaintStore.enabled ? 'sculpt-active' : ''}
-              disabled={loading || !projectStore.project?.sceneGraph?.terrain}
-              onClick={() => {
-                if (!biomePaintStore.enabled) {
-                  sculptStore.setEnabled(false);
-                  scatterPaintStore.setEnabled(false);
-                  waterBrushStore.setEnabled(false);
-                }
-                biomePaintStore.setEnabled(!biomePaintStore.enabled);
-              }}>
-              <StyledIcon icon="paintbrush" size="s" />
-            </Button>
-            <Button
-              variant="text"
-              class={scatterPaintStore.enabled ? 'sculpt-active' : ''}
-              disabled={loading || !projectStore.project?.sceneGraph?.terrain}
-              onClick={() => {
-                if (!scatterPaintStore.enabled) {
-                  sculptStore.setEnabled(false);
-                  biomePaintStore.setEnabled(false);
-                  waterBrushStore.setEnabled(false);
-                }
-                scatterPaintStore.setEnabled(!scatterPaintStore.enabled);
-              }}>
-              <StyledIcon icon="trees" size="s" />
-            </Button>
-            <Button
-              variant="text"
-              class={waterBrushStore.enabled ? 'sculpt-active' : ''}
-              disabled={loading || !projectStore.project?.sceneGraph?.terrain}
-              onClick={() => {
-                if (!waterBrushStore.enabled) {
-                  sculptStore.setEnabled(false);
-                  biomePaintStore.setEnabled(false);
-                  scatterPaintStore.setEnabled(false);
-                }
-                waterBrushStore.setEnabled(!waterBrushStore.enabled);
-              }}>
-              <StyledIcon icon="droplets" size="s" />
-            </Button>
-          </ButtonGroup>
-          {terrainOpen() && (
-            <TerrainSettingsDialog onClose={() => setTerrainOpen(false)} />
-          )}
-        </Card>
-      );
+      home.disabled = loading;
+      save.disabled = !dirty || loading;
+      publish.disabled = loading;
+      terrain.disabled = noTerrain;
+      brushButtons.forEach((button, i) => {
+        button.disabled = noTerrain;
+        button.classList.toggle('sculpt-active', brushes[i].enabled);
+      });
+
+      if (terrainOpen() && !dialog) {
+        dialog = (
+          <TerrainSettingsDialog onClose={() => setTerrainOpen(false)} />
+        ) as HTMLElement;
+        dialogSlot.appendChild(dialog);
+      } else if (!terrainOpen() && dialog) {
+        dialog.remove();
+        dialog = null;
+      }
+
+      return elm;
     };
   }
 

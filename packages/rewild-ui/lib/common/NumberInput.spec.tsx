@@ -69,6 +69,20 @@ describe('NumberInput', () => {
     expect(onChange).toHaveBeenCalledWith(25);
   });
 
+  it('does not call onChange on blur when the value is unchanged', async () => {
+    const onChange = jest.fn();
+    const props: NumberInputProps = { value: 10, onChange };
+    const cmp = new NumberInput({ props });
+
+    cmp._createRenderer();
+    cmp.render();
+
+    const input = cmp.shadow?.querySelector('input') as HTMLInputElement;
+    await fireEvent(input, new Event('blur'));
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('sets step, min, and max attributes on input', () => {
     const props: NumberInputProps = {
       value: 5,

@@ -78,6 +78,8 @@ declare module 'models' {
     customEditor?: CustomEditorType;
     valueOptions?: IValueOptions;
     options?: IOption[];
+    /** Shown only while this sibling property on the same resource is on (`is: true`) or off (`is: false`). */
+    shownWhen?: { property: PropertyType; is: boolean };
   };
 
   export interface ITemplateTreeNode extends ITreeNode<IResource> {
