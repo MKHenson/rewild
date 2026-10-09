@@ -11,6 +11,7 @@ import { registerScatterColliderCommands } from './debug/ScatterDebugCommands';
 import { bindScreenshotHotkey } from './ScreenshotHotkey';
 import { audio, closeSceneScope, openSceneScope } from './audio/audio';
 import { AudioScope } from 'rewild-audio';
+import { WorldSound } from './audio/WorldSound';
 
 export class GameManager {
   renderer: Renderer;
@@ -20,6 +21,7 @@ export class GameManager {
   clock: Clock;
   /** Every sound this game plays; it fades out when the game is disposed. */
   sound: AudioScope;
+  worldSound: WorldSound;
   RAPIER: typeof import('@dimforge/rapier3d-compat');
   physicsWorld: World;
   onUnlock: () => void;
@@ -37,6 +39,7 @@ export class GameManager {
     this.clock = new Clock();
     this.onUnlock = onUnlock;
     this.sound = openSceneScope();
+    this.worldSound = new WorldSound(audio, this.sound);
     this._onPointerlockChange = this._handlePointerlockChange.bind(this);
     this.TerrainEventDelegate = this.onTerrainEvent.bind(this);
     this.terrainRapierBodyMap = new Map();
@@ -170,6 +173,7 @@ export class GameManager {
     audio.setListenerFromMatrix(
       this.renderer.camera.camera.transform.matrixWorld
     );
+    this.worldSound.update(this.renderer, delta);
     audio.update();
   }
 

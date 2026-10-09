@@ -1,6 +1,7 @@
 import { AudioScope } from 'rewild-audio';
 import type { Renderer } from 'rewild-renderer';
 import { audio, closeSceneScope, openSceneScope } from './audio';
+import { WorldSound } from './WorldSound';
 
 /**
  * The editor's sound. It opens a scene scope for the editor, so its sounds stop
@@ -10,12 +11,15 @@ import { audio, closeSceneScope, openSceneScope } from './audio';
  */
 export class EditorSound {
   readonly scope: AudioScope;
+  readonly world: WorldSound;
 
   private _enabled = false;
   private _frame = 0;
+  private _lastFrame = 0;
 
   constructor(private readonly _renderer: Renderer, enabled: boolean) {
     this.scope = openSceneScope();
+    this.world = new WorldSound(audio, this.scope);
     audio.setSilenced('editor', true);
     this.enabled = enabled;
   }
@@ -27,8 +31,10 @@ export class EditorSound {
   set enabled(on: boolean) {
     this._enabled = on;
     audio.setSilenced('editor', !on);
-    if (on && !this._frame) this._frame = requestAnimationFrame(this._tick);
-    else if (!on && this._frame) {
+    if (on && !this._frame) {
+      this._lastFrame = performance.now();
+      this._frame = requestAnimationFrame(this._tick);
+    } else if (!on && this._frame) {
       cancelAnimationFrame(this._frame);
       this._frame = 0;
     }
@@ -42,10 +48,14 @@ export class EditorSound {
 
   private _tick = () => {
     this._frame = requestAnimationFrame(this._tick);
+    const now = performance.now();
+    const seconds = Math.min(0.25, (now - this._lastFrame) / 1000);
+    this._lastFrame = now;
     if (this._renderer.disposed) return;
     audio.setListenerFromMatrix(
       this._renderer.camera.camera.transform.matrixWorld
     );
+    this.world.update(this._renderer, seconds);
     audio.update();
   };
 }
