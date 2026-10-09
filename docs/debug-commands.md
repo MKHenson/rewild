@@ -340,6 +340,7 @@ clearEmitters(); // removes every emitter
 setPanning('equalpower'); // 3D voices pan by level only; 'HRTF' (the default) to switch back
 holdBed('test-loop', 0.5); // holds a looping sound at a gain, on the ambience bus
 holdBed('test-loop', 0); // fades it out; its source stops a few seconds later
+footsteps(); // the footstep signals, the surfaces under the last step and each layer's gain
 ```
 
 The buses are `master`, `music`, `world`, `ambience`, `weather`, `effects`,
@@ -369,6 +370,10 @@ direction is weak.
 An emitter takes a voice when its heard gain is above -40 dB and gives it back
 below -46 dB. With the default distance curve, a gain-1 emitter plays inside
 about 200 m and goes virtual beyond about 400 m.
+
+`footsteps()` works in a game only. Its surface table shows the weight of each surface under the
+last step, from the terrain's splat; its layer table shows the gain each sound played at after the
+rules, so a wet, wading or crouched step can be checked against `templates/footsteps.json`.
 
 See [Susurrus](./milestones/susurrus.md).
 

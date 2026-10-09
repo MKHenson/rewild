@@ -12,7 +12,7 @@ import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
 import {
   audio,
   audioSettings,
-  loadSoundManifest,
+  loadAudioTemplates,
 } from '../../core/audio/audio';
 import { registerAudioDebugCommands } from '../../core/debug/AudioDebugCommands';
 
@@ -24,7 +24,7 @@ export class Application extends Component<Props> {
     audio.startOnGesture(document);
     audio.suspendWhenHidden(document, () => audioSettings.muteInBackground);
     audioSettings.bindBackgroundMute(window);
-    loadSoundManifest();
+    loadAudioTemplates();
     registerAudioDebugCommands(audio);
 
     const onStart = async () => {

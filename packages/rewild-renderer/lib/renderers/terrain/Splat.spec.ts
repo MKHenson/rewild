@@ -9,7 +9,7 @@ import {
   getClimatePalette,
 } from './Biomes';
 import { generateBiomeBlendedHeightMap } from './Noise';
-import { generateSplatMap } from './Splat';
+import { generateSplatMap, sampleSplatMap } from './Splat';
 import { createPaintMask, PaintMask } from './PaintMask';
 
 const SIZE = 32;
@@ -270,5 +270,35 @@ describe('generateSplatMap with a painted biome mask', () => {
         out: new Uint8Array(16),
       })
     ).toThrow(/output buffer is 16 bytes/);
+  });
+});
+
+describe('sampleSplatMap', () => {
+  // A 2 × 2 map: channel 0 full on the left column, channel 5 on the right.
+  const map = new Uint8Array(2 * 2 * SPLAT_BYTES_PER_TEXEL);
+  const plane = 2 * 2 * 4;
+  for (const t of [0, 2]) map[t * 4] = 255;
+  for (const t of [1, 3]) map[plane + t * 4 + 1] = 255;
+  const out = new Float32Array(SPLAT_BYTES_PER_TEXEL);
+
+  it('reads a texel from either plane', () => {
+    sampleSplatMap(map, 2, 0, 0, out);
+    expect(out[0]).toBe(1);
+    expect(out[5]).toBe(0);
+    sampleSplatMap(map, 2, 1, 1, out);
+    expect(out[0]).toBe(0);
+    expect(out[5]).toBe(1);
+  });
+
+  it('blends between texels', () => {
+    sampleSplatMap(map, 2, 0.25, 0.5, out);
+    expect(out[0]).toBeCloseTo(0.75);
+    expect(out[5]).toBeCloseTo(0.25);
+  });
+
+  it('clamps outside the map', () => {
+    sampleSplatMap(map, 2, -3, 9, out);
+    expect(out[0]).toBe(1);
+    expect(out[5]).toBe(0);
   });
 });

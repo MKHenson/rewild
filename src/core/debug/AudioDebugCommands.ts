@@ -1,6 +1,7 @@
 import { Vector3 } from 'rewild-common';
 import { AudioEngine, BUS_NAMES, Bed, isBusName } from 'rewild-audio';
 import { sceneScope } from '../audio/audio';
+import { Footsteps } from '../audio/Footsteps';
 
 export function registerAudioDebugCommands(audio: AudioEngine) {
   const busList = BUS_NAMES.join(' | ');
@@ -270,6 +271,38 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
     const count = audio.emitters.length;
     while (audio.emitters.length) audio.emitters[0].dispose();
     console.log(`Removed ${count} emitter(s)`);
+  };
+
+  (window as any).footsteps = () => {
+    const steps = Footsteps.current;
+    if (!steps) {
+      console.log('footsteps() — no player in a game');
+      return;
+    }
+    const s = steps.signals;
+    console.log(
+      `Footsteps: wetness ${s.get('wetness').toFixed(2)}, immersion ${s
+        .get('immersion')
+        .toFixed(2)} m, speed ${s
+        .get('speed')
+        .toFixed(1)} m/s, crouching ${s.get('crouching')}`
+    );
+    console.table(
+      Object.fromEntries(
+        steps.surfaceNames.map((name, i) => [
+          name,
+          { weight: +steps.surfaceWeights[i].toFixed(2) },
+        ])
+      )
+    );
+    const rules = steps.rules;
+    console.table(
+      rules.slotIds.map((id, i) => ({
+        layer: id,
+        sound: rules.slotSounds[i],
+        gain: +rules.gains[i].toFixed(2),
+      }))
+    );
   };
 }
 

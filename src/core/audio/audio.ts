@@ -5,6 +5,7 @@ import {
   SoundManifest,
 } from 'rewild-audio';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
+import type { FootstepsDef } from './Footsteps';
 
 /** The one audio engine, shared by the game and the editor. */
 export const audio = new AudioEngine(resolveAssetUrl);
@@ -33,13 +34,36 @@ export function closeSceneScope(scope: AudioScope): void {
   audio.duckWorld(false);
 }
 
+/** Fetches the audio templates: the sound manifest, whose files start downloading, and the footsteps. */
+export async function loadAudioTemplates(): Promise<void> {
+  await Promise.all([loadSoundManifest(), loadFootsteps()]);
+}
+
 /** Fetches `templates/sounds.json` and starts downloading its files. */
-export async function loadSoundManifest(): Promise<void> {
+async function loadSoundManifest(): Promise<void> {
   try {
     const response = await fetch('/templates/sounds.json');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     audio.loadSounds((await response.json()) as SoundManifest);
   } catch (e) {
     console.error('Could not load templates/sounds.json', e);
+  }
+}
+
+let footsteps: FootstepsDef | null = null;
+
+/** `templates/footsteps.json`, or null until it has loaded. */
+export function footstepsDef(): FootstepsDef | null {
+  return footsteps;
+}
+
+/** Fetches `templates/footsteps.json`. */
+async function loadFootsteps(): Promise<void> {
+  try {
+    const response = await fetch('/templates/footsteps.json');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    footsteps = (await response.json()) as FootstepsDef;
+  } catch (e) {
+    console.error('Could not load templates/footsteps.json', e);
   }
 }

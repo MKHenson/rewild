@@ -335,3 +335,44 @@ export function generateSplatMap(
 
   return splat;
 }
+
+/**
+ * Writes the `MAX_SPLAT_LAYERS` weights, 0..1, at sample (`fx`, `fy`) of a
+ * `size` × `size` splat map into `out`, bilinearly blended between texels.
+ * The position is clamped to the map.
+ */
+export function sampleSplatMap(
+  splat: Uint8Array,
+  size: number,
+  fx: number,
+  fy: number,
+  out: Float32Array
+): void {
+  const max = size - 1;
+  const x = Math.min(max, Math.max(0, fx));
+  const y = Math.min(max, Math.max(0, fy));
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const x1 = Math.min(x0 + 1, max);
+  const y1 = Math.min(y0 + 1, max);
+  const tx = x - x0;
+  const ty = y - y0;
+  const w00 = (1 - tx) * (1 - ty);
+  const w10 = tx * (1 - ty);
+  const w01 = (1 - tx) * ty;
+  const w11 = tx * ty;
+  const t00 = (y0 * size + x0) * 4;
+  const t10 = (y0 * size + x1) * 4;
+  const t01 = (y1 * size + x0) * 4;
+  const t11 = (y1 * size + x1) * 4;
+  const planeStride = size * size * 4;
+  for (let c = 0; c < MAX_SPLAT_LAYERS; c++) {
+    const o = (c >> 2) * planeStride + (c & 3);
+    out[c] =
+      (splat[t00 + o] * w00 +
+        splat[t10 + o] * w10 +
+        splat[t01 + o] * w01 +
+        splat[t11 + o] * w11) /
+      255;
+  }
+}
