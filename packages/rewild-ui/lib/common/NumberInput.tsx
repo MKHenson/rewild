@@ -1,5 +1,5 @@
 import { Component, register } from '../Component';
-import { theme } from '../theme';
+import { underlineField } from './fieldStyle';
 
 interface Props {
   value?: number;
@@ -71,6 +71,8 @@ export class NumberInput extends Component<Props> {
       }
     };
 
+    // Reports only a value that differs from the one given, so focusing the
+    // field and leaving it unchanged does not count as an edit.
     const onChange = () => {
       const elm = this.shadow!.querySelector('input')!;
       let val = parseFloat((elm as HTMLInputElement).value);
@@ -80,7 +82,7 @@ export class NumberInput extends Component<Props> {
           const factor = Math.pow(10, this.props.precision);
           val = Math.round(val * factor) / factor;
         }
-        this.props.onChange!(val);
+        if (val !== this.props.value) this.props.onChange?.(val);
       }
     };
 
@@ -134,19 +136,7 @@ const StyledInput = cssStylesheet(css`
 
   input {
     width: 100%;
-    height: 100%;
-    padding: 0.6rem;
-    outline: none;
-    box-sizing: border-box;
-    font-family: var(--font-family);
-    transition: all 0.25s;
-    border: 1px solid transparent;
-    border-bottom: 1px solid ${theme.colors.onSurfaceBorder};
-    background: ${theme.colors.surface};
-    color: ${theme.colors.onSurface};
   }
-  input:focus {
-    border: 1px solid ${theme.colors.primary400};
-    color: ${theme.colors.primary500};
-  }
+
+  ${underlineField('input', 'input:focus', 'input:disabled')}
 `);

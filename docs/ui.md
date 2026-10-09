@@ -105,6 +105,20 @@ Routes are defined declaratively in JSX using `RouterSwitch` and `Route` from `r
 4. Extend `Component<Props>` and implement `init()` returning a render function
 5. Optionally implement `getStyle()` for scoped CSS
 
+### Field style
+
+Every text field, number field and dropdown is drawn the same way: no box, a bottom line that
+darkens on hover, a thicker blue line while focused or open, and a dashed, dimmed line when
+disabled. `underlineField(box, active, disabled)` in `rewild-ui` (`lib/common/fieldStyle.ts`)
+returns that CSS for a component's own selectors. `Input`, `NumberInput`, `Select`, `Vec3` and the
+editor's property grid all use it. A new field uses it too rather than drawing its own border. A
+read-only value drops the line, so it reads as plain text.
+
+`Switch` is for a setting that applies at once; a choice applied with Save or Apply is a checkbox.
+It is as tall as a field, so switch rows line up with field rows. Off is an outlined, empty track
+and on a filled blue one, so the state reads from shape as well as colour. It is a focusable
+`role="switch"` that Space and Enter toggle, with the field's blue as its focus ring.
+
 ### Adding a new store
 
 1. Create `MyStore.ts` in `src/ui/stores/`

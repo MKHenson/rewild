@@ -1,5 +1,5 @@
 import { Component, register } from '../Component';
-import { theme } from '../theme';
+import { underlineField } from './fieldStyle';
 
 interface Props {
   value?: string;
@@ -79,21 +79,12 @@ const StyledInput = cssStylesheet(css`
 
   input {
     width: 100%;
-    height: ${theme.sizes.control};
-    padding: 0 ${theme.space.s};
-    font-size: ${theme.colors.fontSizeMedium};
-    font-weight: 400;
-    outline: none;
-    box-sizing: border-box;
-    font-family: var(--font-family);
-    transition: all 0.25s;
-    border: 1px solid ${theme.colors.onSurfaceBorder};
-    border-radius: ${theme.sizes.radius};
-    background: ${theme.colors.surface};
-    color: ${theme.colors.onField};
   }
-  input:focus {
-    border-color: ${theme.colors.primary400};
-    color: ${theme.colors.primary500};
+
+  ${underlineField('input', 'input:focus', 'input:disabled')}
+
+  input[readonly] {
+    border-bottom-color: transparent;
+    box-shadow: none;
   }
 `);

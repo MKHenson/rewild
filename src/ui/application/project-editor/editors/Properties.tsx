@@ -1,11 +1,12 @@
-import { Component, register, Typography, Card } from 'rewild-ui';
+import { Component, register, Typography, Card, theme } from 'rewild-ui';
 import { PropertyValue } from './PropertyValue';
 import { projectStore } from '../../../stores/ProjectStore';
 import { propertyTemplates } from './utils/PropertyTemplates';
 import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
 
 interface Props {}
-let lastFocussedProp = -1;
+/** The property, or `'name'`, to refocus after an edit re-renders the grid. */
+let lastFocussedProp: string | null = null;
 
 @register('x-properties')
 export class Properties extends Component<Props> {
@@ -14,7 +15,7 @@ export class Properties extends Component<Props> {
       if (event.kind === 'resource-selected' || event.kind === 'nodes-updated')
         this.render();
     });
-    lastFocussedProp = -1;
+    lastFocussedProp = null;
 
     return () => {
       const selectedResource = sceneGraphStore.selectedResource;
@@ -24,8 +25,17 @@ export class Properties extends Component<Props> {
           {selectedResource && (
             <div class="properties">
               {selectedResource.properties
-                ?.filter((p) => !propertyTemplates[p.type].hidden)
-                .map((prop, index) => {
+                ?.filter((p) => {
+                  const template = propertyTemplates[p.type];
+                  if (template.hidden) return false;
+                  const rule = template.shownWhen;
+                  if (!rule) return true;
+                  const sibling = selectedResource.properties?.find(
+                    (other) => other.type === rule.property
+                  );
+                  return !!sibling?.value === rule.is;
+                })
+                .map((prop) => {
                   const template = propertyTemplates[prop.type];
                   return [
                     <Typography variant="label">{template.label}</Typography>,
@@ -36,9 +46,9 @@ export class Properties extends Component<Props> {
                         type={template.valueType}
                         options={template.options}
                         valueOptions={template.valueOptions}
-                        refocus={lastFocussedProp === index}
+                        refocus={lastFocussedProp === prop.type}
                         onChange={(val) => {
-                          lastFocussedProp = index;
+                          lastFocussedProp = prop.type;
                           prop.value = val;
                           projectStore.dirty = true;
                           projectStore.dispatcher.dispatch({
@@ -51,7 +61,7 @@ export class Properties extends Component<Props> {
                         }}
                       />
                     </div>,
-                  ].flat();
+                  ];
                 })}
               <Typography variant="label">ID</Typography>
               <div class="value">
@@ -67,9 +77,9 @@ export class Properties extends Component<Props> {
                 <PropertyValue
                   value={selectedResource.name}
                   type="string"
-                  refocus={lastFocussedProp === -2}
+                  refocus={lastFocussedProp === 'name'}
                   onChange={(val) => {
-                    lastFocussedProp = -2;
+                    lastFocussedProp = 'name';
                     selectedResource.name = val;
                     projectStore.dirty = true;
                     projectStore.dispatcher.dispatch({ kind: 'changed' });
@@ -101,7 +111,8 @@ const StyledPropGrid = cssStylesheet(css`
 
   .properties {
     display: grid;
-    grid-template-columns: 1fr 2fr;
+    grid-template-columns: max-content 2fr;
+    column-gap: ${theme.space.l};
     align-items: center;
   }
 `);

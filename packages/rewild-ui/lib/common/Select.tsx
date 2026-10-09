@@ -1,6 +1,7 @@
 import { Icon } from './Icon';
 import { Component, register } from '../Component';
 import { theme } from '../theme';
+import { underlineField } from './fieldStyle';
 
 type OptionType = { value: string; label: string };
 
@@ -219,19 +220,25 @@ export class Options extends Component {
 }
 
 const StyledOption = cssStylesheet(css`
-  /* Padding and size track .select's so each label stays put as the list
-     opens over the control. */
   :host {
-    display: flex;
-    align-items: center;
-    box-sizing: border-box;
-    min-height: ${theme.sizes.control};
-    padding: 0 ${theme.space.s};
+    display: block;
     font-weight: 400;
     font-size: ${theme.colors.fontSizeMedium};
     background-color: ${theme.colors.surface};
     color: ${theme.colors.onField};
     transition: background-color 0.15s;
+  }
+
+  /* The click target, so it fills the whole row the hover lights up. Padding
+     and size track the field's (underlineField) so each label lines up with
+     the value above it. */
+  .option {
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: ${theme.sizes.control};
+    padding: 0 ${theme.space.xs};
   }
 
   :host(:hover) {
@@ -289,47 +296,19 @@ const StyledSelect = cssStylesheet(css`
     display: block;
   }
 
-  /* Deliberately mirrors Input's box: the two sit next to each other in forms,
-     so they share the padding, border, radius and text colour. */
   .select {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    box-sizing: border-box;
-    height: ${theme.sizes.control};
-    padding: 0 ${theme.space.s};
-    font-size: ${theme.colors.fontSizeMedium};
-    background: ${theme.colors.surface};
-    color: ${theme.colors.onField};
-    border: 1px solid ${theme.colors.onSurfaceBorder};
-    border-radius: ${theme.sizes.radius};
-    transition: all 0.25s;
     /* The whole row is a button, so it must not look like selectable text —
        a caret over the arrow reads as "this does nothing". */
     cursor: pointer;
     user-select: none;
   }
 
-  .select:hover {
-    border-color: ${theme.colors.onSurfaceLight};
-  }
-
-  /* Same look Slider gives its disabled state. Hover is restated because the
-     rule above would otherwise still light the border. */
-  .select.disabled,
-  .select.disabled:hover {
-    cursor: default;
-    opacity: 0.5;
-    border-color: ${theme.colors.onSurfaceBorder};
-  }
-
-  /* Same treatment Input gives :focus — an open dropdown is the equivalent
-     "this control has the interaction" state. */
-  :host(.open) .select {
-    border-color: ${theme.colors.primary400};
-    color: ${theme.colors.primary500};
-  }
+  /* An open dropdown is the equivalent of a focused field. */
+  ${underlineField('.select', ':host(.open) .select', '.select.disabled')}
 
   .value {
     font-weight: 400;

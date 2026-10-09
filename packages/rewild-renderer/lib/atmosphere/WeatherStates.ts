@@ -1,4 +1,8 @@
-import { WeatherStateDef, WeatherStateId } from './WeatherTypes';
+import {
+  ClimateProfile,
+  WeatherStateDef,
+  WeatherStateId,
+} from './WeatherTypes';
 
 // Game content: tune in play. Durations and retarget intervals are fractions
 // of one day cycle; variation periods and bursts are seconds.
@@ -177,4 +181,26 @@ export const WEATHER_STATE_IDS = Object.keys(
 
 export function isWeatherStateId(id: unknown): id is WeatherStateId {
   return typeof id === 'string' && id in WEATHER_STATES;
+}
+
+/**
+ * A state picked at random by the climate's `stateWeights`, so a common state
+ * comes up more often and one the climate never has (weight 0) never does.
+ * `random` returns 0..1.
+ */
+export function randomWeatherState(
+  climate: ClimateProfile,
+  random: () => number = Math.random
+): WeatherStateId {
+  let total = 0;
+  for (const id of WEATHER_STATE_IDS)
+    total += Math.max(0, climate.stateWeights[id] ?? 1);
+  if (total <= 0) return climate.initialState;
+
+  let pick = random() * total;
+  for (const id of WEATHER_STATE_IDS) {
+    pick -= Math.max(0, climate.stateWeights[id] ?? 1);
+    if (pick < 0) return id;
+  }
+  return climate.initialState;
 }

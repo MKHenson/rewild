@@ -15,6 +15,7 @@ export * from './common/Field';
 export * from './common/InfoBox';
 export * from './common/Input';
 export * from './common/NumberInput';
+export * from './common/fieldStyle';
 export * from './common/Loading';
 export * from './common/Icon';
 export * from './common/Modal';
