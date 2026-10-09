@@ -2,7 +2,15 @@ import { Matrix4, Vector3 } from 'rewild-common';
 import { AudioScope } from './AudioScope';
 import { Bed, BedSpec } from './Bed';
 import { Emitter, EmitterSpec } from './Emitter';
-import { BUS_NAMES, BUS_PARENT, BusMix, BusName, dbToGain } from './Buses';
+import {
+  BUS_NAMES,
+  BUS_PARENT,
+  BusMix,
+  BusName,
+  DUCKABLE_BUSES,
+  DuckableBus,
+  dbToGain,
+} from './Buses';
 import { MENU_DUCK_DB, OPEN_CUTOFF_HZ } from './constants';
 import {
   FileLoader,
@@ -57,8 +65,8 @@ export interface PlayOptions {
 /**
  * Owns the AudioContext and the bus graph:
  *
- * ambience, weather, effects → world → muffle → menu duck ─┐
- * player, music, ui ───────────────────────────────────────┼→ master → compressor → out
+ * ambience, weather, effects → duck → world → muffle → menu duck ─┐
+ * player, music, ui ──────────────────────────────────────────────┼→ master → compressor → out
  *
  * Construct it freely; the context is only created by `start()`, which must run
  * inside a user gesture. `startOnGesture` does that on the first one.
@@ -69,6 +77,12 @@ export class AudioEngine {
 
   private _ctx: AudioContext | null = null;
   private _buses: Record<BusName, GainNode> | null = null;
+  private _busDucks: Record<DuckableBus, GainNode> | null = null;
+  private readonly _busDuckLevels: Record<DuckableBus, number> = {
+    ambience: 1,
+    weather: 1,
+    effects: 1,
+  };
   private _muffleFilter: BiquadFilterNode;
   private _muffleGain: GainNode;
   private _duck: GainNode;
@@ -483,6 +497,31 @@ export class AudioEngine {
     this._muffleGain.gain.setTargetAtTime(level, t, timeConstant);
   }
 
+  /** The duck on a world bus now: 1 leaves it as the mix sets it. */
+  busDuck(bus: DuckableBus): number {
+    return this._busDuckLevels[bus];
+  }
+
+  /**
+   * Ducks a world bus under a louder sound, such as thunder over the rain:
+   * 1 leaves it as the mix sets it, 0 silences it. Apart from its volume, mute
+   * and solo. Setting the same level again adds no automation.
+   */
+  duckBus(
+    bus: DuckableBus,
+    level: number,
+    timeConstant: number = PARAM_TIME_CONSTANT
+  ): void {
+    if (level === this._busDuckLevels[bus]) return;
+    this._busDuckLevels[bus] = level;
+    if (!this._ctx || !this._busDucks) return;
+    this._busDucks[bus].gain.setTargetAtTime(
+      level,
+      this._ctx.currentTime,
+      timeConstant
+    );
+  }
+
   duckWorld(ducked: boolean, timeConstant: number = 0.15): void {
     this._ducked = ducked;
     if (!this._ctx) return;
@@ -504,6 +543,13 @@ export class AudioEngine {
     }
     this._buses = buses;
 
+    const ducks = {} as Record<DuckableBus, GainNode>;
+    for (const name of DUCKABLE_BUSES) {
+      ducks[name] = ctx.createGain();
+      ducks[name].gain.value = this._busDuckLevels[name];
+    }
+    this._busDucks = ducks;
+
     this._muffleFilter = ctx.createBiquadFilter();
     this._muffleFilter.type = 'lowpass';
     this._muffleFilter.frequency.value = this._muffleCutoff;
@@ -521,7 +567,10 @@ export class AudioEngine {
 
     for (const name of BUS_NAMES) {
       const parent = BUS_PARENT[name];
-      if (parent && name !== 'world') buses[name].connect(buses[parent]);
+      if (!parent || name === 'world') continue;
+      const duck = (ducks as Partial<Record<BusName, GainNode>>)[name];
+      if (duck) buses[name].connect(duck).connect(buses[parent]);
+      else buses[name].connect(buses[parent]);
     }
 
     buses.world

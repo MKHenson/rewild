@@ -1,5 +1,5 @@
 import { AudioEngine, MENU_DUCK_DB, OPEN_CUTOFF_HZ } from './AudioEngine';
-import { BUS_NAMES, BusName, dbToGain } from './Buses';
+import { BUS_NAMES, BusName, DUCKABLE_BUSES, dbToGain } from './Buses';
 import {
   FakeAudioContext,
   FakeAudioNode,
@@ -117,9 +117,37 @@ describe('AudioEngine graph', () => {
     await engine.start();
   });
 
-  it('feeds ambience, weather and effects into world', () => {
-    for (const name of ['ambience', 'weather', 'effects'] as const)
-      expect(bus(engine, name).outputs).toEqual([bus(engine, 'world')]);
+  it('feeds ambience, weather and effects into world through their ducks', () => {
+    for (const name of DUCKABLE_BUSES) {
+      const [duck] = bus(engine, name).outputs as FakeGainNode[];
+      expect(duck.kind).toBe('gain');
+      expect(duck.gain.value).toBe(1);
+      expect(duck.outputs).toEqual([bus(engine, 'world')]);
+    }
+  });
+
+  it('ducks one world bus, apart from its volume', () => {
+    engine.duckBus('weather', 0.3, 0.05);
+    const [duck] = bus(engine, 'weather').outputs as FakeGainNode[];
+    expect(duck.gain.lastTarget).toMatchObject({
+      value: 0.3,
+      timeConstant: 0.05,
+    });
+    expect(engine.busDuck('weather')).toBe(0.3);
+    expect(engine.busDuck('ambience')).toBe(1);
+    expect(bus(engine, 'weather').gain.value).toBe(1);
+
+    const targets = duck.gain.targets.length;
+    engine.duckBus('weather', 0.3);
+    expect(duck.gain.targets).toHaveLength(targets);
+  });
+
+  it('applies a duck set before the context starts', async () => {
+    const late = new AudioEngine();
+    late.duckBus('ambience', 0.5);
+    await late.start();
+    const [duck] = bus(late, 'ambience').outputs as FakeGainNode[];
+    expect(duck.gain.value).toBe(0.5);
   });
 
   it('feeds player, music and ui straight into master', () => {

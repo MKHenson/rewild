@@ -1,6 +1,7 @@
 import type { AudioEngine, AudioScope } from 'rewild-audio';
 import type { Renderer } from 'rewild-renderer';
 import { RainSound } from './RainSound';
+import { ThunderSound } from './ThunderSound';
 import { WindSound } from './WindSound';
 
 /**
@@ -11,10 +12,12 @@ import { WindSound } from './WindSound';
 export class WorldSound {
   private readonly _wind: WindSound;
   private readonly _rain: RainSound;
+  private readonly _thunder: ThunderSound;
 
   constructor(engine: AudioEngine, scope: AudioScope) {
     this._wind = new WindSound(engine, scope);
     this._rain = new RainSound(scope);
+    this._thunder = new ThunderSound(engine, scope);
   }
 
   get wind(): WindSound {
@@ -28,7 +31,14 @@ export class WorldSound {
   update(renderer: Renderer, seconds: number): void {
     const sky = renderer.sky?.skyRenderer;
     if (!sky) return;
+    const atmosphere = renderer.sky.atmosphere;
     this._wind.update(sky.wind, seconds);
     this._rain.update(sky);
+    this._thunder.update(
+      sky.lightning.strikes,
+      sky.wind,
+      atmosphere.running && atmosphere.state === 'FrontApproaching',
+      seconds
+    );
   }
 }

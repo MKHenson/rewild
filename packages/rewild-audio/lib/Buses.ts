@@ -11,6 +11,11 @@ export const BUS_NAMES = [
 
 export type BusName = typeof BUS_NAMES[number];
 
+/** The world's buses, which a loud world sound can duck under it. */
+export const DUCKABLE_BUSES = ['ambience', 'weather', 'effects'] as const;
+
+export type DuckableBus = typeof DUCKABLE_BUSES[number];
+
 export const BUS_PARENT: Readonly<Record<BusName, BusName | null>> = {
   master: null,
   music: 'master',

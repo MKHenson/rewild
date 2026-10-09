@@ -80,6 +80,45 @@
       "loop": true,
       "source": "Soundly: rain mix",
       "license": "soundly"
+    },
+    {
+      "name": "thunder-close",
+      "files": [
+        "audio/thunder/thunder-close-01.ogg",
+        "audio/thunder/thunder-close-02.ogg",
+        "audio/thunder/thunder-close-03.ogg"
+      ],
+      "pitch": [0.92, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: thunder mix",
+      "license": "soundly"
+    },
+    {
+      "name": "thunder-far",
+      "files": [
+        "audio/thunder/thunder-far-01.ogg",
+        "audio/thunder/thunder-far-02.ogg",
+        "audio/thunder/thunder-far-03.ogg"
+      ],
+      "pitch": [0.92, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: thunder mix",
+      "license": "soundly"
+    },
+    {
+      "name": "thunder-chain",
+      "files": [
+        "audio/thunder/thunder-chain-01.ogg",
+        "audio/thunder/thunder-chain-02.ogg",
+        "audio/thunder/thunder-chain-03.ogg",
+        "audio/thunder/thunder-chain-04.ogg",
+        "audio/thunder/thunder-chain-05.ogg",
+        "audio/thunder/thunder-chain-06.ogg"
+      ],
+      "pitch": [0.92, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: thunder mix",
+      "license": "soundly"
     }
   ]
 }
