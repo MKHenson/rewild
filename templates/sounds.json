@@ -19,6 +19,46 @@
       "loop": true,
       "source": "Soundly: meadow",
       "license": "soundly"
+    },
+    {
+      "name": "wind-0",
+      "files": ["audio/wind/wind-0.ogg"],
+      "loop": true,
+      "source": "Soundly: wind mix",
+      "license": "soundly"
+    },
+    {
+      "name": "wind-1",
+      "files": ["audio/wind/wind-1.ogg"],
+      "loop": true,
+      "source": "Soundly: wind mix",
+      "license": "soundly"
+    },
+    {
+      "name": "wind-2",
+      "files": ["audio/wind/wind-2.ogg"],
+      "loop": true,
+      "source": "Soundly: wind mix",
+      "license": "soundly"
+    },
+    {
+      "name": "wind-ears",
+      "files": ["audio/wind/ears.ogg"],
+      "loop": true,
+      "source": "Soundly: wind mix",
+      "license": "soundly"
+    },
+    {
+      "name": "wind-gust",
+      "files": [
+        "audio/wind/gust-0.ogg",
+        "audio/wind/gust-1.ogg",
+        "audio/wind/gust-2.ogg"
+      ],
+      "pitch": [0.9, 1.1],
+      "gain": [0.8, 1],
+      "source": "Soundly: wind mix",
+      "license": "soundly"
     }
   ]
 }

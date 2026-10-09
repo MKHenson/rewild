@@ -348,27 +348,45 @@ else.
 
 ### Wind
 
-Wind is the most important sound in an outdoor game. Two layers play in every biome.
+Wind is the most important sound in an outdoor game. `WindSound` in `src/core/audio/` plays it in
+every biome, from the sky's `WindState`: `vec[2]` is the windiness in force and `vec[0..1]` the
+way the air moves.
 
-| Layer    | Sound                           | Driven by                                                              |
-| -------- | ------------------------------- | ---------------------------------------------------------------------- |
-| **Air**  | Broad, soft noise of moving air | `windiness`. The low-pass opens as the wind rises, so a gale is harsh. |
-| **Ears** | Rough roar and buffeting        | `windFacing × windBlurShare(windiness) × gust`, as for the lens blur.  |
+| Layer     | Sound                                    | Driven by                                                                       |
+| --------- | ---------------------------------------- | ------------------------------------------------------------------------------- |
+| **Air**   | A bed of three loops, calm to windy      | `windiness` picks the blend and opens the low-pass. A gust swells it.           |
+| **Ears**  | A rough roar, as when facing into a gale | `windBlurShare(windiness, 0.8) × windFacing × gust envelope`, as the lens blur. |
+| **Gusts** | One-shot swells                          | The gust at the listener surging past a threshold.                              |
+
+- **The air bed.** Each loop plays alone at the windiness it was cut for, 0.1, 0.45 and 0.8
+  (`AIR_LAYER_AT`), with an equal-power crossfade between. Calm and fair weather sit at 0.05 to
+  0.2, so the calm loop is the one heard most. Its gain is the windiness, from silent in still air
+  to full in a gale, and its low-pass opens from 1.5 kHz to 18 kHz, so a gale is harsh.
+- **Gusts.** `gustShare(gustField(x, z, wind.gustDrift))` at the listener gives the gust value.
+  It is the same gust field that bends the trees and pushes the player, so a gust is heard, seen
+  and felt at the same time. It swells the air bed by up to 35% in strong wind.
+- **Gust one-shots.** When the gust value rises past 0.5, a gust one-shot plays 15 m upwind. It
+  plays again only after the gust has fallen below 0.3 and at least 3 s have passed, so a long
+  gust is one swell. Its gain rises with the windiness from 0.25, and it is silent below that.
+- **Facing into the wind.** The ears layer uses the same `windFacing` value and `followGust`
+  envelope as the lens blur in `WaterLens`. Turn into a gale and the screen blurs and the roar
+  rises together. Turn your back and both drop. It starts at windiness 0.8, as the blur does.
+- **Direction.** The ears layer is an emitter 10 m upwind of the listener, moved each frame, so
+  the gale comes from where the wind comes from. It has no distance curve (`rolloff: 0`), because
+  its gain is set by the wind, not by distance. Below the gale its gain is 0, so it holds no voice.
+- **Bursts.** A storm's wind bursts already swing `windiness` and the bearing. The layers follow
+  them with no extra work.
 
 What the wind does to the place is biome sound, not weather sound. Leaves in a forest, grass on a
 plain and a whistle over a ridge are rules in each biome's soundscape. See
 [Soundscapes](#soundscapes).
 
-- **Gusts.** `gustShare(gustField(x, z, wind.gustDrift))` at the player gives the gust value. It
-  is the same gust field that bends the trees and pushes the player. So a gust is heard, seen and
-  felt at the same time.
-- **Facing into the wind.** The ears layer uses the same `windFacing` value as the lens blur in
-  `WaterLens.render`. Turn into a gale and the screen blurs and the roar rises together. Turn your
-  back and both drop.
-- **Direction.** The ears layer is the one wind sound with a direction. It plays through a
-  panner 10 m upwind of the listener, so the gale comes from where the wind comes from.
-- **Bursts.** A storm's wind bursts already swing `windiness` and the bearing. The beds follow
-  them with no extra work.
+### The world's sound
+
+`WorldSound` in `src/core/audio/` holds the sound of the world around the listener: the wind now,
+and the rain, thunder, water and land as their steps arrive. `GameManager` and `EditorSound` each
+create one in their scene scope and call `update(renderer, seconds)` once a frame, before
+`audio.update()`. It reads the listener's position, so it works in the editor too.
 
 ### Rain and snow
 
@@ -980,7 +998,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 
 | Group      | Sounds                                                                                                                                  | Kind      |
 | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| Wind       | air, ears roar                                                                                                                          | Loops     |
+| Wind       | 3 air loops calm to windy, ears roar, 2 gust swells                                                                                     | Mixed     |
 | Rain       | light rain, heavy rain, drips                                                                                                           | Loops     |
 | Thunder    | 3 close cracks with rumble, 3 far rumbles, 2 short chain cracks                                                                         | One-shots |
 | Water      | under-water bed, ocean surf calm and storm, lake lapping                                                                                | Loops     |
@@ -1092,9 +1110,9 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 #### 8. Wind
 
-- **Delivers.** The air and ears layers. The air layer follows `windiness` and opens its low-pass
-  as the wind rises. The ears layer uses `windFacing × windBlurShare × gust`, on a panner upwind of
-  the listener. The gust at the player from the gust field.
+- **Delivers.** `WorldSound` and `WindSound`. The air bed of three loops, blended and filtered by
+  `windiness` and swelled by gusts. The ears emitter upwind of the listener, from
+  `windBlurShare × windFacing × gust envelope`. Gust one-shots as the gust field surges past.
 - **Expect.** `setWeather` from calm to storm takes the wind from a soft hiss to a harsh roar. Turn
   into the wind in a gale: the roar rises as the lens blurs. Turn away: both drop. Gusts are heard
   as the trees bend. The roar comes from upwind.
