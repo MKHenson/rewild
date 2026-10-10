@@ -311,6 +311,8 @@ sound.loop('engine', { at: position });
 sound.createBed(spec);
 sound.createEmitter(spec);
 sound.dispose(); // fades out and stops everything above over 0.3 s
+const mouth = sound.createScope(); // a child scope, disposed with its parent
+mouth.stopSounds(0.08); // cuts what it played, and stays open
 ```
 
 - Disposing a scope stops its 2D one-shots, its 3D sounds and loops, its beds and its emitters.
@@ -471,12 +473,12 @@ pushes to the queue and thunder can be tested on demand. A manual strike is neve
 ## The player
 
 `PlayerSounds` in `src/core/audio/` holds every player sound: `Footsteps`, `BodySound`,
-`SlideSound`, `SwimSound`, `DripSound` and `UnderWaterSound`, and later the voice. `Player` creates one on
+`SlideSound`, `SwimSound`, `DripSound`, `UnderWaterSound` and `VoiceSound`. `Player` creates one on
 mount, in the game's scope, and disposes it on unmount.
 
 - **State.** Each frame `Player` fills in `sounds.state`, one reused object: where the feet are,
-  the distance moved, the ground contact, the slide speed, the fall, the water, the keys held and
-  the ground's wetness. Then it calls `sounds.update(seconds)`.
+  the distance moved, the ground contact, the slide speed, the fall, the water, the keys held,
+  the ground's wetness, the headwind, the body temperature, `health` and `hunger`. Then it calls `sounds.update(seconds)`.
 - **Events.** A jump and the flashlight are calls of their own: `sounds.jump()` and
   `sounds.flashlight()`.
 - **Its own decisions.** `PlayerSounds` works out the rest from the state, such as a landing
@@ -568,6 +570,8 @@ a new one.
 - **The mix.** The world bus fades and its low-pass falls over about 2 s, so the world goes
   distant and dull. It is the same filter as under water, with a slower curve. The player bus
   stops, so the heartbeat and breathing end.
+- **The body.** `PlayerSounds.die()` fades out the breathing, the heartbeat, the slide and the drips
+  over 0.5 s, since the player no longer updates them. A last pain cry plays to its end.
 - **The Game Over menu.** The world stays faded behind it. It does not take the in-game menu's
   duck as well.
 - **Restart.** The old game's sounds stop. The new game lifts the world bus over about 1 s as it
@@ -582,48 +586,96 @@ Only `health` and `hunger` exist as player stats today. So the voice reads the w
 movement, and keeps a few values of its own. If gameplay adds stamina, oxygen or body heat later,
 those stats replace the voice's own values and the sounds stay the same.
 
+`VoiceSound` in `src/core/audio/`, held by `PlayerSounds`, plays it. Its loops and now-and-then
+sounds are rules in `templates/voice.json`.
+
 #### Body values
 
-| Value        | Range    | How it is worked out                                                                               |
-| ------------ | -------- | -------------------------------------------------------------------------------------------------- |
-| `effort`     | 0 to 1   | Rises while sprinting, swimming fast or walking into a gale (`headwindSpeedShare`). Falls at rest. |
-| `breathHeld` | seconds  | Time with the camera under water. Back to 0 on surfacing.                                          |
-| `heat`       | 0 to 1   | `temperature`, the sun height, a hot biome such as desert, and `effort`. Shade does not count.     |
-| `cold`       | 0 to 1   | Low `temperature`, `snow`, wind on the player, and being wet from swimming or rain.                |
-| `health`     | 0 to 100 | `Player.health`                                                                                    |
-| `hurt`       | 0 to 1   | Jumps up by the damage taken when `health` falls, then fades over a few seconds.                   |
-| `hunger`     | 0 to 100 | `Player.hunger`                                                                                    |
+| Value        | Range    | How it is worked out                                                                                           |
+| ------------ | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `effort`     | 0 to 1   | The share of the player's stamina spent, eased. A gasp raises it for a while.                                  |
+| `breathHeld` | seconds  | Time with the camera under water. Back to 0 on surfacing. The gasp and the strain read the oxygen bar instead. |
+| `heat`       | 0 to 1   | The player's body temperature above normal. See below.                                                         |
+| `cold`       | 0 to 1   | The player's body temperature below normal. See below.                                                         |
+| `health`     | 0 to 100 | `Player.health`                                                                                                |
+| `hurt`       | 0 to 1   | Jumps by the damage over 50 when `health` falls, then fades by e every 3 s.                                    |
+| `hunger`     | 0 to 100 | `Player.hunger`                                                                                                |
 
-These are signals, so the voice uses the same `RuleSet` as the soundscapes and the footsteps.
+- **Body temperature** is a player stat, `BodyTemperature` in `src/core/routing/utils/`: 0 is
+  normal, 1 really hot, -1 really cold. It eases toward its target by e every 10 s. Heat comes as
+  the sky's `temperature` rises from 0.7 to 0.95 while the sun is up, more when worn out. Cold
+  comes as it falls from 0.3 to 0.05, more in wind and snow, and a body wet from a swim or rain
+  chills below 0.55. A swim soaks the body; it dries by e every 45 s. A thin bar on the right of
+  the screen shows it, red as it heats and blue as it chills, hidden near normal.
+- **Effort** follows the stamina bar: by e every 0.5 s as stamina is spent and every 4 s as it
+  refills, so the breath settles a little after the bar. Sprinting and jumping spend stamina.
+- **Each bout bends its own way.** Effort is the stamina spent to a power between 1/1.6 and 1.6,
+  picked at random once the player has recovered, so hard breathing and panting come in at a
+  different point each sprint. An empty bar is always full effort.
+- A loop picks a random file each time it starts from silence, so several files for a breathing
+  loop give each bout its own sound.
+- These are signals, with `swimming` and `under`, so the voice uses the same `RuleSet` as the
+  soundscapes and the footsteps.
 
 #### One mouth
 
 The player has one mouth. Breath and voice sounds never overlap. The voice plays one thing at a
 time, by priority:
 
-1. **Death.**
-2. **Pain.** A grunt when `health` falls. A small hurt makes a small grunt, a big one a cry.
-3. **Gasp.** On surfacing. The longer `breathHeld`, the bigger the gasp and the more breaths after it.
-4. **Strain.** Under water, after about 20 s of `breathHeld`. Muffled straining and a burst of
-   bubbles.
-5. **Breathing.** A loop chosen by rules. See below.
+1. **Death.** With [Death](#death).
+2. **Gasp.** On surfacing, sized by the share of the oxygen bar used: `gasp-small` from 3%, a
+   short breath; `gasp-medium` from 35%; `gasp-big` from 70%, up to running out. It leaves
+   `effort` at the share used, so hard breaths and panting follow a long dive. It ranks above pain,
+   so coming up from drowning always gasps.
+3. **Pain.** A grunt when `health` falls. Damage gathers over about 0.3 s, so a fall is one hit.
+   From 4 it is `pain-small`, from 15 `pain-medium` and from 40 `pain-big`, a cry. The next grunt
+   waits 1.2 s, so a hurting slide or drowning grunts now and then. Starving, a slow drain, never
+   grunts.
+4. **Strain.** Under water, once a third or less of the oxygen bar is left, and every 6 s after:
+   `breath-strain`, straining, and a burst of `swim-bubbles` on the effects bus. A strain held back
+   by a grunt plays as soon as the mouth is free.
+5. **Breathing.** A breath with each swim stroke, the shivers, and the loops chosen by rules. See
+   below.
 
-A higher sound cuts in over a lower one with a short fade. The lower one comes back after.
+- With the head under water, everything the mouth says plays through the world's under-water
+  low-pass, 600 Hz, at half gain, so it sounds as muffled as the world.
+- A higher sound cuts in over a lower one with a 0.08 s fade. A lower one asked for while a higher
+  one plays does not play.
+- The mouth is busy for the length of the file played, at its pitch, from `AudioScope.lastLength`.
+- The mouth's one-shots play in a child scope of the player's, so a cut stops only them.
+- Loops tagged `mouth` fall silent while the mouth says something and come back after.
 
 #### Breathing rules
 
-| Condition              | Sound                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------- |
-| `effort` rises         | Calm breathing becomes hard breathing, then panting.                            |
-| `swimming` and moving  | A breath in time with each stroke, harder as `effort` rises.                    |
-| `heat` above about 0.6 | Slow, dry panting. It adds to the effort breathing.                             |
-| `cold` above about 0.6 | Shaky breath and chattering teeth, now and then.                                |
-| `health` below 25      | Heavy, pained breathing, and a heartbeat loop that gets louder as health falls. |
-| `hunger` below 20      | A stomach growl now and then.                                                   |
+`templates/voice.json` is a rule set, as in [Soundscapes](#soundscapes). Its `every` names the
+layers that play now and then as one-shots, at their rule gain, instead of as loops. Its `bouts`
+names loops that come and go: each bout lasts a random time in `on`, the next comes a random time
+in `off` after it, and each swells in and fades away by e every 1.2 s. The heat panting comes in
+bouts of 4 to 9 s, 10 to 25 s apart, so a hot player strains now and then and breathes normally
+between.
 
+| Layer or rule  | Sound           | When                                                                    |
+| -------------- | --------------- | ----------------------------------------------------------------------- |
+| `calm`         | `breath-calm`   | `effort` below 0.5, fading out by 0.7. Very quiet, at 0.15.             |
+| `hard`         | `breath-hard`   | `effort` from 0.5 to 0.7, until the panting takes over.                 |
+| `pant`         | `breath-pant`   | `effort` from 0.85 to 0.98: the end of the stamina bar.                 |
+| `heat`         | `breath-heat`   | `heat` from 0.5 to 0.8, in bouts. Slow, dry panting over the breathing. |
+| `pained`       | `breath-pained` | `health` from 25 to 10. The effort breathing falls to 0.3 under it.     |
+| `heartbeat`    | `heartbeat`     | `health` from 25 to 5, louder as it falls. Not the mouth.               |
+| `shiver`       | `voice-shiver`  | `cold` from 0.5 to 0.8, every 5 to 12 s.                                |
+| `growl`        | `stomach-growl` | `hunger` from 20 to 5, every 20 to 45 s. Not the mouth.                 |
+| `swim-breaths` |                 | `swimming` silences the breathing loops. Each surface stroke breathes.  |
+| `under-water`  |                 | `under` silences every mouth layer.                                     |
+
+- The swim breath is `breath-swim` 0.35 s after each stroke at the surface, between pulls so the
+  splash does not cover it, at 0.7 rising to 1 with `effort`.
 - The heartbeat is on the player bus, so it stays clear under water and through the death fade.
-- At low health, a small `muffle` on the world bus pulls the world away a little.
+- **The daze.** From 25 health down to 10, the world bus's cutoff falls to 3 kHz and its gain to
+  0.75 over about 0.5 s, pulling the world away a little. `UnderWaterSound.setDaze` owns it, so
+  under water its own muffle wins and the daze comes back on surfacing.
 - Calm breathing is very quiet. The player should notice it only when it changes.
+- **Checks.** `VoiceSound` throws on a bad rule or an `every` that names no layer. The player then
+  logs the error and has no voice.
 
 ### Sliding
 
@@ -1165,20 +1217,20 @@ instance, `audioSettings`, next to the engine.
 
 The minimum set of files. Each loop must loop with no gap or click.
 
-| Group      | Sounds                                                                                                                                  | Kind      |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------- |
-| Wind       | 3 air loops calm to windy, ears roar, 2 gust swells                                                                                     | Mixed     |
-| Rain       | light rain, heavy rain, drips                                                                                                           | Loops     |
-| Thunder    | 3 close cracks with rumble, 3 far rumbles, 6 short chain cracks                                                                         | One-shots |
-| Water      | under-water bed, ocean surf calm and storm, lake lapping                                                                                | Loops     |
-| Swimming   | 4 strokes, 4 under-water strokes, 4 bubbles, 3 emerges, small and big plunge, surface                                                   | One-shots |
-| Dripping   | body drips                                                                                                                              | Loop      |
-| Footsteps  | 6 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                         | One-shots |
-| Body       | 3 jumps, 4 landings, 3 hard landings, 2 flashlight clicks, death                                                                        | Mixed     |
-| Voice      | 3 pain sizes, 3 gasps, strain, calm, hard and panting breath loops, swim breaths, heat panting, cold shivers, heartbeat, stomach growls | Mixed     |
-| Sliding    | crumbling dirt and snow slide loops, 5 slips, 4 debris crumbles, 4 stone rattles, 3 scrabbles                                           | Mixed     |
-| Biome beds | the layers and the `add` and `replace` sounds in each profile                                                                           | Loops     |
-| Calls      | 3 to 6 per biome                                                                                                                        | One-shots |
+| Group      | Sounds                                                                                                                                       | Kind      |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| Wind       | 3 air loops calm to windy, ears roar, 2 gust swells                                                                                          | Mixed     |
+| Rain       | light rain, heavy rain, drips                                                                                                                | Loops     |
+| Thunder    | 3 close cracks with rumble, 3 far rumbles, 6 short chain cracks                                                                              | One-shots |
+| Water      | under-water bed, ocean surf calm and storm, lake lapping                                                                                     | Loops     |
+| Swimming   | 4 strokes, 4 under-water strokes, 4 bubbles, 3 emerges, small and big plunge, surface                                                        | One-shots |
+| Dripping   | body drips                                                                                                                                   | Loop      |
+| Footsteps  | 6 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                              | One-shots |
+| Body       | 3 jumps, 4 landings, 3 hard landings, 2 flashlight clicks, death                                                                             | Mixed     |
+| Voice      | 3 pain sizes, 3 gasp sizes, strain, calm, hard, panting, heat and pained breath loops, swim breaths, cold shivers, heartbeat, stomach growls | Mixed     |
+| Sliding    | crumbling dirt and snow slide loops, 5 slips, 4 debris crumbles, 4 stone rattles, 3 scrabbles                                                | Mixed     |
+| Biome beds | the layers and the `add` and `replace` sounds in each profile                                                                                | Loops     |
+| Calls      | 3 to 6 per biome                                                                                                                             | One-shots |
 
 ## Code changes outside the audio code
 
@@ -1198,6 +1250,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 | `templates/sounds.json`      | The manifest.                                                                                                       |
 | `templates/soundscapes.json` | The biome soundscape profiles.                                                                                      |
 | `templates/footsteps.json`   | The material to surface map, the surfaces and the footstep rules.                                                   |
+| `templates/voice.json`       | The breathing loops, the now-and-then voice sounds and their rules.                                                 |
 | `esbuild.js`                 | Copy nothing new. `templates/` is already copied.                                                                   |
 
 ## Steps
@@ -1362,9 +1415,10 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 #### 16. Breath and voice
 
-- **Delivers.** The body values (`effort`, `breathHeld`, `heat`, `cold`, `hurt`), the one-mouth
-  voice with its priorities, the breathing rules, the gasp and the strain, pain grunts, the
-  heartbeat at low health, and the stomach growl.
+- **Delivers.** `VoiceSound` and `templates/voice.json`. The body values (`effort`,
+  `breathHeld`, `heat`, `cold`, `hurt`), the one-mouth voice with its priorities, the breathing
+  rules, the gasp and the strain, pain grunts, the heartbeat and the daze at low health, and the
+  stomach growl. Child scopes and `stopSounds` on `AudioScope`. The `voice()` command.
 - **Expect.** Sprint and the breathing gets harder, then settles at rest. Swim and each stroke has a
   breath. Stay under water for 20 s for the strain, then surface for a big gasp. Stand in the
   desert sun for panting, in snow for shivers. A fall that hurts gives a grunt sized to the damage.
@@ -1466,6 +1520,7 @@ of each sound is visible while the sounds are chosen.
 | `soundscape()`                | Logs the biome weights, the signals, each rule's weight, and each layer's gain and cutoff. |
 | `reloadSoundscapes()`         | Loads `soundscapes.json` again, to tune rules with no reload of the game.                  |
 | `footsteps()`                 | Logs the footstep signals, the surfaces under the last step, and each layer's gain.        |
+| `voice()`                     | Logs the body values, what the mouth is saying, each rule's weight and each layer's gain.  |
 
 They follow the conventions in [Debugger & Console Commands](../debug-commands.md).
 

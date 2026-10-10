@@ -15,7 +15,12 @@ function sound(name: string) {
 }
 
 const manifest = {
-  sounds: [sound('rain-light'), sound('rain-heavy'), sound('wind')],
+  sounds: [
+    sound('rain-light'),
+    sound('rain-heavy'),
+    sound('wind'),
+    { ...sound('breath'), gain: [0.5, 0.5] as [number, number] },
+  ],
 };
 
 function spec(extra: Partial<BedSpec> = {}): BedSpec {
@@ -234,6 +239,18 @@ describe('Bed', () => {
     expect(layerGain(0).gain.lastTarget!.value).toBeCloseTo(0, 6);
     expect(layerGain(1).gain.lastTarget!.value).toBeCloseTo(1, 6);
     expect(layerGain(1).outputs).toEqual(layerGain(0).outputs);
+  });
+
+  it('plays each layer at the gain the manifest picks, through the crossfade', () => {
+    const bed = engine.createBed(spec({ sounds: ['breath', 'wind'] }));
+    bed.set(1);
+    expect(layerGain(0).gain.value).toBeCloseTo(0.5, 6);
+    expect(layerGain(1).gain.value).toBe(0);
+
+    bed.setBlend(1);
+    expect(layerGain(0).gain.lastTarget!.value).toBeCloseTo(0, 6);
+    bed.setBlend(0);
+    expect(layerGain(0).gain.lastTarget!.value).toBeCloseTo(0.5, 6);
   });
 
   it('keeps a blend set before the engine starts', async () => {

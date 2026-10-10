@@ -21,6 +21,7 @@ import {
 } from '@dimforge/rapier3d-compat';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
 import { UIElementMeterPass } from 'node_modules/rewild-renderer/lib/materials/UIElementMeterPass';
+import { UIElement } from 'node_modules/rewild-renderer/lib/core/UIElement';
 import {
   clamp,
   Color,
@@ -43,13 +44,17 @@ import {
   gustPushSpeed,
   headwindSpeedShare,
 } from './utils/Headwind';
+import { rainShare } from 'rewild-renderer/lib/renderers/sky/RainWetness';
 import {
   GroundSlide,
   MAX_SLOPE_CLIMB,
   impactDamage,
   slideDamage,
 } from './utils/Sliding';
-import { audio, footstepsDef } from '../audio/audio';
+import { STAMINA_FULL, Stamina } from './utils/Stamina';
+import { OXYGEN_FULL, Oxygen } from './utils/Oxygen';
+import { BodyTemperature } from './utils/BodyTemperature';
+import { audio, footstepsDef, voiceDef } from '../audio/audio';
 import { PlayerSounds } from '../audio/PlayerSounds';
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
@@ -90,13 +95,30 @@ const _MIN_CAPSULE_Y: f32 = _CAPSULE_HALF_EXTENT;
 // already points down.
 const _GROUND_STICK: f32 = 0.001;
 // Hunger empties over ten minutes; once it has, starvation drains health over one.
-const _HUNGER_DRAIN_PER_SEC: f32 = 50 / 600;
+const _HUNGER_DRAIN_PER_SEC: f32 = 100 / 600;
 const _STARVATION_DAMAGE_PER_SEC: f32 = 100 / 60;
+// The body temperature bar: on the right, growing up from its foot to its
+// full height; hidden while the body is within NORMAL of normal.
+const _TEMPERATURE_BAR_X: f32 = 0.975;
+const _TEMPERATURE_BAR_FOOT: f32 = 0.95;
+const _TEMPERATURE_BAR_HEIGHT: f32 = 0.35;
+const _TEMPERATURE_NORMAL: f32 = 0.05;
+// Its colour from slightly to really hot, and from slightly to really cold.
+const _WARM = [1.0, 0.75, 0.4];
+const _HOT = [0.95, 0.12, 0.08];
+const _COOL = [0.6, 0.85, 1.0];
+const _COLD = [0.15, 0.35, 1.0];
+// Health refills over three and a half minutes, from six seconds after the last hurt.
+const _HEALTH_REGEN_PER_SEC: f32 = 100 / 210;
+const _HEALTH_REGEN_AFTER: f32 = 6;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
 const _resizeTranslation = { x: 0, y: 0, z: 0 };
 
 export class Player extends Node {
+  /** The player in the running game, for the console. */
+  static current: Player | null = null;
+
   cameraController: ICameraController;
   asset: Asset3D;
   private _hunger: f32;
@@ -139,6 +161,19 @@ export class Player extends Node {
   private _gustPush: f32 = 0;
   uiHealthBar: UIElementMeterPass;
   uiHungerBar: UIElementMeterPass;
+  uiStaminaBar: UIElementMeterPass;
+  private _staminaBar: UIElement | null = null;
+  private _stamina = new Stamina();
+  uiOxygenBar: UIElementMeterPass;
+  private _oxygenBar: UIElement | null = null;
+  private _oxygen = new Oxygen();
+  uiTemperatureBar: UIElementMeterPass;
+  private _temperatureBar: UIElement | null = null;
+  private _body = new BodyTemperature();
+  // The body temperature the bar last showed.
+  private _shownTemperature: f32 = NaN;
+  // Seconds since health last fell.
+  private _sinceHurt: f32 = 0;
   /** Called once when health reaches zero. */
   onDeath: (() => void) | null = null;
   private _dead: boolean = false;
@@ -212,6 +247,7 @@ export class Player extends Node {
 
   mount(): void {
     super.mount();
+    Player.current = this;
 
     const stateData = this.stateMachine?.data as StateMachineData;
 
@@ -240,10 +276,51 @@ export class Player extends Node {
       hungerBar.x = 0.3;
       hungerBar.y = 0.88;
       hungerBar.percentageBasedCalculation = true;
+
+      this.uiStaminaBar = materialManager.get(
+        'ui-stamina-material'
+      ) as UIElementMeterPass;
+      const staminaBar = guiManager.createElement(this.uiStaminaBar);
+      ui.addChild(staminaBar.transform);
+      staminaBar.borderRadius = 8;
+      staminaBar.width = 0.4;
+      staminaBar.height = 0.015;
+      staminaBar.x = 0.3;
+      staminaBar.y = 0.86;
+      staminaBar.percentageBasedCalculation = true;
+      this._staminaBar = staminaBar;
+
+      this.uiOxygenBar = materialManager.get(
+        'ui-oxygen-material'
+      ) as UIElementMeterPass;
+      const oxygenBar = guiManager.createElement(this.uiOxygenBar);
+      ui.addChild(oxygenBar.transform);
+      oxygenBar.borderRadius = 8;
+      oxygenBar.width = 0.4;
+      oxygenBar.height = 0.015;
+      oxygenBar.x = 0.3;
+      oxygenBar.percentageBasedCalculation = true;
+      this._oxygenBar = oxygenBar;
+
+      this.uiTemperatureBar = materialManager.get(
+        'ui-temperature-material'
+      ) as UIElementMeterPass;
+      const temperatureBar = guiManager.createElement(this.uiTemperatureBar);
+      ui.addChild(temperatureBar.transform);
+      temperatureBar.borderRadius = 6;
+      temperatureBar.width = 0.008;
+      temperatureBar.x = _TEMPERATURE_BAR_X;
+      temperatureBar.percentageBasedCalculation = true;
+      this._temperatureBar = temperatureBar;
     }
 
     this.hunger = 100.0;
     this.health = 100.0;
+    this._sinceHurt = 0;
+    this._stamina.reset();
+    this._oxygen.reset();
+    this._body.reset();
+    this._showBars();
     this._dead = false;
     this.cameraController.camera.transform.position.set(0, 0, -10);
     this.cameraController.camera.lookAt(0, 0, 0);
@@ -266,7 +343,7 @@ export class Player extends Node {
     this._sounds?.dispose();
     const scope = stateData.gameManager?.sound;
     this._sounds = scope
-      ? new PlayerSounds(audio, scope, footstepsDef())
+      ? new PlayerSounds(audio, scope, footstepsDef(), voiceDef())
       : null;
     if (this._waterProbe < 0)
       this._waterProbe = this._waterQuery.acquireProbe();
@@ -338,6 +415,18 @@ export class Player extends Node {
     this.uiHungerBar.meter.value = this._hunger / 100.0;
   }
 
+  get stamina(): Stamina {
+    return this._stamina;
+  }
+
+  get oxygen(): Oxygen {
+    return this._oxygen;
+  }
+
+  get bodyTemperature(): BodyTemperature {
+    return this._body;
+  }
+
   get dead(): boolean {
     return this._dead;
   }
@@ -347,12 +436,54 @@ export class Player extends Node {
   }
 
   set health(value: f32) {
+    if (value < this._health) this._sinceHurt = 0;
     this._health = clamp(value, 0.0, 100.0);
     this.uiHealthBar.meter.value = this._health / 100.0;
   }
 
+  /**
+   * Fills the stamina and oxygen bars, each shown only while below full. The
+   * oxygen bar sits above the stamina bar while both show, and takes its
+   * place when stamina is full.
+   */
+  private _showBars(): void {
+    const stamina = this._stamina.value;
+    const oxygen = this._oxygen.value;
+    if (!this._staminaBar || !this._oxygenBar) return;
+    this.uiStaminaBar.meter.value = stamina / STAMINA_FULL;
+    this._staminaBar.visible = stamina < STAMINA_FULL;
+    this.uiOxygenBar.meter.value = oxygen / OXYGEN_FULL;
+    this._oxygenBar.visible = oxygen < OXYGEN_FULL;
+    const y = this._staminaBar.visible ? 0.835 : 0.86;
+    if (this._oxygenBar.y !== y) this._oxygenBar.y = y;
+    this._showTemperature();
+  }
+
+  /**
+   * Grows the body temperature bar up the right of the screen, red and deeper
+   * as the body heats, blue as it chills.
+   */
+  private _showTemperature(): void {
+    const bar = this._temperatureBar;
+    if (!bar) return;
+    const t = this._body.value;
+    const size = Math.abs(t);
+    bar.visible = size > _TEMPERATURE_NORMAL;
+    if (!bar.visible || Math.abs(t - this._shownTemperature) < 0.005) return;
+    this._shownTemperature = t;
+    bar.height = size * _TEMPERATURE_BAR_HEIGHT;
+    bar.y = _TEMPERATURE_BAR_FOOT - bar.height;
+    const from = t > 0 ? _WARM : _COOL;
+    const to = t > 0 ? _HOT : _COLD;
+    const r = from[0] + (to[0] - from[0]) * size;
+    const g = from[1] + (to[1] - from[1]) * size;
+    const b = from[2] + (to[2] - from[2]) * size;
+    this.uiTemperatureBar.meter.setColors(r, g, b, r, g, b);
+  }
+
   unMount(): void {
     super.unMount();
+    if (Player.current === this) Player.current = null;
 
     document.removeEventListener('mousemove', this._onMouseMove);
     document.removeEventListener(
@@ -416,6 +547,7 @@ export class Player extends Node {
 
   private _die(): void {
     this._dead = true;
+    this._sounds?.die();
     this.stopMotion();
     this._movingForward = false;
     this._movingBackward = false;
@@ -561,7 +693,7 @@ export class Player extends Node {
     if (this.jumpRequested) {
       if (this.grounded && !this.swimming) {
         this._sounds?.jump();
-        this.verticalVelocity = JUMP_IMPULSE;
+        this.verticalVelocity = JUMP_IMPULSE * this._stamina.jump();
         this.grounded = false;
         this._onGround = false;
       }
@@ -589,9 +721,16 @@ export class Player extends Node {
       : this._crouching
       ? _CROUCH_EYE_HEIGHT
       : _STANDING_EYE_HEIGHT;
+    const pushing =
+      this._movingForward ||
+      this._movingBackward ||
+      this._movingLeft ||
+      this._movingRight;
+    const sprinting = this._sprinting && this._stamina.canSprint;
+    this._stamina.update(sprinting && pushing, delta);
     const speed =
       _MOVE_SPEED *
-      (this._sprinting ? _RUN_MULTIPLIER : 1.0) *
+      (sprinting ? _RUN_MULTIPLIER : 1.0) *
       (this._crouching && !this.swimming ? _CROUCH_SPEED_MULTIPLIER : 1.0) *
       (this.swimming
         ? SWIM_SPEED_SHARE
@@ -715,6 +854,9 @@ export class Player extends Node {
     if (this.spawnResolved) {
       if (this._hunger > 0) this.hunger -= _HUNGER_DRAIN_PER_SEC * delta;
       else this.health -= _STARVATION_DAMAGE_PER_SEC * delta;
+      this._sinceHurt += delta;
+      if (this._sinceHurt >= _HEALTH_REGEN_AFTER && this._health > 0)
+        this.health += _HEALTH_REGEN_PER_SEC * delta;
     }
 
     this._onGround =
@@ -757,6 +899,23 @@ export class Player extends Node {
     const camZ = pos.z;
     this.cameraController.camera.transform.position.set(camX, camY, camZ);
     this.cameraUnderWater = inWater && camY < water.surface;
+    if (this.spawnResolved)
+      this.health -= this._oxygen.update(this.cameraUnderWater, delta);
+    const sky = stateData?.renderer?.sky?.skyRenderer;
+    if (sky) {
+      const rain = rainShare(sky.precipitation, sky.temperature);
+      this._body.update(
+        sky.temperature,
+        sky.upDot,
+        sky.wind.vec[2],
+        rain,
+        Math.max(0, sky.precipitation) - rain,
+        this.swimming,
+        1 - this._stamina.value / STAMINA_FULL,
+        delta
+      );
+    }
+    this._showBars();
 
     const sounds = this._sounds;
     if (sounds) {
@@ -778,15 +937,16 @@ export class Player extends Node {
       s.waterDepth = inWater ? water.surface - water.ground : 0;
       s.cameraUnderWater = this.cameraUnderWater;
       s.crouching = this._crouching;
-      s.sprinting = this._sprinting;
-      s.pushing =
-        this._movingForward ||
-        this._movingBackward ||
-        this._movingLeft ||
-        this._movingRight;
+      s.sprinting = sprinting;
+      s.pushing = pushing;
       s.diving = this._downHeld;
       s.rising = this._upHeld;
-      s.wetness = stateData?.renderer?.sky?.skyRenderer?.rainWetness.soak ?? 0;
+      s.wetness = sky?.rainWetness.soak ?? 0;
+      s.stamina = this._stamina.value / STAMINA_FULL;
+      s.bodyTemperature = this._body.value;
+      s.oxygen = this._oxygen.value / OXYGEN_FULL;
+      s.health = this._health;
+      s.hunger = this._hunger;
       s.ground = hasTerrain ? terrainRenderer! : null;
       sounds.update(delta);
     }

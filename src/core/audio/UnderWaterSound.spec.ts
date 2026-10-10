@@ -6,6 +6,8 @@ import {
   installFakeAudioContext,
 } from 'rewild-audio/lib/testing/FakeAudioContext';
 import {
+  DAZED_CUTOFF,
+  DAZED_LEVEL,
   PLUNGE_BIG_AT,
   PLUNGE_BIG_DEPTH,
   PLUNGE_FROM,
@@ -156,5 +158,23 @@ describe('UnderWaterSound', () => {
     water.dispose();
     expect(engine.muffleCutoff).toBe(OPEN_CUTOFF_HZ);
     expect(engine.muffleLevel).toBe(1);
+  });
+
+  it('dulls the world above water by the daze, and lifts it again', () => {
+    water.setDaze(1);
+    expect(engine.muffleCutoff).toBeCloseTo(DAZED_CUTOFF, 3);
+    expect(engine.muffleLevel).toBeCloseTo(DAZED_LEVEL, 6);
+    water.setDaze(0.01);
+    water.setDaze(0);
+    expect(engine.muffleCutoff).toBe(OPEN_CUTOFF_HZ);
+    expect(engine.muffleLevel).toBe(1);
+  });
+
+  it('keeps the daze under the under-water muffle and returns to it on surfacing', () => {
+    water.update(2, 5, true, 0, 0.1);
+    water.setDaze(1);
+    expect(engine.muffleCutoff).toBe(UNDER_WATER_CUTOFF);
+    water.update(1, 5, false, 0, 0.1);
+    expect(engine.muffleCutoff).toBeCloseTo(DAZED_CUTOFF, 3);
   });
 });

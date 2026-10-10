@@ -53,6 +53,8 @@ interface Layer {
   sound: string;
   gain: GainNode;
   source: AudioBufferSourceNode | null;
+  /** The gain the bank picked for the source, applied with the crossfade. */
+  level: number;
   /** The pitch the bank picked for the source, before the bed's rate. */
   pitch: number;
 }
@@ -88,6 +90,7 @@ export class Bed {
       sound,
       gain: null as unknown as GainNode,
       source: null,
+      level: 1,
       pitch: 1,
     }));
     this._weights = new Float32Array(spec.sounds.length);
@@ -168,8 +171,10 @@ export class Bed {
     if (!this._ctx) return;
     const now = this._ctx.currentTime;
     const tc = timeConstant(this.spec.attack);
-    for (let i = 0; i < this._layers.length; i++)
-      this._layers[i].gain.gain.setTargetAtTime(this._weights[i], now, tc);
+    for (let i = 0; i < this._layers.length; i++) {
+      const layer = this._layers[i];
+      layer.gain.gain.setTargetAtTime(this._weights[i] * layer.level, now, tc);
+    }
   }
 
   /** Scales every layer's playback rate, which raises or lowers its pitch, ramping over the attack. */
@@ -243,22 +248,26 @@ export class Bed {
       const layer = this._layers[i];
       layer.source = null;
       layer.gain = ctx.createGain();
-      layer.gain.gain.value = this._weights[i];
+      layer.gain.gain.value = this._weights[i] * layer.level;
       layer.gain.connect(this._out);
     }
     return true;
   }
 
-  /** Starts each idle layer whose sound has loaded, at a random point in its loop. */
+  /** Starts each idle layer whose sound has loaded, at a random point in its loop, at the gain the bank picked. */
   private _startSources(): void {
     const ctx = this._ctx!;
-    for (const layer of this._layers) {
+    for (let i = 0; i < this._layers.length; i++) {
+      const layer = this._layers[i];
       if (layer.source || !this._engine.bank.pick(layer.sound, this._pick))
         continue;
       const buffer = this._pick.buffer!;
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.loop = true;
+      layer.level = this._pick.gain;
+      layer.gain.gain.cancelScheduledValues(ctx.currentTime);
+      layer.gain.gain.value = this._weights[i] * layer.level;
       layer.pitch = this._pick.pitch;
       source.playbackRate.value = this._pick.pitch * this._rate;
       source.connect(layer.gain);

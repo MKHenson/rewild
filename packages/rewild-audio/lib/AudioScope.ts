@@ -14,6 +14,7 @@ export const SCOPE_FADE = 0.3;
 export class AudioScope {
   private readonly _beds: Bed[] = [];
   private readonly _emitters: Emitter[] = [];
+  private readonly _children: AudioScope[] = [];
   private _disposed = false;
 
   constructor(private readonly _engine: AudioEngine, readonly id: number) {}
@@ -25,6 +26,11 @@ export class AudioScope {
   play(name: string, options?: PlayOptions): boolean {
     if (this._disposed) return false;
     return this._engine.play(name, options, this.id);
+  }
+
+  /** Seconds the last 2D sound played lasts, at its pitch. */
+  get lastLength(): number {
+    return this._engine.lastLength;
   }
 
   loop(name: string, options: PlayOptions & { at: Vector3 }): number {
@@ -46,10 +52,25 @@ export class AudioScope {
     return emitter;
   }
 
+  /** A scope inside this one, disposed with it. */
+  createScope(): AudioScope {
+    const child = this._engine.createScope();
+    if (this._disposed) child.dispose(0);
+    else this._children.push(child);
+    return child;
+  }
+
+  /** Fades out the sounds the scope played and looped, and keeps it open. Its beds and emitters carry on. */
+  stopSounds(fade: number = SCOPE_FADE): void {
+    if (!this._disposed) this._engine.stopOwner(this.id, fade);
+  }
+
   /** Fades out and stops everything the scope started. */
   dispose(fade: number = SCOPE_FADE): void {
     if (this._disposed) return;
     this._disposed = true;
+    for (const child of this._children) child.dispose(fade);
+    this._children.length = 0;
     for (const bed of this._beds) bed.dispose(fade);
     for (const emitter of this._emitters) emitter.dispose(fade);
     this._beds.length = 0;

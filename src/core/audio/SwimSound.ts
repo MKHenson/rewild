@@ -26,6 +26,8 @@ export function strokeInterval(under: boolean, fast: boolean): number {
  */
 export class SwimSound {
   random: () => number = Math.random;
+  /** Whether a stroke at the surface played in the last update. */
+  stroked = false;
 
   private readonly _options: PlayOptions = { bus: 'player', gain: 1 };
   private readonly _bubbles: PlayOptions = { bus: 'effects', gain: 1 };
@@ -47,6 +49,7 @@ export class SwimSound {
     fast: boolean,
     seconds: number
   ): void {
+    this.stroked = false;
     if (this._wasSwimming && !swimming)
       this._sink.play('swim-emerge', this._options);
     this._wasSwimming = swimming;
@@ -59,6 +62,7 @@ export class SwimSound {
     this._next += strokeInterval(under, fast);
     if (this._next < 0) this._next = 0;
     this._sink.play(under ? 'swim-stroke-under' : 'swim-stroke', this._options);
+    this.stroked = !under;
     if (under && this.random() < BUBBLES_CHANCE)
       this._sink.play('swim-bubbles', this._bubbles);
   }

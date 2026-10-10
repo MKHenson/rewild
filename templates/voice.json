@@ -1,0 +1,89 @@
+{
+  "layers": [
+    {
+      "id": "calm",
+      "sound": "breath-calm",
+      "gain": 0.15,
+      "tags": ["mouth", "breath"],
+      "when": { "effort": [0.7, 0.5] }
+    },
+    {
+      "id": "hard",
+      "sound": "breath-hard",
+      "gain": 0.5,
+      "tags": ["mouth", "breath"],
+      "when": { "effort": [0.5, 0.7] }
+    },
+    {
+      "id": "pant",
+      "sound": "breath-pant",
+      "gain": 0.9,
+      "tags": ["mouth", "breath"],
+      "when": { "effort": [0.85, 0.98] }
+    },
+    {
+      "id": "pained",
+      "sound": "breath-pained",
+      "gain": 0.8,
+      "tags": ["mouth"],
+      "when": { "health": [25, 10] }
+    },
+    {
+      "id": "heartbeat",
+      "sound": "heartbeat",
+      "when": { "health": [25, 5] }
+    },
+    {
+      "id": "shiver",
+      "sound": "voice-shiver",
+      "tags": ["mouth"],
+      "when": { "cold": [0.5, 0.8] }
+    },
+    {
+      "id": "growl",
+      "sound": "stomach-growl",
+      "gain": 0.8,
+      "when": { "hunger": [20, 5] }
+    }
+  ],
+  "rules": [
+    {
+      "id": "pant-over-hard",
+      "when": { "effort": [0.85, 0.98] },
+      "scale": "hard",
+      "by": 0
+    },
+    {
+      "id": "heat",
+      "when": { "heat": [0.5, 0.8] },
+      "add": "breath-heat",
+      "gain": 0.6,
+      "tags": ["mouth", "breath"]
+    },
+    {
+      "id": "pain-over-breath",
+      "when": { "health": [25, 10] },
+      "scale": "#breath",
+      "by": 0.3
+    },
+    {
+      "id": "swim-breaths",
+      "when": { "swimming": [0, 1] },
+      "scale": "#breath",
+      "by": 0
+    },
+    {
+      "id": "under-water",
+      "when": { "under": [0, 1] },
+      "scale": "#mouth",
+      "by": 0
+    }
+  ],
+  "bouts": {
+    "heat": { "on": [4, 9], "off": [10, 25] }
+  },
+  "every": {
+    "shiver": [5, 12],
+    "growl": [20, 45]
+  }
+}

@@ -50,7 +50,7 @@ export interface PlayOptions {
   gain?: number;
   /** Seconds from now, on the audio clock. */
   delay?: number;
-  /** Low-pass cutoff in Hz. 3D only. */
+  /** Low-pass cutoff in Hz. A 2D sound gets a filter only below the open cutoff. */
   cutoff?: number;
   /** How fast a 3D sound fades with distance. 0 leaves the distance curve to the caller. */
   rolloff?: number;
@@ -122,6 +122,7 @@ export class AudioEngine {
   };
   private readonly _oneShots = new Set<OneShot>();
   private _nextScope = 1;
+  private _lastLength = 0;
   private readonly _emitters: Emitter[] = [];
 
   /** `resolveUrl` turns a manifest file path into the URL to fetch. */
@@ -191,15 +192,30 @@ export class AudioEngine {
     source.playbackRate.value = this._pick.pitch;
     const amp = ctx.createGain();
     amp.gain.value = this._pick.gain * (options?.gain ?? 1);
-    source.connect(amp).connect(this._buses[options?.bus ?? 'effects']);
+    const cutoff = options?.cutoff ?? OPEN_CUTOFF_HZ;
+    let filter: BiquadFilterNode | null = null;
+    if (cutoff < OPEN_CUTOFF_HZ) {
+      filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = cutoff;
+      source.connect(filter).connect(amp);
+    } else source.connect(amp);
+    amp.connect(this._buses[options?.bus ?? 'effects']);
     const shot: OneShot = { source, amp, owner };
     this._oneShots.add(shot);
     source.onended = () => {
+      filter?.disconnect();
       amp.disconnect();
       this._oneShots.delete(shot);
     };
     source.start(ctx.currentTime + Math.max(0, options?.delay ?? 0));
+    this._lastLength = this._pick.buffer!.duration / this._pick.pitch;
     return true;
+  }
+
+  /** Seconds the last 2D sound played lasts, at its pitch. */
+  get lastLength(): number {
+    return this._lastLength;
   }
 
   /** Loops a sound at a world position until `stop`. Returns its id, or 0 if it did not start. */

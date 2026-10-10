@@ -4,6 +4,7 @@ import { SCOPE_FADE } from './AudioScope';
 import {
   FakeAudioBufferSourceNode,
   FakeAudioContext,
+  FakeBiquadFilterNode,
   FakeGainNode,
   installFakeAudioContext,
 } from './testing/FakeAudioContext';
@@ -163,6 +164,50 @@ describe('AudioScope', () => {
 
   it('gives each scope its own id', () => {
     expect(engine.createScope().id).not.toBe(engine.createScope().id);
+  });
+
+  it('cuts its one-shots on stopSounds and stays open', () => {
+    const scope = engine.createScope();
+    scope.play('blip');
+    const source = lastSource();
+    scope.stopSounds(0.1);
+    expect(source.stoppedAt).toBeCloseTo(10.1, 10);
+    expect(scope.disposed).toBe(false);
+    expect(scope.play('blip')).toBe(true);
+  });
+
+  it('says how long the last 2D sound played lasts', () => {
+    const scope = engine.createScope();
+    engine.bank.random = () => 0.5;
+    scope.play('blip');
+    expect(scope.lastLength).toBeCloseTo(1, 6);
+  });
+
+  it('filters a 2D sound only when given a cutoff below open', () => {
+    const scope = engine.createScope();
+    scope.play('blip');
+    expect(lastSource().outputs[0]).toBeInstanceOf(FakeGainNode);
+    scope.play('blip', { cutoff: 600 });
+    const filter = lastSource().outputs[0] as FakeBiquadFilterNode;
+    expect(filter).toBeInstanceOf(FakeBiquadFilterNode);
+    expect(filter.frequency.value).toBe(600);
+    expect(filter.outputs[0]).toBeInstanceOf(FakeGainNode);
+  });
+
+  it('disposes a child scope with its parent', () => {
+    const parent = engine.createScope();
+    const child = parent.createScope();
+    child.play('blip');
+    const source = lastSource();
+    parent.dispose();
+    expect(child.disposed).toBe(true);
+    expect(source.stoppedAt).toBeCloseTo(10 + SCOPE_FADE, 10);
+  });
+
+  it('gives a disposed scope a disposed child', () => {
+    const parent = engine.createScope();
+    parent.dispose();
+    expect(parent.createScope().disposed).toBe(true);
   });
 });
 

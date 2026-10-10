@@ -6,6 +6,8 @@ import {
 import { Footsteps, FootstepsDef } from './Footsteps';
 import { PlayerSounds } from './PlayerSounds';
 import { SLIDING_FROM } from './SlideSound';
+import { VoiceDef, VoiceSound } from './VoiceSound';
+import { DAZED_LEVEL } from './UnderWaterSound';
 
 // Each file decodes to a buffer whose length says which sound it is.
 const LENGTHS: Record<string, number> = {
@@ -16,6 +18,8 @@ const LENGTHS: Record<string, number> = {
   'land-hard': 3001,
   jump: 3002,
   flashlight: 3003,
+  'swim-stroke': 4000,
+  'breath-swim': 4001,
 };
 
 const manifest = {
@@ -25,6 +29,10 @@ const manifest = {
     loop: name === 'under-water' || name === 'body-drips',
     source: 'test',
   })),
+};
+
+const VOICE: VoiceDef = {
+  layers: [{ id: 'calm', sound: 'under-water', tags: ['mouth'] }],
 };
 
 const FOOTSTEPS: FootstepsDef = {
@@ -157,5 +165,80 @@ describe('PlayerSounds', () => {
     for (let i = 0; i < 60; i++) bad.update(frame);
     expect(played('step-dirt')).toBe(0);
     bad.dispose();
+  });
+
+  it('breathes from the stamina spent, with a voice table', () => {
+    const voiced = new PlayerSounds(
+      engine,
+      engine.createScope(),
+      FOOTSTEPS,
+      VOICE
+    );
+    const voice = VoiceSound.current!;
+    expect(voice).not.toBeNull();
+    const s = voiced.state;
+    s.stamina = 0.1;
+    for (let i = 0; i < 180; i++) voiced.update(frame);
+    expect(voice.effort).toBeGreaterThan(0.7);
+
+    s.stamina = 1;
+    for (let i = 0; i < 600; i++) voiced.update(frame);
+    expect(voice.effort).toBeLessThan(0.2);
+    voiced.dispose();
+    expect(VoiceSound.current).toBeNull();
+  });
+
+  it('logs a bad voice table and carries on without a voice', () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const bad = new PlayerSounds(engine, engine.createScope(), FOOTSTEPS, {
+      layers: [],
+      every: { calm: [1, 2] },
+    });
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
+    expect(VoiceSound.current).toBeNull();
+    bad.update(frame);
+    bad.dispose();
+  });
+
+  it('pulls the world away at low health', () => {
+    sounds.state.health = 5;
+    sounds.update(frame);
+    expect(engine.muffleLevel).toBeCloseTo(DAZED_LEVEL, 6);
+    sounds.state.health = 100;
+    sounds.update(frame);
+    expect(engine.muffleLevel).toBe(1);
+  });
+
+  it('breathes with the strokes while swimming at the surface', () => {
+    const voiced = new PlayerSounds(
+      engine,
+      engine.createScope(),
+      FOOTSTEPS,
+      VOICE
+    );
+    const s = voiced.state;
+    s.swimming = true;
+    s.immersion = 2;
+    s.pushing = true;
+    for (let i = 0; i < 300; i++) voiced.update(frame);
+    expect(played('swim-stroke')).toBeGreaterThan(3);
+    expect(played('breath-swim')).toBe(played('swim-stroke'));
+    voiced.dispose();
+  });
+
+  it('fades out the breathing and the body loops on death', () => {
+    const before = new Set(engine.beds);
+    const voiced = new PlayerSounds(
+      engine,
+      engine.createScope(),
+      FOOTSTEPS,
+      VOICE
+    );
+    const own = () => [...engine.beds].filter((bed) => !before.has(bed));
+    expect(own().length).toBeGreaterThan(1);
+    voiced.die();
+    expect(own().map((bed) => bed.spec.sounds[0])).toEqual(['under-water']);
+    voiced.dispose();
   });
 });

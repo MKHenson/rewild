@@ -14,6 +14,24 @@ export const UNDER_WATER_LEVEL = 0.5;
 /** Seconds by e the world takes to go under and to come back. */
 const MUFFLE_TIME = 0.035;
 
+/** The world bus's cutoff and gain when the player is fully dazed. */
+export const DAZED_CUTOFF = 3000;
+export const DAZED_LEVEL = 0.75;
+/** Seconds by e the world takes to follow the daze. */
+const DAZE_TIME = 0.5;
+/** Change in daze that moves the world. */
+const DAZE_STEP = 0.02;
+
+/** The world bus's cutoff above water at `daze` 0..1. */
+export function dazedCutoff(daze: number): number {
+  return OPEN_CUTOFF_HZ * Math.pow(DAZED_CUTOFF / OPEN_CUTOFF_HZ, daze);
+}
+
+/** The world bus's gain above water at `daze` 0..1. */
+export function dazedLevel(daze: number): number {
+  return 1 - (1 - DAZED_LEVEL) * daze;
+}
+
 // Plunge speeds are in Player.verticalVelocity's units, down: a jump on flat
 // ground lands at about 10.5, and a fall hurts from 15.
 
@@ -70,6 +88,7 @@ export class UnderWaterSound {
   private _wet = false;
   private _under = false;
   private _underFor = 0;
+  private _daze = 0;
 
   constructor(
     private readonly _engine: AudioEngine,
@@ -82,6 +101,17 @@ export class UnderWaterSound {
       release: 0.4,
     });
     this._engine.muffleWorld(OPEN_CUTOFF_HZ, 1, MUFFLE_TIME);
+  }
+
+  /**
+   * Pulls the world away a little above water, as when badly hurt.
+   * @param daze 0..1.
+   */
+  setDaze(daze: number): void {
+    if (Math.abs(daze - this._daze) < DAZE_STEP && (daze > 0 || !this._daze))
+      return;
+    this._daze = daze;
+    if (!this._under) this._open(DAZE_TIME);
   }
 
   get underWater(): boolean {
@@ -120,7 +150,7 @@ export class UnderWaterSound {
           MUFFLE_TIME
         );
       else {
-        this._engine.muffleWorld(OPEN_CUTOFF_HZ, 1, MUFFLE_TIME);
+        this._open(MUFFLE_TIME);
         if (this._underFor >= SURFACE_AFTER) {
           this._options.gain = 1;
           this._scope.play('surface', this._options);
@@ -137,5 +167,14 @@ export class UnderWaterSound {
   dispose(): void {
     this._engine.muffleWorld(OPEN_CUTOFF_HZ, 1, MUFFLE_TIME);
     this._bed.dispose(0.3);
+  }
+
+  /** The world above water, dulled by the daze. */
+  private _open(timeConstant: number): void {
+    this._engine.muffleWorld(
+      dazedCutoff(this._daze),
+      dazedLevel(this._daze),
+      timeConstant
+    );
   }
 }

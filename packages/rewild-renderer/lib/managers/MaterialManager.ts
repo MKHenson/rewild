@@ -51,6 +51,13 @@ export class MaterialManager {
     const hunger = new UIElementMeterPass();
     hunger.meter.setColors(0.95, 0.6, 0.1, 0.55, 0.2, 0.0);
     this.addMaterial('ui-hunger-material', hunger);
+    const stamina = new UIElementMeterPass();
+    stamina.meter.setColors(0.45, 0.8, 1.0, 0.2, 0.3, 0.55);
+    this.addMaterial('ui-stamina-material', stamina);
+    const oxygen = new UIElementMeterPass();
+    oxygen.meter.setColors(0.92, 0.96, 1.0, 0.55, 0.1, 0.45);
+    this.addMaterial('ui-oxygen-material', oxygen);
+    this.addMaterial('ui-temperature-material', new UIElementMeterPass());
 
     templates.materials.forEach((t) => {
       let materialPass: IMaterialPass;
