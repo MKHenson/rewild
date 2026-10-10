@@ -17,7 +17,7 @@
   "surfaces": {
     "grass": { "sound": "step-grass", "tags": ["soft"] },
     "leaves": { "sound": "step-leaves", "tags": ["soft"] },
-    "snow": { "sound": "step-snow", "tags": ["soft"] },
+    "snow": { "sound": "step-snow", "slide": "slide-snow", "tags": ["soft"] },
     "sand": { "sound": "step-sand", "tags": ["soft"] },
     "dirt": { "sound": "step-dirt", "tags": ["soft"] },
     "rock": { "sound": "step-rock", "tags": ["hard"] }

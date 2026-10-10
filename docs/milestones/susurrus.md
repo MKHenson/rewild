@@ -142,6 +142,7 @@ interface BedSpec {
 const bed = audio.createBed(spec);
 bed.set(gain, cutoff?);                // called each frame; uses setTargetAtTime
 bed.setBlend(value);                   // 0 is the first layer, 1 the second, and so on
+bed.setRate(rate);                     // playback rate, to raise or lower the pitch
 bed.dispose();
 ```
 
@@ -152,6 +153,8 @@ bed.dispose();
 - **Layers.** A bed can hold two or three loops, for example light rain and heavy rain. `setBlend`
   moves one value across them with an equal-power crossfade, so the loudness holds steady through
   the fade.
+- **Rate.** `setRate` scales every layer's playback rate over the attack, so a loop can rise in
+  pitch, as a slide does as it speeds up.
 - A layer whose sound has not loaded yet starts on the first `set` after it loads.
 - Setting the same gain again adds no automation, so calling `set` every frame costs nothing when
   the value holds still.
@@ -468,7 +471,7 @@ pushes to the queue and thunder can be tested on demand. A manual strike is neve
 ## The player
 
 `PlayerSounds` in `src/core/audio/` holds every player sound: `Footsteps`, `BodySound`,
-`SwimSound`, `DripSound` and `UnderWaterSound`, and later the voice. `Player` creates one on
+`SlideSound`, `SwimSound`, `DripSound` and `UnderWaterSound`, and later the voice. `Player` creates one on
 mount, in the game's scope, and disposes it on unmount.
 
 - **State.** Each frame `Player` fills in `sounds.state`, one reused object: where the feet are,
@@ -633,15 +636,51 @@ frame and keeps a slide velocity:
 - On steep ground the player cannot walk uphill. `uphillCancel` takes the uphill part out of the
   walking input.
 - On gentler ground the slide slows down by `SLIDE_FRICTION`. In the air it carries on.
+- **A fast slide hurts.** Snapping holds the player to slopes up to 70°, so a slide down a steep
+  face never builds up `verticalVelocity` and takes no fall damage at the bottom. Instead, sliding
+  on the ground faster than `SLIDE_HURT_FROM` (9) takes health every second, rising to
+  `SLIDE_HURT_RATE` (20 a second) at `SLIDE_MAX_SPEED`. A slide only reaches that speed on slopes
+  of about 43° and steeper, so slides on gentler ground are safe, and a long slide down a steep
+  mountain face kills. `slideDamage` in `Sliding.ts` works it out. A slide off a cliff still
+  takes the fall damage of its landing.
+- **Obstacles stop a slide.** After the character controller resolves a move, `GroundSlide.collide`
+  compares the move asked for with the move allowed. The difference is the way an obstacle, such
+  as a rock, blocked the player, and the slide and skid velocity into it are lost, as in a dead
+  stop. The velocity along the obstacle carries on, so a glancing hit keeps sliding. A slide
+  stopped by a rock cannot throw the player on once they step clear of it.
+- **Hitting an obstacle hurts.** The slide speed lost into it is the impact. Above
+  `IMPACT_HURT_FROM` (6) each unit takes `IMPACT_HURT_SCALE` (5) health, so a rock hit at full
+  slide speed takes 40, and `land-hard` plays. It hurts on any ground, slippery or not. Walking or
+  skidding into something never hurts; only the slide counts.
+- **Slippery ground.** Each terrain material has a `slip`, 0 for full grip to 1 for ice, in
+  `TerrainMaterials.ts`. The mountain snow, `snow_field_aerial`, is 1. A material without one has
+  grip, and a new one such as mud sets its own. `TerrainRenderer.sampleSlip(x, z)` weights each
+  material's slip by its splat under the feet, and `Player` passes it to the slide each frame. On
+  slippery ground:
+  - A slide starts on gentler slopes, from 15° on ice in place of 35°, so on ice most slopes pull
+    the player downhill and a 30° slope is hard to climb.
+  - A slide bleeds off slower on gentle ground, with 97% less friction on ice, so it barely slows
+    past the bottom of a slope.
+  - Walking skids. The walking velocity catches up with the keys by e every `slip / 0.8`
+    seconds, so on ice it takes over a second to get going, stop or turn, and the player drifts
+    on for a couple of seconds after letting go. On ground with grip
+    it follows the keys at once, and in the air it always does. The uphill cancel acts after the
+    skid, so a skid cannot carry the player up a slope too steep to climb.
+  - A slide does no harm: its damage scales by `1 − slip`. What it carries the player into still
+    hurts. A slide off ice onto rock hurts as soon as the rock is underfoot, and one off a cliff
+    takes the fall damage of its landing.
+- `GroundSlide.climbing` says when the last step held back walking input that pushed up a sliding
+  slope.
 - `Player.grounded` is false on ground steeper than `MAX_SLOPE_CLIMB` (45°), even when the player
   stands on it. The real contact is the private `_onGround`.
 
-`Player` passes the slide state to `PlayerSounds` in its state:
+`SlideSound` in `src/core/audio/`, held by `PlayerSounds`, plays it. `Player` passes the slide in
+its state: the slide velocity, the feet's height and whether the walking input is `climbing`.
 
-- **Slide speed**: `Math.hypot(_slide.velocityX, _slide.velocityZ)`, in the slide's units of half
-  a metre a second.
-- **Sliding**: on the ground with a slide speed above 0.5 (`SLIDE_STOPS_STEPS`), about 1 m/s. A
-  slide in the air makes no sound.
+- **Slide speed**: the length of the slide velocity, in the slide's units of half a metre a
+  second.
+- **Sliding**: on the ground with a slide speed above 0.5 (`SLIDING_FROM`), about 1 m/s. A slide
+  in the air makes no sound.
 - **Steep**: on the ground and not `grounded`. The player is on ground too steep to climb.
 
 A slide sounds like the ground giving way: crumbling dirt, grit and loose stones moving under the
@@ -652,17 +691,22 @@ in `footsteps.json` can name its own `slide` loop. One that does not uses `slide
 "snow": { "sound": "step-snow", "slide": "slide-snow", "tags": ["soft"] }
 ```
 
-- **The loop.** While sliding, the slide loop plays. Its gain and pitch rise with the slide speed,
-  so a fast slide crumbles harder. It fades out when the slide stops. It is a bed, so the change
-  is smooth.
-- **The slip.** A short slip one-shot plays when a slide starts: the ground breaking away under the
-  feet.
-- **Falling debris.** Dirt and stones break loose ahead of the player. One-shot crumbles and stone
-  rattles play on 3D emitters 3 to 10 m downhill, every 0.2 to 0.6 s. Faster slides send more.
-- **Over the edge.** A slide off a cliff sends a last burst of crumbling dirt and stones from the
-  edge. The player falls in silence and plays the landing as normal.
-- **Scrabbling.** While on steep ground and the player pushes uphill, short scrabble one-shots
-  play: feet that cannot get a grip. They stop when the player stops pushing.
+- **The loop.** While sliding, the slide loop plays on the player bus. From the slowest slide to
+  the fastest, its gain rises from 0.35 to 1, its rate from 0.85 to 1.2 and its low-pass opens
+  from 1.5 kHz to 14 kHz, so a fast slide crumbles harder, higher and harsher. It fades out when
+  the slide stops. Each slide sound is its own bed, set by the share of its surfaces under the
+  feet from `Footsteps.weigh`, so a slide from snow onto rock crossfades.
+- **The slip.** `slide-slip` plays when a slide starts: the ground breaking away under the feet.
+  A slide that starts again within 0.5 s of stopping does not slip again.
+- **Falling debris.** Dirt and stones break loose ahead of the player. `slide-debris-crumble` or
+  `slide-debris-stones` plays in 3D on the effects bus, 3 to 10 m downhill along the slide, on the
+  terrain there. The first comes 0.2 s into a slide, then every 0.6 s for the slowest slide down
+  to 0.2 s for the fastest, give or take a quarter. Their gain rises with the speed.
+- **Over the edge.** A slide faster than 2 that leaves the ground, other than by a jump, plays both
+  debris sounds at full gain from the edge. The player falls in silence and plays the landing as
+  normal.
+- **Scrabbling.** While on steep ground and `climbing`, `slide-scrabble` plays at once and then
+  every 0.25 to 0.45 s: feet that cannot get a grip. They stop when the player stops pushing.
 - **The end.** When the slide stops, the steps start again with no gap.
 - Footsteps do not play while sliding.
 
@@ -1132,7 +1176,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 | Footsteps  | 6 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                         | One-shots |
 | Body       | 3 jumps, 4 landings, 3 hard landings, 2 flashlight clicks, death                                                                        | Mixed     |
 | Voice      | 3 pain sizes, 3 gasps, strain, calm, hard and panting breath loops, swim breaths, heat panting, cold shivers, heartbeat, stomach growls | Mixed     |
-| Sliding    | crumbling dirt and snow slide loops, 3 slips, 4 crumbles, 4 stone rattles, 3 scrabbles                                                  | Mixed     |
+| Sliding    | crumbling dirt and snow slide loops, 5 slips, 4 debris crumbles, 4 stone rattles, 3 scrabbles                                           | Mixed     |
 | Biome beds | the layers and the `add` and `replace` sounds in each profile                                                                           | Loops     |
 | Calls      | 3 to 6 per biome                                                                                                                        | One-shots |
 
@@ -1145,7 +1189,9 @@ The minimum set of files. Each loop must loop with no gap or click.
 | `Player.ts`                  | Own a `PlayerSounds`, fill in its state each frame, and call it for the jump, the flashlight and the death.         |
 | `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.                         |
 | `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle, which owns an `EditorSound`.                                 |
-| `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point.                                                             |
+| `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point, and `sampleSlip(x, z)`, how slippery the ground is there.   |
+| `Sliding.ts`                 | `slideDamage` and `impactDamage`, `GroundSlide.collide` and `climbing`. Slippery ground and the skid.               |
+| `TerrainMaterials.ts`        | `slip` on each material, 1 on the mountain snow.                                                                    |
 | `InGame.tsx`                 | Duck and lift the world bus when the menu opens and closes. No duck over the Game Over menu.                        |
 | `SettingsPanel.tsx`          | The Audio tab.                                                                                                      |
 | `src/core/debug/`            | `AudioDebugCommands.ts`, registered by `Application` when the app starts.                                           |
@@ -1305,10 +1351,14 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 - **Delivers.** The crumbling slide loop and the snow slide loop, the slip when a slide starts,
   crumbles and stone rattles downhill, the burst over a cliff edge, and scrabbling on steep ground.
+  Damage from a fast slide. Slippery ground from the materials' `slip`: slides start sooner and
+  run on, walking skids, and a slide on it does no harm. `Bed.setRate`.
 - **Expect.** Slide down a steep slope: the ground gives way under the feet, the crumbling gets
   louder and higher as the slide speeds up, and dirt and stones fall away below. Slide down snow
   and it sounds like snow. Slide off a cliff: a last spill of dirt from the edge, silence in the
-  air, then the landing. Push uphill on ground that is too steep and the feet scrabble.
+  air, then the landing. Push uphill on ground that is too steep and the feet scrabble. A long
+  slide down a steep mountain face hurts, and can kill. On the mountain snow the player skids when
+  they stop or turn, a slide runs on past the bottom, and sliding down it does no harm.
 
 #### 16. Breath and voice
 

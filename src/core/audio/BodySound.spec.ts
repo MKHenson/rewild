@@ -57,6 +57,11 @@ describe('BodySound', () => {
     expect(played).toEqual([{ name: 'land-hard', gain: 1, bus: 'player' }]);
   });
 
+  it('slams hard into an obstacle', () => {
+    body.impact();
+    expect(played).toEqual([{ name: 'land-hard', gain: 1, bus: 'player' }]);
+  });
+
   it('clicks the flashlight', () => {
     body.flashlight();
     expect(played).toEqual([{ name: 'flashlight', gain: 1, bus: 'player' }]);

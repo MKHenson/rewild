@@ -385,6 +385,72 @@
       "gain": [0.85, 1],
       "source": "Soundly: water mix",
       "license": "soundly"
+    },
+    {
+      "name": "slide-crumble",
+      "files": ["audio/slide/slide-crumble.ogg"],
+      "loop": true,
+      "source": "Soundly: slide mix",
+      "license": "soundly"
+    },
+    {
+      "name": "slide-snow",
+      "files": ["audio/slide/slide-snow.ogg"],
+      "loop": true,
+      "source": "Soundly: slide mix",
+      "license": "soundly"
+    },
+    {
+      "name": "slide-slip",
+      "files": [
+        "audio/slide/slide-slip-01.ogg",
+        "audio/slide/slide-slip-02.ogg",
+        "audio/slide/slide-slip-03.ogg",
+        "audio/slide/slide-slip-04.ogg",
+        "audio/slide/slide-slip-05.ogg"
+      ],
+      "pitch": [0.9, 1.1],
+      "gain": [0.8, 1],
+      "source": "Soundly: slide mix",
+      "license": "soundly"
+    },
+    {
+      "name": "slide-debris-crumble",
+      "files": [
+        "audio/slide/slide-debris-crumble-01.ogg",
+        "audio/slide/slide-debris-crumble-02.ogg",
+        "audio/slide/slide-debris-crumble-03.ogg",
+        "audio/slide/slide-debris-crumble-04.ogg"
+      ],
+      "pitch": [0.9, 1.1],
+      "gain": [0.8, 1],
+      "source": "Soundly: slide mix",
+      "license": "soundly"
+    },
+    {
+      "name": "slide-debris-stones",
+      "files": [
+        "audio/slide/slide-debris-stones-01.ogg",
+        "audio/slide/slide-debris-stones-02.ogg",
+        "audio/slide/slide-debris-stones-03.ogg",
+        "audio/slide/slide-debris-stones-04.ogg"
+      ],
+      "pitch": [0.9, 1.1],
+      "gain": [0.8, 1],
+      "source": "Soundly: slide mix",
+      "license": "soundly"
+    },
+    {
+      "name": "slide-scrabble",
+      "files": [
+        "audio/slide/slide-scrabble-01.ogg",
+        "audio/slide/slide-scrabble-02.ogg",
+        "audio/slide/slide-scrabble-03.ogg"
+      ],
+      "pitch": [0.9, 1.1],
+      "gain": [0.8, 1],
+      "source": "Soundly: slide mix",
+      "license": "soundly"
     }
   ]
 }

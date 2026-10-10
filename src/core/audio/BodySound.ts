@@ -57,6 +57,11 @@ export class BodySound {
     return true;
   }
 
+  /** The body slamming into an obstacle. */
+  impact(): void {
+    this._play('land-hard', 1);
+  }
+
   flashlight(): void {
     this._play('flashlight', 1);
   }

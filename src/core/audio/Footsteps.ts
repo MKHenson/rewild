@@ -49,6 +49,9 @@ const STRIDE_FAST_AT = 15;
 /** Share of a stride a player starting from rest walks before the first step. */
 export const FIRST_STEP = 0.5;
 
+/** The slide loop of a surface that names none. */
+export const DEFAULT_SLIDE = 'slide-crumble';
+
 /** Gain below which a step's sound is not played. */
 const QUIETEST = 0.01;
 
@@ -73,6 +76,8 @@ export class Footsteps {
   readonly signals = new RuleSignals(FOOTSTEP_SIGNALS);
   readonly rules: RuleSet;
   readonly surfaceNames: readonly string[];
+  /** The slide loop of each surface. */
+  readonly slideSounds: readonly string[];
   /** The surface weights under the last step. */
   readonly surfaceWeights: Float32Array;
   ground: FootstepGround | null = null;
@@ -97,6 +102,9 @@ export class Footsteps {
       tags: [...(_def.surfaces[id].tags ?? []), GROUND_TAG],
     }));
     this.surfaceNames = names;
+    this.slideSounds = names.map(
+      (id) => _def.surfaces[id].slide ?? DEFAULT_SLIDE
+    );
     this._fallback = names.indexOf(_def.fallback);
     if (this._fallback < 0)
       throw new Error(`footsteps: no surface "${_def.fallback}" for fallback`);
@@ -142,8 +150,8 @@ export class Footsteps {
 
   /** Plays one step at (x, z) now. */
   step(x: number, z: number): void {
-    this._weighSurfaces(x, z);
     const weights = this.surfaceWeights;
+    this.weigh(x, z, weights);
     const gains = this._layerGains;
     gains.fill(0);
     let first = this._fallback;
@@ -169,9 +177,8 @@ export class Footsteps {
     }
   }
 
-  /** Fills `surfaceWeights` from the splat at (x, z), or the fallback where there is none. */
-  private _weighSurfaces(x: number, z: number): void {
-    const weights = this.surfaceWeights;
+  /** Fills `weights`, one per surface, from the splat at (x, z), or the fallback where there is none. */
+  weigh(x: number, z: number, weights: Float32Array): void {
     weights.fill(0);
     const ground = this.ground;
     if (!ground || !ground.sampleSplat(x, z, this._splat)) {
