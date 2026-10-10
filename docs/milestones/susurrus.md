@@ -514,7 +514,8 @@ to 0.4 of that into the shallowest water.
 
 **Coming out.** A splash (`surface`) when the camera leaves the water after at least 0.5 s under,
 so a wave over the eye does not splash. The gasp from the voice comes with
-[Breath and voice](#breath-and-voice). The lens drops begin at the same time in `WaterLens`.
+[Breath and voice](#breath-and-voice). The head going in or out of the water cuts off whatever the
+voice was saying, short of the death, so a wave that takes the head under mid-gasp ends the gasp. The lens drops begin at the same time in `WaterLens`.
 
 ### Swimming and wading
 
@@ -911,6 +912,13 @@ equal-power panning so the recordings stay stereo and clear.
   and a lagoon blending lake into ocean laps by its share of lake.
 - **Lapping gain.** Full within 3 m of the shoreline, then `3 / d`, fading out from 30 m to 60 m.
   It is 0.35 in still air, rising to full as `windiness` goes from 0.1 to 0.6.
+- **Open sea.** `OpenSeaSound`, also held by `WorldSound`, plays the sea all around the listener
+  out on the ocean, where the surf has faded: swell and slosh, no breaking waves. A 2D bed on the
+  ambience bus crossfades `sea-calm` into `sea-storm` with the sea state, at the surf's level. Five
+  times a second it reads `WaterQuery.sample` under the listener: the gain is the ocean's share of
+  the water's `typeWeights` times its coverage, so a lagoon plays by its share of ocean and a lake
+  not at all. It is full within 3 m above the sea and fades out by 60 m. Under water it keeps
+  playing, dulled by the world bus's muffle.
 
 ### Where the player is
 
@@ -1247,7 +1255,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 | Wind       | 3 air loops calm to windy, ears roar, 2 gust swells                                                                                          | Mixed     |
 | Rain       | light rain, heavy rain, drips                                                                                                                | Loops     |
 | Thunder    | 3 close cracks with rumble, 3 far rumbles, 6 short chain cracks                                                                              | One-shots |
-| Water      | under-water bed, ocean surf calm and storm, lake lapping                                                                                     | Loops     |
+| Water      | under-water bed, ocean surf calm and storm, open sea calm and storm, lake lapping                                                            | Loops     |
 | Swimming   | 4 strokes, 4 under-water strokes, 4 bubbles, 3 emerges, small and big plunge, surface                                                        | One-shots |
 | Dripping   | body drips                                                                                                                                   | Loop      |
 | Footsteps  | 6 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                              | One-shots |

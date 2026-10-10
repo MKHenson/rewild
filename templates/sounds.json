@@ -142,6 +142,20 @@
       "license": "soundly"
     },
     {
+      "name": "sea-calm",
+      "files": ["audio/water/sea-calm.ogg"],
+      "loop": true,
+      "source": "Soundly: open sea mix",
+      "license": "soundly"
+    },
+    {
+      "name": "sea-storm",
+      "files": ["audio/water/sea-storm.ogg"],
+      "loop": true,
+      "source": "Soundly: open sea mix",
+      "license": "soundly"
+    },
+    {
       "name": "lake-lapping",
       "files": ["audio/water/lake-lapping.ogg"],
       "loop": true,
