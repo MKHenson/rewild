@@ -11,6 +11,7 @@ import {
   EFFORT_FALL,
   GASP_BIG_AT,
   GASP_FROM,
+  GASP_ROUGH_SEA,
   GASP_MEDIUM_AT,
   PAIN_GAP,
   STRAIN_BELOW,
@@ -115,6 +116,7 @@ beforeEach(async () => {
     swimming: false,
     cameraUnderWater: false,
     oxygen: 1,
+    windiness: 0,
     stamina: 1,
     bodyTemperature: 0,
     health: 100,
@@ -299,6 +301,17 @@ describe('VoiceSound', () => {
     expect(played('gasp-big')).toBe(2);
     expect(voice.breathHeld).toBe(0);
     expect(voice.effort).toBeGreaterThan(0.95);
+  });
+
+  it('always gasps big in a rough sea', () => {
+    input.windiness = GASP_ROUGH_SEA + 0.1;
+    input.cameraUnderWater = true;
+    input.oxygen = 0.9;
+    run(1);
+    input.cameraUnderWater = false;
+    run(frame);
+    expect(played('gasp-small')).toBe(0);
+    expect(played('gasp-big')).toBe(1);
   });
 
   it('does not gasp when hardly any breath was used', () => {

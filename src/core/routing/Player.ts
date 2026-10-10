@@ -945,6 +945,7 @@ export class Player extends Node {
       s.stamina = this._stamina.value / STAMINA_FULL;
       s.bodyTemperature = this._body.value;
       s.oxygen = this._oxygen.value / OXYGEN_FULL;
+      s.windiness = sky?.wind.vec[2] ?? 0;
       s.health = this._health;
       s.hunger = this._hunger;
       s.ground = hasTerrain ? terrainRenderer! : null;

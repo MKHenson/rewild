@@ -65,6 +65,8 @@ export const PAIN_GAP = 1.2;
 export const GASP_FROM = 0.03;
 export const GASP_MEDIUM_AT = 0.35;
 export const GASP_BIG_AT = 0.7;
+/** Windiness above which every gasp is a big one: a rough sea leaves no easy breath. */
+export const GASP_ROUGH_SEA = 0.7;
 /** Share of the breath left below which the player strains under water. */
 export const STRAIN_BELOW = 0.33;
 /** Seconds between strains under water. */
@@ -132,6 +134,8 @@ export interface VoiceInput {
   cameraUnderWater: boolean;
   /** 0..1: the share of the breath left. */
   oxygen: number;
+  /** 0..1: the sky's windiness. */
+  windiness: number;
   /** 0..1: the share of the stamina left. */
   stamina: number;
   /** How hot or cold the body is: 0 normal, 1 really hot, -1 really cold. */
@@ -266,7 +270,7 @@ export class VoiceSound {
       seconds
     );
     this._pain(s.health, seconds);
-    this._breath(s.cameraUnderWater, s.oxygen, seconds);
+    this._breath(s.cameraUnderWater, s.oxygen, s.windiness, seconds);
     if (stroked)
       this._speak(
         VoicePriority.Breath,
@@ -329,10 +333,15 @@ export class VoiceSound {
 
   /**
    * The breath held under water: the strain as it runs low, and on coming up
-   * a gasp sized by how much of it was used.
+   * a gasp sized by how much of it was used, and always big in a rough sea.
    * @param oxygen 0..1: the share of the breath left.
    */
-  private _breath(under: boolean, oxygen: number, seconds: number): void {
+  private _breath(
+    under: boolean,
+    oxygen: number,
+    windiness: number,
+    seconds: number
+  ): void {
     if (under) {
       this.breathHeld += seconds;
       this._strainIn -= seconds;
@@ -349,7 +358,11 @@ export class VoiceSound {
       const used = 1 - oxygen;
       const sound = gaspSound(used);
       if (sound) {
-        this._speak(VoicePriority.Gasp, sound, 1);
+        this._speak(
+          VoicePriority.Gasp,
+          windiness > GASP_ROUGH_SEA ? 'gasp-big' : sound,
+          1
+        );
         this.effort = Math.max(this.effort, recoveryEffort(used));
       }
       this.breathHeld = 0;
