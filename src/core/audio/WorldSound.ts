@@ -1,6 +1,7 @@
 import type { AudioEngine, AudioScope } from 'rewild-audio';
 import type { Renderer } from 'rewild-renderer';
 import { resolveClimatePreset } from 'rewild-renderer/lib/renderers/terrain/Biomes';
+import { BiomeProbe } from 'rewild-renderer/lib/renderers/terrain/BiomeProbe';
 import type { TerrainRenderer } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
 import { MAX_WATER_TYPES } from 'rewild-renderer/lib/renderers/terrain/Water';
 import type { ShorePoint } from 'rewild-renderer/lib/renderers/water/ShoreField';
@@ -38,6 +39,8 @@ class TerrainWater implements SurfWater {
   }
 }
 
+const BIOME_PROBE_SECONDS = 0.2;
+
 /**
  * The sound of the world around the listener: the weather now, and the water
  * and the land as they arrive. The game and the editor each own one in their
@@ -49,8 +52,12 @@ export class WorldSound {
   private readonly _thunder: ThunderSound;
   private readonly _surf: SurfSound;
   private readonly _water = new TerrainWater();
+  private readonly _biomes = new BiomeProbe();
+  private readonly _engine: AudioEngine;
+  private _biomeWait = 0;
 
   constructor(engine: AudioEngine, scope: AudioScope) {
+    this._engine = engine;
     this._wind = new WindSound(engine, scope);
     this._rain = new RainSound(scope);
     this._thunder = new ThunderSound(engine, scope);
@@ -63,6 +70,11 @@ export class WorldSound {
 
   get rain(): RainSound {
     return this._rain;
+  }
+
+  /** The biomes at the listener, probed at 5 Hz. */
+  get biomes(): BiomeProbe {
+    return this._biomes;
   }
 
   update(renderer: Renderer, seconds: number): void {
@@ -80,6 +92,12 @@ export class WorldSound {
     if (renderer.terrainRenderer) {
       this._water.attach(renderer.terrainRenderer);
       this._surf.update(this._water, sky.wind.vec[2], seconds);
+      this._biomeWait -= seconds;
+      if (this._biomeWait <= 0) {
+        this._biomeWait = BIOME_PROBE_SECONDS;
+        const listener = this._engine.listenerPosition;
+        this._biomes.probe(renderer.terrainRenderer, listener.x, listener.z);
+      }
     }
   }
 }
