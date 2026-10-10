@@ -1,17 +1,9 @@
 import { Component, register, theme, StyledIcon, Button } from 'rewild-ui';
 import type { Renderer } from 'rewild-renderer';
-import { Vector2, Vector3 } from 'rewild-common';
+import { Vector3 } from 'rewild-common';
 // Deep imports: the terrain tables only, not the renderer's root index (which
 // drags in WGSL assets that plain ts tooling/jest cannot load).
-import {
-  ClimateConfig,
-  resolveClimatePreset,
-} from 'rewild-renderer/lib/renderers/terrain/Biomes';
-import {
-  ClimateField,
-  createClimateField,
-  resolveBiomeWeights,
-} from 'rewild-renderer/lib/renderers/terrain/ClimateField';
+import { BiomeProbe } from 'rewild-renderer/lib/renderers/terrain/BiomeProbe';
 import {
   Lake,
   OCEAN_BODY_ID,
@@ -226,14 +218,10 @@ export class PositionReadout extends Component<Props> {
     let editorSound: EditorSound | null = null;
 
     const position = new Vector3();
-    const lakeSpace = new Float64Array(2);
     const lakeWorld = new Float64Array(2);
-    const biomes = new Int32Array(4);
-    const weights = new Float64Array(4);
+    const probe = new BiomeProbe();
 
-    let climateKey = '';
-    let climate: ClimateConfig | null = null;
-    let field: ClimateField | null = null;
+    let lakeKey = '';
     let lakes: Lake[] = [];
     let lakeQueryX = NaN;
     let lakeQueryZ = NaN;
@@ -264,29 +252,10 @@ export class PositionReadout extends Component<Props> {
       groundValue.textContent =
         ground === null ? '—' : `${ground.toFixed(1)} m`;
 
-      const key = `${terrain.seed}|${terrain.climatePreset}|${terrain.seaLevel}`;
-      if (key !== climateKey) {
-        climateKey = key;
-        climate = resolveClimatePreset(terrain.climatePreset);
-        field = createClimateField(
-          0,
-          0,
-          terrain.seed,
-          new Vector2(0, 0),
-          climate
-        );
-        lakeQueryX = NaN;
-      }
-      if (!climate || !field) return;
-
-      worldToLakeSpace(position.x, position.z, lakeSpace);
-      const count = resolveBiomeWeights(
-        field,
-        lakeSpace[0],
-        lakeSpace[1],
-        biomes,
-        weights
-      );
+      const count = probe.probe(terrain, position.x, position.z);
+      const climate = probe.climate!;
+      const biomes = probe.biomes!;
+      const weights = probe.weights!;
       const parts: string[] = [];
       for (let i = 0; i < count; i++)
         parts.push(
@@ -297,6 +266,12 @@ export class PositionReadout extends Component<Props> {
               )}%`
         );
       biomeValue.textContent = parts.join(' · ');
+
+      const key = `${terrain.seed}|${terrain.climatePreset}|${terrain.seaLevel}`;
+      if (key !== lakeKey) {
+        lakeKey = key;
+        lakeQueryX = NaN;
+      }
 
       const under = waterUnder(renderer, position.x, position.z, ground);
       if (under) {

@@ -918,6 +918,11 @@ There is no runtime biome query at the player today. The editor's `PositionReado
 calls `resolveBiomeWeights` every 200 ms. This milestone moves that logic to a shared
 **`BiomeProbe`** that both use. The probe uses `resolveActiveBiomes`, so painted biomes count.
 
+`BiomeProbe` is in `rewild-renderer/lib/renderers/terrain/`. It reads the climate field and the
+painted biome mask of the chunk under the point, as the splat map does, so the probe and the
+ground agree. An unloaded chunk counts as unpainted. `WorldSound.biomes` probes at the listener
+at 5 Hz.
+
 The probe gives weights that sum to 1. Each biome's soundscape plays at its weight. So walking from
 a plain into a forest crossfades the sound as the ground changes.
 
