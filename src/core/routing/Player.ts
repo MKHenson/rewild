@@ -43,7 +43,12 @@ import {
   gustPushSpeed,
   headwindSpeedShare,
 } from './utils/Headwind';
-import { GroundSlide, MAX_SLOPE_CLIMB } from './utils/Sliding';
+import {
+  GroundSlide,
+  MAX_SLOPE_CLIMB,
+  impactDamage,
+  slideDamage,
+} from './utils/Sliding';
 import { audio, footstepsDef } from '../audio/audio';
 import { PlayerSounds } from '../audio/PlayerSounds';
 
@@ -107,6 +112,8 @@ export class Player extends Node {
   // Whether the capsule rests on any ground, however steep.
   private _onGround: boolean = false;
   private _slide = new GroundSlide();
+  // How slippery the ground underfoot is, 0..1.
+  private _slip: f32 = 0;
   // Set once the level's rigid bodies have been released — the world is as
   // ready as it is going to get.
   terrainLoaded: boolean = false;
@@ -629,13 +636,18 @@ export class Player extends Node {
       this._gustPush = 0;
     }
 
+    this._slip =
+      hasTerrain && this._onGround
+        ? terrainRenderer!.sampleSlip(body.x, body.z)
+        : 0;
     this._slide.step(
       moveX,
       moveZ,
       this._onGround,
       gravityEnabled && !this.swimming,
       dt,
-      delta
+      delta,
+      this._slip
     );
     moveX = this._slide.moveX;
     moveZ = this._slide.moveZ;
@@ -677,6 +689,19 @@ export class Player extends Node {
     );
 
     let correctedMovement = this.characterController.computedMovement();
+    const impact = impactDamage(
+      this._slide.collide(
+        moveX,
+        moveZ,
+        correctedMovement.x,
+        correctedMovement.z,
+        dt
+      )
+    );
+    if (impact > 0) {
+      this.health -= impact;
+      this._sounds?.impact();
+    }
 
     const controllerGrounded = this.characterController.computedGrounded();
 
@@ -719,6 +744,12 @@ export class Player extends Node {
         nextZ
       );
     this.grounded = this._onGround && this._slide.walkable;
+    if (this._onGround)
+      this.health -= slideDamage(
+        Math.hypot(this._slide.velocityX, this._slide.velocityZ),
+        delta,
+        this._slip
+      );
 
     const pos = this.capsuleBody.translation();
     const camX = pos.x;
@@ -731,11 +762,14 @@ export class Player extends Node {
     if (sounds) {
       const s = sounds.state;
       s.x = nextX;
+      s.y = nextY - (this.swimming ? _SWIM_HALF_EXTENT : _CAPSULE_HALF_EXTENT);
       s.z = nextZ;
       s.moved = Math.hypot(correctedMovement.x, correctedMovement.z);
       s.onGround = this._onGround;
       s.grounded = this.grounded;
-      s.slideSpeed = Math.hypot(this._slide.velocityX, this._slide.velocityZ);
+      s.slideX = this._slide.velocityX;
+      s.slideZ = this._slide.velocityZ;
+      s.climbing = this._slide.climbing;
       s.fallSpeed = fallSpeed;
       s.hurt = hurt;
       s.entryVelocity = entryVelocity;

@@ -15,6 +15,7 @@ import { TerrainWorkerPool } from './TerrainWorkerPool';
 import {
   ClimateConfig,
   DEFAULT_CLIMATE_PRESET,
+  MAX_SPLAT_LAYERS,
   getClimatePalette,
   resolveClimatePreset,
 } from './Biomes';
@@ -26,6 +27,7 @@ import { WaterBodyRules } from './WaterBodyRules';
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { ScatterInstances, ScatterPick, pickScatterInstance } from './Scatter';
 import { generateSplatMap, sampleSplatMap } from './Splat';
+import { TERRAIN_MATERIALS } from './TerrainMaterials';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ScatterModels } from './ScatterModels';
 import {
@@ -183,6 +185,9 @@ export class TerrainRenderer implements WaterQuerySource {
   private _climatePreset: string = DEFAULT_CLIMATE_PRESET;
   private _splatPalette: readonly string[] = [];
   private _splatPalettePreset: string | null = null;
+  // `slip` of each splat channel's material, and the weights sampleSlip reads.
+  private readonly _splatSlips = new Float32Array(MAX_SPLAT_LAYERS);
+  private readonly _slipWeights = new Float32Array(MAX_SPLAT_LAYERS);
   private _seaLevel: number = 0;
   // Injected by the host app (game/editor); looks up a chunk's saved snapshot
   // heights on the asset path. Saved ⇒ meshed from storage, absent ⇒ generated.
@@ -691,13 +696,35 @@ export class TerrainRenderer implements WaterQuerySource {
 
   /** The material of each splat channel, for the climate preset in force. */
   get splatPalette(): readonly string[] {
-    if (this._splatPalettePreset !== this._climatePreset) {
-      this._splatPalettePreset = this._climatePreset;
-      this._splatPalette = getClimatePalette(
-        resolveClimatePreset(this._climatePreset)
-      );
-    }
+    this.refreshSplatPalette();
     return this._splatPalette;
+  }
+
+  /**
+   * How slippery the ground is at world (x, z), 0..1: each material's `slip`
+   * weighted by its splat there. 0 where the owning chunk has no splat yet.
+   */
+  sampleSlip(x: number, z: number): number {
+    this.refreshSplatPalette();
+    const weights = this._slipWeights;
+    if (!this.sampleSplat(x, z, weights)) return 0;
+    let slip = 0;
+    for (let c = 0; c < MAX_SPLAT_LAYERS; c++)
+      slip += weights[c] * this._splatSlips[c];
+    return slip;
+  }
+
+  // Rebuilds the splat palette and each channel's slip after a preset change.
+  private refreshSplatPalette(): void {
+    if (this._splatPalettePreset === this._climatePreset) return;
+    this._splatPalettePreset = this._climatePreset;
+    this._splatPalette = getClimatePalette(
+      resolveClimatePreset(this._climatePreset)
+    );
+    this._splatSlips.fill(0);
+    this._splatPalette.forEach(
+      (name, c) => (this._splatSlips[c] = TERRAIN_MATERIALS[name]?.slip ?? 0)
+    );
   }
 
   /** The water map of chunk (cx, cy); null where it has none or is not

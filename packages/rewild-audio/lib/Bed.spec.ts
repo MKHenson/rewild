@@ -265,6 +265,28 @@ describe('Bed', () => {
     expect(output(bed).outputs).toEqual([engine.bus('weather')]);
   });
 
+  it('ramps its playback rate over the attack', () => {
+    const bed = engine.createBed(spec());
+    bed.set(0.5);
+    ctx().currentTime = 3;
+    bed.setRate(1.25);
+    const rate = sources()[0].playbackRate;
+    expect(rate.lastTarget).toEqual({
+      value: 1.25,
+      time: 3,
+      timeConstant: 0.5,
+    });
+    bed.setRate(1.25);
+    expect(rate.targets).toHaveLength(1);
+  });
+
+  it('starts new sources at a rate set before they play', () => {
+    const bed = engine.createBed(spec());
+    bed.setRate(0.8);
+    bed.set(0.5);
+    expect(sources()[0].playbackRate.value).toBeCloseTo(0.8, 10);
+  });
+
   it('stops, disconnects and leaves the engine on dispose', () => {
     const bed = engine.createBed(spec());
     bed.set(0.5);

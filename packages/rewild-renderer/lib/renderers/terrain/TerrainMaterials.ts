@@ -61,6 +61,10 @@ export interface TerrainMaterial {
   // and an OpenGL map needs its green inverted. Get this backwards and every
   // bump on the material reads as a dent.
   normalConvention: 'opengl' | 'directx';
+  // How slippery the ground is underfoot, 0 (full grip) to 1 (ice). Slippery
+  // ground starts a slide on gentler slopes, lets it run on further and skids
+  // the player's walking, and a slide on it does no harm. Omitted ⇒ 0.
+  slip?: number;
 }
 
 // Matches the shader's current `fragUV * 25.0`, so the detail tiling of the
@@ -158,6 +162,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroFadeEnd: 800,
     roughness: ROUGHNESS * 0.55,
     normalConvention: 'opengl',
+    slip: 0.5,
   },
   rocky_terrain: {
     name: 'rocky_terrain',

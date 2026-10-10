@@ -4,7 +4,8 @@ import {
   installFakeAudioContext,
 } from 'rewild-audio/lib/testing/FakeAudioContext';
 import { Footsteps, FootstepsDef } from './Footsteps';
-import { PlayerSounds, SLIDE_STOPS_STEPS } from './PlayerSounds';
+import { PlayerSounds } from './PlayerSounds';
+import { SLIDING_FROM } from './SlideSound';
 
 // Each file decodes to a buffer whose length says which sound it is.
 const LENGTHS: Record<string, number> = {
@@ -88,6 +89,11 @@ describe('PlayerSounds', () => {
     expect(played('flashlight')).toBe(1);
   });
 
+  it('slams into an obstacle on request', () => {
+    sounds.impact();
+    expect(played('land-hard')).toBe(1);
+  });
+
   it('lands with a footstep as the feet touch down', () => {
     fall();
     sounds.state.onGround = true;
@@ -126,7 +132,7 @@ describe('PlayerSounds', () => {
     const walking = played('step-dirt');
     expect(walking).toBeGreaterThan(0);
 
-    s.slideSpeed = SLIDE_STOPS_STEPS + 1;
+    s.slideX = SLIDING_FROM + 1;
     for (let i = 0; i < 120; i++) sounds.update(frame);
     expect(played('step-dirt')).toBe(walking);
   });

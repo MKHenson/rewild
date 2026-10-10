@@ -53,6 +53,8 @@ interface Layer {
   sound: string;
   gain: GainNode;
   source: AudioBufferSourceNode | null;
+  /** The pitch the bank picked for the source, before the bed's rate. */
+  pitch: number;
 }
 
 /**
@@ -73,6 +75,7 @@ export class Bed {
   private _gain = 0;
   private _cutoff = 20000;
   private _blend = 0;
+  private _rate = 1;
   private _state: BedState = 'stopped';
   private _waiting = 0;
   private _disposed = false;
@@ -85,6 +88,7 @@ export class Bed {
       sound,
       gain: null as unknown as GainNode,
       source: null,
+      pitch: 1,
     }));
     this._weights = new Float32Array(spec.sounds.length);
     layerWeights(0, spec.sounds.length, this._weights);
@@ -100,6 +104,10 @@ export class Bed {
 
   get blend(): number {
     return this._blend;
+  }
+
+  get rate(): number {
+    return this._rate;
   }
 
   get disposed(): boolean {
@@ -162,6 +170,17 @@ export class Bed {
     const tc = timeConstant(this.spec.attack);
     for (let i = 0; i < this._layers.length; i++)
       this._layers[i].gain.gain.setTargetAtTime(this._weights[i], now, tc);
+  }
+
+  /** Scales every layer's playback rate, which raises or lowers its pitch, ramping over the attack. */
+  setRate(rate: number): void {
+    if (this._disposed || rate === this._rate) return;
+    this._rate = rate;
+    if (!this._ctx) return;
+    const now = this._ctx.currentTime;
+    const tc = timeConstant(this.spec.attack);
+    for (const layer of this._layers)
+      layer.source?.playbackRate.setTargetAtTime(layer.pitch * rate, now, tc);
   }
 
   /** Stops the bed for good, fading out over `fade` seconds. */
@@ -240,7 +259,8 @@ export class Bed {
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.loop = true;
-      source.playbackRate.value = this._pick.pitch;
+      layer.pitch = this._pick.pitch;
+      source.playbackRate.value = this._pick.pitch * this._rate;
       source.connect(layer.gain);
       source.start(0, Math.random() * buffer.duration);
       layer.source = source;

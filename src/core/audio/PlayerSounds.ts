@@ -1,26 +1,15 @@
 import type { AudioEngine, AudioScope } from 'rewild-audio';
 import { BodySound } from './BodySound';
 import { DripSound } from './DripSound';
-import { FootstepGround, Footsteps, FootstepsDef } from './Footsteps';
+import { Footsteps, FootstepsDef } from './Footsteps';
+import { SLIDING_FROM, SlideInput, SlideSound } from './SlideSound';
 import { SwimSound } from './SwimSound';
 import { UnderWaterSound } from './UnderWaterSound';
 
-/** Slide speed, in the slide's units of half a metre a second, above which the feet slide rather than step. */
-export const SLIDE_STOPS_STEPS = 0.5;
-
 /** What the player sounds read each frame. The player fills it in, then calls `update`. */
-export interface PlayerSoundState {
-  /** Where the feet are. */
-  x: number;
-  z: number;
+export interface PlayerSoundState extends SlideInput {
   /** Metres moved across the ground this frame. */
   moved: number;
-  /** Whether the capsule rests on any ground, however steep. */
-  onGround: boolean;
-  /** Whether the ground is gentle enough to walk on. */
-  grounded: boolean;
-  /** Speed of the slide down steep ground, in the slide's units. */
-  slideSpeed: number;
   /** Player.verticalVelocity, downward, as the feet touched down. */
   fallSpeed: number;
   /** Whether touching down did fall damage. */
@@ -41,17 +30,19 @@ export interface PlayerSoundState {
   rising: boolean;
   /** 0..1: how wet the rain has left the ground. */
   wetness: number;
-  ground: FootstepGround | null;
 }
 
 function createState(): PlayerSoundState {
   return {
     x: 0,
+    y: 0,
     z: 0,
     moved: 0,
     onGround: false,
     grounded: false,
-    slideSpeed: 0,
+    slideX: 0,
+    slideZ: 0,
+    climbing: false,
     fallSpeed: 0,
     hurt: false,
     entryVelocity: 0,
@@ -70,8 +61,8 @@ function createState(): PlayerSoundState {
 }
 
 /**
- * Every sound the player makes: footsteps, the jump and landings, swimming,
- * dripping, the under-water mix and the flashlight. The player fills in
+ * Every sound the player makes: footsteps, the jump and landings, sliding,
+ * swimming, dripping, the under-water mix and the flashlight. The player fills in
  * `state` each frame and calls `update`; events such as a jump are calls of
  * their own. Everything plays in the player's scope.
  */
@@ -83,6 +74,7 @@ export class PlayerSounds {
   private readonly _body: BodySound;
   private readonly _swim: SwimSound;
   private readonly _drips: DripSound;
+  private readonly _slide: SlideSound;
   private _wasOnGround = false;
 
   /** A bad footsteps table logs an error and leaves the player without steps. */
@@ -97,10 +89,17 @@ export class PlayerSounds {
     this._body = new BodySound(scope);
     this._swim = new SwimSound(scope);
     this._drips = new DripSound(scope);
+    this._slide = new SlideSound(scope, this._footsteps);
   }
 
   jump(): void {
     this._body.jump();
+    this._slide.jumped();
+  }
+
+  /** The player slid into an obstacle hard enough to hurt. */
+  impact(): void {
+    this._body.impact();
   }
 
   flashlight(): void {
@@ -112,6 +111,7 @@ export class PlayerSounds {
     this._step(seconds);
     if (!this._wasOnGround && s.onGround && s.immersion <= 0) this._land();
     this._wasOnGround = s.onGround;
+    this._slide.update(s, seconds);
 
     this._underWater.update(
       s.immersion,
@@ -135,6 +135,7 @@ export class PlayerSounds {
     if (Footsteps.current === this._footsteps) Footsteps.current = null;
     this._underWater.dispose();
     this._drips.dispose();
+    this._slide.dispose();
   }
 
   /** Steps as the player walks, from the ground under the feet. */
@@ -147,7 +148,7 @@ export class PlayerSounds {
     signals.set('wetness', s.wetness);
     signals.set('immersion', s.immersion);
     signals.set('crouching', s.crouching ? 1 : 0);
-    const sliding = s.onGround && s.slideSpeed > SLIDE_STOPS_STEPS;
+    const sliding = s.onGround && Math.hypot(s.slideX, s.slideZ) > SLIDING_FROM;
     footsteps.update(
       s.moved,
       seconds,
