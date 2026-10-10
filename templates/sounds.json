@@ -329,6 +329,13 @@
       "license": "soundly"
     },
     {
+      "name": "death",
+      "files": ["audio/voice/death-01.ogg", "audio/voice/death-02.ogg"],
+      "pitch": [0.97, 1.03],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
       "name": "swim-stroke",
       "files": [
         "audio/swim/swim-stroke-01.ogg",

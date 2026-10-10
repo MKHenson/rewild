@@ -34,6 +34,10 @@ export interface PlayerSoundState extends SlideInput, VoiceInput {
 
 /** Seconds the breathing and the heartbeat take to fade out on death. */
 const DEATH_FADE = 0.5;
+/** Seconds the death sound waits after the thud of the fall or impact that killed. */
+export const DEATH_AFTER_THUD = 0.35;
+/** Seconds after a hard thud within which a death counts as caused by it. */
+const THUD_KILLS = 0.1;
 
 /** Health below which the world starts to pull away, and at which it is furthest. */
 const DAZE_FROM = 25;
@@ -95,6 +99,7 @@ export class PlayerSounds {
   private readonly _slide: SlideSound;
   private readonly _voice: VoiceSound | null;
   private _wasOnGround = false;
+  private _sinceThud = Infinity;
 
   /** A bad footsteps or voice table logs an error and leaves the player without steps, or voice. */
   constructor(
@@ -122,6 +127,7 @@ export class PlayerSounds {
   /** The player slid into an obstacle hard enough to hurt. */
   impact(): void {
     this._body.impact();
+    this._sinceThud = 0;
   }
 
   flashlight(): void {
@@ -130,6 +136,7 @@ export class PlayerSounds {
 
   update(seconds: number): void {
     const s = this.state;
+    this._sinceThud += seconds;
     this._step(seconds);
     if (!this._wasOnGround && s.onGround && s.immersion <= 0) this._land();
     this._wasOnGround = s.onGround;
@@ -157,11 +164,18 @@ export class PlayerSounds {
     this._underWater.setDaze(dazeShare(s.health));
   }
 
-  /** The player died: the breathing, the heartbeat, the slide and the drips fade out. */
+  /**
+   * The player died: the death sound, after the thud if a fall or an impact
+   * killed them; the breathing, the heartbeat, the slide and the drips fade
+   * out; and the world goes distant and dull.
+   */
   die(): void {
-    this._voice?.stopBreathing(DEATH_FADE);
+    const delay = this._sinceThud < THUD_KILLS ? DEATH_AFTER_THUD : 0;
+    if (this._voice) this._voice.die(DEATH_FADE, delay);
+    else this._body.death(delay);
     this._slide.dispose();
     this._drips.dispose();
+    this._underWater.die();
   }
 
   /** Lifts the under-water muffle and stops the beds. */
@@ -197,6 +211,7 @@ export class PlayerSounds {
   private _land(): void {
     const s = this.state;
     if (!this._body.land(s.fallSpeed, s.hurt)) return;
+    if (s.hurt) this._sinceThud = 0;
     this._footsteps?.step(s.x, s.z);
     this._footsteps?.reset();
   }

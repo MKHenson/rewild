@@ -62,6 +62,13 @@ export class BodySound {
     this._play('land-hard', 1);
   }
 
+  /** The death sound, `delay` seconds from now, for a player with no voice. */
+  death(delay: number): void {
+    this._options.delay = delay;
+    this._play('death', 1);
+    this._options.delay = 0;
+  }
+
   flashlight(): void {
     this._play('flashlight', 1);
   }

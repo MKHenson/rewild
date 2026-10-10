@@ -565,17 +565,20 @@ When `health` reaches 0, `Player._die()` stops the player, calls `onDeath` and r
 lock. `InGame` then opens the **Game Over** menu. Its **Restart** disposes the viewport and builds
 a new one.
 
-- **The sound.** `_die()` plays a one-shot death sound on the player bus. If a fall caused the
-  death, the hard landing plays first and the death sound follows it.
-- **The mix.** The world bus fades and its low-pass falls over about 2 s, so the world goes
-  distant and dull. It is the same filter as under water, with a slower curve. The player bus
-  stops, so the heartbeat and breathing end.
-- **The body.** `PlayerSounds.die()` fades out the breathing, the heartbeat, the slide and the drips
-  over 0.5 s, since the player no longer updates them. A last pain cry plays to its end.
+- **The sound.** `_die()` calls `PlayerSounds.die()`, and the voice says `death`, on the player
+  bus. It is the voice's highest priority, so it cuts off a pain cry from the same hit. If a hard
+  landing or an impact killed the player, it waits 0.35 s so the thud comes first. Drowned, it is
+  muffled as every voice sound under water is. A player with no voice table still plays it.
+- **The body.** The breathing, the heartbeat, the slide and the drips fade out over 0.5 s, since
+  the player no longer updates them.
+- **The mix.** `UnderWaterSound.die()` takes the world bus's low-pass to 500 Hz and its gain to 0.2,
+  by e every 0.67 s, so the world goes distant and dull over about 2 s. It is the same filter as
+  under water, with a slower curve. The under-water bed fades with it.
 - **The Game Over menu.** The world stays faded behind it. It does not take the in-game menu's
   duck as well.
-- **Restart.** The old game's sounds stop. The new game lifts the world bus over about 1 s as it
-  starts.
+- **Restart and quit.** The old game's sounds stop. Disposing the dead player's sounds lifts the
+  world over about 1 s, and a new game's player lifts it as slowly, so the world comes back as the
+  new game starts.
 
 ### Breath and voice
 
