@@ -154,7 +154,8 @@ export interface VoiceInput {
  * `VoicePriority`: a gasp on surfacing, a pain grunt, a strain under water,
  * or a breath. A higher one cuts in over a lower one, and the breathing
  * loops fall silent while it speaks. With the head under water it is
- * muffled as the world is. On the player bus, in 2D.
+ * muffled as the world is, and the head going in or out of the water cuts
+ * off what it was saying. On the player bus, in 2D.
  */
 export class VoiceSound {
   /** The player's voice in the running game, for the console. */
@@ -259,6 +260,7 @@ export class VoiceSound {
   update(s: VoiceInput, stroked: boolean, seconds: number): void {
     this._speakFor -= seconds;
     if (this._speakFor <= 0) this._speaking = -1;
+    if (s.cameraUnderWater !== this._under) this._hush();
     this._under = s.cameraUnderWater;
 
     const spent = 1 - s.stamina;
@@ -420,6 +422,13 @@ export class VoiceSound {
   /** A random number of seconds in `range`. */
   private _pick(range: readonly [number, number]): number {
     return range[0] + (range[1] - range[0]) * this.random();
+  }
+
+  /** Cuts off what the mouth is saying, short of the death. */
+  private _hush(): void {
+    if (this._speaking < 0 || this._speaking >= VoicePriority.Death) return;
+    this._mouth.stopSounds(MOUTH_CUT);
+    this._speaking = -1;
   }
 
   /**

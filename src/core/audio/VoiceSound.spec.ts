@@ -303,6 +303,30 @@ describe('VoiceSound', () => {
     expect(voice.effort).toBeGreaterThan(0.95);
   });
 
+  it('cuts the gasp off when a wave takes the head under again', () => {
+    input.cameraUnderWater = true;
+    input.oxygen = 0.5;
+    run(1);
+    input.cameraUnderWater = false;
+    run(frame);
+    const gasp = sources('gasp-medium')[0];
+    expect(gasp.stopped).toBe(false);
+
+    input.cameraUnderWater = true;
+    run(frame);
+    expect(gasp.stopped).toBe(true);
+    expect(voice.speaking).toBe(-1);
+  });
+
+  it('keeps dying through a wave over the head', () => {
+    run(1);
+    voice.die(1, 0);
+    input.cameraUnderWater = true;
+    run(frame);
+    expect(sources('death')[0].stopped).toBe(false);
+    expect(voice.speaking).toBe(VoicePriority.Death);
+  });
+
   it('always gasps big in a rough sea', () => {
     input.windiness = GASP_ROUGH_SEA + 0.1;
     input.cameraUnderWater = true;

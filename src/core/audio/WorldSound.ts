@@ -3,17 +3,22 @@ import type { Renderer } from 'rewild-renderer';
 import { resolveClimatePreset } from 'rewild-renderer/lib/renderers/terrain/Biomes';
 import { BiomeProbe } from 'rewild-renderer/lib/renderers/terrain/BiomeProbe';
 import type { TerrainRenderer } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
-import { MAX_WATER_TYPES } from 'rewild-renderer/lib/renderers/terrain/Water';
+import {
+  MAX_WATER_TYPES,
+  OCEAN_WATER,
+} from 'rewild-renderer/lib/renderers/terrain/Water';
 import type { ShorePoint } from 'rewild-renderer/lib/renderers/water/ShoreField';
 import type { WaterQuerySample } from 'rewild-renderer/lib/renderers/water/WaterQuery';
+import { OpenSeaSound, SeaWater } from './OpenSeaSound';
 import { RainSound } from './RainSound';
 import { SurfSound, SurfWater } from './SurfSound';
 import { ThunderSound } from './ThunderSound';
 import { WindSound } from './WindSound';
 
-/** The terrain's water, as the surf reads it. */
-class TerrainWater implements SurfWater {
+/** The terrain's water, as the surf and the open sea read it. */
+class TerrainWater implements SurfWater, SeaWater {
   readonly lapping = new Float64Array(MAX_WATER_TYPES);
+  readonly ocean = new Float64Array(MAX_WATER_TYPES);
   private _terrain: TerrainRenderer | null = null;
   private _preset: string | null = null;
 
@@ -30,8 +35,11 @@ class TerrainWater implements SurfWater {
     this._preset = terrain.climatePreset;
     const palette = resolveClimatePreset(this._preset).water ?? [];
     this.lapping.fill(0);
-    for (let i = 0; i < palette.length && i < MAX_WATER_TYPES; i++)
+    this.ocean.fill(0);
+    for (let i = 0; i < palette.length && i < MAX_WATER_TYPES; i++) {
       this.lapping[i] = palette[i].lapping;
+      this.ocean[i] = palette[i].name === OCEAN_WATER ? 1 : 0;
+    }
   }
 
   nearestShore(x: number, z: number, out: ShorePoint): boolean {
@@ -51,6 +59,7 @@ export class WorldSound {
   private readonly _rain: RainSound;
   private readonly _thunder: ThunderSound;
   private readonly _surf: SurfSound;
+  private readonly _openSea: OpenSeaSound;
   private readonly _water = new TerrainWater();
   private readonly _biomes = new BiomeProbe();
   private readonly _engine: AudioEngine;
@@ -62,6 +71,7 @@ export class WorldSound {
     this._rain = new RainSound(scope);
     this._thunder = new ThunderSound(engine, scope);
     this._surf = new SurfSound(engine, scope);
+    this._openSea = new OpenSeaSound(engine, scope);
   }
 
   get wind(): WindSound {
@@ -92,6 +102,7 @@ export class WorldSound {
     if (renderer.terrainRenderer) {
       this._water.attach(renderer.terrainRenderer);
       this._surf.update(this._water, sky.wind.vec[2], seconds);
+      this._openSea.update(this._water, sky.wind.vec[2], seconds);
       this._biomeWait -= seconds;
       if (this._biomeWait <= 0) {
         this._biomeWait = BIOME_PROBE_SECONDS;

@@ -67,3 +67,21 @@ export function lapLevel(lapping: number, windiness: number): number {
     (LAP_CALM_LEVEL + (1 - LAP_CALM_LEVEL) * wind)
   );
 }
+
+/** Metres above the sea within which the open sea plays at full gain. */
+export const OPEN_SEA_NEAR = 3;
+/** Metres above the sea by which the open sea has faded out. */
+export const OPEN_SEA_FAR = 60;
+
+/** The open sea's gain `height` metres above water that is `ocean` 0..1 ocean, louder as the sea rises. */
+export function openSeaGain(
+  height: number,
+  ocean: number,
+  sea: number
+): number {
+  return (
+    Math.min(1, Math.max(0, ocean)) *
+    (1 - smoothstep(height, OPEN_SEA_NEAR, OPEN_SEA_FAR)) *
+    surfLevel(sea)
+  );
+}
