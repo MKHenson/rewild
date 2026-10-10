@@ -2,8 +2,8 @@
 export const OXYGEN_FULL = 100;
 /** Oxygen a second under water uses: a full breath lasts thirty seconds. */
 export const OXYGEN_USE = OXYGEN_FULL / 30;
-/** Oxygen a second above water brings back: an empty breath refills in ten seconds. */
-export const OXYGEN_RECOVER = OXYGEN_FULL / 10;
+/** Oxygen a second above water brings back: an empty breath refills in twenty-five seconds. */
+export const OXYGEN_RECOVER = OXYGEN_FULL / 80;
 /** Health a second of drowning takes: ten seconds from full health to death. */
 export const DROWN_DAMAGE = 10;
 
