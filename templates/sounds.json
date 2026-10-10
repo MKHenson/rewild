@@ -451,6 +451,165 @@
       "gain": [0.8, 1],
       "source": "Soundly: slide mix",
       "license": "soundly"
+    },
+    {
+      "name": "breath-calm",
+      "files": ["audio/voice/breath-calm.ogg"],
+      "loop": true,
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "breath-hard",
+      "files": ["audio/voice/breath-hard.ogg"],
+      "gain": [0.2, 0.3],
+      "loop": true,
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "breath-pant",
+      "files": ["audio/voice/breath-pant.ogg"],
+      "gain": [0.2, 0.3],
+      "loop": true,
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "breath-heat",
+      "files": ["audio/voice/breath-heat.ogg"],
+      "loop": true,
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "breath-pained",
+      "files": ["audio/voice/breath-pained.ogg"],
+      "loop": true,
+      "gain": [0.2, 0.3],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "heartbeat",
+      "files": ["audio/voice/heartbeat.ogg"],
+      "loop": true,
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "pain-small",
+      "files": [
+        "audio/voice/pain-small-01.ogg",
+        "audio/voice/pain-small-02.ogg",
+        "audio/voice/pain-small-03.ogg"
+      ],
+      "pitch": [0.95, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "pain-medium",
+      "files": [
+        "audio/voice/pain-medium-01.ogg",
+        "audio/voice/pain-medium-02.ogg",
+        "audio/voice/pain-medium-03.ogg"
+      ],
+      "pitch": [0.95, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "pain-big",
+      "files": [
+        "audio/voice/pain-big-01.ogg",
+        "audio/voice/pain-big-02.ogg",
+        "audio/voice/pain-big-03.ogg"
+      ],
+      "pitch": [0.95, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "gasp-small",
+      "files": [
+        "audio/voice/gasp-small-01.ogg",
+        "audio/voice/gasp-small-02.ogg"
+      ],
+      "pitch": [0.95, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "gasp-medium",
+      "files": [
+        "audio/voice/gasp-medium-01.ogg",
+        "audio/voice/gasp-medium-02.ogg"
+      ],
+      "pitch": [0.95, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "gasp-big",
+      "files": ["audio/voice/gasp-big-01.ogg", "audio/voice/gasp-big-02.ogg"],
+      "pitch": [0.95, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "breath-strain",
+      "files": [
+        "audio/voice/breath-strain-01.ogg",
+        "audio/voice/breath-strain-02.ogg"
+      ],
+      "pitch": [0.95, 1.05],
+      "gain": [0.5, 0.6],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "breath-swim",
+      "files": [
+        "audio/voice/breath-swim-01.ogg",
+        "audio/voice/breath-swim-02.ogg",
+        "audio/voice/breath-swim-03.ogg",
+        "audio/voice/breath-swim-04.ogg"
+      ],
+      "pitch": [0.95, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "voice-shiver",
+      "files": [
+        "audio/voice/voice-shiver-01.ogg",
+        "audio/voice/voice-shiver-02.ogg",
+        "audio/voice/voice-shiver-03.ogg"
+      ],
+      "pitch": [0.95, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
+    },
+    {
+      "name": "stomach-growl",
+      "files": [
+        "audio/voice/stomach-growl-01.ogg",
+        "audio/voice/stomach-growl-02.ogg",
+        "audio/voice/stomach-growl-03.ogg"
+      ],
+      "pitch": [0.95, 1.05],
+      "gain": [0.85, 1],
+      "source": "Soundly: voice mix",
+      "license": "soundly"
     }
   ]
 }

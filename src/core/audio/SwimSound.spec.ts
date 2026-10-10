@@ -108,4 +108,14 @@ describe('SwimSound', () => {
     swimFor(FIRST_STROKE + 2 * frame);
     expect(played).toEqual(['swim-stroke']);
   });
+
+  it('says when a stroke at the surface played', () => {
+    swim.update(true, false, true, false, FIRST_STROKE + frame);
+    expect(swim.stroked).toBe(true);
+    swim.update(true, false, true, false, frame);
+    expect(swim.stroked).toBe(false);
+    swim.update(true, true, true, false, DIVE_STROKE_EVERY + frame);
+    expect(played).toContain('swim-stroke-under');
+    expect(swim.stroked).toBe(false);
+  });
 });

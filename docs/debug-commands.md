@@ -318,6 +318,27 @@ See [Understory](./milestones/understory.md).
 
 ---
 
+## Player
+
+Registered in `PlayerDebugCommands.ts`. They work in a game only.
+
+```js
+player(); // health, hunger, stamina, oxygen, body temperature and how wet the body is
+setHealth(20); // 0..100
+setHunger(10); // 0..100
+setStamina(0); // 0..100; empty exhausts the player, as running it down does
+setOxygen(30); // 0..100
+setBodyTemperature(0.8); // -1 really cold .. 1 really hot, held until released
+setBodyTemperature('weather'); // lets it follow the weather again
+```
+
+Health, stamina and oxygen carry on from the value set: health regenerates, stamina and oxygen
+refill. Body temperature would ease back toward the weather within seconds, so a set value is held
+until `setBodyTemperature('weather')`. Each command with no argument prints its range and the
+current value.
+
+---
+
 ## Audio
 
 Registered in `AudioDebugCommands.ts` when the app starts, so they work on the main
@@ -341,6 +362,7 @@ setPanning('equalpower'); // 3D voices pan by level only; 'HRTF' (the default) t
 holdBed('test-loop', 0.5); // holds a looping sound at a gain, on the ambience bus
 holdBed('test-loop', 0); // fades it out; its source stops a few seconds later
 footsteps(); // the footstep signals, the surfaces under the last step and each layer's gain
+voice(); // the body values, what the mouth is saying, each rule's weight and each layer's gain
 ```
 
 The buses are `master`, `music`, `world`, `ambience`, `weather`, `effects`,
@@ -374,6 +396,10 @@ about 200 m and goes virtual beyond about 400 m.
 `footsteps()` works in a game only. Its surface table shows the weight of each surface under the
 last step, from the terrain's splat; its layer table shows the gain each sound played at after the
 rules, so a wet, wading or crouched step can be checked against `templates/footsteps.json`.
+
+`voice()` works in a game only. `speaking` is the priority of what the mouth is saying: 3 pain,
+2 a gasp, 1 the strain, 0 a breath, and -1 nothing. Its tables show each rule's weight and each
+layer's gain, to check against `templates/voice.json`.
 
 See [Susurrus](./milestones/susurrus.md).
 

@@ -2,6 +2,7 @@ import { Vector3 } from 'rewild-common';
 import { AudioEngine, BUS_NAMES, Bed, isBusName } from 'rewild-audio';
 import { sceneScope } from '../audio/audio';
 import { Footsteps } from '../audio/Footsteps';
+import { VoiceSound } from '../audio/VoiceSound';
 
 export function registerAudioDebugCommands(audio: AudioEngine) {
   const busList = BUS_NAMES.join(' | ');
@@ -296,6 +297,36 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
       )
     );
     const rules = steps.rules;
+    console.table(
+      rules.slotIds.map((id, i) => ({
+        layer: id,
+        sound: rules.slotSounds[i],
+        gain: +rules.gains[i].toFixed(2),
+      }))
+    );
+  };
+  (window as any).voice = () => {
+    const voice = VoiceSound.current;
+    if (!voice) {
+      console.log('voice() — no player in a game');
+      return;
+    }
+    console.log(
+      `Voice: effort ${voice.effort.toFixed(
+        2
+      )}, breath held ${voice.breathHeld.toFixed(
+        1
+      )} s, heat ${voice.heat.toFixed(2)}, cold ${voice.cold.toFixed(
+        2
+      )}, hurt ${voice.hurt.toFixed(2)}, speaking ${voice.speaking}`
+    );
+    const rules = voice.rules;
+    console.table(
+      rules.ruleIds.map((id, i) => ({
+        rule: id,
+        weight: +rules.ruleWeights[i].toFixed(2),
+      }))
+    );
     console.table(
       rules.slotIds.map((id, i) => ({
         layer: id,
