@@ -60,6 +60,12 @@ export interface PlayOptions {
   fadeIn?: number;
   /** Multiplies its loudness when voices are ranked, so it is stolen last. 3D only. */
   priority?: number;
+  /**
+   * The panner's model; the engine's default when left out. 'equalpower'
+   * keeps a stereo sound stereo and uncoloured, for a wide source such as the
+   * surf. 3D only.
+   */
+  panning?: PanningModelType;
 }
 
 /**
@@ -119,6 +125,7 @@ export class AudioEngine {
     fadeIn: 0,
     priority: 1,
     owner: 0,
+    panning: null,
   };
   private readonly _oneShots = new Set<OneShot>();
   private _nextScope = 1;
@@ -310,7 +317,8 @@ export class AudioEngine {
     return this._voices?.inUse ?? 0;
   }
 
-  /** 'equalpower' pans by level only: a sound to the side plays in one speaker. */
+  /** The panning model for sounds that name none. 'equalpower' pans by level
+   *  only: a sound to the side plays in one speaker. */
   setPanningModel(model: PanningModelType): void {
     this._voices?.setPanningModel(model);
   }
@@ -375,6 +383,7 @@ export class AudioEngine {
     s.fadeIn = options.fadeIn ?? 0;
     s.priority = options.priority ?? 1;
     s.owner = owner;
+    s.panning = options.panning ?? null;
     return this._voices.start(name, s);
   }
 

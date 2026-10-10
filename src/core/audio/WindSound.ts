@@ -56,6 +56,7 @@ export class WindSound {
     rolloff: 0,
     gain: 1,
     priority: 2,
+    panning: 'equalpower',
   };
 
   private _envelope = 0;
@@ -81,6 +82,7 @@ export class WindSound {
       gain: 0,
       rolloff: 0,
       priority: 4,
+      panning: 'equalpower',
     });
   }
 

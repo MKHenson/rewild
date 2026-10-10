@@ -67,6 +67,7 @@ function createState(): PlayerSoundState {
     waterDepth: 0,
     cameraUnderWater: false,
     oxygen: 1,
+    windiness: 0,
     crouching: false,
     sprinting: false,
     pushing: false,

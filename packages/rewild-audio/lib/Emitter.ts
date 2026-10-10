@@ -13,6 +13,8 @@ export interface EmitterSpec {
   rolloff?: number;
   /** Multiplies its loudness when voices are ranked, so it is stolen last. */
   priority?: number;
+  /** The panner's model. See `PlayOptions.panning`. */
+  panning?: PanningModelType;
 }
 
 export type EmitterState = 'playing' | 'virtual';
@@ -56,6 +58,7 @@ export class Emitter {
       cutoff: this._cutoff,
       rolloff: spec.rolloff ?? 1,
       priority: spec.priority ?? 1,
+      panning: spec.panning,
       fadeIn: EMITTER_FADE,
       offset: 0,
     };

@@ -128,6 +128,27 @@
       "license": "soundly"
     },
     {
+      "name": "surf-calm",
+      "files": ["audio/water/surf-calm.ogg"],
+      "loop": true,
+      "source": "Soundly: surf mix",
+      "license": "soundly"
+    },
+    {
+      "name": "surf-storm",
+      "files": ["audio/water/surf-storm.ogg"],
+      "loop": true,
+      "source": "Soundly: surf mix",
+      "license": "soundly"
+    },
+    {
+      "name": "lake-lapping",
+      "files": ["audio/water/lake-lapping.ogg"],
+      "loop": true,
+      "source": "Soundly: lapping mix",
+      "license": "soundly"
+    },
+    {
       "name": "plunge-small",
       "files": [
         "audio/water/plunge-small-01.ogg",
@@ -304,7 +325,7 @@
         "audio/body/land-04.ogg"
       ],
       "pitch": [0.92, 1.08],
-      "gain": [0.85, 1],
+      "gain": [0.45, 0.5],
       "source": "Soundly: body mix",
       "license": "soundly"
     },

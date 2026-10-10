@@ -89,7 +89,7 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
 | Parameter changes  | **`setTargetAtTime`** on every `AudioParam`                                        | Writing `.value` each frame makes zipper noise and clicks. A time constant gives smooth changes at any frame rate.                                                                                       |
 | Beds               | **2D, no panner**                                                                  | Rain, wind and biome life are all around the player. A panner would make them come from one point.                                                                                                       |
 | Player sounds      | **2D, no panner**                                                                  | Footsteps and breathing are at the listener. A panner there gives nothing and costs CPU.                                                                                                                 |
-| 3D emitters        | **`PannerNode`, HRTF**, from a fixed pool                                          | HRTF gives above, below and behind. A pool caps the CPU cost and needs no allocation per sound.                                                                                                          |
+| 3D emitters        | **`PannerNode`, HRTF**, from a fixed pool; equal power for wide sounds            | HRTF gives above, below and behind. Equal power keeps wind, thunder and surf stereo and clear. A pool caps the CPU cost and needs no allocation per sound.                                                |
 | Places that sound  | **`Emitter`s with virtual voices**                                                 | A waterfall must still sound when the player comes back. An emitter always exists, but holds a voice only while it can be heard, and takes one again by itself.                                          |
 | Far sounds         | **Gain and tone set by the game**, panner only for direction                       | Thunder is 700 to 1,900 m away. The game sets the distance curve. The panner sits 50 m out in the right direction.                                                                                       |
 | Under water        | **A low-pass insert** on the world bus, driven by the player                       | One filter makes every world sound muffled. No sound needs its own under-water version. `Player.cameraUnderWater` sets it.                                                                               |
@@ -178,7 +178,7 @@ audio.move(id, position);
 audio.stop(id, 0.5); // fade out over 0.5 s
 ```
 
-- **Voice pool.** 24 voices, each a low-pass, a gain and an HRTF `PannerNode`, built once when
+- **Voice pool.** 24 voices, each a low-pass, a gain and a `PannerNode`, built once when
   the context starts. A play creates only its buffer source. When the pool is full, a new sound
   takes the voice heard quietest, or does not play if it would be quieter than all of them.
   "Heard" is the voice's gain times the panner's distance curve from the listener.
@@ -195,6 +195,9 @@ audio.stop(id, 0.5); // fade out over 0.5 s
   picks one at random, so ten footsteps do not sound the same.
 - **Priority** multiplies a sound's loudness when voices are ranked, so a sound with a high
   priority is stolen last. Its real gain does not change.
+- **Panning.** A voice pans with HRTF unless its sound names `panning: 'equalpower'`. HRTF colours
+  a sound and mixes it to mono, which dulls a wide stereo recording, so the wide sounds use equal
+  power: the wind in the ears, the gusts, the thunder, the surf and the lapping. `setPanning` changes the model for sounds that name none.
 
 ### Emitters that belong to a place
 
@@ -627,7 +630,8 @@ time, by priority:
 
 1. **Death.** With [Death](#death).
 2. **Gasp.** On surfacing, sized by the share of the oxygen bar used: `gasp-small` from 3%, a
-   short breath; `gasp-medium` from 35%; `gasp-big` from 70%, up to running out. It leaves
+   short breath; `gasp-medium` from 35%; `gasp-big` from 70%, up to running out. Above
+   `windiness` 0.7 every gasp is `gasp-big`: a rough sea leaves no easy breath. It leaves
    `effort` at the share used, so hard breaths and panting follow a long dive. It ranks above pain,
    so coming up from drowning always gasps.
 3. **Pain.** A grunt when `health` falls. Damage gathers over about 0.3 s, so a fall is one hit.
@@ -887,13 +891,26 @@ is in real metres a second: a walk is about 6 and a sprint about 15.
 
 Surf and lapping are world sounds, read at the listener, so they play in the editor too.
 
-- **Ocean surf.** An emitter on the nearest shore point from `ShoreField`, moved as the listener
-  walks, so the surf comes from the beach. Its gain follows the sea state from `windiness`. A calm
-  sea is a soft wash. A storm sea is a heavy crash.
-- **Lake lapping.** Quieter and shorter. It follows the lake's `lapping` value from the water
-  palette.
-- `WaterQuery.sample` gives the water's kind through `typeWeights`, so ocean and lake can blend at
-  a lagoon.
+`SurfSound` in `src/core/audio/`, held by `WorldSound`, plays them on the ambience bus, with
+equal-power panning so the recordings stay stereo and clear.
+
+- **Ocean surf.** Two emitters, `surf-calm` and `surf-storm`, on the nearest point of the
+  waterline the shore waves reach, from `ShoreField.nearestShore`. Each rebuild of the field
+  collects that waterline: the reached water texels with land beside them. The emitters glide
+  toward the point by e every 0.3 s as the listener walks, so the surf comes from the beach. A
+  jump of more than 40 m snaps them.
+- **The sea state.** `windiness` from 0.25 to 0.75 crossfades the calm wash into the storm crash
+  with equal power, and raises the level from 0.6 to 1.
+- **Surf distance.** The game sets it, with no distance curve (`rolloff: 0`): full within 15 m of
+  the shore, then falling as `(15 / d)^0.8`, a long beach falling slower than a point, and fading
+  out from 500 m to 900 m. The waves' strength from the field fades it toward the grid's edge.
+- **Lake lapping.** `lake-lapping` on an emitter at the nearest shoreline within 60 m whose water
+  laps. Five times a second, `findLapping` marches 16 bearings out from the listener in 4 m steps
+  through `WaterQuery.sample`, and places where water meets dry ground by four halvings. The
+  water's lapping is its `typeWeights` over each palette entry's `lapping`, so the ocean has none
+  and a lagoon blending lake into ocean laps by its share of lake.
+- **Lapping gain.** Full within 3 m of the shoreline, then `3 / d`, fading out from 30 m to 60 m.
+  It is 0.35 in still air, rising to full as `windiness` goes from 0.1 to 0.6.
 
 ### Where the player is
 
