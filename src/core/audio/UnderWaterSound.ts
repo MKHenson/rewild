@@ -14,6 +14,14 @@ export const UNDER_WATER_LEVEL = 0.5;
 /** Seconds by e the world takes to go under and to come back. */
 const MUFFLE_TIME = 0.035;
 
+/** The world bus's cutoff and gain once the player has died. */
+export const DEAD_CUTOFF = 500;
+export const DEAD_LEVEL = 0.2;
+/** Seconds by e the world takes to go distant on death, about 2 s in all. */
+const DEATH_TIME = 0.67;
+/** Seconds by e the world takes to come back for a new game, about 1 s in all. */
+const LIFT_TIME = 0.33;
+
 /** The world bus's cutoff and gain when the player is fully dazed. */
 export const DAZED_CUTOFF = 3000;
 export const DAZED_LEVEL = 0.75;
@@ -89,6 +97,7 @@ export class UnderWaterSound {
   private _under = false;
   private _underFor = 0;
   private _daze = 0;
+  private _dead = false;
 
   constructor(
     private readonly _engine: AudioEngine,
@@ -100,7 +109,7 @@ export class UnderWaterSound {
       attack: 0.15,
       release: 0.4,
     });
-    this._engine.muffleWorld(OPEN_CUTOFF_HZ, 1, MUFFLE_TIME);
+    this._engine.muffleWorld(OPEN_CUTOFF_HZ, 1, LIFT_TIME);
   }
 
   /**
@@ -163,9 +172,20 @@ export class UnderWaterSound {
     this._bed.set(this._under ? 1 : 0);
   }
 
-  /** Lifts the muffle and stops the bed. */
+  /** The player died: the world goes distant and dull, and the bed fades. */
+  die(): void {
+    this._dead = true;
+    this._engine.muffleWorld(DEAD_CUTOFF, DEAD_LEVEL, DEATH_TIME);
+    this._bed.set(0);
+  }
+
+  /** Lifts the muffle, slowly after a death, and stops the bed. */
   dispose(): void {
-    this._engine.muffleWorld(OPEN_CUTOFF_HZ, 1, MUFFLE_TIME);
+    this._engine.muffleWorld(
+      OPEN_CUTOFF_HZ,
+      1,
+      this._dead ? LIFT_TIME : MUFFLE_TIME
+    );
     this._bed.dispose(0.3);
   }
 

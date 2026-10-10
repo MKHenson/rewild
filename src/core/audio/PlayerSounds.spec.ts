@@ -4,10 +4,10 @@ import {
   installFakeAudioContext,
 } from 'rewild-audio/lib/testing/FakeAudioContext';
 import { Footsteps, FootstepsDef } from './Footsteps';
-import { PlayerSounds } from './PlayerSounds';
+import { DEATH_AFTER_THUD, PlayerSounds } from './PlayerSounds';
 import { SLIDING_FROM } from './SlideSound';
 import { VoiceDef, VoiceSound } from './VoiceSound';
-import { DAZED_LEVEL } from './UnderWaterSound';
+import { DAZED_LEVEL, DEAD_CUTOFF, DEAD_LEVEL } from './UnderWaterSound';
 
 // Each file decodes to a buffer whose length says which sound it is.
 const LENGTHS: Record<string, number> = {
@@ -20,6 +20,7 @@ const LENGTHS: Record<string, number> = {
   flashlight: 3003,
   'swim-stroke': 4000,
   'breath-swim': 4001,
+  death: 5000,
 };
 
 const manifest = {
@@ -53,6 +54,17 @@ function played(name: string): number {
 }
 
 const frame = 1 / 60;
+
+function now(): number {
+  return (engine.context as unknown as FakeAudioContext).currentTime;
+}
+
+/** When the death sound starts, on the audio clock. */
+function deathStart(): number {
+  const ctx = engine.context as unknown as FakeAudioContext;
+  return ctx.sources.find((s) => s.buffer?.length === LENGTHS.death)!
+    .startedAt!;
+}
 
 /** Stands the player on flat ground for a frame. */
 function stand(): void {
@@ -239,6 +251,35 @@ describe('PlayerSounds', () => {
     expect(own().length).toBeGreaterThan(1);
     voiced.die();
     expect(own().map((bed) => bed.spec.sounds[0])).toEqual(['under-water']);
+    expect(own()[0].gain).toBe(0);
     voiced.dispose();
+  });
+
+  it('dies with a death sound, and the world goes distant and dull', () => {
+    sounds.die();
+    expect(played('death')).toBe(1);
+    expect(deathStart()).toBeCloseTo(now(), 6);
+    expect(engine.muffleCutoff).toBe(DEAD_CUTOFF);
+    expect(engine.muffleLevel).toBe(DEAD_LEVEL);
+    sounds.dispose();
+    expect(engine.muffleLevel).toBe(1);
+  });
+
+  it('dies after the thud of a fall that kills', () => {
+    fall();
+    sounds.state.onGround = true;
+    sounds.state.fallSpeed = 30;
+    sounds.state.hurt = true;
+    sounds.update(frame);
+    sounds.die();
+    expect(played('land-hard')).toBe(1);
+    expect(deathStart()).toBeCloseTo(now() + DEATH_AFTER_THUD, 6);
+  });
+
+  it('dies after the thud of an impact that kills', () => {
+    sounds.impact();
+    sounds.update(frame);
+    sounds.die();
+    expect(deathStart()).toBeCloseTo(now() + DEATH_AFTER_THUD, 6);
   });
 });

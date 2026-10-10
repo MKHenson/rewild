@@ -37,6 +37,7 @@ export const MOUTH_TAG = 'mouth';
 
 /** What the mouth is saying, highest first. A higher sound cuts in over a lower one. */
 export const VoicePriority = {
+  Death: 4,
   Gasp: 3,
   Pain: 2,
   Strain: 1,
@@ -291,9 +292,14 @@ export class VoiceSound {
     this._play(seconds);
   }
 
-  /** Fades out the breathing and the body loops for good. What the mouth is saying plays on to its end. */
-  stopBreathing(fade: number): void {
+  /**
+   * The player died: the breathing and the body loops fade out over `fade`
+   * seconds, and the death sound cuts in over whatever the mouth is saying,
+   * `delay` seconds from now.
+   */
+  die(fade: number, delay: number): void {
     for (const bed of this._beds) bed?.dispose(fade);
+    this._speak(VoicePriority.Death, 'death', 1, delay);
   }
 
   dispose(): void {

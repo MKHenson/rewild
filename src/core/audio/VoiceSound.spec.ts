@@ -50,6 +50,7 @@ const NAMES = [
   'breath-strain',
   'breath-swim',
   'swim-bubbles',
+  'death',
 ];
 /** Seconds each test file lasts. */
 const CLIP = 2;
@@ -411,6 +412,25 @@ describe('VoiceSound', () => {
           engine.createScope()
         )
     ).toThrow(/nope/);
+  });
+
+  it('dies over whatever it is saying, and stops breathing', () => {
+    run(1);
+    input.health -= 60;
+    run(frame);
+    const cry = sources('pain-big')[0];
+    const before = [...engine.beds].length;
+    voice.die(0.5, 0);
+    expect(cry.stopped).toBe(true);
+    expect(played('death')).toBe(1);
+    expect(voice.speaking).toBe(VoicePriority.Death);
+    expect([...engine.beds].length).toBeLessThan(before);
+
+    input.health = 100;
+    run(frame);
+    input.health -= 60;
+    run(frame);
+    expect(played('pain-big')).toBe(1);
   });
 
   it('owns nothing for the console once disposed', () => {
