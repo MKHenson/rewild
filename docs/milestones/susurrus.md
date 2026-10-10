@@ -34,8 +34,9 @@ The work has four parts:
    3D.
 
 The engine is a library and knows nothing about the game. The game systems own their own sound
-as plain classes that use the engine. The `Player` owns every player sound, because it already
-knows its own state. The soundscape owns the weather and the land. A system can drive its sound
+as plain classes that use the engine. The `Player` owns one `PlayerSounds`, which holds every
+player sound, and tells it the player's state each frame. The soundscape owns the weather and the
+land. A system can drive its sound
 from its own update or from an event, whichever fits.
 
 There are no animals yet. Wildlife sound comes from biome beds and from one-shot calls placed in
@@ -78,7 +79,7 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
 | Middleware         | **None**                                                                           | FMOD and Wwise add licences, a large WASM download and an authoring tool. The goals do not need them.                                                                                                    |
 | Custom DSP         | **None in this milestone**                                                         | Panners, filters, convolvers and gains are native nodes on the audio thread. JS only sets their parameters.                                                                                              |
 | Where it lives     | **`AudioEngine`** in `packages/rewild-audio`, **soundscape** in `src/core/audio/`  | The engine knows nothing about the game. The soundscape reads the listener, the sky and the water.                                                                                                       |
-| Player sound       | **Owned by `Player`**, as plain classes it holds                                   | The player already has its slide, crouch, immersion, health and death. Its sound reads them directly, with no getters and no parallel copy of its state.                                                 |
+| Player sound       | **`PlayerSounds`**, owned by `Player`, fed a state each frame                      | The player sound stays out of `Player`, which only fills in a few values and calls `update`. The state is one reused object, so a frame allocates nothing.                                               |
 | Biome sound        | **Soundscape profiles** with **weather rules**, in `templates/soundscapes.json`    | A forest in a gale sounds different from a calm forest. Rules add, replace or scale layers. See [Soundscapes](#soundscapes).                                                                             |
 | Rule engine        | **One shared `RuleSet`** in `packages/rewild-audio`, for soundscapes and footsteps | Biome sound and footsteps both need "when the world is like this, change these sounds". One engine, one format, one test suite.                                                                          |
 | Rule conditions    | **Ranges on weather values**, and weather states eased over seconds                | The weather knobs ease and wander. A range follows them, so a layer fades in as the wind rises, not at a state change.                                                                                   |
@@ -466,17 +467,25 @@ pushes to the queue and thunder can be tested on demand. A manual strike is neve
 
 ## The player
 
-`Player` owns every player sound. It holds a few small classes, for example `Footsteps`, `Voice`
-and `BodySound`, and updates them from its own update. They read the player's private state
-directly: `_slide`, `_onGround`, `_crouching`, `immersion`, `health` and the rest. So the player
-needs no getters for sound, and the sound keeps no copy of the player's state.
+`PlayerSounds` in `src/core/audio/` holds every player sound: `Footsteps`, `BodySound`,
+`SwimSound`, `DripSound` and `UnderWaterSound`, and later the voice. `Player` creates one on
+mount, in the game's scope, and disposes it on unmount.
+
+- **State.** Each frame `Player` fills in `sounds.state`, one reused object: where the feet are,
+  the distance moved, the ground contact, the slide speed, the fall, the water, the keys held and
+  the ground's wetness. Then it calls `sounds.update(seconds)`.
+- **Events.** A jump and the flashlight are calls of their own: `sounds.jump()` and
+  `sounds.flashlight()`.
+- **Its own decisions.** `PlayerSounds` works out the rest from the state, such as a landing
+  from the ground contact changing, and whether a slide stops the steps. So `Player` holds no
+  sound logic.
 
 The player sounds play on the player bus, in 2D. The editor has no player, so it has none of
 these sounds.
 
 ### Under water
 
-`UnderWaterSound` in `src/core/audio/`, owned by `Player`, plays it. `Player.cameraUnderWater`
+`UnderWaterSound` in `src/core/audio/`, held by `PlayerSounds`, plays it. `Player.cameraUnderWater`
 switches the mix. The camera is the player's eye.
 
 - The world bus low-pass falls to 600 Hz over 0.1 s and its gain halves.
@@ -508,6 +517,22 @@ so a wave over the eye does not splash. The gasp from the voice comes with
 | **Diving**   | `cameraUnderWater` and movement | Slower, muffled strokes and bubbles.            |
 | **Floating** | `swimming`, no movement         | Water lapping at the head, from wave height.    |
 
+- `SwimSound` in `src/core/audio/` plays the strokes. Moving is any movement key, diving, or rising
+  under water. The first stroke comes 0.15 s after the swimmer starts to move.
+- **Strokes.** `swim-stroke` every 0.9 s at the surface, 0.65 s sprinting. Under water,
+  `swim-stroke-under` every 1.3 s, 1 s sprinting, and four strokes in ten let out
+  `swim-bubbles`.
+- Every stroke plays on the player bus, so the world muffle does not dull it. The under-water
+  strokes are muffled in the recording.
+- The bubbles are in the water around the head, so they play on the effects bus, like the
+  splashes, and go dull with the world's under-water muffle.
+- **Emerging.** When a swimmer finds their feet and stands, `swim-emerge` plays once: the body
+  rising out of the water. It plays whether or not they were moving.
+- **Dripping.** `DripSound` in `src/core/audio/` drips water off the player after a swim.
+  Swimming soaks the body through; wading does not. Out of the water the `body-drips` bed plays at
+  the soak, which falls by e every 4 s as the body dries, so a swimmer drips for about ten seconds
+  after their feet leave the water. It is silent while the player is still in the water.
+
 ### The body
 
 | Event            | Read from                                     | Sound                                     |
@@ -518,8 +543,16 @@ so a wave over the eye does not splash. The gasp from the voice comes with
 | **Flashlight**   | the F key                                     | A click.                                  |
 
 - A landing also plays a footstep on the surface below, so a jump onto snow sounds like snow.
+  The next step comes half a stride later.
 - A landing is `_onGround` changing from false to true. It is not `grounded`, because `grounded`
   also changes when the player moves from steep ground to walkable ground with no fall.
+- **Sizes.** Fall speeds are in `verticalVelocity`'s units, in which a jump on flat ground lands at
+  about 10.5. Below 3, as off a bump, there is no landing. From 3 the `land` thud rises in gain
+  from 0.3 to full at 15. A landing that does fall damage plays `land-hard` at full gain instead.
+  Its grunt is the voice's pain, in [Breath and voice](#breath-and-voice).
+- **Into water.** Touching down with water over the feet plays no landing. The plunge covers it.
+- `BodySound` in `src/core/audio/` plays the jump, the landings and the click. The flashlight
+  clicks when it turns on and off.
 
 ### Death
 
@@ -603,11 +636,13 @@ frame and keeps a slide velocity:
 - `Player.grounded` is false on ground steeper than `MAX_SLOPE_CLIMB` (45°), even when the player
   stands on it. The real contact is the private `_onGround`.
 
-The player's sound reads the slide state directly:
+`Player` passes the slide state to `PlayerSounds` in its state:
 
-- **Slide speed**: `Math.hypot(_slide.velocityX, _slide.velocityZ)`, in m/s.
-- **Sliding**: `_onGround` and a slide speed above about 1 m/s. A slide in the air makes no sound.
-- **Steep**: `_onGround` and not `_slide.walkable`. The player is on ground too steep to climb.
+- **Slide speed**: `Math.hypot(_slide.velocityX, _slide.velocityZ)`, in the slide's units of half
+  a metre a second.
+- **Sliding**: on the ground with a slide speed above 0.5 (`SLIDE_STOPS_STEPS`), about 1 m/s. A
+  slide in the air makes no sound.
+- **Steep**: on the ground and not `grounded`. The player is on ground too steep to climb.
 
 A slide sounds like the ground giving way: crumbling dirt, grit and loose stones moving under the
 player. It is the same on every surface except snow, which hisses and crunches instead. A surface
@@ -1092,9 +1127,10 @@ The minimum set of files. Each loop must loop with no gap or click.
 | Rain       | light rain, heavy rain, drips                                                                                                           | Loops     |
 | Thunder    | 3 close cracks with rumble, 3 far rumbles, 6 short chain cracks                                                                         | One-shots |
 | Water      | under-water bed, ocean surf calm and storm, lake lapping                                                                                | Loops     |
-| Swimming   | 4 strokes, 3 under-water strokes, 2 bubbles, small and big plunge, surface                                                              | One-shots |
+| Swimming   | 4 strokes, 4 under-water strokes, 4 bubbles, 3 emerges, small and big plunge, surface                                                   | One-shots |
+| Dripping   | body drips                                                                                                                              | Loop      |
 | Footsteps  | 6 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                         | One-shots |
-| Body       | jump, 3 landings, hard landing, flashlight click, death                                                                                 | Mixed     |
+| Body       | 3 jumps, 4 landings, 3 hard landings, 2 flashlight clicks, death                                                                        | Mixed     |
 | Voice      | 3 pain sizes, 3 gasps, strain, calm, hard and panting breath loops, swim breaths, heat panting, cold shivers, heartbeat, stomach growls | Mixed     |
 | Sliding    | crumbling dirt and snow slide loops, 3 slips, 4 crumbles, 4 stone rattles, 3 scrabbles                                                  | Mixed     |
 | Biome beds | the layers and the `add` and `replace` sounds in each profile                                                                           | Loops     |
@@ -1106,7 +1142,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `Application`                | Start the engine on the first user gesture. Keep it for the whole session.                                          |
 | `GameManager`                | Set the listener and call `audio.update()` after `renderer.onFrame()`. Open a scene scope, and close it on dispose. |
-| `Player.ts`                  | Own the player sound: footsteps, body, swimming, sliding, voice, the under-water mix and the death sound.           |
+| `Player.ts`                  | Own a `PlayerSounds`, fill in its state each frame, and call it for the jump, the flashlight and the death.         |
 | `LightningController.ts`     | A strike queue: a ring buffer of 8 records with the position, the chain index and the time.                         |
 | `PositionReadout.tsx`        | Use the new shared `BiomeProbe`. Add the sound toggle, which owns an `EditorSound`.                                 |
 | `TerrainRenderer.ts`         | `sampleSplat(x, z, out)`, the splat weights at a point.                                                             |
@@ -1249,7 +1285,7 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 #### 13. Footsteps
 
-- **Delivers.** `TerrainRenderer.sampleSplat`. `Footsteps`, owned by `Player`.
+- **Delivers.** `TerrainRenderer.sampleSplat`. `Footsteps`, held by `PlayerSounds`.
   `templates/footsteps.json` with the material map, the surfaces and the rules for wet ground,
   wading, speed and crouching. Steps by distance moved.
 - **Expect.** Walk from grass onto rock, then onto snow on a mountain: each step sounds like the

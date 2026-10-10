@@ -45,8 +45,7 @@ import {
 } from './utils/Headwind';
 import { GroundSlide, MAX_SLOPE_CLIMB } from './utils/Sliding';
 import { audio, footstepsDef } from '../audio/audio';
-import { Footsteps } from '../audio/Footsteps';
-import { UnderWaterSound } from '../audio/UnderWaterSound';
+import { PlayerSounds } from '../audio/PlayerSounds';
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
 const _PI_HALF = Math.PI / 2 - 0.01;
@@ -88,9 +87,6 @@ const _GROUND_STICK: f32 = 0.001;
 // Hunger empties over ten minutes; once it has, starvation drains health over one.
 const _HUNGER_DRAIN_PER_SEC: f32 = 50 / 600;
 const _STARVATION_DAMAGE_PER_SEC: f32 = 100 / 60;
-// Slide speed, in the slide's units of half a metre a second, above which the
-// feet slide rather than step.
-const _SLIDE_STOPS_STEPS: f32 = 0.5;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
 const _resizeTranslation = { x: 0, y: 0, z: 0 };
@@ -126,8 +122,7 @@ export class Player extends Node {
   immersion: f32 = 0;
   /** Whether the camera's eye is below the water's surface. */
   cameraUnderWater: boolean = false;
-  private _underWaterSound: UnderWaterSound | null = null;
-  private _footsteps: Footsteps | null = null;
+  private _sounds: PlayerSounds | null = null;
   private _water = createWaterQuerySample();
   // World height a submerged swimmer holds their eye at; NaN while floating.
   private _swimHold: f32 = NaN;
@@ -261,10 +256,11 @@ export class Player extends Node {
     this.immersion = 0;
     this.cameraUnderWater = false;
     this._waterQuery = stateData.renderer.terrainRenderer.waterQuery;
-    this._underWaterSound?.dispose();
+    this._sounds?.dispose();
     const scope = stateData.gameManager?.sound;
-    this._underWaterSound = scope ? new UnderWaterSound(audio, scope) : null;
-    this._footsteps = this._createFootsteps();
+    this._sounds = scope
+      ? new PlayerSounds(audio, scope, footstepsDef())
+      : null;
     if (this._waterProbe < 0)
       this._waterProbe = this._waterQuery.acquireProbe();
 
@@ -371,10 +367,8 @@ export class Player extends Node {
     this._waterProbe = -1;
     this._waterQuery = null;
 
-    this._underWaterSound?.dispose();
-    this._underWaterSound = null;
-    if (Footsteps.current === this._footsteps) Footsteps.current = null;
-    this._footsteps = null;
+    this._sounds?.dispose();
+    this._sounds = null;
 
     if (this.rapierWorld && this.characterController) {
       this.rapierWorld.removeCharacterController(this.characterController);
@@ -405,53 +399,6 @@ export class Player extends Node {
     _resizeTranslation.y = p.y + shift;
     _resizeTranslation.z = p.z;
     this.capsuleBody.setTranslation(_resizeTranslation, true);
-  }
-
-  private _createFootsteps(): Footsteps | null {
-    const stateData = this.stateMachine?.data as StateMachineData;
-    const scope = stateData.gameManager?.sound;
-    const def = footstepsDef();
-    if (!scope || !def) return null;
-    try {
-      const footsteps = new Footsteps(def, scope);
-      Footsteps.current = footsteps;
-      return footsteps;
-    } catch (e) {
-      console.error('templates/footsteps.json:', e);
-      return null;
-    }
-  }
-
-  /** Steps as the player walks, from the ground under the feet. */
-  private _stepSound(
-    distance: number,
-    delta: number,
-    x: number,
-    z: number,
-    stateData: StateMachineData | undefined
-  ): void {
-    const footsteps = this._footsteps;
-    if (!footsteps) return;
-    const terrainRenderer = stateData?.renderer?.terrainRenderer;
-    footsteps.ground = terrainRenderer?.enabled ? terrainRenderer : null;
-    const signals = footsteps.signals;
-    signals.set(
-      'wetness',
-      stateData?.renderer?.sky?.skyRenderer?.rainWetness.soak ?? 0
-    );
-    signals.set('immersion', this.immersion);
-    signals.set('crouching', this._crouching ? 1 : 0);
-    const sliding =
-      this._onGround &&
-      Math.hypot(this._slide.velocityX, this._slide.velocityZ) >
-        _SLIDE_STOPS_STEPS;
-    footsteps.update(
-      distance,
-      delta,
-      this.grounded && !sliding && !this.swimming,
-      x,
-      z
-    );
   }
 
   /** Drops any slide and ground contact, e.g. after a teleport. */
@@ -606,6 +553,7 @@ export class Player extends Node {
     const JUMP_IMPULSE: f32 = 10.5;
     if (this.jumpRequested) {
       if (this.grounded && !this.swimming) {
+        this._sounds?.jump();
         this.verticalVelocity = JUMP_IMPULSE;
         this.grounded = false;
         this._onGround = false;
@@ -732,7 +680,9 @@ export class Player extends Node {
 
     const controllerGrounded = this.characterController.computedGrounded();
 
-    if (controllerGrounded && this.verticalVelocity < -15.0) {
+    const fallSpeed = -this.verticalVelocity;
+    const hurt = controllerGrounded && this.verticalVelocity < -15.0;
+    if (hurt) {
       const damage = (Math.abs(this.verticalVelocity) - 15.0) * 10.0;
       this.health -= damage;
     }
@@ -769,13 +719,6 @@ export class Player extends Node {
         nextZ
       );
     this.grounded = this._onGround && this._slide.walkable;
-    this._stepSound(
-      Math.hypot(correctedMovement.x, correctedMovement.z),
-      delta,
-      nextX,
-      nextZ,
-      stateData
-    );
 
     const pos = this.capsuleBody.translation();
     const camX = pos.x;
@@ -783,13 +726,36 @@ export class Player extends Node {
     const camZ = pos.z;
     this.cameraController.camera.transform.position.set(camX, camY, camZ);
     this.cameraUnderWater = inWater && camY < water.surface;
-    this._underWaterSound?.update(
-      this.immersion,
-      inWater ? water.surface - water.ground : 0,
-      this.cameraUnderWater,
-      entryVelocity,
-      delta
-    );
+
+    const sounds = this._sounds;
+    if (sounds) {
+      const s = sounds.state;
+      s.x = nextX;
+      s.z = nextZ;
+      s.moved = Math.hypot(correctedMovement.x, correctedMovement.z);
+      s.onGround = this._onGround;
+      s.grounded = this.grounded;
+      s.slideSpeed = Math.hypot(this._slide.velocityX, this._slide.velocityZ);
+      s.fallSpeed = fallSpeed;
+      s.hurt = hurt;
+      s.entryVelocity = entryVelocity;
+      s.swimming = this.swimming;
+      s.immersion = this.immersion;
+      s.waterDepth = inWater ? water.surface - water.ground : 0;
+      s.cameraUnderWater = this.cameraUnderWater;
+      s.crouching = this._crouching;
+      s.sprinting = this._sprinting;
+      s.pushing =
+        this._movingForward ||
+        this._movingBackward ||
+        this._movingLeft ||
+        this._movingRight;
+      s.diving = this._downHeld;
+      s.rising = this._upHeld;
+      s.wetness = stateData?.renderer?.sky?.skyRenderer?.rainWetness.soak ?? 0;
+      s.ground = hasTerrain ? terrainRenderer! : null;
+      sounds.update(delta);
+    }
 
     if (this._flashlight) {
       const flashY = camY - _FLASHLIGHT_BODY_DROP;
@@ -831,6 +797,7 @@ export class Player extends Node {
       if (!e.repeat && !this.swimming) this._crouching = !this._crouching;
     } else if (e.code === 'KeyF' && this._flashlight) {
       this._flashlightOn = !this._flashlightOn;
+      this._sounds?.flashlight();
       this._flashlight.intensity = this._flashlightOn
         ? Player._FLASHLIGHT_INTENSITY
         : 0.0;

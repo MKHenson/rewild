@@ -282,6 +282,109 @@
       "gain": [0.8, 1],
       "source": "Soundly: footsteps mix",
       "license": "soundly"
+    },
+    {
+      "name": "jump",
+      "files": [
+        "audio/body/jump-01.ogg",
+        "audio/body/jump-02.ogg",
+        "audio/body/jump-03.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.45, 0.5],
+      "source": "Soundly: body mix",
+      "license": "soundly"
+    },
+    {
+      "name": "land",
+      "files": [
+        "audio/body/land-01.ogg",
+        "audio/body/land-02.ogg",
+        "audio/body/land-03.ogg",
+        "audio/body/land-04.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: body mix",
+      "license": "soundly"
+    },
+    {
+      "name": "land-hard",
+      "files": [
+        "audio/body/land-hard-01.ogg",
+        "audio/body/land-hard-02.ogg",
+        "audio/body/land-hard-03.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: body mix",
+      "license": "soundly"
+    },
+    {
+      "name": "flashlight",
+      "files": ["audio/body/flashlight-01.ogg", "audio/body/flashlight-02.ogg"],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: body mix",
+      "license": "soundly"
+    },
+    {
+      "name": "swim-stroke",
+      "files": [
+        "audio/swim/swim-stroke-01.ogg",
+        "audio/swim/swim-stroke-02.ogg",
+        "audio/swim/swim-stroke-03.ogg",
+        "audio/swim/swim-stroke-04.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: water mix",
+      "license": "soundly"
+    },
+    {
+      "name": "swim-stroke-under",
+      "files": [
+        "audio/swim/swim-stroke-under-01.ogg",
+        "audio/swim/swim-stroke-under-02.ogg",
+        "audio/swim/swim-stroke-under-03.ogg",
+        "audio/swim/swim-stroke-under-04.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: water mix",
+      "license": "soundly"
+    },
+    {
+      "name": "swim-bubbles",
+      "files": [
+        "audio/swim/swim-bubbles-01.ogg",
+        "audio/swim/swim-bubbles-02.ogg",
+        "audio/swim/swim-bubbles-03.ogg",
+        "audio/swim/swim-bubbles-04.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: water mix",
+      "license": "soundly"
+    },
+    {
+      "name": "body-drips",
+      "files": ["audio/swim/body-drips.ogg"],
+      "loop": true,
+      "source": "Soundly: water mix",
+      "license": "soundly"
+    },
+    {
+      "name": "swim-emerge",
+      "files": [
+        "audio/swim/swim-emerge-01.ogg",
+        "audio/swim/swim-emerge-02.ogg",
+        "audio/swim/swim-emerge-03.ogg"
+      ],
+      "pitch": [0.92, 1.08],
+      "gain": [0.85, 1],
+      "source": "Soundly: water mix",
+      "license": "soundly"
     }
   ]
 }
