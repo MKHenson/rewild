@@ -128,6 +128,7 @@ describe('WindSound', () => {
     expect(panner.positionX.value).toBeCloseTo(-10, 6);
     expect(panner.positionZ.value).toBeCloseTo(0, 6);
     expect(panner.rolloffFactor).toBe(0);
+    expect(panner.panningModel).toBe('equalpower');
   });
 
   it('drops the roar with your back to the gale', () => {

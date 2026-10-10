@@ -40,6 +40,7 @@ export class ThunderSound {
     at: new Vector3(),
     bus: 'effects',
     rolloff: 0,
+    panning: 'equalpower',
     gain: 1,
     cutoff: 20000,
     delay: 0,

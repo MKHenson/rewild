@@ -39,6 +39,8 @@ export interface VoiceStart {
   priority: number;
   /** The scope that started it, or 0. See `stopOwner`. */
   owner: number;
+  /** The panning model, or null for the pool's default. */
+  panning: PanningModelType | null;
 }
 
 interface Voice {
@@ -55,6 +57,7 @@ interface Voice {
   rolloff: number;
   priority: number;
   owner: number;
+  panning: PanningModelType | null;
   x: number;
   y: number;
   z: number;
@@ -70,8 +73,9 @@ export interface VoiceInfo {
 }
 
 /**
- * A fixed set of 3D voices. Each has its own low-pass, gain and HRTF panner,
- * built once per context, so a play allocates only its buffer source. When
+ * A fixed set of 3D voices. Each has its own low-pass, gain and panner, built
+ * once per context, so a play allocates only its buffer source. A voice pans
+ * with its sound's model, or the pool's default, HRTF. When
  * every voice is busy, a new sound takes the one heard quietest, or does not
  * play if it would be quieter still.
  */
@@ -81,6 +85,7 @@ export class VoicePool {
   private _lx = 0;
   private _ly = 0;
   private _lz = 0;
+  private _defaultPanning: PanningModelType = 'HRTF';
 
   constructor(
     private readonly _ctx: AudioContext,
@@ -110,6 +115,7 @@ export class VoicePool {
         rolloff: 1,
         priority: 1,
         owner: 0,
+        panning: null,
         x: 0,
         y: 0,
         z: 0,
@@ -127,12 +133,15 @@ export class VoicePool {
     return n;
   }
 
+  /** The model for sounds that name none. Voices playing such a sound change
+   *  at once. */
   setPanningModel(model: PanningModelType): void {
-    for (const v of this._voices) v.panner.panningModel = model;
+    this._defaultPanning = model;
+    for (const v of this._voices) if (!v.panning) v.panner.panningModel = model;
   }
 
   get panningModel(): PanningModelType {
-    return this._voices[0]?.panner.panningModel ?? 'HRTF';
+    return this._defaultPanning;
   }
 
   /** The listener position, used to rank voices by loudness. */
@@ -160,6 +169,9 @@ export class VoicePool {
     voice.rolloff = s.rolloff;
     voice.priority = s.priority;
     voice.owner = s.owner;
+    voice.panning = s.panning;
+    const model = s.panning ?? this._defaultPanning;
+    if (voice.panner.panningModel !== model) voice.panner.panningModel = model;
 
     voice.filter.frequency.cancelScheduledValues(now);
     voice.filter.frequency.value = s.cutoff;

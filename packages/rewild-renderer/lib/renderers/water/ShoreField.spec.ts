@@ -1,6 +1,7 @@
 import { fromFloat16 } from '../../utils/float16';
 import {
   SWASH_REACH_TEXELS,
+  collectShore,
   extendArrival,
   packShoreField,
   packSwashField,
@@ -212,5 +213,53 @@ describe('packSwashField', () => {
     const { reach } = packSwash(depth);
     expect(reach(16, 8)).toBe(1);
     expect(reach(17, 8)).toBe(0);
+  });
+});
+
+describe('collectShore', () => {
+  function shore(depth: Float32Array) {
+    const times = solve(depth);
+    const reached = new Uint8Array(SIZE * SIZE);
+    extendArrival(times, SIZE, TEXEL, reached);
+    const xs = new Float32Array(SIZE * SIZE);
+    const zs = new Float32Array(SIZE * SIZE);
+    const strengths = new Float32Array(SIZE * SIZE);
+    const count = collectShore(
+      depth,
+      reached,
+      SIZE,
+      TEXEL,
+      100,
+      200,
+      xs,
+      zs,
+      strengths
+    );
+    return { count, xs, zs, strengths };
+  }
+
+  it('finds the last water before the beach on every row', () => {
+    const { count, xs, zs } = shore(beach());
+    expect(count).toBe(SIZE);
+    for (let i = 0; i < count; i++) {
+      expect(xs[i]).toBe(100 + 23 * TEXEL);
+      expect(zs[i]).toBe(200 + i * TEXEL);
+    }
+  });
+
+  it('fades the waves toward the edge of the grid', () => {
+    const { strengths } = shore(beach());
+    expect(strengths[SIZE / 2]).toBe(1);
+    expect(strengths[0]).toBeLessThan(0.1);
+  });
+
+  it('skips the shore of water the waves cannot reach', () => {
+    const depth = beach();
+    // A pond inland, cut off from the sea.
+    for (let y = 10; y < 13; y++)
+      for (let x = 28; x < 31; x++) depth[x + y * SIZE] = 2;
+    const { count, xs } = shore(depth);
+    expect(count).toBe(SIZE);
+    for (let i = 0; i < count; i++) expect(xs[i]).toBe(100 + 23 * TEXEL);
   });
 });

@@ -69,6 +69,16 @@ export interface ShoreFieldStats {
   longest: number;
 }
 
+/** A point on the waterline the waves reach (ShoreField.nearestShore). */
+export interface ShorePoint {
+  x: number;
+  z: number;
+  /** Metres from the point asked about. */
+  distance: number;
+  /** 0..1: the waves' strength there, fading toward the grid's edge. */
+  strength: number;
+}
+
 /** Metres of ocean at world (x, z): 0 on land, in lakes or on unknown ground. */
 export type OceanDepthSampler = (x: number, z: number) => number;
 
@@ -230,6 +240,42 @@ function edgeStrength(x: number, y: number, size: number): number {
 }
 
 /**
+ * Writes the waterline the waves reach: each reached texel of water with land
+ * beside it, as world x and z and its strength, into `xs`, `zs` and
+ * `strengths`. Texel (0, 0) is centred on world (`originX`, `originZ`).
+ * Returns how many it wrote.
+ */
+export function collectShore(
+  depth: Float32Array,
+  reached: Uint8Array,
+  size: number,
+  texel: number,
+  originX: number,
+  originZ: number,
+  xs: Float32Array,
+  zs: Float32Array,
+  strengths: Float32Array
+): number {
+  let count = 0;
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const i = x + y * size;
+      if (!reached[i] || depth[i] <= 0) continue;
+      const shore =
+        (x > 0 && depth[i - 1] <= 0) ||
+        (x < size - 1 && depth[i + 1] <= 0) ||
+        (y > 0 && depth[i - size] <= 0) ||
+        (y < size - 1 && depth[i + size] <= 0);
+      if (!shore) continue;
+      xs[count] = originX + x * texel;
+      zs[count] = originZ + y * texel;
+      strengths[count] = edgeStrength(x, y, size);
+      count++;
+    }
+  return count;
+}
+
+/**
  * Packs the swash field into f16 texels of (seconds a wave takes to get to the
  * nearest water it reaches, its strength there). Reached texels keep their
  * own. Ground up to SWASH_REACH_TEXELS from them takes the nearest one's, so
@@ -317,6 +363,12 @@ export class ShoreField {
   private swashSources = new Int32Array(
     SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS
   );
+  private shoreX = new Float32Array(SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS);
+  private shoreZ = new Float32Array(SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS);
+  private shoreStrength = new Float32Array(
+    SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS
+  );
+  private shoreCount = 0;
   private buildX = 0;
   private buildZ = 0;
   // Next row to sample, or -1 when no rebuild is under way.
@@ -341,6 +393,31 @@ export class ShoreField {
       format: 'rg16float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
+  }
+
+  /**
+   * The point of the waterline the waves reach nearest to world (`x`, `z`),
+   * from the last build, into `out`. False, and `out` untouched, when the
+   * grid holds none.
+   */
+  nearestShore(x: number, z: number, out: ShorePoint): boolean {
+    let best = -1;
+    let bestSq = Infinity;
+    for (let i = 0; i < this.shoreCount; i++) {
+      const dx = this.shoreX[i] - x;
+      const dz = this.shoreZ[i] - z;
+      const sq = dx * dx + dz * dz;
+      if (sq < bestSq) {
+        bestSq = sq;
+        best = i;
+      }
+    }
+    if (best < 0) return false;
+    out.x = this.shoreX[best];
+    out.z = this.shoreZ[best];
+    out.distance = Math.sqrt(bestSq);
+    out.strength = this.shoreStrength[best];
+    return true;
   }
 
   /** The ground changed: rebuild once REFRESH has passed. */
@@ -402,6 +479,17 @@ export class ShoreField {
         this.packedSwash as BufferSource,
         { bytesPerRow: size * 4 },
         { width: size, height: size }
+      );
+      this.shoreCount = collectShore(
+        this.depth,
+        this.reached,
+        size,
+        texel,
+        originX,
+        originZ,
+        this.shoreX,
+        this.shoreZ,
+        this.shoreStrength
       );
       this.centreX = this.buildX;
       this.centreZ = this.buildZ;

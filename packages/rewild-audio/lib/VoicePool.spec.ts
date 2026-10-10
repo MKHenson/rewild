@@ -133,6 +133,27 @@ describe('3D voices', () => {
     expect(engine.voicesInUse).toBe(1);
   });
 
+  it('pans with the model a sound names, and HRTF after it', () => {
+    engine.play('blip', { at: new Vector3(1, 0, 0), panning: 'equalpower' });
+    const { panner } = chain(lastSource());
+    expect(panner.panningModel).toBe('equalpower');
+    lastSource().end();
+    engine.play('blip', { at: new Vector3(1, 0, 0) });
+    expect(chain(lastSource()).panner).toBe(panner);
+    expect(panner.panningModel).toBe('HRTF');
+  });
+
+  it('changes the default model without touching a sound that names one', () => {
+    engine.loop('blip', { at: new Vector3(1, 0, 0), panning: 'HRTF' });
+    const named = chain(lastSource()).panner;
+    engine.loop('blip', { at: new Vector3(2, 0, 0) });
+    const plain = chain(lastSource()).panner;
+    engine.setPanningModel('equalpower');
+    expect(engine.panningModel).toBe('equalpower');
+    expect(named.panningModel).toBe('HRTF');
+    expect(plain.panningModel).toBe('equalpower');
+  });
+
   it('reconnects a reused voice to a new bus', () => {
     engine.play('blip', { at: new Vector3(1, 0, 0), bus: 'weather' });
     const first = chain(lastSource()).panner;
