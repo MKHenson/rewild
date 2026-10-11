@@ -1268,6 +1268,13 @@ describe('scatter layer', () => {
     expect(layer.footprint).toBeGreaterThan(0);
   });
 
+  it('emits a yOffset only when the file sets one', () => {
+    const { params, skeleton } = buildAll();
+
+    expect(scatterLayer(params, skeleton).yOffset).toBeUndefined();
+    expect(scatterLayer({ ...params, yOffset: -0.4 }, skeleton).yOffset).toBe(-0.4);
+  });
+
   it('prints the entry as scatter-layers.json holds it', () => {
     const { params, skeleton } = buildAll();
     const layer = scatterLayer(params, skeleton);

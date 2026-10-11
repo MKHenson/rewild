@@ -129,7 +129,7 @@ export function clumpLayer(params: Params, metrics: ClumpMetrics): ScatterLayer 
       tilt: clumpTilt(metrics),
     },
     alignToNormal: 0.6,
-    yOffset: clumpOffset(metrics),
+    yOffset: round(clumpOffset(metrics) + params.yOffset, 3),
     footprint: params.footprint > 0 ? params.footprint : clumpFootprint(metrics),
     wind: {
       amplitude: params.windAmplitude,
@@ -207,6 +207,7 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     // Trees stand up whatever the slope does. A tilted trunk reads as damage,
     // not as terrain.
     alignToNormal: 0,
+    ...(params.yOffset ? { yOffset: params.yOffset } : {}),
     footprint,
     ...(params.collider ? { collider: colliderFor(params, skeleton) } : {}),
     wind: {
@@ -264,7 +265,7 @@ export function rockLayer(params: Params, rock: Rock): ScatterLayer {
     ...(params.impostor ? { impostor: { ...params.impostor, fromDistance: impostorDistance(params) } } : {}),
     jitter: { scale: { from: params.scaleMin, to: params.scaleMax }, yaw: { from: 0, to: 360 }, tilt: 8 },
     alignToNormal: 1,
-    yOffset: -round(metrics.height * ROCK_SINK),
+    yOffset: round(params.yOffset - metrics.height * ROCK_SINK),
     footprint: params.footprint > 0 ? params.footprint : round(Math.max(0.3, span * 0.8), 1),
     collider: { type: 'hull', points: metrics.hull },
     castShadow: params.castShadow,
@@ -330,7 +331,7 @@ export function pebbleLayer(params: Params, metrics: ClusterMetrics): ScatterLay
     // the wider it is spread the further out that error reaches. Held under a
     // share of the tallest stone as well, because a cluster sunk by more than
     // that is a cluster of half-buried stones.
-    yOffset: -round(Math.min(metrics.height * 0.15, span * 0.05), 3),
+    yOffset: round(params.yOffset - Math.min(metrics.height * 0.15, span * 0.05), 3),
     footprint: params.footprint > 0 ? params.footprint : round(Math.max(CLUSTER_FOOTPRINT_FLOOR, span * CLUSTER_SPACING), 1),
     castShadow: params.castShadow,
   };
