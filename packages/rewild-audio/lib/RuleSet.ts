@@ -42,7 +42,7 @@ export class RuleSet {
   private readonly _condFroms: Float32Array;
   private readonly _condTos: Float32Array;
 
-  /** Compiles `def` over `base`'s rules against `signals`. Throws on an unknown signal, layer or base rule. */
+  /** Compiles `def` over `base`'s layers and rules against `signals`. Throws on an unknown signal, layer, or base rule or layer. */
   constructor(
     readonly signals: RuleSignals,
     def: RuleSetDef,
@@ -53,18 +53,26 @@ export class RuleSet {
     const layerGains: number[] = [];
     const layerConds: number[] = [];
 
-    for (const layer of def.layers ?? []) {
+    const without = new Set(def.without ?? []);
+    const baseRules = base?.rules ?? [];
+    const baseLayers = base?.layers ?? [];
+    for (const id of without)
+      if (
+        !baseRules.some((rule) => rule.id === id) &&
+        !baseLayers.some((layer) => layer.id === id)
+      )
+        throw new Error(`without: no base rule or layer "${id}"`);
+
+    const layers = [
+      ...baseLayers.filter((layer) => !without.has(layer.id)),
+      ...(def.layers ?? []),
+    ];
+    for (const layer of layers) {
       slots.push({ id: layer.id, sound: layer.sound, tags: layer.tags ?? [] });
       layerGains.push(layer.gain ?? 1);
       layerConds.push(...conds.add(layer.when, signals, `Layer "${layer.id}"`));
     }
     this.layerCount = slots.length;
-
-    const without = new Set(def.without ?? []);
-    const baseRules = base?.rules ?? [];
-    for (const id of without)
-      if (!baseRules.some((rule) => rule.id === id))
-        throw new Error(`without: no base rule "${id}"`);
     const rules = [
       ...baseRules.filter((rule) => !rule.id || !without.has(rule.id)),
       ...(def.rules ?? []),

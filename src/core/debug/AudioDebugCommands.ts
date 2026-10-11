@@ -340,6 +340,7 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
           sound,
           gain: +scape.gains[k].toFixed(2),
           cutoff: Math.round(scape.cutoffs[k]),
+          loaded: audio.bank.isLoaded(sound),
         }))
         .filter((row) => row.gain > 0)
     );
@@ -386,6 +387,7 @@ function describeBank(audio: AudioEngine): string {
   return (
     `Sounds: ${s.sounds}, files ${s.loaded}/${s.files} loaded` +
     (s.pending ? `, ${s.pending} pending` : '') +
+    (s.idle ? `, ${s.idle} on demand and not wanted` : '') +
     (s.failed ? `, ${s.failed} failed` : '') +
     `, ${(s.bytes / (1024 * 1024)).toFixed(1)} MB decoded`
   );

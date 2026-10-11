@@ -88,6 +88,7 @@ export class SurfSound {
   };
   private readonly _scratch = createWaterQuerySample();
   private _lapFound = false;
+  private _reach = 0;
   private _sinceSearch = Infinity;
 
   constructor(private readonly _engine: AudioEngine, scope: AudioScope) {
@@ -105,6 +106,11 @@ export class SurfSound {
     this._calm = emitter('surf-calm', 3);
     this._storm = emitter('surf-storm', 3);
     this._lap = emitter('lake-lapping', 2);
+  }
+
+  /** 0..1: how strongly the surf reaches the listener, from the shore's distance and the waves' strength. */
+  get shore(): number {
+    return this._reach;
   }
 
   update(water: SurfWater, windiness: number, seconds: number): void {
@@ -145,6 +151,7 @@ export class SurfSound {
   ): void {
     const shore = this._shore;
     if (!water.nearestShore(listener.x, listener.z, shore)) {
+      this._reach = 0;
       this._calm.silence();
       this._storm.silence();
       return;
@@ -156,6 +163,7 @@ export class SurfSound {
     const dz = this._calm.at.z - listener.z;
     const level =
       shore.strength * surfDistanceGain(Math.sqrt(dx * dx + dz * dz));
+    this._reach = level;
     const sea = seaState(windiness);
     this._calm.emitter.set(level * surfCalmGain(sea));
     this._storm.emitter.set(level * surfStormGain(sea));

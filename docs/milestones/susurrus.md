@@ -281,8 +281,13 @@ and come back with `npm run assets:pull`, like every other shared asset.
 A `SoundBank` holds the manifest's sounds. `Application` fetches the manifest when the app loads,
 and the bank starts downloading every file at once. The files decode as soon as the
 `AudioContext` exists, so by the time a game or the editor has loaded they are ready. A decoded
-buffer outlives its context, so each file decodes once per session. Beds for climates the world
-does not use are not loaded. An arid world never loads the forest bed.
+buffer outlives its context, so each file decodes once per session.
+
+A sound marked `"demand": true` loads only while something wants it. `SoundBank.want(name)` loads
+it, and `release(name)` frees its buffers once every want is released. The soundscape sounds are
+all on demand: the soundscape wants the sounds of the climate's own biomes, and releases them when
+the climate changes, so an arid world never loads the forest. A sound two biomes share, such as
+the ridge whistle, stays loaded while either wants it.
 
 - **A failed file** logs one error naming the sound and the URL. The sound plays its other files.
   A sound with no loaded files does not play. Nothing throws.
@@ -1046,10 +1051,13 @@ The `"*"` profile holds the rules that most biomes share. Every biome profile ex
 - **Tags.** Base rules target tags, not layer ids, because the base knows no biome's layers. A
   target that starts with `#` is a tag, such as `"#wildlife"`. `"*"` is every layer.
 - **Order.** The base rules apply first, then the biome's own rules.
-- **Opting out.** A base rule has an `id`. A biome can turn it off with
-  `"without": ["gale-quiets-wildlife"]`. For example, the desert keeps its cicadas in wind.
-- **No base layers.** The base has rules and calls, but no layers. Each biome owns all of its
-  sound.
+- **Base layers.** The base holds the layers that follow the world rather than the ground, such
+  as the gulls, which play by day wherever the ocean's surf reaches (`"shore": [0, 0.5]`). They
+  come before the biome's own layers, and the base and biome rules act on them too. Everything
+  else a biome sounds like, it owns.
+- **Opting out.** A base rule or layer has an `id`. A biome can turn it off with `without`, for
+  example `"without": ["gale-quiets-wildlife"]`, so the palm forest keeps its cicadas in wind, or
+  `"without": ["gulls"]`, so the dunes stay open desert.
 
 #### Conditions
 
@@ -1085,6 +1093,7 @@ editor too:
 | `sun`        | -1 to 1    | `skyRenderer.upDot`                                       |
 | `dawn`       | 0 to 1     | `isDawn`, eased over 4 s like a state                     |
 | `moon`       | 0 to 1     | `moonIllumination(phase)` while the moon is the key light |
+| `shore`      | 0 to 1     | `SurfSound.shore`: the surf's distance gain × the waves   |
 | `state`      | a state id | `atmosphere.state`, eased per state                       |
 
 #### Actions
@@ -1156,7 +1165,8 @@ load into flat arrays, so the frame does no lookups by name and no allocation.
 
 `Soundscape` in `src/core/audio/`, held by `WorldSound`, does this in the game and the editor. It
 has one bed per sound across all profiles, on the ambience bus with a low-pass, fading in over 2 s
-and out over 4 s, which smooths the probe's 5 Hz steps. When two biomes play one sound, the gains
+and out over 4 s, which smooths the probe's 5 Hz steps. Every bed plays at `SOUNDSCAPE_LEVEL`
+(0.8) times its gain, so the whole soundscape can be turned up or down in one place. When two biomes play one sound, the gains
 sum and the lowest cutoff wins. A biome with no profile is silent. The first update snaps the
 states and dawn, so a game loaded into a storm starts with no birds. `WorldSound` builds the
 soundscape again each time `soundscapes.json` loads, so `reloadSoundscapes()` applies an edit. A
@@ -1164,17 +1174,18 @@ profile that fails to compile logs its name and the error, and the soundscape st
 
 #### First profiles
 
-Every biome also gets the base rules: wildlife quiets in rain and gales and stops in storms, birds
-sing louder at dawn and after rain, snow dampens and fog dulls far calls.
+Every biome also gets the base: gulls by day along the ocean shore, wildlife quiets in rain and
+gales and stops in storms, birds sing louder at dawn and after rain, snow dampens and fog dulls far
+calls.
 
 | Biome           | Layers                                    | Own rules, after the base                                                 |
 | --------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
-| plain           | grass, larks by day, crickets by night    | wind replaces soft grass with hissing grass                               |
+| plain           | grass, birds by day, crickets by night    | wind replaces soft grass with hissing grass                               |
 | forest          | leaves, songbirds by day, owls by night   | the profile above                                                         |
-| mountain        | thin air, a far raven by day              | wind adds a ridge whistle                                                 |
-| desert          | dry air, cicadas by day, insects by night | wind adds blowing sand, `without: ["gale-quiets-wildlife"]` keeps cicadas |
+| mountain        | thin air, far birds by day                | wind adds a ridge whistle                                                 |
+| palm-forest     | dry air, cicadas by day, insects by night | wind adds blowing sand, `without: ["gale-quiets-wildlife"]` keeps cicadas |
 | desert-mountain | dry thin air                              | wind adds a ridge whistle                                                 |
-| beach-sand      | gulls by day                              | none, the surf bed does the rest                                          |
+| dunes           | open desert: dry air, insects by night    | wind adds blowing sand, `without: ["gulls"]`; no birds or day insects     |
 
 ### Wildlife calls in 3D
 
@@ -1273,6 +1284,7 @@ The minimum set of files. Each loop must loop with no gap or click.
 | Rain       | light rain, heavy rain, drips                                                                                                                | Loops     |
 | Thunder    | 3 close cracks with rumble, 3 far rumbles, 6 short chain cracks                                                                              | One-shots |
 | Water      | under-water bed, ocean surf calm and storm, open sea calm and storm, lake lapping                                                            | Loops     |
+| Biomes     | per biome: a base air or ground loop, day and night wildlife, and the wind and rain layers its rules add; see [First profiles](#first-profiles) | Loops     |
 | Swimming   | 4 strokes, 4 under-water strokes, 4 bubbles, 3 emerges, small and big plunge, surface                                                        | One-shots |
 | Dripping   | body drips                                                                                                                                   | Loop      |
 | Footsteps  | 6 each of grass, leaves, dirt, rock, sand, snow, wet and splash                                                                              | One-shots |
@@ -1513,9 +1525,9 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
 
 #### 21. The first six profiles
 
-- **Delivers.** Profiles and sounds for plain, mountain, desert, desert-mountain and beach-sand.
+- **Delivers.** Profiles and sounds for plain, mountain, palm-forest, desert-mountain and dunes.
 - **Expect.** Walk from a plain into a forest and the sound crossfades as the ground changes. Each
-  biome has its own day and night. The desert keeps its cicadas in wind. The mountain whistles in
+  biome has its own day and night. The palm forest keeps its cicadas in wind. The mountain whistles in
   a gale. An arid world loads no temperate sounds.
 
 #### 22. Wildlife calls in 3D

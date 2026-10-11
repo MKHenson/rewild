@@ -306,6 +306,34 @@ describe('base profiles', () => {
     expect(gainOf(set, 'birds')).toBe(1);
   });
 
+  it('plays the base layers before its own, under the base rules', () => {
+    const set = new RuleSet(signals, forest, {
+      ...base,
+      layers: [
+        {
+          id: 'gulls',
+          sound: 'gulls',
+          tags: ['wildlife'],
+          when: { sun: [-0.1, 0.2] },
+        },
+      ],
+    });
+    expect(set.slotIds.slice(0, 2)).toEqual(['gulls', 'leaves']);
+    signals.set('sun', 1);
+    signals.set('windiness', 1);
+    set.evaluate();
+    expect(gainOf(set, 'gulls')).toBeCloseTo(0.3, 6);
+  });
+
+  it('turns a base layer off with without', () => {
+    const set = new RuleSet(
+      signals,
+      { layers: forest.layers, without: ['gulls'] },
+      { layers: [{ id: 'gulls', sound: 'gulls' }] }
+    );
+    expect(set.slotIds).not.toContain('gulls');
+  });
+
   it('lets a base tag match no layer', () => {
     expect(
       () =>
@@ -338,7 +366,7 @@ describe('compiling', () => {
         })
     ).toThrow('no layer "leaves"');
     expect(() => new RuleSet(signals, { without: ['nope'] }, {})).toThrow(
-      'no base rule "nope"'
+      'no base rule or layer "nope"'
     );
   });
 

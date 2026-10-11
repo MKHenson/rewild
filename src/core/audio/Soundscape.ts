@@ -23,6 +23,7 @@ export const SOUNDSCAPE_SIGNALS = {
     'sun',
     'dawn',
     'moon',
+    'shore',
   ],
   states: { state: WEATHER_STATE_IDS },
 } as const;
@@ -45,6 +46,8 @@ export interface SoundscapeWeather {
   dawn: boolean;
   /** 0..1: the moon's light while it is the key light. */
   moon: number;
+  /** 0..1: how strongly the ocean's surf reaches the listener. */
+  shore: number;
   state: WeatherStateId;
 }
 
@@ -56,6 +59,15 @@ export interface SoundscapeBiomes {
   readonly weights: Float64Array | null;
 }
 
+/** Loads and frees on-demand sounds. `SoundBank` is one. */
+export interface SoundDemand {
+  want(name: string): void;
+  release(name: string): void;
+}
+
+/** The level every soundscape bed plays at, under the rules' gains. */
+export const SOUNDSCAPE_LEVEL = 0.5;
+
 /** Bed fade-in and fade-out, seconds, over the biome probe's steps. */
 const ATTACK = 2;
 const RELEASE = 4;
@@ -65,7 +77,8 @@ const RELEASE = 4;
  * a RuleSet over the base profile's rules. Each frame the profiles of the
  * biomes at the listener give a gain and a cutoff per sound; the gains, times
  * each biome's weight, sum, and the lowest cutoff wins. One bed per sound, on
- * the ambience bus.
+ * the ambience bus. Only the sounds of the climate's own biomes are wanted
+ * from the bank, so a world loads none of another climate's sounds.
  */
 export class Soundscape {
   /** The soundscape last made, for the console. */
@@ -86,11 +99,16 @@ export class Soundscape {
   private readonly _slotSounds: Int32Array[];
   private _climate: ClimateConfig | null = null;
   private _byBiome = new Int32Array(0);
+  private _wanted: string[] = [];
   private _dawn = 0;
   private _settled = false;
 
   /** Throws, naming the profile, on a bad rule. */
-  constructor(def: SoundscapesDef, scope: AudioScope) {
+  constructor(
+    def: SoundscapesDef,
+    scope: AudioScope,
+    private readonly _bank: SoundDemand | null = null
+  ) {
     const base = def[BASE_PROFILE];
     this.names = Object.keys(def).filter((name) => name !== BASE_PROFILE);
     this.profiles = this.names.map((name) => {
@@ -142,6 +160,7 @@ export class Soundscape {
     signals.set('cloudiness', weather.cloudiness);
     signals.set('sun', weather.sun);
     signals.set('moon', weather.moon);
+    signals.set('shore', weather.shore);
     signals.setState('state', weather.state);
 
     const dawn = weather.dawn ? 1 : 0;
@@ -189,21 +208,36 @@ export class Soundscape {
       }
     }
     for (let k = 0; k < this._beds.length; k++)
-      this._beds[k].set(gains[k], cutoffs[k]);
+      this._beds[k].set(gains[k] * SOUNDSCAPE_LEVEL, cutoffs[k]);
   }
 
   dispose(fade: number = RELEASE): void {
     if (Soundscape.current === this) Soundscape.current = null;
     for (const bed of this._beds) bed.dispose(fade);
+    this._want([]);
   }
 
-  /** Points each of the climate's biomes at its profile, or none. */
+  /** Points each of the climate's biomes at its profile, or none, and wants their sounds. */
   private _mapBiomes(climate: ClimateConfig | null): void {
     this._climate = climate;
     const biomes = climate?.biomes ?? [];
     this._byBiome = new Int32Array(biomes.length);
-    biomes.forEach(
-      (biome, i) => (this._byBiome[i] = this.names.indexOf(biome.name))
-    );
+    const sounds = new Set<string>();
+    biomes.forEach((biome, i) => {
+      const p = this.names.indexOf(biome.name);
+      this._byBiome[i] = p;
+      if (p >= 0)
+        for (const k of this._slotSounds[p]) sounds.add(this.sounds[k]);
+    });
+    this._want([...sounds]);
+  }
+
+  /** Wants `sounds` from the bank and releases the ones wanted before. */
+  private _want(sounds: string[]): void {
+    const bank = this._bank;
+    if (!bank) return;
+    for (const sound of sounds) bank.want(sound);
+    for (const sound of this._wanted) bank.release(sound);
+    this._wanted = sounds;
   }
 }

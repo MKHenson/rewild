@@ -80,6 +80,7 @@ export class WorldSound {
     sun: 0,
     dawn: false,
     moon: 0,
+    shore: 0,
     state: 'Fair',
   };
   private _biomeWait = 0;
@@ -145,7 +146,11 @@ export class WorldSound {
       const def = soundscapesDef();
       if (def)
         try {
-          this._soundscape = new Soundscape(def, this._scope);
+          this._soundscape = new Soundscape(
+            def,
+            this._scope,
+            this._engine.bank
+          );
         } catch (e) {
           console.error('templates/soundscapes.json:', e);
         }
@@ -167,6 +172,7 @@ export class WorldSound {
     w.moon = sky.moon.isKeyLight(sky.elevation)
       ? moonIllumination(sky.moon.phase)
       : 0;
+    w.shore = this._surf.shore;
     w.state = renderer.sky.atmosphere.state;
     this._soundscape.update(w, this._biomes, seconds);
   }
