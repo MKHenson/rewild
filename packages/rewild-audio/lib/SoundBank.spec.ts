@@ -214,6 +214,7 @@ describe('SoundBank', () => {
       loaded: 0,
       failed: 0,
       pending: 3,
+      idle: 0,
       bytes: 0,
     });
 
@@ -224,7 +225,92 @@ describe('SoundBank', () => {
       loaded: 2,
       failed: 1,
       pending: 0,
+      idle: 0,
       bytes: 150 * 4,
     });
+  });
+
+  it('loads an on-demand sound only while something wants it', async () => {
+    const requested: string[] = [];
+    const bank = new SoundBank(undefined, async (url) => {
+      requested.push(url);
+      return new ArrayBuffer(8);
+    });
+    bank.setManifest({
+      sounds: [entry('a', ['a1']), entry('d', ['d1', 'd2'], { demand: true })],
+    });
+    await bank.decode(ctx());
+    expect(requested).toEqual(['a1']);
+    expect(bank.isLoaded('d')).toBe(false);
+    expect(bank.stats().idle).toBe(2);
+    expect(bank.stats().pending).toBe(0);
+
+    bank.want('d');
+    bank.want('d');
+    expect(requested).toEqual(['a1', 'd1', 'd2']);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(bank.isLoaded('d')).toBe(true);
+    expect(bank.stats().bytes).toBe(3 * 8 * 4);
+
+    bank.release('d');
+    expect(bank.isLoaded('d')).toBe(true);
+    bank.release('d');
+    expect(bank.isLoaded('d')).toBe(false);
+    expect(bank.pick('d', createSoundPick())).toBe(false);
+    expect(bank.stats().idle).toBe(2);
+    expect(bank.stats().bytes).toBe(8 * 4);
+  });
+
+  it('loads a wanted sound once the context exists', async () => {
+    const bank = new SoundBank(undefined, loader({ d1: 8 }));
+    bank.setManifest({ sounds: [entry('d', ['d1'], { demand: true })] });
+    bank.want('d');
+    expect(bank.isLoaded('d')).toBe(false);
+    await bank.decode(ctx());
+    expect(bank.isLoaded('d')).toBe(true);
+  });
+
+  it('drops a load that lands after its sound was released', async () => {
+    let finish: (data: ArrayBuffer) => void = () => {};
+    const bank = new SoundBank(
+      undefined,
+      () => new Promise<ArrayBuffer>((resolve) => (finish = resolve))
+    );
+    bank.setManifest({ sounds: [entry('d', ['d1'], { demand: true })] });
+    await bank.decode(ctx());
+    bank.want('d');
+    bank.release('d');
+    finish(new ArrayBuffer(8));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(bank.isLoaded('d')).toBe(false);
+  });
+
+  it('keeps a want made before the manifest arrives', async () => {
+    const bank = new SoundBank(undefined, loader({ d1: 8 }));
+    bank.want('d');
+    bank.setManifest({ sounds: [entry('d', ['d1'], { demand: true })] });
+    await bank.decode(ctx());
+    expect(bank.isLoaded('d')).toBe(true);
+    expect(bank.stats().idle).toBe(0);
+    bank.release('d');
+    expect(bank.isLoaded('d')).toBe(false);
+  });
+
+  it('keeps its wants across a new manifest', async () => {
+    const bank = new SoundBank(undefined, loader({ d1: 8 }));
+    const manifest = { sounds: [entry('d', ['d1'], { demand: true })] };
+    bank.setManifest(manifest);
+    bank.want('d');
+    bank.setManifest(manifest);
+    await bank.decode(ctx());
+    expect(bank.isLoaded('d')).toBe(true);
+  });
+
+  it('ignores want and release for a sound that loads up front', () => {
+    const bank = new SoundBank(undefined, loader({ a1: 8 }));
+    bank.setManifest({ sounds: [entry('a', ['a1'])] });
+    bank.release('a');
+    bank.want('a');
+    expect(bank.stats().pending).toBe(1);
   });
 });

@@ -1,8 +1,13 @@
 import { readFileSync } from 'fs';
 import { AudioEngine, OPEN_CUTOFF_HZ, STATE_EASE } from 'rewild-audio';
 import { installFakeAudioContext } from 'rewild-audio/lib/testing/FakeAudioContext';
-import { DEFAULT_CLIMATE } from 'rewild-renderer/lib/renderers/terrain/Biomes';
 import {
+  ARID_CLIMATE,
+  ClimateConfig,
+  DEFAULT_CLIMATE,
+} from 'rewild-renderer/lib/renderers/terrain/Biomes';
+import {
+  SOUNDSCAPE_LEVEL,
   Soundscape,
   SoundscapeBiomes,
   SoundscapeWeather,
@@ -15,6 +20,28 @@ const DEF: SoundscapesDef = JSON.parse(
 
 const FOREST = DEFAULT_CLIMATE.biomes.findIndex((b) => b.name === 'forest');
 const PLAIN = DEFAULT_CLIMATE.biomes.findIndex((b) => b.name === 'plain');
+const MOUNTAIN = DEFAULT_CLIMATE.biomes.findIndex((b) => b.name === 'mountain');
+
+function biomeIn(climate: ClimateConfig, name: string): number {
+  return climate.biomes.findIndex((b) => b.name === name);
+}
+
+/** Counts each sound's wants, as the bank does. */
+class FakeBank {
+  readonly wants = new Map<string, number>();
+  want(name: string): void {
+    this.wants.set(name, (this.wants.get(name) ?? 0) + 1);
+  }
+  release(name: string): void {
+    const n = (this.wants.get(name) ?? 0) - 1;
+    if (n < 0) throw new Error(`released ${name} more than wanted`);
+    if (n === 0) this.wants.delete(name);
+    else this.wants.set(name, n);
+  }
+  get loaded(): string[] {
+    return [...this.wants.keys()].sort();
+  }
+}
 
 const frame = 1 / 60;
 
@@ -23,7 +50,7 @@ let engine: AudioEngine;
 let scape: Soundscape;
 let weather: SoundscapeWeather;
 let biomes: {
-  climate: typeof DEFAULT_CLIMATE | null;
+  climate: ClimateConfig | null;
   count: number;
   biomes: Int32Array;
   weights: Float64Array;
@@ -67,6 +94,7 @@ beforeEach(async () => {
     sun: 0.6,
     dawn: false,
     moon: 0,
+    shore: 0,
     state: 'Fair',
   };
   biomes = {
@@ -95,7 +123,7 @@ describe('Soundscape', () => {
       (b) => b.spec.sounds[0] === 'forest-birds-day'
     )!;
     expect(bed.spec.bus).toBe('ambience');
-    expect(bed.gain).toBeCloseTo(1, 6);
+    expect(bed.gain).toBeCloseTo(SOUNDSCAPE_LEVEL, 6);
   });
 
   it('roars, creaks and quiets the birds in a gale', () => {
@@ -177,6 +205,11 @@ describe('Soundscape', () => {
   });
 
   it('is silent where no biome has a profile, or before the probe', () => {
+    scape.dispose(0);
+    scape = new Soundscape(
+      { '*': DEF['*'], forest: DEF.forest },
+      engine.createScope()
+    );
     at([PLAIN, 1]);
     run(frame);
     expect(scape.gains.every((g) => g === 0)).toBe(true);
@@ -225,6 +258,126 @@ describe('Soundscape', () => {
           engine.createScope()
         )
     ).toThrow(/soundscape "forest"/);
+  });
+
+  it('has its own day and night on the plain', () => {
+    at([PLAIN, 1]);
+    run(frame);
+    expect(gain('plain-grass-calm')).toBeCloseTo(1, 6);
+    expect(gain('plain-birds')).toBeCloseTo(1, 6);
+    expect(gain('plain-crickets')).toBe(0);
+    weather.sun = -0.5;
+    weather.windiness = 1;
+    run(frame);
+    expect(gain('plain-birds')).toBe(0);
+    expect(gain('plain-crickets')).toBeCloseTo(0.3, 6);
+    expect(gain('plain-grass-calm')).toBe(0);
+    expect(gain('plain-grass-wind')).toBeCloseTo(1, 6);
+  });
+
+  it('whistles on the mountain in a gale', () => {
+    at([MOUNTAIN, 1]);
+    run(frame);
+    expect(gain('mountain-whistle')).toBe(0);
+    weather.windiness = 1;
+    run(frame);
+    expect(gain('mountain-whistle')).toBeCloseTo(1, 6);
+    expect(gain('mountain-birds')).toBeCloseTo(0.3, 6);
+  });
+
+  it('keeps the palm forest cicadas in wind, but not in rain', () => {
+    biomes.climate = ARID_CLIMATE;
+    at([biomeIn(ARID_CLIMATE, 'palm-forest'), 1]);
+    weather.windiness = 1;
+    run(frame);
+    expect(gain('desert-cicadas')).toBeCloseTo(1, 6);
+    expect(gain('desert-sand')).toBeCloseTo(1, 6);
+    weather.rain = 0.5;
+    run(frame);
+    expect(gain('desert-cicadas')).toBeCloseTo(0.2, 6);
+  });
+
+  it('plays gulls by the shore in any biome, by day only', () => {
+    run(frame);
+    expect(gain('beach-gulls')).toBe(0);
+    weather.shore = 0.5;
+    run(frame);
+    expect(gain('beach-gulls')).toBeCloseTo(1, 6);
+
+    at([PLAIN, 0.5], [FOREST, 0.5]);
+    run(frame);
+    expect(gain('beach-gulls')).toBeCloseTo(1, 6);
+
+    weather.sun = -0.5;
+    run(frame);
+    expect(gain('beach-gulls')).toBe(0);
+  });
+
+  it('quiets the gulls in rain like any wildlife', () => {
+    weather.shore = 1;
+    weather.rain = 0.5;
+    run(frame);
+    expect(gain('beach-gulls')).toBeCloseTo(0.2, 6);
+  });
+
+  it('blows the air louder on the open dunes than in the palm forest', () => {
+    biomes.climate = ARID_CLIMATE;
+    at([biomeIn(ARID_CLIMATE, 'palm-forest'), 1]);
+    run(frame);
+    const sheltered = gain('desert-air');
+    at([biomeIn(ARID_CLIMATE, 'dunes'), 1]);
+    run(frame);
+    expect(gain('desert-air')).toBeGreaterThan(sheltered * 3);
+  });
+
+  it('plays open desert on the dunes: no birds or day insects', () => {
+    biomes.climate = ARID_CLIMATE;
+    at([biomeIn(ARID_CLIMATE, 'dunes'), 1]);
+    weather.shore = 1;
+    weather.windiness = 1;
+    run(frame);
+    expect(gain('desert-air')).toBeCloseTo(0.5, 6);
+    expect(gain('desert-sand')).toBeCloseTo(1, 6);
+    expect(gain('desert-cicadas')).toBe(0);
+    expect(gain('beach-gulls')).toBe(0);
+
+    weather.sun = -0.5;
+    weather.windiness = 0;
+    run(frame);
+    expect(gain('desert-night')).toBeCloseTo(1, 6);
+  });
+
+  it('crossfades between biomes as the ground changes', () => {
+    at([PLAIN, 0.6], [FOREST, 0.4]);
+    run(frame);
+    expect(gain('plain-grass-calm')).toBeCloseTo(0.6, 6);
+    expect(gain('forest-leaves-calm')).toBeCloseTo(0.4, 6);
+  });
+
+  it("loads only the sounds of the climate's biomes", () => {
+    scape.dispose(0);
+    const bank = new FakeBank();
+    scape = new Soundscape(DEF, engine.createScope(), bank);
+    expect(bank.loaded).toEqual([]);
+
+    run(frame);
+    expect(bank.loaded).toContain('forest-birds-day');
+    expect(bank.loaded).toContain('plain-crickets');
+    expect(bank.loaded).toContain('mountain-whistle');
+    expect(bank.loaded.some((s) => s.startsWith('desert'))).toBe(false);
+    expect(bank.loaded).toContain('beach-gulls');
+
+    biomes.climate = ARID_CLIMATE;
+    at([biomeIn(ARID_CLIMATE, 'palm-forest'), 1]);
+    run(frame);
+    expect(bank.loaded.some((s) => /^(forest|plain)-/.test(s))).toBe(false);
+    expect(bank.loaded).not.toContain('mountain-air');
+    expect(bank.loaded).toContain('desert-cicadas');
+    expect(bank.loaded).toContain('beach-gulls');
+    expect(bank.wants.get('mountain-whistle')).toBe(1);
+
+    scape.dispose(0);
+    expect(bank.loaded).toEqual([]);
   });
 
   it('owns nothing for the console once disposed', () => {

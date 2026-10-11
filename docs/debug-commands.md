@@ -381,7 +381,7 @@ that `audio()` reports `idle`. Volume, mute and solo changes made earlier still 
 once it starts.
 
 `audio()` shows the listener and panning mode, and lists the 3D voices in use with their position and loudness, every emitter with its heard gain and state (`playing` or `virtual`), and every bed with its gain, blend and state, so `holdBed(name, 0)`
-can be watched going from `playing` to `stopped`. It also counts the sound files loaded, pending and failed, and the decoded
+can be watched going from `playing` to `stopped`. It also counts the sound files loaded, pending and failed, the on-demand files nothing wants (such as another climate's soundscape), and the decoded
 size of the bank. Decoded audio is float PCM, so this is the real memory cost,
 several times the size of the files. A file that fails to load logs its own
 error with the sound's name and URL.
@@ -404,7 +404,8 @@ rules, so a wet, wading or crouched step can be checked against `templates/foots
 layer's gain, to check against `templates/voice.json`.
 
 `soundscape()` works in a game, and in the editor with its sound on. It shows only the biome
-profiles with weight at the listener, and only the sounds playing. A rule's weight is how far its
+profiles with weight at the listener, and only the sounds playing, with whether each one's file has
+loaded. A rule's weight is how far its
 `when` holds, 0 to 1. `reloadSoundscapes()` applies an edit to `templates/soundscapes.json` with
 no reload of the page; a bad profile logs its error and leaves the soundscape silent until the
 next good load.

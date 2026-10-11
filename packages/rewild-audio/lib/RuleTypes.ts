@@ -50,7 +50,7 @@ export interface RuleDef {
 export interface RuleSetDef {
   layers?: readonly RuleLayerDef[];
   rules?: readonly RuleDef[];
-  /** Ids of base rules this profile turns off. */
+  /** Ids of base rules and base layers this profile turns off. */
   without?: readonly string[];
 }
 

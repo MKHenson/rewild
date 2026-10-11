@@ -6,6 +6,8 @@ export interface SoundEntry {
   pitch?: [number, number];
   /** Gain range, picked at random per play. */
   gain?: [number, number];
+  /** Loads only while something wants it. See `SoundBank.want`. */
+  demand?: boolean;
   source: string;
 }
 
@@ -27,6 +29,8 @@ export interface SoundBankStats {
   loaded: number;
   failed: number;
   pending: number;
+  /** Files of on-demand sounds nothing wants, so not loaded. */
+  idle: number;
   bytes: number;
 }
 
@@ -52,14 +56,18 @@ export function createSoundPick(): SoundPick {
 
 /**
  * The sounds in a manifest. Files download as soon as the manifest is set and
- * decode once a context exists. A file that fails logs one error and is left
- * out; the rest of its sound still plays.
+ * decode once a context exists. An on-demand sound loads only while something
+ * wants it. A file that fails logs one error and is left out; the rest of its
+ * sound still plays.
  */
 export class SoundBank {
   random: () => number = Math.random;
 
   private _sounds = new Map<string, BankSound>();
   private _decoding: Promise<void> | null = null;
+  private _ctx: BaseAudioContext | null = null;
+  // Wants by name, so one made before the manifest arrives still counts.
+  private readonly _wants = new Map<string, number>();
 
   constructor(
     private readonly _resolveUrl: (path: string) => string = (path) => path,
@@ -81,21 +89,40 @@ export class SoundBank {
         failed: entry.files.map(() => false),
         last: -1,
       };
-      sound.data = entry.files.map((file, i) => {
-        const url = this._resolveUrl(file);
-        return this._load(url).catch((e) => {
-          this._fail(sound, i, `could not load ${url}`, e);
-          return null;
-        });
-      });
+      if (!entry.demand || this._wants.has(entry.name)) this._fetch(sound);
       this._sounds.set(entry.name, sound);
     }
   }
 
   /** Decodes every downloaded file. Buffers outlive the context, so this runs once per manifest. */
   decode(ctx: BaseAudioContext): Promise<void> {
+    this._ctx = ctx;
     if (!this._decoding) this._decoding = this._decodeAll(ctx);
     return this._decoding;
+  }
+
+  /** Loads an on-demand sound, if nothing wanted it yet. Pair each call with `release`. */
+  want(name: string): void {
+    const wants = (this._wants.get(name) ?? 0) + 1;
+    this._wants.set(name, wants);
+    const sound = this._sounds.get(name);
+    if (wants > 1 || !sound?.entry.demand) return;
+    this._fetch(sound);
+    const ctx = this._ctx;
+    if (ctx) sound.data.forEach((data, i) => this._decode(ctx, sound, i, data));
+  }
+
+  /** Lets go of an on-demand sound, freeing its buffers once nothing wants it. */
+  release(name: string): void {
+    const wants = this._wants.get(name) ?? 0;
+    if (wants > 1) this._wants.set(name, wants - 1);
+    else this._wants.delete(name);
+    const sound = this._sounds.get(name);
+    if (wants !== 1 || !sound?.entry.demand) return;
+    sound.data = [];
+    sound.buffers.fill(null);
+    sound.failed.fill(false);
+    sound.last = -1;
   }
 
   has(name: string): boolean {
@@ -148,13 +175,16 @@ export class SoundBank {
       loaded: 0,
       failed: 0,
       pending: 0,
+      idle: 0,
       bytes: 0,
     };
     for (const sound of this._sounds.values()) {
+      const idle = !!sound.entry.demand && !this._wants.has(sound.entry.name);
       for (let i = 0; i < sound.buffers.length; i++) {
         const buffer = sound.buffers[i];
         stats.files++;
-        if (buffer) {
+        if (idle) stats.idle++;
+        else if (buffer) {
           stats.loaded++;
           stats.bytes += buffer.length * buffer.numberOfChannels * 4;
         } else if (sound.failed[i]) stats.failed++;
@@ -162,6 +192,29 @@ export class SoundBank {
       }
     }
     return stats;
+  }
+
+  private _fetch(sound: BankSound): void {
+    sound.data = sound.entry.files.map((file, i) => {
+      const url = this._resolveUrl(file);
+      const data: Promise<ArrayBuffer | null> = this._load(url).catch((e) => {
+        if (this._holds(sound, i, data))
+          this._fail(sound, i, `could not load ${url}`, e);
+        return null;
+      });
+      return data;
+    });
+  }
+
+  /** Whether `data` is still file `index` of a sound in the manifest, not released or replaced. */
+  private _holds(
+    sound: BankSound,
+    index: number,
+    data: Promise<ArrayBuffer | null>
+  ): boolean {
+    return (
+      this._sounds.get(sound.entry.name) === sound && sound.data[index] === data
+    );
   }
 
   private async _decodeAll(ctx: BaseAudioContext): Promise<void> {
@@ -180,9 +233,10 @@ export class SoundBank {
     data: Promise<ArrayBuffer | null>
   ): Promise<void> {
     const bytes = await data;
-    if (!bytes || this._sounds.get(sound.entry.name) !== sound) return;
+    if (!bytes || !this._holds(sound, index, data)) return;
     try {
-      sound.buffers[index] = await ctx.decodeAudioData(bytes);
+      const buffer = await ctx.decodeAudioData(bytes);
+      if (this._holds(sound, index, data)) sound.buffers[index] = buffer;
     } catch (e) {
       this._fail(
         sound,

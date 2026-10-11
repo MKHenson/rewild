@@ -145,6 +145,7 @@
       "name": "forest-leaves-calm",
       "files": ["audio/forest/forest-leaves-calm.ogg"],
       "loop": true,
+      "demand": true,
       "source": "Soundly: forest mix",
       "license": "soundly"
     },
@@ -152,6 +153,7 @@
       "name": "forest-leaves-gale",
       "files": ["audio/forest/forest-leaves-gale.ogg"],
       "loop": true,
+      "demand": true,
       "source": "Soundly: forest mix",
       "license": "soundly"
     },
@@ -159,6 +161,7 @@
       "name": "forest-birds-day",
       "files": ["audio/forest/birds-day.ogg"],
       "loop": true,
+      "demand": true,
       "source": "Soundly: forest mix",
       "license": "soundly"
     },
@@ -166,6 +169,7 @@
       "name": "forest-night",
       "files": ["audio/forest/forest-night.ogg"],
       "loop": true,
+      "demand": true,
       "source": "Soundly: forest mix",
       "license": "soundly"
     },
@@ -173,6 +177,7 @@
       "name": "forest-creak",
       "files": ["audio/forest/creak.ogg"],
       "loop": true,
+      "demand": true,
       "source": "Soundly: forest mix",
       "license": "soundly"
     },
@@ -180,7 +185,114 @@
       "name": "forest-canopy-rain",
       "files": ["audio/forest/canopy-rain.ogg"],
       "loop": true,
+      "demand": true,
       "source": "Soundly: forest mix",
+      "license": "soundly"
+    },
+    {
+      "name": "plain-grass-calm",
+      "files": ["audio/plain/plain-grass-calm.ogg"],
+      "loop": true,
+      "demand": true,
+      "gain": [0.1, 0.15],
+      "source": "Soundly: plain mix",
+      "license": "soundly"
+    },
+    {
+      "name": "plain-grass-wind",
+      "files": ["audio/plain/plain-grass-wind.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: plain mix",
+      "license": "Farshad_hamzavi pixabay"
+    },
+    {
+      "name": "plain-birds",
+      "files": ["audio/plain/plain-birds.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: plain mix",
+      "license": "soundly"
+    },
+    {
+      "name": "plain-crickets",
+      "files": ["audio/plain/plain-crickets.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: plain mix",
+      "license": "soundly"
+    },
+    {
+      "name": "mountain-air",
+      "files": ["audio/mountain/mountain-air.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: mountain mix",
+      "license": "soundly"
+    },
+    {
+      "name": "mountain-birds",
+      "files": ["audio/mountain/mountain-birds.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: mountain mix",
+      "license": "soundly"
+    },
+    {
+      "name": "mountain-whistle",
+      "files": ["audio/mountain/mountain-whistle.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: mountain mix",
+      "license": "soundly"
+    },
+    {
+      "name": "desert-air",
+      "files": ["audio/desert/desert-air.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: desert mix",
+      "license": "soundly"
+    },
+    {
+      "name": "desert-cicadas",
+      "files": ["audio/desert/desert-cicadas.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: desert mix",
+      "license": "soundly"
+    },
+    {
+      "name": "desert-night",
+      "files": ["audio/desert/desert-night.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: desert mix",
+      "license": "soundly"
+    },
+    {
+      "name": "desert-sand",
+      "files": ["audio/desert/desert-sand.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: desert mix",
+      "license": "soundly"
+    },
+    {
+      "name": "desert-mountain-air",
+      "files": ["audio/desert/desert-mountain-air.ogg"],
+      "loop": true,
+      "demand": true,
+      "source": "Soundly: desert mix",
+      "license": "soundly"
+    },
+    {
+      "name": "beach-gulls",
+      "files": ["audio/beach/beach-gulls.ogg"],
+      "loop": true,
+      "demand": true,
+      "gain": [0.5, 0.6],
+      "source": "Soundly: beach mix",
       "license": "soundly"
     },
     {

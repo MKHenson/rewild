@@ -121,6 +121,19 @@ describe('SurfSound', () => {
     expect(sourcesOf('surf-storm')).toHaveLength(0);
   });
 
+  it('tells how strongly the surf reaches the listener', () => {
+    stand(95);
+    step(water(true, false), 0);
+    expect(surf.shore).toBeCloseTo(1, 6);
+    stand(-2000);
+    step(water(true, false), 0);
+    expect(surf.shore).toBe(0);
+    stand(95);
+    step(water(true, false), 0);
+    step(water(false, false), 0);
+    expect(surf.shore).toBe(0);
+  });
+
   it('is silent with no shore the waves reach', () => {
     stand(60);
     step(water(false, false), 1);

@@ -754,7 +754,7 @@ export const DESERT_MOUNTAIN: BiomeParams = {
 // secondary crest riding it, so the ground has a rhythm at the scale you cross
 // it.
 export const DESERT: BiomeParams = {
-  name: 'desert',
+  name: 'palm-forest',
   farColor: [0.45, 0.32, 0.18],
   deformations: [
     {
@@ -839,7 +839,7 @@ export const DESERT: BiomeParams = {
 // The two beach materials are one sand at two wetnesses, so height alone splits
 // them — which puts the tide line in the terrain's own shape, not on a contour.
 export const BEACH_SAND: BiomeParams = {
-  name: 'beach-sand',
+  name: 'dunes',
   farColor: [0.5, 0.4, 0.26],
   deformations: [
     {
@@ -1013,8 +1013,8 @@ export const ARID_CLIMATE: ClimateConfig = {
   biomes: [BEACH_SAND, DESERT, DESERT_MOUNTAIN],
   cells: [
     [2], // cold → desert mountain
-    [1], // mid  → dunes
-    [0], // warm → coastal flats
+    [1], // mid  → palm forest
+    [0], // warm → dunes
   ],
 };
 

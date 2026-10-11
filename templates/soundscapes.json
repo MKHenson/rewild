@@ -1,5 +1,13 @@
 {
   "*": {
+    "layers": [
+      {
+        "id": "gulls",
+        "sound": "beach-gulls",
+        "tags": ["wildlife", "birds", "far"],
+        "when": { "shore": [0, 0.5], "sun": [-0.1, 0.2] }
+      }
+    ],
     "rules": [
       {
         "id": "rain-quiets-wildlife",
@@ -77,6 +85,102 @@
         "id": "canopy-rain",
         "when": { "rain": [0.05, 0.4] },
         "add": "forest-canopy-rain"
+      }
+    ]
+  },
+  "plain": {
+    "layers": [
+      { "id": "grass", "sound": "plain-grass-calm" },
+      {
+        "id": "birds",
+        "sound": "plain-birds",
+        "tags": ["wildlife", "birds", "far"],
+        "when": { "sun": [-0.1, 0.2] }
+      },
+      {
+        "id": "crickets",
+        "sound": "plain-crickets",
+        "tags": ["wildlife"],
+        "when": { "sun": [0.1, -0.2] }
+      }
+    ],
+    "rules": [
+      {
+        "id": "wind-grass",
+        "when": { "windiness": [0.4, 0.8] },
+        "replace": "grass",
+        "with": "plain-grass-wind"
+      }
+    ]
+  },
+  "mountain": {
+    "layers": [
+      { "id": "air", "sound": "mountain-air" },
+      {
+        "id": "birds",
+        "sound": "mountain-birds",
+        "tags": ["wildlife", "birds", "far"],
+        "when": { "sun": [-0.1, 0.2] }
+      }
+    ],
+    "rules": [
+      {
+        "id": "ridge-whistle",
+        "when": { "windiness": [0.5, 0.9] },
+        "add": "mountain-whistle"
+      }
+    ]
+  },
+  "palm-forest": {
+    "without": ["gale-quiets-wildlife"],
+    "layers": [
+      {
+        "id": "cicadas",
+        "sound": "desert-cicadas",
+        "tags": ["wildlife"],
+        "when": { "sun": [-0.1, 0.2] }
+      },
+      {
+        "id": "night",
+        "sound": "desert-night",
+        "tags": ["wildlife", "far"],
+        "when": { "sun": [0.1, -0.2] }
+      }
+    ],
+    "rules": [
+      {
+        "id": "blowing-sand",
+        "when": { "windiness": [0.4, 0.8] },
+        "add": "desert-sand"
+      }
+    ]
+  },
+  "desert-mountain": {
+    "layers": [{ "id": "air", "sound": "desert-mountain-air" }],
+    "rules": [
+      {
+        "id": "ridge-whistle",
+        "when": { "windiness": [0.5, 0.9] },
+        "add": "mountain-whistle"
+      }
+    ]
+  },
+  "dunes": {
+    "without": ["gulls"],
+    "layers": [
+      { "id": "air", "sound": "desert-air", "gain": 0.5 },
+      {
+        "id": "night",
+        "sound": "desert-night",
+        "tags": ["wildlife", "far"],
+        "when": { "sun": [0.1, -0.2] }
+      }
+    ],
+    "rules": [
+      {
+        "id": "blowing-sand",
+        "when": { "windiness": [0.4, 0.8] },
+        "add": "desert-sand"
       }
     ]
   }
