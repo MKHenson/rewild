@@ -2,6 +2,7 @@ import {
   Component,
   Divider,
   Field,
+  InfoBox,
   Modal,
   register,
   Select,
@@ -21,6 +22,7 @@ import {
 import { getQualitySettings } from '../utils/getQualitySettings';
 import { VOLUME_SETTINGS, VolumeSetting } from 'rewild-audio';
 import { audioSettings } from '../../core/audio/audio';
+import { OutputDeviceField } from './OutputDeviceField';
 
 type Props = {
   /** Leave the settings, discarding anything not applied. */
@@ -209,6 +211,8 @@ export class SettingsPanel extends Component<Props> {
 
               <Divider />
 
+              <OutputDeviceField />
+
               <div class="section">
                 <Field label="Mute when in the background">
                   <Switch
@@ -224,9 +228,9 @@ export class SettingsPanel extends Component<Props> {
                 </Typography>
               </div>
 
-              <Typography variant="info">
+              <InfoBox variant="info" title="No need to apply">
                 Audio changes apply straight away, without Apply.
-              </Typography>
+              </InfoBox>
             </Tab>
           </Tabs>
         </Modal>

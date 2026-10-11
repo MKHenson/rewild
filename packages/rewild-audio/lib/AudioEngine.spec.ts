@@ -342,6 +342,61 @@ describe('AudioEngine changes after start', () => {
   });
 });
 
+describe('AudioEngine output device', () => {
+  it('plays through the chosen device, and the default again for ""', async () => {
+    const engine = new AudioEngine();
+    await engine.start();
+    expect(await engine.setOutputDevice('phones')).toBe(true);
+    expect(context(engine).sinkId).toBe('phones');
+    expect(await engine.setOutputDevice('')).toBe(true);
+    expect(context(engine).sinkId).toBe('');
+  });
+
+  it('keeps a device chosen before the context starts', async () => {
+    const engine = new AudioEngine();
+    expect(await engine.setOutputDevice('phones')).toBe(false);
+    await engine.start();
+    await Promise.resolve();
+    expect(context(engine).sinkId).toBe('phones');
+  });
+
+  it('plays through the default when the device is not connected', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    FakeAudioContext.missingDevices = ['phones'];
+    const engine = new AudioEngine();
+    await engine.start();
+    expect(await engine.setOutputDevice('phones')).toBe(false);
+    expect(context(engine).sinkId).toBe('');
+    expect(engine.outputDevice).toBe('phones');
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('tries the device again when one is plugged in', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    FakeAudioContext.missingDevices = ['phones'];
+    const engine = new AudioEngine();
+    await engine.start();
+    await engine.setOutputDevice('phones');
+    const media = new EventTarget();
+    const stop = engine.followOutputDevice(media);
+
+    FakeAudioContext.missingDevices = [];
+    media.dispatchEvent(new Event('devicechange'));
+    await Promise.resolve();
+    expect(context(engine).sinkId).toBe('phones');
+
+    stop();
+    FakeAudioContext.missingDevices = ['speakers'];
+    await engine.setOutputDevice('speakers');
+    FakeAudioContext.missingDevices = [];
+    media.dispatchEvent(new Event('devicechange'));
+    await Promise.resolve();
+    expect(context(engine).sinkId).toBe('phones');
+    jest.restoreAllMocks();
+  });
+});
+
 describe('AudioEngine.startOnGesture', () => {
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 

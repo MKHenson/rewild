@@ -43,6 +43,9 @@ const GESTURE_EVENTS = ['pointerdown', 'pointerup', 'keydown'] as const;
 
 export type AudioEngineState = AudioContextState | 'idle';
 
+/** An AudioContext that can play through a chosen output device. */
+type SinkContext = AudioContext & { setSinkId?(id: string): Promise<void> };
+
 interface OneShot {
   source: AudioBufferSourceNode;
   amp: GainNode;
@@ -106,6 +109,7 @@ export class AudioEngine {
   private _reverb: ConvolverNode | null = null;
   private _reverbLevel = 0;
   private readonly _reverbShape: ReverbShape = { ...DEFAULT_REVERB_SHAPE };
+  private _outputDevice = '';
 
   private _muffleCutoff = OPEN_CUTOFF_HZ;
   private _muffleLevel = 1;
@@ -168,6 +172,46 @@ export class AudioEngine {
 
   get ducked(): boolean {
     return this._ducked;
+  }
+
+  /** The output device's id, or '' for the system default. */
+  get outputDevice(): string {
+    return this._outputDevice;
+  }
+
+  /**
+   * Plays through the output device with this id, or the system default for
+   * ''. Kept for a context made later. Resolves false if the browser cannot
+   * choose a device, or this one is not connected; the sound then plays
+   * through the default.
+   */
+  setOutputDevice(id: string): Promise<boolean> {
+    this._outputDevice = id;
+    return this._applyOutputDevice();
+  }
+
+  /** Tries the chosen output device again whenever `media` reports a device plugged in or out. */
+  followOutputDevice(media: EventTarget): () => void {
+    const onChange = () => {
+      if (this._outputDevice) this._applyOutputDevice();
+    };
+    media.addEventListener('devicechange', onChange);
+    return () => media.removeEventListener('devicechange', onChange);
+  }
+
+  private async _applyOutputDevice(): Promise<boolean> {
+    const ctx = this._ctx as SinkContext | null;
+    if (!ctx?.setSinkId || ctx.state === 'closed') return false;
+    try {
+      await ctx.setSinkId(this._outputDevice);
+      return true;
+    } catch (e) {
+      console.warn(
+        `Audio output device "${this._outputDevice}" is not available; playing through the default`,
+        e
+      );
+      return false;
+    }
   }
 
   get reverbLevel(): number {
@@ -674,6 +718,7 @@ export class AudioEngine {
     const p = this._listenerPosition;
     this._voices.setListenerPosition(p.x, p.y, p.z);
 
+    if (this._outputDevice) this._applyOutputDevice();
     this.bank.decode(ctx);
   }
 

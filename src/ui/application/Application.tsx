@@ -24,6 +24,8 @@ export class Application extends Component<Props> {
     audio.startOnGesture(document);
     audio.suspendWhenHidden(document, () => audioSettings.muteInBackground);
     audioSettings.bindBackgroundMute(window);
+    if (navigator.mediaDevices)
+      audio.followOutputDevice(navigator.mediaDevices);
     loadAudioTemplates();
     registerAudioDebugCommands(audio);
 

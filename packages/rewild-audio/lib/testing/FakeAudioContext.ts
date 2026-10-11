@@ -171,6 +171,9 @@ export class FakeAudioContext {
   readonly panners: FakePannerNode[] = [];
   readonly calls = { resume: 0, suspend: 0, close: 0, decode: 0 };
   readonly sources: FakeAudioBufferSourceNode[] = [];
+  sinkId = '';
+  /** Device ids `setSinkId` rejects, as for a device that is not connected. */
+  static missingDevices: string[] = [];
 
   constructor(readonly options?: AudioContextOptions) {
     FakeAudioContext.instances.push(this);
@@ -226,6 +229,13 @@ export class FakeAudioContext {
     return Promise.resolve(fakeAudioBuffer(data.byteLength));
   }
 
+  setSinkId(id: string): Promise<void> {
+    if (FakeAudioContext.missingDevices.includes(id))
+      return Promise.reject(new DOMException('No device', 'NotFoundError'));
+    this.sinkId = id;
+    return Promise.resolve();
+  }
+
   resume(): Promise<void> {
     this.calls.resume++;
     if (FakeAudioContext.blocked) return new Promise<void>(() => {});
@@ -252,6 +262,7 @@ export function installFakeAudioContext(): () => void {
   FakeAudioContext.instances.length = 0;
   FakeAudioContext.initialState = 'running';
   FakeAudioContext.blocked = false;
+  FakeAudioContext.missingDevices = [];
   return () => {
     g.AudioContext = previous;
   };

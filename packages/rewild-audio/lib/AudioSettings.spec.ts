@@ -160,6 +160,48 @@ describe('AudioSettings', () => {
   });
 });
 
+describe('output device', () => {
+  it('starts on the system default', () => {
+    const settings = new AudioSettings(new AudioEngine(), memoryStorage());
+    expect(settings.outputDevice).toEqual({ id: '', label: '' });
+  });
+
+  it('plays through a chosen device at once and stores it', async () => {
+    const engine = new AudioEngine();
+    await engine.start();
+    const storage = memoryStorage();
+    const settings = new AudioSettings(engine, storage);
+
+    expect(
+      await settings.setOutputDevice({ id: 'phones', label: 'Phones' })
+    ).toBe(true);
+    expect(FakeAudioContext.instances[0].sinkId).toBe('phones');
+    expect(stored(storage).outputDevice).toEqual({
+      id: 'phones',
+      label: 'Phones',
+    });
+  });
+
+  it('restores a stored device for the context made later', async () => {
+    const engine = new AudioEngine();
+    const settings = new AudioSettings(
+      engine,
+      memoryStorage({ outputDevice: { id: 'phones', label: 'Phones' } })
+    );
+    expect(settings.outputDevice.label).toBe('Phones');
+    await engine.start();
+    expect(FakeAudioContext.instances[0].sinkId).toBe('phones');
+  });
+
+  it('ignores a stored device that is not one', () => {
+    const settings = new AudioSettings(
+      new AudioEngine(),
+      memoryStorage({ outputDevice: { id: 3 } })
+    );
+    expect(settings.outputDevice.id).toBe('');
+  });
+});
+
 describe('background mute', () => {
   async function setup(muteInBackground: boolean) {
     const engine = new AudioEngine();

@@ -1,5 +1,6 @@
 import type { AudioEngine } from './AudioEngine';
 import { BusName } from './Buses';
+import type { OutputDevice } from './OutputDevices';
 
 /** localStorage key holding the audio settings, as a JSON object. */
 export const AUDIO_SETTINGS_KEY = 'rewild.audio';
@@ -58,6 +59,7 @@ export function isVolumeSetting(value: unknown): value is VolumeSetting {
 export class AudioSettings {
   private readonly _volumes = { ...DEFAULT_VOLUMES };
   private _muteInBackground = true;
+  private _outputDevice: OutputDevice = { id: '', label: '' };
 
   constructor(
     private readonly _engine: AudioEngine,
@@ -65,6 +67,25 @@ export class AudioSettings {
   ) {
     this._read();
     for (const setting of VOLUME_SETTINGS) this._apply(setting);
+    if (this._outputDevice.id)
+      this._engine.setOutputDevice(this._outputDevice.id);
+  }
+
+  /** The chosen output device, with its name when chosen; an id of '' is the system default. */
+  get outputDevice(): Readonly<OutputDevice> {
+    return this._outputDevice;
+  }
+
+  /** Plays through `device`, or the system default for an id of ''. */
+  setOutputDevice(device: OutputDevice): Promise<boolean> {
+    if (
+      device.id !== this._outputDevice.id ||
+      device.label !== this._outputDevice.label
+    ) {
+      this._outputDevice = { id: device.id, label: device.label };
+      this._write();
+    }
+    return this._engine.setOutputDevice(device.id);
   }
 
   volume(setting: VolumeSetting): number {
@@ -118,7 +139,10 @@ export class AudioSettings {
       if (!stored) return;
       const parsed = JSON.parse(stored) as unknown;
       if (!parsed || typeof parsed !== 'object') return;
-      const { volumes, muteInBackground } = parsed as Record<string, unknown>;
+      const { volumes, muteInBackground, outputDevice } = parsed as Record<
+        string,
+        unknown
+      >;
 
       if (volumes && typeof volumes === 'object')
         for (const [key, value] of Object.entries(volumes))
@@ -131,6 +155,12 @@ export class AudioSettings {
 
       if (typeof muteInBackground === 'boolean')
         this._muteInBackground = muteInBackground;
+
+      if (outputDevice && typeof outputDevice === 'object') {
+        const { id, label } = outputDevice as Record<string, unknown>;
+        if (typeof id === 'string' && typeof label === 'string')
+          this._outputDevice = { id, label };
+      }
     } catch {
       // Blocked storage, or JSON that is not JSON: the defaults stand.
     }
@@ -143,6 +173,7 @@ export class AudioSettings {
         JSON.stringify({
           volumes: this._volumes,
           muteInBackground: this._muteInBackground,
+          outputDevice: this._outputDevice,
         })
       );
     } catch {
