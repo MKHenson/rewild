@@ -223,12 +223,12 @@ export class SettingsPanel extends Component<Props> {
                     }
                   />
                 </Field>
-                <Typography variant="light">
+                <Typography variant="info">
                   Silences the game while another window has focus.
                 </Typography>
               </div>
 
-              <InfoBox variant="info" title="No need to apply">
+              <InfoBox variant="info" title="">
                 Audio changes apply straight away, without Apply.
               </InfoBox>
             </Tab>
