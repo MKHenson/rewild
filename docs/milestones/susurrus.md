@@ -30,8 +30,7 @@ The work has four parts:
    3D emitters, the listener, settings and debug commands.
 2. **Weather sound.** Wind, rain, snow and thunder.
 3. **The player.** Under-water sound, swimming, splashes, footsteps, sliding, breath and death.
-4. **The land.** Surf, biome soundscapes with weather rules, day and night, and wildlife calls in
-   3D.
+4. **The land.** Surf, biome soundscapes with weather rules, and day and night.
 
 The engine is a library and knows nothing about the game. The game systems own their own sound
 as plain classes that use the engine. The `Player` owns one `PlayerSounds`, which holds every
@@ -39,8 +38,8 @@ player sound, and tells it the player's state each frame. The soundscape owns th
 land. A system can drive its sound
 from its own update or from an event, whichever fits.
 
-There are no animals yet. Wildlife sound comes from biome beds and from one-shot calls placed in
-3D around the player. The emitter API is the one creatures will use when they arrive.
+There are no animals yet. Wildlife sound comes from the biome beds. Calls in 3D come with the
+creatures, from their own positions, through the same emitter API.
 
 ## Goals
 
@@ -67,9 +66,11 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
 ## Non-goals (deferred)
 
 - **Music.** The music bus and its slider exist, but no music system or score is in this milestone.
-- **Creatures.** No animal entities exist. Their sound waits for the creatures milestone.
+- **Creatures.** No animal entities exist. Their sound, wildlife calls in 3D included, waits for
+  the creatures milestone. A call heard from a place with no animal in it would ring false.
 - **Occlusion and sound propagation.** No ray casts against terrain or trees in this milestone.
-- **Reverb from the terrain.** Valleys and cliffs that echo are a stretch goal (step 23).
+- **Reverb from the terrain shape.** The reverb follows the biome, not ray casts against the
+  ground. See [Reverb in the mountains](#reverb-in-the-mountains).
 
 ## Key technical decisions
 
@@ -107,6 +108,7 @@ There are no animals yet. Wildlife sound comes from biome beds and from one-shot
                          ┌─▶ ambience ─┐
 emitters, beds  ─────────┼─▶ weather  ─┼─▶ world ─▶ under-water low-pass ─▶ menu duck ─┐
                          └─▶ effects  ─┘                                              ├─▶ master ─▶ compressor ─▶ out
+                               └─▶ reverb ◀─ player; reverb ─▶ world                  │
 player sounds   ──────────▶ player ──────────────────────────────────────────────────┤
 music           ──────────▶ music ───────────────────────────────────────────────────┤
 UI sounds       ──────────▶ ui ──────────────────────────────────────────────────────┘
@@ -122,6 +124,9 @@ UI sounds       ──────────▶ ui ─────────
   menu, so silence would sound wrong. A duck of about 12 dB is enough.
 - **music** skips the world, so music is never muffled under water. Nothing plays on it yet.
 - **compressor** is a `DynamicsCompressorNode` that keeps a close thunderclap from clipping.
+- **reverb** is a send from the effects duck and the player bus through a `ConvolverNode` back
+  into the world, so it is muffled under water with everything else. `audio.setReverb(level)` sets the send, 0 to 1.
+  See [Reverb in the mountains](#reverb-in-the-mountains).
 - Each bus is a `GainNode`. The settings set the master, music, world, player and UI gains. The
   ambience, weather and effects gains are for tuning the mix, through debug commands.
 
@@ -951,7 +956,8 @@ Each biome has a **soundscape profile** in `templates/soundscapes.json`. A profi
   A layer can have **tags**, such as `wildlife` or `birds`.
 - **Rules.** Changes to the layers when a condition is true: **add** a layer, **replace** a layer,
   **scale** a layer or **muffle** a layer.
-- **Calls.** One-shot wildlife calls in 3D. See [Wildlife calls in 3D](#wildlife-calls-in-3d).
+- **Reverb.** How much the effects reverberate there, 0 to 1. See
+  [Reverb in the mountains](#reverb-in-the-mountains).
 
 The profiles stay in `templates/soundscapes.json`, keyed by biome name. They do not go on
 `BiomeParams` in `Biomes.ts`. That file is in the renderer, and the renderer knows nothing about
@@ -1103,7 +1109,7 @@ editor too:
 | `add`     | Plays a new sound at gain `w`.                                                              | Creaking trees, canopy rain, a ridge whistle   |
 | `replace` | Crossfades a layer to a new sound: the old one at `1 − w` of its gain, the new one at `w`.  | Calm leaves becoming gale leaves               |
 | `scale`   | Multiplies a layer's gain by a value between 1 and `by`, moved by `w`. `by: 0` silences it. | Birds quiet in rain, louder at dawn            |
-| `muffle`  | Moves a layer's low-pass cutoff from fully open toward `cutoff` Hz, moved by `w`.           | Snow dampening the land, fog dulling far calls |
+| `muffle`  | Moves a layer's low-pass cutoff from fully open toward `cutoff` Hz, moved by `w`.           | Snow dampening the land, fog dulling far birds |
 
 - Rules apply in list order. A `scale` after a `replace` scales the new sound too.
 - `add` and `replace` take a `gain` for the sound they bring in, for example `"gain": 0.6`.
@@ -1176,7 +1182,7 @@ profile that fails to compile logs its name and the error, and the soundscape st
 
 Every biome also gets the base: gulls by day along the ocean shore, wildlife quiets in rain and
 gales and stops in storms, birds sing louder at dawn and after rain, snow dampens and fog dulls far
-calls.
+wildlife.
 
 | Biome           | Layers                                    | Own rules, after the base                                                 |
 | --------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
@@ -1187,25 +1193,28 @@ calls.
 | desert-mountain | dry thin air                              | wind adds a ridge whistle                                                 |
 | dunes           | open desert: dry air, insects by night    | wind adds blowing sand, `without: ["gulls"]`; no birds or day insects     |
 
-### Wildlife calls in 3D
+### Reverb in the mountains
 
-The beds give the background. **Calls** give the life in it:
+Thunder, falling stones, splashes and the player's own sounds ring out in the mountains.
+Everywhere else they sound dry.
 
-- Each profile lists its calls, with the same `when` conditions as layers.
-- Every few seconds, the soundscape may pick a call from the biomes at the player, for example a
-  woodpecker, a crow or a hawk. The rule weights and the biome weight set the chance.
-- It plays the call on a 3D emitter 20 to 80 m from the player, at a random bearing and at a
-  height that suits it. Birds call from above, insects from the ground.
-
-```json
-"calls": [
-  { "sound": "woodpecker", "when": { "sun": [0, 0.3], "rain": [0.3, 0] }, "every": [8, 25], "height": [6, 18] },
-  { "sound": "owl", "when": { "sun": [0, -0.2] }, "every": [20, 60], "height": [8, 15] }
-]
-```
-
-This gives sound from all around with no animals in the world. When creatures arrive, they use the
-same `audio.play(name, { at })` call from their own position.
+- **Where.** A profile's `reverb` says how much its biome reverberates: 1 on the mountain, 0.8 on
+  the desert mountain, and 0 where a profile leaves it out. `Soundscape.reverb` sums each
+  profile's reverb times its biome weight at the listener, so the reverb fades in as the ground
+  turns to mountain. `WorldSound` passes it to `audio.setReverb` each frame, which eases the send
+  by e every 0.5 s.
+- **What reverberates.** The effects bus: thunder, slide debris, plunges, surfacing and bubbles.
+  The player bus: steps, landings, the flashlight, the swim strokes, the breath and the voice. The
+  ambience and weather beds are already all around the listener, and a reverb would only blur
+  them.
+- **The reverb.** `writeReverbImpulse` in `packages/rewild-audio` builds the impulse response
+  when the context starts, with no sound file: noise, different in each ear, falling by 60 dB
+  over `seconds` (3.5) after a `predelay` (0.02 s), and darkening from `cutoff` (5 kHz) to a
+  quarter of it as it falls. It is scaled so the reverb of a sound is `gain` (0.16) times as loud
+  as the sound, and the convolver does not normalize it. `audio.setReverbShape` changes the
+  `ReverbShape` and builds it again.
+- **Cost.** With the send at 0 the convolver hears silence, and Chrome stops processing it once its
+  tail has passed.
 
 ## The editor
 
@@ -1220,7 +1229,7 @@ it is built.
   emitters keep their state and come back as they were. See [Silencing](#silencing).
 - **The start.** The click on **Editor** in the main menu already started the context. The toggle
   only says whether the editor plays its sound.
-- **The listener** is the editor camera. Weather, thunder, water, biome soundscapes and calls all
+- **The listener** is the editor camera. Weather, thunder, water and biome soundscapes all
   read the listener's position, so they work with no player.
 - **No player sounds.** There is no player in the editor, so no footsteps, breathing or splashes.
 - **The loop.** The editor renders on the renderer's own animation frame, which has no hook. While
@@ -1274,7 +1283,7 @@ instance, `audioSettings`, next to the engine.
   setting decides whether a hidden tab suspends the context; see
   [Start, focus and pause](#start-focus-and-pause).
 
-## Sound list (steps 1 to 22)
+## Sound list (steps 1 to 21)
 
 The minimum set of files. Each loop must loop with no gap or click.
 
@@ -1292,8 +1301,6 @@ The minimum set of files. Each loop must loop with no gap or click.
 | Voice      | 3 pain sizes, 3 gasp sizes, strain, calm, hard, panting, heat and pained breath loops, swim breaths, cold shivers, heartbeat, stomach growls | Mixed     |
 | Sliding    | crumbling dirt and snow slide loops, 5 slips, 4 debris crumbles, 4 stone rattles, 3 scrabbles                                                | Mixed     |
 | Biome beds | the layers and the `add` and `replace` sounds in each profile                                                                                | Loops     |
-| Calls      | 3 to 6 per biome                                                                                                                             | One-shots |
-
 ## Code changes outside the audio code
 
 | Where                        | Change                                                                                                              |
@@ -1530,22 +1537,16 @@ files to the bucket with `npm run assets:push`. Every step adds its debug comman
   biome has its own day and night. The palm forest keeps its cicadas in wind. The mountain whistles in
   a gale. An arid world loads no temperate sounds.
 
-#### 22. Wildlife calls in 3D
-
-- **Delivers.** Calls in each profile, with `when`, `every` and `height`. Each call plays on an
-  emitter 20 to 80 m from the listener.
-- **Expect.** A woodpecker knocks from somewhere in the trees, from a new place each time. Owls
-  call at night only. Calls stop in rain and storms. Turn toward a call and it is in front of you.
-
 ### Phase 6: Stretch
 
 Each of these is its own issue, and none of them blocks the milestone.
 
-- **23. Echo in valleys.** A `ConvolverNode` driven by how open the terrain is around the listener.
-  Expect thunder and calls to ring on in a valley and to sound dry on open ground.
-- **24. Rain on open water.** Its own rain layer when the listener is near or on water. Expect rain
+- **22. Reverb in the mountains.** A `ConvolverNode` on the effects and player buses, set by each
+  soundscape profile's `reverb`. Expect thunder, falling stones and the player's own sounds to
+  ring out in the mountains and to sound dry on the plain.
+- **23. Rain on open water.** Its own rain layer when the listener is near or on water. Expect rain
   on a lake to hiss, not patter.
-- **25. Output device.** An output device setting from `AudioContext.setSinkId`. Expect the game to
+- **24. Output device.** An output device setting from `AudioContext.setSinkId`. Expect the game to
   play through the chosen device, in Chrome and in Electron.
 
 ## Performance notes
@@ -1573,13 +1574,13 @@ of each sound is visible while the sounds are chosen.
 
 | Command                       | What it does                                                                               |
 | ----------------------------- | ------------------------------------------------------------------------------------------ |
-| `audio()`                     | Logs the context state, bus gains, active beds and their gains, and voices.                |
+| `audio()`                     | Logs the context state, the reverb, bus gains, active beds and their gains, and voices.    |
 | `setAudioVolume(bus, value)`  | Sets a bus gain, 0 to 1.                                                                   |
 | `muteAudio(bus?)`             | Mutes a bus, or all audio. Call again to unmute.                                           |
 | `soloAudio(bus)`              | Plays one bus only, to tune it.                                                            |
 | `playSound(name, [x, y, z]?)` | Plays a sound from the manifest, at a position or in 2D.                                   |
 | `holdBed(name, gain)`         | Holds one bed at a gain, to hear it alone.                                                 |
-| `soundscape()`                | Logs the biome weights, the signals, each rule's weight, and each layer's gain and cutoff. |
+| `soundscape()`                | Logs the biome weights, the signals, the reverb, each rule's weight, and each layer's gain.|
 | `reloadSoundscapes()`         | Loads `soundscapes.json` again, to tune rules with no reload of the game.                  |
 | `footsteps()`                 | Logs the footstep signals, the surfaces under the last step, and each layer's gain.        |
 | `voice()`                     | Logs the body values, what the mouth is saying, each rule's weight and each layer's gain.  |

@@ -285,6 +285,25 @@ describe('Soundscape', () => {
     expect(gain('mountain-birds')).toBeCloseTo(0.3, 6);
   });
 
+  it('reverberates in the mountains, by their share of the ground', () => {
+    run(frame);
+    expect(scape.reverb).toBe(0);
+    at([MOUNTAIN, 1]);
+    run(frame);
+    expect(scape.reverb).toBeCloseTo(1, 6);
+    at([MOUNTAIN, 0.25], [FOREST, 0.75]);
+    run(frame);
+    expect(scape.reverb).toBeCloseTo(0.25, 6);
+
+    biomes.climate = ARID_CLIMATE;
+    at([biomeIn(ARID_CLIMATE, 'desert-mountain'), 1]);
+    run(frame);
+    expect(scape.reverb).toBeGreaterThan(0.5);
+    at([biomeIn(ARID_CLIMATE, 'dunes'), 1]);
+    run(frame);
+    expect(scape.reverb).toBe(0);
+  });
+
   it('keeps the palm forest cicadas in wind, but not in rain', () => {
     biomes.climate = ARID_CLIMATE;
     at([biomeIn(ARID_CLIMATE, 'palm-forest'), 1]);

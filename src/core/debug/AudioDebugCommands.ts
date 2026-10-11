@@ -25,6 +25,7 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
           audio.muffleCutoff
         )} Hz at ${audio.muffleLevel.toFixed(2)}` +
         `, ${audio.ducked ? 'ducked' : 'not ducked'}` +
+        `, reverb ${audio.reverbLevel.toFixed(2)}` +
         (audio.mix.solo ? `\nSolo: ${audio.mix.solo}` : '') +
         (audio.isSilenced()
           ? `\nSilenced by: ${audio.silencedBy.join(', ')}`
@@ -319,6 +320,7 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
           .map((name) => `${name} ${signals.get(name).toFixed(2)}`)
           .join(', ')
     );
+    console.log(`Reverb: ${scape.reverb.toFixed(2)}`);
     const shown = scape.profiles
       .map((rules, p) => ({ rules, p }))
       .filter(({ p }) => scape.profileWeights[p] > 0);
@@ -343,6 +345,27 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
           loaded: audio.bank.isLoaded(sound),
         }))
         .filter((row) => row.gain > 0)
+    );
+  };
+
+  (window as any).reverbShape = (shape?: Record<string, number>) => {
+    if (shape) {
+      const known = Object.keys(audio.reverbShape);
+      const unknown = Object.keys(shape).filter((key) => !known.includes(key));
+      if (unknown.length) {
+        console.warn(
+          `Unknown reverb setting ${unknown.join(', ')}. Expected: ${known.join(
+            ', '
+          )}`
+        );
+        return;
+      }
+      audio.setReverbShape(shape);
+    }
+    console.log(
+      `Reverb at ${audio.reverbLevel.toFixed(2)}: ${JSON.stringify(
+        audio.reverbShape
+      )}`
     );
   };
 

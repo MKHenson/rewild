@@ -67,7 +67,7 @@ describe('BiomePaintToolbar', () => {
     const comp = createToolbar();
     const labels = getBiomeButtons(comp).map((b) => b.textContent);
     expect(labels.some((l) => l?.includes('Desert Mountain'))).toBe(true);
-    expect(labels.some((l) => l?.includes('Beach Sand'))).toBe(true);
+    expect(labels.some((l) => l?.includes('Palm Forest'))).toBe(true);
   });
 
   it('marks the selected biome as the only selected biome button', () => {

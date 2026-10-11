@@ -8,8 +8,13 @@ import type { ClimateConfig } from 'rewild-renderer/lib/renderers/terrain/Biomes
 /** The profile every biome's profile extends. */
 export const BASE_PROFILE = '*';
 
+export interface SoundscapeProfileDef extends RuleSetDef {
+  /** 0..1: how much the effects reverberate here. */
+  reverb?: number;
+}
+
 /** `templates/soundscapes.json`: a profile per biome name, and the base profile under `"*"`. */
-export type SoundscapesDef = Readonly<Record<string, RuleSetDef>>;
+export type SoundscapesDef = Readonly<Record<string, SoundscapeProfileDef>>;
 
 export const SOUNDSCAPE_SIGNALS = {
   numbers: [
@@ -94,7 +99,10 @@ export class Soundscape {
   readonly sounds: readonly string[];
   readonly gains: Float32Array;
   readonly cutoffs: Float32Array;
+  /** Each profile's reverb. */
+  readonly reverbs: Float32Array;
 
+  private _reverb = 0;
   private readonly _beds: Bed[];
   private readonly _slotSounds: Int32Array[];
   private _climate: ClimateConfig | null = null;
@@ -119,6 +127,9 @@ export class Soundscape {
       }
     });
     this.profileWeights = new Float32Array(this.profiles.length);
+    this.reverbs = new Float32Array(
+      this.names.map((name) => def[name].reverb ?? 0)
+    );
 
     const sounds: string[] = [];
     this._slotSounds = this.profiles.map(
@@ -143,6 +154,11 @@ export class Soundscape {
       })
     );
     Soundscape.current = this;
+  }
+
+  /** The reverb at the listener: each profile's reverb times its weight, summed. */
+  get reverb(): number {
+    return this._reverb;
   }
 
   update(
@@ -188,6 +204,11 @@ export class Soundscape {
         const p = this._byBiome[ids[i]];
         if (p >= 0) profileWeights[p] += weights[i];
       }
+
+    let reverb = 0;
+    for (let p = 0; p < this.profiles.length; p++)
+      reverb += profileWeights[p] * this.reverbs[p];
+    this._reverb = reverb;
 
     const gains = this.gains;
     const cutoffs = this.cutoffs;

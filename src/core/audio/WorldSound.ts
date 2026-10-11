@@ -134,6 +134,9 @@ export class WorldSound {
       }
       this._updateSoundscape(renderer, seconds);
     }
+    this._engine.setReverb(
+      renderer.terrainRenderer ? this._soundscape?.reverb ?? 0 : 0
+    );
   }
 
   /** Builds the soundscape again whenever `soundscapes.json` loads. */

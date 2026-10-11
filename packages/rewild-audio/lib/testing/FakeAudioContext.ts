@@ -37,8 +37,13 @@ export class FakeAudioNode {
     return destination;
   }
 
-  disconnect() {
-    this.outputs.length = 0;
+  disconnect(destination?: FakeAudioNode) {
+    if (!destination) {
+      this.outputs.length = 0;
+      return;
+    }
+    const i = this.outputs.indexOf(destination);
+    if (i >= 0) this.outputs.splice(i, 1);
   }
 }
 
@@ -68,6 +73,15 @@ export class FakeDynamicsCompressorNode extends FakeAudioNode {
 
   constructor() {
     super('compressor');
+  }
+}
+
+export class FakeConvolverNode extends FakeAudioNode {
+  buffer: AudioBuffer | null = null;
+  normalize = true;
+
+  constructor() {
+    super('convolver');
   }
 }
 
@@ -172,6 +186,24 @@ export class FakeAudioContext {
 
   createDynamicsCompressor() {
     return new FakeDynamicsCompressorNode();
+  }
+
+  createConvolver() {
+    return new FakeConvolverNode();
+  }
+
+  createBuffer(channels: number, length: number, sampleRate: number) {
+    const data = Array.from(
+      { length: channels },
+      () => new Float32Array(length)
+    );
+    return {
+      length,
+      numberOfChannels: channels,
+      sampleRate,
+      duration: length / sampleRate,
+      getChannelData: (channel: number) => data[channel],
+    } as unknown as AudioBuffer;
   }
 
   createPanner() {

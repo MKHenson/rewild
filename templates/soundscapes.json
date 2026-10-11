@@ -114,6 +114,7 @@
     ]
   },
   "mountain": {
+    "reverb": 1,
     "layers": [
       { "id": "air", "sound": "mountain-air" },
       {
@@ -156,6 +157,7 @@
     ]
   },
   "desert-mountain": {
+    "reverb": 0.8,
     "layers": [{ "id": "air", "sound": "desert-mountain-air" }],
     "rules": [
       {
