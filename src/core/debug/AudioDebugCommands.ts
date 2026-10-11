@@ -1,7 +1,8 @@
 import { Vector3 } from 'rewild-common';
 import { AudioEngine, BUS_NAMES, Bed, isBusName } from 'rewild-audio';
-import { sceneScope } from '../audio/audio';
+import { reloadSoundscapes, sceneScope } from '../audio/audio';
 import { Footsteps } from '../audio/Footsteps';
+import { SOUNDSCAPE_SIGNALS, Soundscape } from '../audio/Soundscape';
 import { VoiceSound } from '../audio/VoiceSound';
 
 export function registerAudioDebugCommands(audio: AudioEngine) {
@@ -305,6 +306,49 @@ export function registerAudioDebugCommands(audio: AudioEngine) {
       }))
     );
   };
+  (window as any).soundscape = () => {
+    const scape = Soundscape.current;
+    if (!scape) {
+      console.log('soundscape() — no soundscape in a game or the editor');
+      return;
+    }
+    const signals = scape.signals;
+    console.log(
+      'Soundscape signals: ' +
+        SOUNDSCAPE_SIGNALS.numbers
+          .map((name) => `${name} ${signals.get(name).toFixed(2)}`)
+          .join(', ')
+    );
+    const shown = scape.profiles
+      .map((rules, p) => ({ rules, p }))
+      .filter(({ p }) => scape.profileWeights[p] > 0);
+    if (!shown.length) console.log('No biome with a profile here');
+    for (const { rules, p } of shown) {
+      console.log(
+        `${scape.names[p]}: weight ${scape.profileWeights[p].toFixed(2)}`
+      );
+      console.table(
+        rules.ruleIds.map((id, i) => ({
+          rule: id,
+          weight: +rules.ruleWeights[i].toFixed(2),
+        }))
+      );
+    }
+    console.table(
+      scape.sounds
+        .map((sound, k) => ({
+          sound,
+          gain: +scape.gains[k].toFixed(2),
+          cutoff: Math.round(scape.cutoffs[k]),
+        }))
+        .filter((row) => row.gain > 0)
+    );
+  };
+
+  (window as any).reloadSoundscapes = async () => {
+    if (await reloadSoundscapes()) console.log('Soundscapes reloaded');
+  };
+
   (window as any).voice = () => {
     const voice = VoiceSound.current;
     if (!voice) {

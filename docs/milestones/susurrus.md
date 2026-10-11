@@ -1018,12 +1018,21 @@ sound.
     ],
     "rules": [
       {
+        "id": "gale-leaves",
         "when": { "windiness": [0.4, 0.8] },
         "replace": "leaves",
         "with": "forest-leaves-gale"
       },
-      { "when": { "windiness": [0.6, 1.0] }, "add": "forest-creak" },
-      { "when": { "rain": [0.05, 0.4] }, "add": "forest-canopy-rain" }
+      {
+        "id": "creak",
+        "when": { "windiness": [0.6, 1.0] },
+        "add": "forest-creak"
+      },
+      {
+        "id": "canopy-rain",
+        "when": { "rain": [0.05, 0.4] },
+        "add": "forest-canopy-rain"
+      }
     ]
   }
 }
@@ -1067,14 +1076,14 @@ editor too:
 | Signal       | Range      | From                                                      |
 | ------------ | ---------- | --------------------------------------------------------- |
 | `windiness`  | 0 to 1     | `SkyRenderer.windiness`                                   |
-| `gust`       | 0 to 1     | `gustShare(gustField(...))` at the player                 |
-| `rain`       | 0 to 1     | `rainShare(precipitation, temperature) × precipitation`   |
-| `snow`       | 0 to 1     | The snow share of `precipitation`                         |
-| `wetness`    | 0 to 1     | `rainWetness`, so the world can drip after the rain       |
+| `gust`       | 0 to 1     | `gustShare(gustField(...))` at the listener, `WindSound`  |
+| `rain`       | 0 to 1     | `rainShare(precipitation, temperature)`                   |
+| `snow`       | 0 to 1     | `precipitation` less `rain`                               |
+| `wetness`    | 0 to 1     | `rainWetness.film`, so the world can drip after the rain  |
 | `fog`        | 0 to 1     | `foginess`                                                |
 | `cloudiness` | 0 to 1     | `cloudiness`                                              |
 | `sun`        | -1 to 1    | `skyRenderer.upDot`                                       |
-| `dawn`       | 0 or 1     | `isDawn`, eased                                           |
+| `dawn`       | 0 to 1     | `isDawn`, eased over 4 s like a state                     |
 | `moon`       | 0 to 1     | `moonIllumination(phase)` while the moon is the key light |
 | `state`      | a state id | `atmosphere.state`, eased per state                       |
 
@@ -1144,6 +1153,14 @@ forest.evaluate(); // fills forest.gains and forest.cutoffs
 
 Signals change every frame, but the profiles do not. The soundscape compiles each profile once at
 load into flat arrays, so the frame does no lookups by name and no allocation.
+
+`Soundscape` in `src/core/audio/`, held by `WorldSound`, does this in the game and the editor. It
+has one bed per sound across all profiles, on the ambience bus with a low-pass, fading in over 2 s
+and out over 4 s, which smooths the probe's 5 Hz steps. When two biomes play one sound, the gains
+sum and the lowest cutoff wins. A biome with no profile is silent. The first update snaps the
+states and dawn, so a game loaded into a storm starts with no birds. `WorldSound` builds the
+soundscape again each time `soundscapes.json` loads, so `reloadSoundscapes()` applies an edit. A
+profile that fails to compile logs its name and the error, and the soundscape stays silent.
 
 #### First profiles
 

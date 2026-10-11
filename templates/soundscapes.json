@@ -1,0 +1,83 @@
+{
+  "*": {
+    "rules": [
+      {
+        "id": "rain-quiets-wildlife",
+        "when": { "rain": [0.1, 0.5] },
+        "scale": "#wildlife",
+        "by": 0.2
+      },
+      {
+        "id": "gale-quiets-wildlife",
+        "when": { "windiness": [0.7, 1.0] },
+        "scale": "#wildlife",
+        "by": 0.3
+      },
+      {
+        "id": "storm-silences-wildlife",
+        "when": { "state": "Storm" },
+        "scale": "#wildlife",
+        "by": 0
+      },
+      {
+        "id": "birds-after-rain",
+        "when": { "state": "Clearing" },
+        "scale": "#birds",
+        "by": 1.3
+      },
+      {
+        "id": "dawn-chorus",
+        "when": { "dawn": [0, 1] },
+        "scale": "#birds",
+        "by": 1.6
+      },
+      {
+        "id": "snow-dampens",
+        "when": { "snow": [0.2, 0.8] },
+        "muffle": "*",
+        "cutoff": 2500
+      },
+      {
+        "id": "fog-dulls",
+        "when": { "fog": [0.4, 1.0] },
+        "muffle": "#far",
+        "cutoff": 4000
+      }
+    ]
+  },
+  "forest": {
+    "layers": [
+      { "id": "leaves", "sound": "forest-leaves-calm" },
+      {
+        "id": "birds",
+        "sound": "forest-birds-day",
+        "tags": ["wildlife", "birds", "far"],
+        "when": { "sun": [-0.1, 0.2] }
+      },
+      {
+        "id": "night",
+        "sound": "forest-night",
+        "tags": ["wildlife", "far"],
+        "when": { "sun": [0.1, -0.2] }
+      }
+    ],
+    "rules": [
+      {
+        "id": "gale-leaves",
+        "when": { "windiness": [0.4, 0.8] },
+        "replace": "leaves",
+        "with": "forest-leaves-gale"
+      },
+      {
+        "id": "creak",
+        "when": { "windiness": [0.6, 1.0] },
+        "add": "forest-creak"
+      },
+      {
+        "id": "canopy-rain",
+        "when": { "rain": [0.05, 0.4] },
+        "add": "forest-canopy-rain"
+      }
+    ]
+  }
+}

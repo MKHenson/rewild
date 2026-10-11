@@ -60,6 +60,7 @@ export class WindSound {
   };
 
   private _envelope = 0;
+  private _gust = 0;
   private _armed = true;
   private _sinceShot = Infinity;
 
@@ -86,6 +87,11 @@ export class WindSound {
     });
   }
 
+  /** 0..1: the gust at the listener now. */
+  get gust(): number {
+    return this._gust;
+  }
+
   /** The gust envelope at the listener: quick to rise, slow to fall. */
   get envelope(): number {
     return this._envelope;
@@ -98,6 +104,7 @@ export class WindSound {
     const forward = this._engine.listenerForward;
 
     const gust = this._gustAt(listener.x, listener.z, wind.gustDrift);
+    this._gust = gust;
     this._envelope = followGust(this._envelope, gust, seconds);
 
     this._air.set(airGain(windiness, gust), airCutoff(windiness));
