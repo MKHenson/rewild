@@ -108,9 +108,9 @@ const _WARM = [1.0, 0.75, 0.4];
 const _HOT = [0.95, 0.12, 0.08];
 const _COOL = [0.6, 0.85, 1.0];
 const _COLD = [0.15, 0.35, 1.0];
-// Health refills over three and a half minutes, from six seconds after the last hurt.
-const _HEALTH_REGEN_PER_SEC: f32 = 100 / 210;
-const _HEALTH_REGEN_AFTER: f32 = 6;
+// Health refills over three and a half minutes, from twenty seconds after the last hurt.
+const _HEALTH_REGEN_PER_SEC: f32 = 50 / 210;
+const _HEALTH_REGEN_AFTER: f32 = 20;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
 const _resizeTranslation = { x: 0, y: 0, z: 0 };

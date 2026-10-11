@@ -35,7 +35,7 @@ const GROUND_PROBE_REACH = 4.0;
 /** Slope angle at which the ground starts to pull the player downhill. */
 export const SLIDE_START = 35 * DEG;
 /** The same on fully slippery ground. */
-export const SLIDE_START_SLIPPERY = 15 * DEG;
+export const SLIDE_START_SLIPPERY = 35 * DEG;
 /** Slope angle from which the full share of gravity pulls the player. */
 export const SLIDE_FULL = 45 * DEG;
 /** Gravity the slide accelerates under, scaled by the slope's sine. */
