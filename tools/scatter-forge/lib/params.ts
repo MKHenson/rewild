@@ -370,6 +370,7 @@ export const PARAM_SPEC = {
   collider: { type: 'flag', default: true, help: 'Stop the player at the trunk, with a capsule measured off it. Off emits no collider, for a plant low enough to walk through: heather and gorse stop nobody, and a waist-high bush that does reads as a wall.', types: WOODY },
   impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null, pebble: null, rock: { fromDistance: 120, views: 8, tileSize: 128 } }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint in metres. 0 derives it from the model. The most expensive number here: candidates go as 1/footprint squared.', byType: { clump: 0.7 } },
+  yOffset: { type: 'number', default: 0, help: 'Metres added to the ScatterLayer yOffset, on top of any sink the model derives. Negative sinks the model into the ground.' },
   scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75, rock: 0.6, pebble: 0.7 }, help: 'Lower bound of the emitted scale jitter.' },
   scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3, rock: 1.6, pebble: 1.4 } },
 
