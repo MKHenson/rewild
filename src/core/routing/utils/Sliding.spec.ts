@@ -2,10 +2,12 @@ import {
   GroundSlide,
   IMPACT_HURT_FROM,
   IMPACT_HURT_SCALE,
+  SLIDE_FULL,
   SLIDE_GRAVITY,
   SLIDE_HURT_FROM,
   SLIDE_HURT_RATE,
   SLIDE_MAX_SPEED,
+  SLIDE_START_SLIPPERY,
   slideAccel,
   impactDamage,
   slideDamage,
@@ -15,7 +17,8 @@ import {
   walkCatchUp,
 } from './Sliding';
 
-const normalYAt = (degrees: number) => Math.cos((degrees * Math.PI) / 180);
+const DEG = Math.PI / 180;
+const normalYAt = (degrees: number) => Math.cos(degrees * DEG);
 
 describe('slideRamp', () => {
   it('leaves gentle ground alone', () => {
@@ -75,11 +78,12 @@ describe('impactDamage', () => {
 });
 
 describe('slippery ground', () => {
-  it('starts a slide on gentler slopes', () => {
-    expect(slideRamp(normalYAt(32))).toBe(0);
-    expect(slideRamp(normalYAt(32), 1)).toBeGreaterThan(0);
-    expect(slideAccel(normalYAt(32), 1)).toBeGreaterThan(0);
-    expect(slideRamp(normalYAt(45), 1)).toBe(1);
+  it('starts a slide from SLIDE_START_SLIPPERY', () => {
+    const start = SLIDE_START_SLIPPERY / DEG;
+    expect(slideRamp(normalYAt(start - 1), 1)).toBe(0);
+    expect(slideRamp(normalYAt(start + 1), 1)).toBeGreaterThan(0);
+    expect(slideAccel(normalYAt(start + 1), 1)).toBeGreaterThan(0);
+    expect(slideRamp(normalYAt(SLIDE_FULL / DEG), 1)).toBe(1);
   });
 
   it('takes the harm out of a slide', () => {
