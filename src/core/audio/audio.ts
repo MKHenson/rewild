@@ -6,6 +6,7 @@ import {
 } from 'rewild-audio';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
 import type { FootstepsDef } from './Footsteps';
+import type { SoundscapesDef } from './Soundscape';
 import type { VoiceDef } from './VoiceSound';
 
 /** The one audio engine, shared by the game and the editor. */
@@ -35,9 +36,14 @@ export function closeSceneScope(scope: AudioScope): void {
   audio.duckWorld(false);
 }
 
-/** Fetches the audio templates: the sound manifest, whose files start downloading, the footsteps and the voice. */
+/** Fetches the audio templates: the sound manifest, whose files start downloading, the footsteps, the voice and the soundscapes. */
 export async function loadAudioTemplates(): Promise<void> {
-  await Promise.all([loadSoundManifest(), loadFootsteps(), loadVoice()]);
+  await Promise.all([
+    loadSoundManifest(),
+    loadFootsteps(),
+    loadVoice(),
+    reloadSoundscapes(),
+  ]);
 }
 
 /** Fetches `templates/sounds.json` and starts downloading its files. */
@@ -84,5 +90,34 @@ async function loadVoice(): Promise<void> {
     voice = (await response.json()) as VoiceDef;
   } catch (e) {
     console.error('Could not load templates/voice.json', e);
+  }
+}
+
+let soundscapes: SoundscapesDef | null = null;
+let soundscapesVersion = 0;
+
+/** `templates/soundscapes.json`, or null until it has loaded. */
+export function soundscapesDef(): SoundscapesDef | null {
+  return soundscapes;
+}
+
+/** Rises each time the soundscapes load, so their users can rebuild. */
+export function soundscapesLoaded(): number {
+  return soundscapesVersion;
+}
+
+/** Fetches `templates/soundscapes.json`, again if it has loaded before. */
+export async function reloadSoundscapes(): Promise<boolean> {
+  try {
+    const response = await fetch('/templates/soundscapes.json', {
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    soundscapes = (await response.json()) as SoundscapesDef;
+    soundscapesVersion++;
+    return true;
+  } catch (e) {
+    console.error('Could not load templates/soundscapes.json', e);
+    return false;
   }
 }

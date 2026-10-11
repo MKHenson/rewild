@@ -1,5 +1,8 @@
 import type { AudioEngine, AudioScope } from 'rewild-audio';
 import type { Renderer } from 'rewild-renderer';
+import { isDawn } from 'rewild-renderer/lib/atmosphere/DayNightCycle';
+import { moonIllumination } from 'rewild-renderer/lib/renderers/sky/Moon';
+import { rainShare } from 'rewild-renderer/lib/renderers/sky/RainWetness';
 import { resolveClimatePreset } from 'rewild-renderer/lib/renderers/terrain/Biomes';
 import { BiomeProbe } from 'rewild-renderer/lib/renderers/terrain/BiomeProbe';
 import type { TerrainRenderer } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
@@ -9,8 +12,10 @@ import {
 } from 'rewild-renderer/lib/renderers/terrain/Water';
 import type { ShorePoint } from 'rewild-renderer/lib/renderers/water/ShoreField';
 import type { WaterQuerySample } from 'rewild-renderer/lib/renderers/water/WaterQuery';
+import { soundscapesDef, soundscapesLoaded } from './audio';
 import { OpenSeaSound, SeaWater } from './OpenSeaSound';
 import { RainSound } from './RainSound';
+import { Soundscape, SoundscapeWeather } from './Soundscape';
 import { SurfSound, SurfWater } from './SurfSound';
 import { ThunderSound } from './ThunderSound';
 import { WindSound } from './WindSound';
@@ -63,10 +68,27 @@ export class WorldSound {
   private readonly _water = new TerrainWater();
   private readonly _biomes = new BiomeProbe();
   private readonly _engine: AudioEngine;
+  private readonly _scope: AudioScope;
+  private readonly _weather: SoundscapeWeather = {
+    windiness: 0,
+    gust: 0,
+    rain: 0,
+    snow: 0,
+    wetness: 0,
+    fog: 0,
+    cloudiness: 0,
+    sun: 0,
+    dawn: false,
+    moon: 0,
+    state: 'Fair',
+  };
   private _biomeWait = 0;
+  private _soundscape: Soundscape | null = null;
+  private _soundscapeVersion = 0;
 
   constructor(engine: AudioEngine, scope: AudioScope) {
     this._engine = engine;
+    this._scope = scope;
     this._wind = new WindSound(engine, scope);
     this._rain = new RainSound(scope);
     this._thunder = new ThunderSound(engine, scope);
@@ -109,6 +131,43 @@ export class WorldSound {
         const listener = this._engine.listenerPosition;
         this._biomes.probe(renderer.terrainRenderer, listener.x, listener.z);
       }
+      this._updateSoundscape(renderer, seconds);
     }
+  }
+
+  /** Builds the soundscape again whenever `soundscapes.json` loads. */
+  private _updateSoundscape(renderer: Renderer, seconds: number): void {
+    const version = soundscapesLoaded();
+    if (version !== this._soundscapeVersion) {
+      this._soundscapeVersion = version;
+      this._soundscape?.dispose();
+      this._soundscape = null;
+      const def = soundscapesDef();
+      if (def)
+        try {
+          this._soundscape = new Soundscape(def, this._scope);
+        } catch (e) {
+          console.error('templates/soundscapes.json:', e);
+        }
+    }
+    if (!this._soundscape) return;
+
+    const sky = renderer.sky.skyRenderer;
+    const w = this._weather;
+    const precipitation = Math.max(0, sky.precipitation);
+    w.windiness = sky.wind.vec[2];
+    w.gust = this._wind.gust;
+    w.rain = rainShare(precipitation, sky.temperature);
+    w.snow = precipitation - w.rain;
+    w.wetness = sky.rainWetness.film;
+    w.fog = sky.foginess;
+    w.cloudiness = sky.cloudiness;
+    w.sun = sky.upDot;
+    w.dawn = isDawn(sky.elevation);
+    w.moon = sky.moon.isKeyLight(sky.elevation)
+      ? moonIllumination(sky.moon.phase)
+      : 0;
+    w.state = renderer.sky.atmosphere.state;
+    this._soundscape.update(w, this._biomes, seconds);
   }
 }

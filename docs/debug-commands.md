@@ -363,6 +363,8 @@ holdBed('test-loop', 0.5); // holds a looping sound at a gain, on the ambience b
 holdBed('test-loop', 0); // fades it out; its source stops a few seconds later
 footsteps(); // the footstep signals, the surfaces under the last step and each layer's gain
 voice(); // the body values, what the mouth is saying, each rule's weight and each layer's gain
+soundscape(); // the signals, each biome profile at the listener with its rules' weights, and each sound's gain and cutoff
+reloadSoundscapes(); // loads templates/soundscapes.json again and rebuilds the soundscape
 ```
 
 The buses are `master`, `music`, `world`, `ambience`, `weather`, `effects`,
@@ -400,6 +402,12 @@ rules, so a wet, wading or crouched step can be checked against `templates/foots
 `voice()` works in a game only. `speaking` is the priority of what the mouth is saying: 3 pain,
 2 a gasp, 1 the strain, 0 a breath, and -1 nothing. Its tables show each rule's weight and each
 layer's gain, to check against `templates/voice.json`.
+
+`soundscape()` works in a game, and in the editor with its sound on. It shows only the biome
+profiles with weight at the listener, and only the sounds playing. A rule's weight is how far its
+`when` holds, 0 to 1. `reloadSoundscapes()` applies an edit to `templates/soundscapes.json` with
+no reload of the page; a bad profile logs its error and leaves the soundscape silent until the
+next good load.
 
 See [Susurrus](./milestones/susurrus.md).
 
