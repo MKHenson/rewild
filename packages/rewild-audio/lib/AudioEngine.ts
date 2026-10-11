@@ -13,6 +13,12 @@ import {
 } from './Buses';
 import { MENU_DUCK_DB, OPEN_CUTOFF_HZ } from './constants';
 import {
+  DEFAULT_REVERB_SHAPE,
+  ReverbShape,
+  reverbSeconds,
+  writeReverbImpulse,
+} from './Reverb';
+import {
   FileLoader,
   SoundBank,
   SoundManifest,
@@ -74,6 +80,9 @@ export interface PlayOptions {
  * ambience, weather, effects → duck → world → muffle → menu duck ─┐
  * player, music, ui ──────────────────────────────────────────────┼→ master → compressor → out
  *
+ * The effects duck and the player bus also send to the reverb, which returns
+ * into the world.
+ *
  * Construct it freely; the context is only created by `start()`, which must run
  * inside a user gesture. `startOnGesture` does that on the first one.
  */
@@ -93,6 +102,10 @@ export class AudioEngine {
   private _muffleGain: GainNode;
   private _duck: GainNode;
   private _compressor: DynamicsCompressorNode;
+  private _reverbSend: GainNode | null = null;
+  private _reverb: ConvolverNode | null = null;
+  private _reverbLevel = 0;
+  private readonly _reverbShape: ReverbShape = { ...DEFAULT_REVERB_SHAPE };
 
   private _muffleCutoff = OPEN_CUTOFF_HZ;
   private _muffleLevel = 1;
@@ -155,6 +168,36 @@ export class AudioEngine {
 
   get ducked(): boolean {
     return this._ducked;
+  }
+
+  get reverbLevel(): number {
+    return this._reverbLevel;
+  }
+
+  get reverbShape(): Readonly<ReverbShape> {
+    return this._reverbShape;
+  }
+
+  /** Changes the shape of the reverb and builds it again. */
+  setReverbShape(shape: Partial<ReverbShape>): void {
+    Object.assign(this._reverbShape, shape);
+    if (this._ctx && this._reverbSend && this._buses) this._buildReverb();
+  }
+
+  /**
+   * How much the effects and the player reverberate: 0 is dry, 1 the full
+   * reverb. Setting the same level again adds no automation.
+   */
+  setReverb(level: number, timeConstant: number = 0.5): void {
+    level = Math.max(0, level);
+    if (level === this._reverbLevel) return;
+    this._reverbLevel = level;
+    if (!this._ctx || !this._reverbSend) return;
+    this._reverbSend.gain.setTargetAtTime(
+      level,
+      this._ctx.currentTime,
+      timeConstant
+    );
   }
 
   /** Bus input node for sources to connect to. Null before `start()`. */
@@ -468,6 +511,8 @@ export class AudioEngine {
     const ctx = this._ctx;
     this._ctx = null;
     this._buses = null;
+    this._reverbSend = null;
+    this._reverb = null;
     this._voices = null;
     this._listenerParams = [];
     this._oneShots.clear();
@@ -606,6 +651,12 @@ export class AudioEngine {
 
     buses.master.connect(this._compressor).connect(ctx.destination);
 
+    this._reverbSend = ctx.createGain();
+    this._reverbSend.gain.value = this._reverbLevel;
+    ducks.effects.connect(this._reverbSend);
+    buses.player.connect(this._reverbSend);
+    this._buildReverb();
+
     const listener = ctx.listener;
     this._listenerParams = [
       listener.positionX,
@@ -624,6 +675,32 @@ export class AudioEngine {
     this._voices.setListenerPosition(p.x, p.y, p.z);
 
     this.bank.decode(ctx);
+  }
+
+  /** A new convolver for the reverb's shape, in place of the old one. */
+  private _buildReverb(): void {
+    const ctx = this._ctx!;
+    const send = this._reverbSend!;
+    if (this._reverb) {
+      send.disconnect(this._reverb);
+      this._reverb.disconnect();
+    }
+    const reverb = ctx.createConvolver();
+    reverb.normalize = false;
+    const impulse = ctx.createBuffer(
+      2,
+      Math.round(reverbSeconds(this._reverbShape) * ctx.sampleRate),
+      ctx.sampleRate
+    );
+    writeReverbImpulse(
+      impulse.getChannelData(0),
+      impulse.getChannelData(1),
+      ctx.sampleRate,
+      this._reverbShape
+    );
+    reverb.buffer = impulse;
+    send.connect(reverb).connect(this._buses!.world);
+    this._reverb = reverb;
   }
 
   private _applyBusGains(timeConstant: number = PARAM_TIME_CONSTANT): void {

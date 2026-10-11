@@ -345,7 +345,7 @@ Registered in `AudioDebugCommands.ts` when the app starts, so they work on the m
 menu too, not only after a game or the editor has loaded.
 
 ```js
-audio(); // context state, world muffle and duck, sounds loaded, and a table of every bus
+audio(); // context state, world muffle, duck and reverb, sounds loaded, and a table of every bus
 setAudioVolume('weather', 0.5); // bus gain, 0 to 1; not saved, unlike the Audio tab
 muteAudio('world'); // toggles; no argument mutes master
 soloAudio('weather'); // hear one bus; call again, or with no argument, to clear
@@ -363,8 +363,10 @@ holdBed('test-loop', 0.5); // holds a looping sound at a gain, on the ambience b
 holdBed('test-loop', 0); // fades it out; its source stops a few seconds later
 footsteps(); // the footstep signals, the surfaces under the last step and each layer's gain
 voice(); // the body values, what the mouth is saying, each rule's weight and each layer's gain
-soundscape(); // the signals, each biome profile at the listener with its rules' weights, and each sound's gain and cutoff
+soundscape(); // the signals, the reverb, each biome profile at the listener with its rules' weights, and each sound's gain and cutoff
 reloadSoundscapes(); // loads templates/soundscapes.json again and rebuilds the soundscape
+reverbShape(); // the reverb's level and shape
+reverbShape({ seconds: 4, gain: 0.7 }); // changes the shape and rebuilds the reverb
 ```
 
 The buses are `master`, `music`, `world`, `ambience`, `weather`, `effects`,
@@ -409,6 +411,10 @@ loaded. A rule's weight is how far its
 `when` holds, 0 to 1. `reloadSoundscapes()` applies an edit to `templates/soundscapes.json` with
 no reload of the page; a bad profile logs its error and leaves the soundscape silent until the
 next good load.
+
+`reverbShape(shape)` changes only the settings it names and keeps the rest: `seconds`, `gain`,
+`predelay` and `cutoff`, from `ReverbShape` in `packages/rewild-audio/lib/Reverb.ts`. A page
+reload goes back to its defaults.
 
 See [Susurrus](./milestones/susurrus.md).
 

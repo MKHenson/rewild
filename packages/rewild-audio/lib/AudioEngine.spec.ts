@@ -4,6 +4,7 @@ import {
   FakeAudioContext,
   FakeAudioNode,
   FakeBiquadFilterNode,
+  FakeConvolverNode,
   FakeGainNode,
   installFakeAudioContext,
 } from './testing/FakeAudioContext';
@@ -32,6 +33,14 @@ function worldChain(engine: AudioEngine) {
   const muffle = filter.outputs[0] as FakeGainNode;
   const duck = muffle.outputs[0] as FakeGainNode;
   return { filter, muffle, duck };
+}
+
+/** The send to the reverb, and the reverb. */
+function reverbChain(engine: AudioEngine) {
+  const [effectsDuck] = bus(engine, 'effects').outputs as FakeGainNode[];
+  const send = effectsDuck.outputs[1] as FakeGainNode;
+  const reverb = send.outputs[0] as FakeConvolverNode;
+  return { send, reverb };
 }
 
 describe('AudioEngine lifecycle', () => {
@@ -122,8 +131,26 @@ describe('AudioEngine graph', () => {
       const [duck] = bus(engine, name).outputs as FakeGainNode[];
       expect(duck.kind).toBe('gain');
       expect(duck.gain.value).toBe(1);
-      expect(duck.outputs).toEqual([bus(engine, 'world')]);
+      expect(duck.outputs[0]).toBe(bus(engine, 'world'));
     }
+  });
+
+  it('sends the effects to a reverb that returns into the world, dry until set', () => {
+    const { send, reverb } = reverbChain(engine);
+    expect(send.gain.value).toBe(0);
+    expect(reverb.kind).toBe('convolver');
+    expect(reverb.normalize).toBe(false);
+    expect(reverb.buffer!.numberOfChannels).toBe(2);
+    expect(reverb.outputs).toEqual([bus(engine, 'world')]);
+    for (const name of ['ambience', 'weather'] as const)
+      expect(bus(engine, name).outputs[0].outputs).toHaveLength(1);
+  });
+
+  it('applies a reverb set before the context starts', async () => {
+    const late = new AudioEngine();
+    late.setReverb(0.7);
+    await late.start();
+    expect(reverbChain(late).send.gain.value).toBe(0.7);
   });
 
   it('ducks one world bus, apart from its volume', () => {
@@ -152,7 +179,17 @@ describe('AudioEngine graph', () => {
 
   it('feeds player, music and ui straight into master', () => {
     for (const name of ['player', 'music', 'ui'] as const)
-      expect(bus(engine, name).outputs).toEqual([bus(engine, 'master')]);
+      expect(bus(engine, name).outputs[0]).toBe(bus(engine, 'master'));
+  });
+
+  it('sends the player to the reverb, but not the music or the ui', () => {
+    const { send } = reverbChain(engine);
+    expect(bus(engine, 'player').outputs).toEqual([
+      bus(engine, 'master'),
+      send,
+    ]);
+    expect(bus(engine, 'music').outputs).toHaveLength(1);
+    expect(bus(engine, 'ui').outputs).toHaveLength(1);
   });
 
   it('routes world through the muffle and the duck, never straight to master', () => {
@@ -264,6 +301,34 @@ describe('AudioEngine changes after start', () => {
     });
     expect(engine.muffleCutoff).toBe(600);
     expect(engine.muffleLevel).toBe(0.4);
+  });
+
+  it('moves the reverb send, and adds nothing for the same level', () => {
+    engine.setReverb(0.8, 0.4);
+    const { send } = reverbChain(engine);
+    expect(send.gain.lastTarget).toEqual({
+      value: 0.8,
+      time: 5,
+      timeConstant: 0.4,
+    });
+    expect(engine.reverbLevel).toBe(0.8);
+    engine.setReverb(0.8);
+    expect(send.gain.targets).toHaveLength(1);
+    engine.setReverb(-1);
+    expect(engine.reverbLevel).toBe(0);
+  });
+
+  it('builds the reverb again for a new shape, in place of the old one', () => {
+    const { send, reverb: old } = reverbChain(engine);
+    const length = old.buffer!.length;
+    engine.setReverbShape({ seconds: 5 });
+    expect(engine.reverbShape.seconds).toBe(5);
+    expect(old.outputs).toHaveLength(0);
+    expect(send.outputs).toHaveLength(1);
+    const reverb = send.outputs[0] as FakeConvolverNode;
+    expect(reverb).not.toBe(old);
+    expect(reverb.buffer!.length).toBeGreaterThan(length);
+    expect(reverb.outputs).toEqual([bus(engine, 'world')]);
   });
 
   it('ducks the world by the menu duck and lifts it back', () => {
