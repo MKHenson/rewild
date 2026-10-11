@@ -430,7 +430,7 @@ create one in their scene scope and call `update(renderer, seconds)` once a fram
   snow by itself. At `temperature` 0.25, half snow, it plays at half strength.
 
 - Rain on leaves, on sand or on rock is biome sound. A forest adds canopy rain with a rule.
-- Rain on open water could be its own layer later. In Phase 2, the rain bed covers it.
+- The rain bed plays the same over land and water.
 - Rain never runs ahead of the clouds in the weather system, so rain sound never starts from a
   clear sky.
 
@@ -1246,8 +1246,8 @@ Electron is Chromium, so this design runs in it unchanged. Electron also allows:
 
 - **No autoplay block.** `app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')` turns off the user-gesture rule, so the context runs on arrival.
   The gesture start stays for the browser.
-- **An output device setting.** `AudioContext.setSinkId` picks a device, for example headphones.
-  It works in Chrome too.
+- **Named output devices.** Electron grants permission requests unless the app adds a handler,
+  so **Show devices** shows no microphone prompt there. See [Output device](#output-device).
 - **Audio in the background.** The window can keep playing when it does not have focus. The
   **Mute when in the background** setting controls this.
 
@@ -1263,6 +1263,7 @@ A new **Audio** tab in `SettingsPanel.tsx`, next to **Display**. A few sliders c
 | Player volume               | player | 100%    |
 | Interface volume            | ui     | 100%    |
 | Mute when in the background |        | On      |
+| Output device               |        | System  |
 
 The world slider covers ambience, weather and effects together. A new bus joins one of these
 sliders, not a new one.
@@ -1282,6 +1283,27 @@ instance, `audioSettings`, next to the engine.
   `'background'` reason on `blur` while the setting is on, and lifts it on `focus`. The same
   setting decides whether a hidden tab suspends the context; see
   [Start, focus and pause](#start-focus-and-pause).
+
+### Output device
+
+The **Output device** select picks the speakers or headphones the game plays through.
+
+- **Playing.** `audio.setOutputDevice(id)` calls `AudioContext.setSinkId`; an id of `''` is the
+  system default. A device chosen before the context exists is applied when it starts. If the
+  device is not connected, the sound plays through the default and the choice is kept.
+- **Plugging in.** `audio.followOutputDevice(navigator.mediaDevices)`, from `Application`, tries
+  the chosen device again on each `devicechange`, so headphones plugged back in take the sound
+  back.
+- **Storage.** `audioSettings.setOutputDevice({ id, label })` stores the id with its name, so a
+  device that is not connected still shows by name, marked "(not connected)".
+- **Listing.** `OutputDeviceField` lists `listOutputDevices(navigator.mediaDevices)`: the named
+  `audiooutput` devices, apart from the `default` and `communications` aliases, after **System
+  default**. It refreshes on `devicechange`.
+- **Names.** Chrome lists no output device by name until the page has had microphone
+  permission. While the list is empty, a **Show devices** button calls `revealOutputDevices`,
+  which asks for the microphone and stops its tracks at once. Nothing is recorded.
+- **No support.** A browser without `setSinkId` shows a line saying it plays through the default
+  device only.
 
 ## Sound list (steps 1 to 21)
 
@@ -1544,9 +1566,8 @@ Each of these is its own issue, and none of them blocks the milestone.
 - **22. Reverb in the mountains.** A `ConvolverNode` on the effects and player buses, set by each
   soundscape profile's `reverb`. Expect thunder, falling stones and the player's own sounds to
   ring out in the mountains and to sound dry on the plain.
-- **23. Rain on open water.** Its own rain layer when the listener is near or on water. Expect rain
-  on a lake to hiss, not patter.
-- **24. Output device.** An output device setting from `AudioContext.setSinkId`. Expect the game to
+- **23. Output device.** An output device setting from `AudioContext.setSinkId`. See
+  [Output device](#output-device). Expect the game to
   play through the chosen device, in Chrome and in Electron.
 
 ## Performance notes
