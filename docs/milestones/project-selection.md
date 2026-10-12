@@ -1,4 +1,4 @@
-# Project Selection
+# Project Promotion
 
 Working doc. It is for planning this work, not a milestone write up. Delete it when the work ships.
 
@@ -15,23 +15,25 @@ In this doc, "admin" always means a super admin: `UserRole.SUPER_ADMIN`, checked
 
 ## Decisions
 
-| Topic | Decision |
-|---|---|
-| Unit of play | The player picks a project, not a level. Each project names its start level |
-| Levels | A project can have many levels. The UI allows one for now, but the model and API must not assume one |
-| Start level | `project.levelId` is the start level. The owner picks it in Project Settings. `activeOnStartup` is removed |
-| Public game | One promoted project. Admins set it at `/admin/public`. It uses the project's start level |
-| Public game edits | The public game is the live project. Admin edits reach players at once. A publish snapshot is out of scope |
-| Logged out players | They can play Story Mode. My Games shows only their local projects |
-| Sharing | Only for logged in users and projects saved on the server. A share gives play access, not edit access |
-| Admin access | Super admins can see and run all projects from an admin-only tab. This is a stopgap. Privacy improves later |
-| Remote projects | Shared projects and the public project sync down read-only. The game loads them from the local DB, as it does today |
-| Local copies | A synced remote project stays on the device. Each play syncs only the changes. Clearing browser storage removes it, and the next play downloads it again |
-| Delete | Only logged in users can delete, and only projects saved on the server. Local only projects cannot be deleted |
-| Flagged project | The project cannot be played or shared. Players see a general message that tells them to contact an admin |
-| List order | Projects sort by `updatedAt`, newest first |
-| Project image | The owner uploads an image in Project Settings. It is stored in the bucket under the user and the project. A new image deletes the old one. Size limit: 2 MB |
-| Bucket layout | All project files live under `users/{userId}/projects/{projectId}/`, level files too. There are no live projects, so there is no data migration |
+| Topic              | Decision                                                                                                                                                          |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit of play       | The player picks a project, not a level. Each project names its start level                                                                                       |
+| Levels             | A project can have many levels. The UI allows one for now, but the model and API must not assume one                                                              |
+| Start level        | `project.levelId` is the start level. The owner picks it in Project Settings. `activeOnStartup` is removed                                                        |
+| Game URL           | The game always runs at `/game/{projectId}`, also for the public game. There is no `/game` route without an id                                                    |
+| Public game        | One promoted project. Admins set it at `/admin/public`. It uses the project's start level                                                                         |
+| Public game edits  | The public game is the live project. Admin edits reach players at once. A publish snapshot is out of scope                                                        |
+| Logged out players | They can play Story Mode. My Games shows only their local projects                                                                                                |
+| Sharing            | Only for logged in users and projects saved on the server. A share gives play access, not edit access                                                             |
+| Admin access       | Super admins can see and run all projects from an admin-only tab. This is a stopgap. Privacy improves later                                                       |
+| Sync               | Sync is only for the player's own projects                                                                                                                        |
+| Remote projects    | Public, shared and admin-run projects are not stored on the device. The game loads them from the server each time it starts them, and all three use the same path |
+| Asset caching      | Every asset URL carries a version, so the browser cache never serves an old file                                                                                  |
+| Delete             | A project saved on the server is deleted through the API, by its logged in owner. A local only project is deleted on the device                                   |
+| Flagged project    | The project cannot be played or shared. Players see a general message that tells them to contact an admin                                                         |
+| List order         | Projects sort by `updatedAt`, newest first                                                                                                                        |
+| Project image      | The owner uploads an image in Project Settings. It is stored in the bucket under the user and the project. A new image deletes the old one. Size limit: 2 MB      |
+| Bucket layout      | All project files live under `users/{userId}/projects/{projectId}/`, level files too. There are no live projects, so there is no data migration                   |
 
 ---
 
@@ -44,8 +46,7 @@ In this doc, "admin" always means a super admin: `UserRole.SUPER_ADMIN`, checked
 
 - Calls `GET /api/public-game`.
 - Shows the project image and the project description.
-- The Start button is enabled only when a public game is set. Start opens `/game`.
-- A direct visit to `/game` when no public game is set shows an error.
+- The Start button is enabled only when a public game is set. Start opens `/game/{projectId}` with the public project's id.
 
 ### My Games tab
 
@@ -112,8 +113,28 @@ A reusable component, so other screens can use it later.
 ### Public game
 
 - New table `public_game`: a single row with `project_id` (nullable).
-- `GET /api/public-game`: no auth. It returns the promoted project, its levels, and what the game needs to load them. It can return only the promoted project.
+- `GET /api/public-game`: no auth. It returns the promoted project's id, name, description and image URL, or nothing when no project is promoted. The game data comes from the play endpoint, like any other remote project.
 - `PUT /api/public-game`: super admins only (`SuperAdminGuard`). It rejects a project that is flagged or not saved on the server.
+
+### Play
+
+- `GET /api/play/{projectId}`: auth is optional. It returns the project, its levels, and the asset list for each level. This is the one way the game loads a project that is not on the device.
+- The caller can read the project if any of these is true:
+  - it is the public project (logged out callers too)
+  - the caller owns it
+  - it is shared with the caller
+  - the caller is a super admin
+- All other callers get `404`, so the API does not show that the project exists.
+- A flagged project returns an error with a general message for all callers except the owner and super admins.
+- Each asset in the list has a `publicUrl` with a version query (`?v={updatedAt}`). See Asset versions.
+
+### Asset versions
+
+The editor overwrites a level file at the same bucket key when it saves it again. Without a version in the URL, the browser cache can serve the old file.
+
+- New `updated_at` column on `assets`. The upload confirm sets it.
+- The play endpoint and the sync asset list add `?v={updatedAt}` to each `publicUrl`.
+- Only the files that changed get a new URL, so the player downloads only those again.
 
 ### Bucket layout
 
@@ -134,14 +155,13 @@ users/{userId}/projects/{projectId}/
 - **Storage:** a new `image_key` column on `projects`. The image is not an `assets` row, because `assets.level_id` cannot be null.
 - `POST /api/projects/{id}/image/upload-url`: owner only. It returns a presigned PUT URL. It accepts PNG, JPEG and WebP only, with a maximum size of 2 MB.
 - `POST /api/projects/{id}/image/confirm`: owner only. It checks that the object exists and is within the size limit. It sets `image_key`, then queues the old object for deletion.
-- The project read APIs and `GET /api/public-game` return the image URL.
+- The project read APIs, the play endpoint and `GET /api/public-game` return the image URL.
 - A project delete also deletes its image.
 
-### Project access
+### Project lists
 
 - `GET /api/projects?scope=mine|shared` lists the projects the caller owns or that are shared with the caller.
-- `GET /api/projects/{id}` and the level reads allow the owner and users with a share. All other callers get `404`, so the API does not show that the project exists.
-- A flagged project returns an error with a general message for all callers except the owner and super admins. The owner still sees the project in the editor.
+- The owner still sees a flagged project in the editor.
 
 ### Sharing
 
@@ -151,7 +171,7 @@ users/{userId}/projects/{projectId}/
   - `POST /api/projects/{id}/shares` adds one
   - `DELETE /api/projects/{id}/shares/{userId}` revokes one
 - The server rejects a share for a flagged project.
-- Shared projects sync down read-only (see Game loading).
+- A shared project loads through the play endpoint. A revoke takes effect on the next start.
 
 ### User search
 
@@ -161,17 +181,18 @@ users/{userId}/projects/{projectId}/
 
 ### Delete
 
-- `DELETE /api/projects/{id}` is the only way to delete a project. Only the owner can call it.
+- `DELETE /api/projects/{id}` deletes a project saved on the server. Only the owner can call it.
 - The server deletes the project, its levels and its shares, and queues the assets for clean up.
 - The server keeps the `deleted_at` tombstone, so the owner's other devices drop the project on their next sync.
 - `/api/sync` stops accepting `deletedAt` from the client.
 - The server rejects the delete of the public project with `409` and a message.
-- **Client:** the delete button shows only for logged in users and projects saved on the server. The UI disables it for the public project. The client removes its local copy only after the server returns success.
+- **Client, saved on the server:** the delete button shows only for logged in owners. The UI disables it for the public project. The client removes its local copy only after the server returns success.
+- **Client, local only:** a project that was never saved on the server is deleted on the device, after a confirm. Nothing exists on the server, so there is no tombstone.
 
 ### Admin projects
 
 - `GET /api/admin/projects`: super admins only (`SuperAdminGuard`). It lists all projects with paging and sorting: name, author, updated, flag state.
-- Super admins can read and run any project. This is the stopgap from the Decisions table.
+- Super admins can run any project through the play endpoint. This is the stopgap from the Decisions table.
 
 ### Flagging
 
@@ -180,7 +201,7 @@ Flagging is a way to stop a bad project fast. Keep it simple.
 - New columns on `projects`: `flagged_at`, `flagged_by`.
 - `POST /api/projects/{id}/flag` and `DELETE /api/projects/{id}/flag`: super admins only (`SuperAdminGuard`).
 - An admin cannot flag the public project. Unpromote it first.
-- A flagged project does not sync down to users with a share. The next sync removes their local copy.
+- A flagged project fails to load through the play endpoint on the next start.
 
 ---
 
@@ -195,24 +216,21 @@ Flagging is a way to stop a bad project fast. Keep it simple.
 
 ## Game loading
 
-`GameLoader.loadInitialLevels` loads the first `activeOnStartup` project from the local DB. The terrain data (chunk snapshots, biome masks, scatter masks, water edits, water bodies, scatter kills) comes from local files. A public or shared project is not on the device, so it cannot load today.
-
-The player must get the assets that the creator saved. So remote projects sync down into the local DB and the local asset store, and the game loads all projects the same way.
+`GameLoader.loadInitialLevels` loads the first `activeOnStartup` project from the local DB. The terrain data (chunk snapshots, biome masks, scatter masks, water edits, water bodies, scatter kills) comes from the local asset store through one provider for each data type. Sync fills the local DB and the asset store, but only with the player's own projects. A public or shared project is not on the device, so it cannot load today.
 
 ### Loader
 
-- The loader takes a project id instead of reading `activeOnStartup`.
+- The loader takes a project id from `/game/{projectId}`.
 - It loads the start level from `project.levelId`.
-- It reads from the local DB for all projects: own, shared and public.
+- **Local project:** if the project is in the local DB, the loader reads it from there, as today. This keeps unsynced edits and offline play for the player's own projects.
+- **Remote project:** if not, the loader calls `GET /api/play/{projectId}`. It holds the project, the levels and the asset lists in memory. Nothing is written to the local DB or the asset store.
+- An error from the play endpoint (`404` or flagged) shows an error screen.
 
-### Read-only sync
+### Remote providers
 
-- **Pull:** the sync pull returns the caller's own projects, the projects shared with them, and the public project. It includes their levels and assets.
-- **Revoke and flag:** the sync response lists the remote project ids the caller can read. The client removes local remote projects that are not on the list. This covers revoked shares, flagged projects and a changed public project.
-- **Push:** the client pushes only records it owns. The server `upsert` already rejects records that another user owns. That stays as the backstop.
-- **Writes:** the local tables reject a write to a record the user does not own. The editor does not open a remote project.
-- **Logged out players:** they cannot call `/api/sync`. For Story Mode, `GET /api/public-game` returns the project, its levels and the asset list. The client writes them into the local DB as read-only, then loads as usual.
-- **Updates:** a remote project syncs again before each play, so the player gets the creator's latest save.
+- The terrain providers take one chunk at a time, so each has a remote version that fetches the file from its versioned `publicUrl`.
+- A chunk with no file in the asset list returns `null` and is generated, as it is for local levels.
+- The browser HTTP cache keeps the files between plays. The version query makes sure a changed file downloads again.
 
 ### Future: player changes to the world (out of scope)
 
@@ -224,13 +242,13 @@ A later feature can let players change the world, for example to flatten terrain
 - Creator edits and player edits do not conflict on the same chunk files.
 - A project setting can choose the scope: off, one layer for each player, or one shared layer for all players. A shared layer gives the No Man's Sky behaviour.
 
-Nothing in this work builds the layer. The read-only rules above must not block it later.
+Nothing in this work builds the layer. Loading remote projects in memory must not block it later.
 
 ### Future: player progress (out of scope)
 
 The game will have progression, so play will write data to tables.
 
-- Progress belongs to the player, not to the project. It is never part of the creator's read-only data.
+- Progress belongs to the player, not to the project. It is never part of the creator's data.
 - A logged out player's progress is stored only on the device. If they clear their browser storage, they lose it. That is the risk of not signing in.
 - When the player signs in, sync pushes the local progress to their account. That is the only way to keep it.
 
@@ -241,53 +259,63 @@ The game will have progression, so play will write data to tables.
 Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect" is what is true when the ticket is done.
 
 - [ ] **1. Start level replaces `activeOnStartup`**
-  - Scope: remove `activeOnStartup` from projects (client, server, migration). `project.levelId` is the start level. `GameLoader` takes a project id and loads its start level. New route `/game/{projectId}`. The editor's play action uses it.
+
+  - Scope: remove `activeOnStartup` from projects (client, server, migration). `project.levelId` is the start level. `GameLoader` takes a project id and loads its start level from the local DB. The game route becomes `/game/{projectId}`, and `/game` without an id is removed. The editor's play action uses the new route.
   - Expect: the game plays the project you open, from its start level. No code reads `activeOnStartup`. No code assumes one level for each project, other than the UI.
   - Depends on: nothing.
 
 - [ ] **2. Explicit project delete**
-  - Scope: `DELETE /api/projects/{id}` deletes the project, its levels and its assets, and keeps the tombstone. `/api/sync` stops accepting `deletedAt` from the client. The client calls the API, then removes the local copy. The delete button shows only for logged in users and projects saved on the server.
-  - Expect: a local only project cannot be deleted. A delete on one device removes the project on the owner's other devices after their next sync. A failed delete leaves the local copy in place.
+
+  - Scope: `DELETE /api/projects/{id}` deletes the project, its levels and its assets, and keeps the tombstone. `/api/sync` stops accepting `deletedAt` from the client. For a project saved on the server, the client calls the API, then removes the local copy. A local only project is deleted on the device after a confirm.
+  - Expect: any project can be deleted. A delete on one device removes the project on the owner's other devices after their next sync. A failed server delete leaves the local copy in place.
   - Depends on: nothing.
 
 - [ ] **3. Project Settings dialog: General tab**
+
   - Scope: a Project Settings button on the editor toolbar opens a modal with vertical tabs. The General tab edits the name and the description, and holds the other fields from `ProjectSettings.tsx` and a start level dropdown. The pane is removed from the editor layout.
   - Expect: the owner edits the name, the description and the start level (one entry for now). The editor has no project settings pane. The dialog can take more tabs.
   - Depends on: 1.
 
 - [ ] **4. Bucket layout and project image**
+
   - Scope: level files move to `users/{userId}/projects/{projectId}/levels/{levelId}/...` in `AssetService` and `AssetCleanupService`. Remove the old dev data under `levels/`. Then the project image: the `image_key` column, the upload URL and confirm endpoints, and the bucket key `users/{userId}/projects/{projectId}/image/{uuid}.{ext}`. A new image queues the old one for deletion. The project delete from ticket 2 deletes the image. The General tab gets the image upload control and a placeholder.
   - Expect: all files for a project are under one bucket prefix, and a project delete removes that prefix. The owner uploads a PNG, JPEG or WebP image up to 2 MB and sees it at once. The bucket holds one image for each project. A file of the wrong type or size is rejected with a message.
   - Depends on: 2, 3.
 
 - [ ] **5. Public game: server and `/admin/public`**
-  - Scope: `public_game` table. `GET /api/public-game` with no auth, which returns the project, its image URL, its levels and the asset list. `PUT /api/public-game` for super admins only (`SuperAdminGuard`). The delete API returns `409` for the public project. A Public tab at `/admin/public` with a project picker and a Save button.
-  - Expect: an admin promotes a project or clears the promotion. A logged out request to `GET /api/public-game` returns the promoted project and nothing else. The public project cannot be deleted.
+
+  - Scope: `public_game` table. `GET /api/public-game` with no auth, which returns the promoted project's id, name, description and image URL. `PUT /api/public-game` for super admins only (`SuperAdminGuard`). The delete API returns `409` for the public project. A Public tab at `/admin/public` with a project picker and a Save button.
+  - Expect: an admin promotes a project or clears the promotion. A logged out request to `GET /api/public-game` returns the promoted project's summary and nothing else. The public project cannot be deleted.
   - Depends on: 2.
 
-- [ ] **6. Read-only sync of remote projects**
-  - Scope: the sync pull adds the public project, and returns the list of remote project ids the caller can read. The client removes remote projects that are not on the list. The client pushes only records it owns. The local tables reject writes to records the user does not own. The editor does not open a remote project. Logged out players get the public project from `GET /api/public-game` into the local DB.
-  - Expect: a logged in or logged out player has the public project and its assets on the device, read-only. A changed promotion removes the old copy. Each play syncs only the changes. The remote id list works for shares when ticket 10 adds them.
+- [ ] **6. Remote project loading**
+
+  - Scope: `GET /api/play/{projectId}` with optional auth, which returns the project, its levels and their asset lists. It allows the public project and the owner. The `updated_at` column on `assets`, set on confirm, and `?v={updatedAt}` on every `publicUrl`. The loader falls back to the play endpoint when the project is not in the local DB, and uses remote terrain providers that fetch by URL. An error screen for `404`.
+  - Expect: a logged in or logged out player opens `/game/{publicProjectId}` and plays the public project without it being stored on the device. After the creator saves, the next start shows the change, and only the changed files download again. Shares and admin access plug into the same endpoint in tickets 9 and 10.
   - Depends on: 1, 5.
 
 - [ ] **7. `/launch` screen: Story Mode tab**
-  - Scope: New Game opens `/launch`, a modal with vertical tabs and a way back to the main menu. The Story Mode tab shows the image, the description and Start. Start syncs the public project, then opens `/game`.
-  - Expect: any player, logged in or not, plays the public game from the main menu. Start is disabled when no game is promoted. A direct visit to `/game` with no promotion shows an error.
+
+  - Scope: New Game opens `/launch`, a modal with vertical tabs and a way back to the main menu. The Story Mode tab shows the image, the description and Start. Start opens `/game/{projectId}` with the public project's id.
+  - Expect: any player, logged in or not, plays the public game from the main menu. Start is disabled when no game is promoted.
   - Depends on: 4, 6.
 
 - [ ] **8. `/launch` screen: My Games tab (own projects)**
+
   - Scope: a table of the player's projects, newest first, with a details side that shows the image, the author, the dates and the levels. Start opens `/game/{projectId}`.
   - Expect: a player starts any of their own projects from the main menu, logged in or not. The 'Shared Games' filter is not there yet.
   - Depends on: 1, 7.
 
 - [ ] **9. Admin projects tab and flagging**
-  - Scope: `flagged_at` and `flagged_by` columns. Flag and unflag endpoints for super admins only. `GET /api/admin/projects` with paging and sorting. A Projects tab at `/admin/projects` with a run link and a Flag / Unflag action behind a confirm dialog. Super admins can read and run any project. A flagged project shows a general "contact an admin" message to all players except the owner and super admins. The public project cannot be flagged.
+
+  - Scope: `flagged_at` and `flagged_by` columns. Flag and unflag endpoints for super admins only. `GET /api/admin/projects` with paging and sorting. The play endpoint allows super admins. A Projects tab at `/admin/projects` with a run link and a Flag / Unflag action behind a confirm dialog. The play endpoint returns a general "contact an admin" error for a flagged project to all callers except the owner and super admins. The public project cannot be flagged.
   - Expect: an admin finds any project, runs it, and blocks it in a few clicks. Players cannot start a flagged project.
-  - Depends on: 1. Must ship before ticket 10 goes live.
+  - Depends on: 6. Must ship before ticket 10 goes live.
 
 - [ ] **10. Sharing: server and user search**
-  - Scope: `project_shares` table and the owner endpoints to list, add and revoke. `GET /api/projects?scope=mine|shared`. Project and level reads allow users with a share, and return `404` to all others. The sync pull includes shared projects. `GET /api/users/search` with the privacy rules. Shares are rejected for flagged projects and for projects not saved on the server.
-  - Expect: a shared project syncs down read-only to the user it is shared with. A revoke or a flag removes it from their device on the next sync. The search never returns another user's email.
+
+  - Scope: `project_shares` table and the owner endpoints to list, add and revoke. `GET /api/projects?scope=mine|shared`. The play endpoint allows users with a share. `GET /api/users/search` with the privacy rules. Shares are rejected for flagged projects and for projects not saved on the server.
+  - Expect: a user starts a project shared with them through the play endpoint. After a revoke or a flag, their next start fails with an error. The search never returns another user's email.
   - Depends on: 6, 9.
 
 - [ ] **11. Sharing: UI**
