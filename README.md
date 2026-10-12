@@ -36,6 +36,8 @@ Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (
 
 ## Screenshots
 
+![Rough ocean](./docs/images/screenshots/pelagic.jpg)
+![Lake with stones](./docs/images/screenshots/pelagic-lakes.jpg)
 ![Cold Sunrise Pic](./docs/images/screenshots/understory-arid.jpg)
 ![Storm Pic](./docs/images/screenshots/understory-dry-mountains.jpg)
 ![Nightsky Pic](./docs/images/screenshots/understory-mesa.jpg)

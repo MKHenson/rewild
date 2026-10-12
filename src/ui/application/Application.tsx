@@ -53,9 +53,19 @@ export class Application extends Component<Props> {
     // and the editor alike. It finds whichever renderer is mounted.
     const perfPanel = <PerfPanel />;
 
+    const mainMenuBackgrounds = [
+      'screenshots/understory-plains.webp',
+      'screenshots/pelagic.jpg',
+    ];
+
+    const pickRandomBackground = () => {
+      const index = Math.floor(Math.random() * mainMenuBackgrounds.length);
+      return mainMenuBackgrounds[index];
+    };
+
     const canvas = <div class="background" />;
     canvas.style.backgroundImage = `url(${resolveAssetUrl(
-      'screenshots/understory-plains.webp'
+      pickRandomBackground()
     )})`;
 
     return () => {
@@ -84,7 +94,10 @@ export class Application extends Component<Props> {
             path="/editor"
             onRender={(params) => <ProjectEditorPage onQuit={onQuit} />}
           />
-          <Route path="/admin" onRender={() => <AdminPage onClose={onQuit} />} />
+          <Route
+            path="/admin"
+            onRender={() => <AdminPage onClose={onQuit} />}
+          />
           <Route path="/reset-password" onRender={() => <ResetPassword />} />
         </RouterSwitch>,
         <Auth />,
