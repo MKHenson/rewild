@@ -46,7 +46,6 @@ class ProjectService {
                 it[levelId] = record.levelId
                 it[name] = record.name
                 it[description] = record.description
-                it[activeOnStartup] = record.activeOnStartup
                 it[startEvent] = record.startEvent
                 it[sceneGraph] = json.encodeToString(record.sceneGraph)
                 it[updatedAt] = record.updatedAt
@@ -59,7 +58,6 @@ class ProjectService {
                 it[levelId] = record.levelId
                 it[name] = record.name
                 it[description] = record.description
-                it[activeOnStartup] = record.activeOnStartup
                 it[startEvent] = record.startEvent
                 it[sceneGraph] = json.encodeToString(record.sceneGraph)
                 it[updatedAt] = record.updatedAt
@@ -96,7 +94,6 @@ class ProjectService {
         levelId = this[ProjectsTable.levelId],
         name = this[ProjectsTable.name],
         description = this[ProjectsTable.description],
-        activeOnStartup = this[ProjectsTable.activeOnStartup],
         startEvent = this[ProjectsTable.startEvent],
         sceneGraph = json.decodeFromString<SceneGraph>(this[ProjectsTable.sceneGraph]),
         updatedAt = this[ProjectsTable.updatedAt],

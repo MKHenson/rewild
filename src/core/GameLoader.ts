@@ -1,5 +1,5 @@
-import { findLevel } from '../api/levels';
-import { getProjects } from '../api/projects';
+import { getLevel } from '../api/levels';
+import { getProject } from '../api/projects';
 import { StateMachine } from 'rewild-routing';
 import { InGameLevel } from './routing/InGameLevel';
 import { Asset3D } from './routing/Asset3D';
@@ -21,6 +21,7 @@ import { applyAtmosphere } from './AtmosphereSync';
 /** Loads game files and assets and sends the created objects to wasm */
 
 export async function loadInitialLevels(
+  projectId: string,
   player: Player,
   gameManager: GameManager
 ) {
@@ -28,12 +29,12 @@ export async function loadInitialLevels(
   const renderer: Renderer = gameManager.renderer;
   await templateLoader.load();
 
-  // A fresh install — or a startup project that hasn't had a level authored
-  // yet — has nothing to load. Rather than refusing to start, fall back to a
-  // bare world: default sky, default-seed terrain, no actors. There is still
-  // somewhere to stand, and the Player places itself on the surface.
-  const project = (await getProjects(true)).at(0) ?? null;
-  const level = project ? await findLevel(project.id) : null;
+  const project = await getProject(projectId);
+  if (!project) throw new Error(`Project ${projectId} not found`);
+
+  // A project without a start level falls back to a bare world: default sky,
+  // the project's terrain, no actors. The Player places itself on the surface.
+  const level = project.levelId ? await getLevel(project.levelId) : null;
 
   const stateMachine = new StateMachine<StateMachineData>({
     renderer,
@@ -41,19 +42,16 @@ export async function loadInitialLevels(
     gameManager,
   });
 
-  if (project) {
-    if (project.sceneGraph.terrain) {
-      renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
-      renderer.terrainRenderer.climatePreset =
-        project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
-      renderer.terrainRenderer.seaLevel =
-        project.sceneGraph.terrain.seaLevel ?? 0;
-    }
-
-    applyAtmosphere(renderer, project.sceneGraph.atmosphere);
-
-    registerDebugCommands(renderer, project);
+  if (project.sceneGraph.terrain) {
+    renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
+    renderer.terrainRenderer.climatePreset =
+      project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
+    renderer.terrainRenderer.seaLevel = project.sceneGraph.terrain.seaLevel ?? 0;
   }
+
+  applyAtmosphere(renderer, project.sceneGraph.atmosphere);
+
+  registerDebugCommands(renderer, project);
 
   renderer.terrainRenderer.enabled = level ? level.hasTerrain : true;
   renderer.terrainRenderer.snapshotProvider = level?.id

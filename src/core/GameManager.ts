@@ -49,7 +49,7 @@ export class GameManager {
     this.player.requestLock();
   }
 
-  async init(pane3D: Pane3D) {
+  async init(pane3D: Pane3D, projectId: string) {
     try {
       if (this.hasInitialized) return false;
       this.hasInitialized = true;
@@ -58,7 +58,11 @@ export class GameManager {
       await this.renderer.init(pane3D.canvas()!, false);
 
       this.player.setCamera(this.renderer.camera);
-      const stateMachine = await loadInitialLevels(this.player, this);
+      const stateMachine = await loadInitialLevels(
+        projectId,
+        this.player,
+        this
+      );
 
       this.renderer.terrainRenderer.dispatcher.add(this.TerrainEventDelegate);
 

@@ -15,6 +15,7 @@ import {
   loadAudioTemplates,
 } from '../../core/audio/audio';
 import { registerAudioDebugCommands } from '../../core/debug/AudioDebugCommands';
+import { getProjects } from '../../api/projects';
 
 interface Props {}
 
@@ -29,8 +30,10 @@ export class Application extends Component<Props> {
     loadAudioTemplates();
     registerAudioDebugCommands(audio);
 
+    // Plays the most recently updated project.
     const onStart = async () => {
-      navigate('/game');
+      const [project] = await getProjects();
+      navigate(project ? `/game/${project.id}` : '/editor');
     };
 
     const onEditor = () => {
@@ -89,7 +92,12 @@ export class Application extends Component<Props> {
             path="/settings"
             onRender={() => <SettingsPanel onClose={onQuit} />}
           />
-          <Route path="/game" onRender={() => <InGame onQuit={onQuit} />} />
+          <Route
+            path="/game/:project"
+            onRender={(params) => (
+              <InGame projectId={params.project} onQuit={onQuit} />
+            )}
+          />
           <Route
             path="/editor"
             onRender={(params) => <ProjectEditorPage onQuit={onQuit} />}

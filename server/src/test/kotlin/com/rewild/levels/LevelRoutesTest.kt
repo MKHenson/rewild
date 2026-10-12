@@ -67,7 +67,6 @@ class LevelRoutesTest {
             levelId = null,
             name = "Fixture Project",
             description = "",
-            activeOnStartup = false,
             startEvent = "",
             sceneGraph = SceneGraph(containers = emptyList(), atmosphere = makeAtmosphere()),
             updatedAt = 1000L
@@ -78,7 +77,6 @@ class LevelRoutesTest {
             userId = "placeholder",
             projectId = projectId,
             name = name,
-            activeOnStartup = false,
             hasTerrain = false,
             startEvent = "",
             containers = emptyList(),

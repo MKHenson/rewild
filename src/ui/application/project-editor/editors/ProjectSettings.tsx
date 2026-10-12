@@ -1,7 +1,6 @@
 import {
   Card,
   Typography,
-  Switch,
   Date,
   Input,
   Button,
@@ -37,19 +36,6 @@ export class ProjectSettings extends Component<Props> {
               <Typography variant="body2">
                 <Date date={level?.updatedAt} />
               </Typography>
-              <Typography variant="label">Active on Startup</Typography>
-              <Switch
-                onClick={(e) => {
-                  setUpdatedProject(
-                    {
-                      ...updatedProject(),
-                      activeOnStartup: !updatedProject().activeOnStartup,
-                    },
-                    false
-                  );
-                }}
-                checked={updatedProject().activeOnStartup}
-              />
               <Typography variant="label">Start Event</Typography>
               <Input
                 fullWidth

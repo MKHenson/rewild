@@ -70,7 +70,6 @@ class AssetCleanupServiceTest {
             levelId = null,
             name = "Fixture Project",
             description = "",
-            activeOnStartup = false,
             startEvent = "",
             sceneGraph = SceneGraph(
                 containers = emptyList(),
@@ -97,7 +96,6 @@ class AssetCleanupServiceTest {
             userId = "placeholder",
             projectId = PROJECT_A,
             name = "Fixture Level",
-            activeOnStartup = false,
             hasTerrain = false,
             startEvent = "",
             containers = emptyList(),

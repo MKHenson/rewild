@@ -1,19 +1,10 @@
 import { ILevel } from 'models';
 import { db } from '../database/database';
 
-/** The project's level, or null when it has none yet. */
-export async function findLevel(projectId: string) {
-  const allLevels = await db.levels.getMany({
-    where: [['projectId', '==', projectId]],
-  });
+export async function getLevel(id: string) {
+  const level = await db.levels.getOne(id);
 
-  return allLevels.items.at(0) ?? null;
-}
-
-export async function getLevel(projectId: string) {
-  const level = await findLevel(projectId);
-
-  if (!level) throw new Error('No level found for this project');
+  if (!level) throw new Error('Level not found');
 
   return level;
 }

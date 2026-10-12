@@ -54,7 +54,6 @@ describe('Database clears', () => {
     const { id } = await db.levels.add({
       name: 'Level',
       projectId: 'p1',
-      activeOnStartup: false,
       hasTerrain: true,
       startEvent: '',
       containers: [],

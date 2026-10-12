@@ -6,6 +6,7 @@ import { ViewportStateMachine } from './ViewportStateMachine';
 import { audio } from '../../core/audio/audio';
 
 interface Props {
+  projectId: string;
   onQuit: () => void;
 }
 type ActiveMenu = 'ingameMenu' | 'gameOverMenu' | 'settings';
@@ -30,7 +31,11 @@ export class InGame extends Component<Props> {
 
     const createViewport = () =>
       (
-        <ViewportStateMachine onUnlock={onUnlock} onDeath={onDeath} />
+        <ViewportStateMachine
+          projectId={this.props.projectId}
+          onUnlock={onUnlock}
+          onDeath={onDeath}
+        />
       ) as ViewportStateMachine;
 
     const onRestart = () => {

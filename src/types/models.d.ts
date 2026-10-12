@@ -124,7 +124,6 @@ declare module 'models' {
     levelId: string;
     name: string;
     description: string;
-    activeOnStartup: boolean;
     startEvent: string;
     sceneGraph: {
       containers: IContainer[];
@@ -152,7 +151,6 @@ declare module 'models' {
     id?: string;
     name: string;
     projectId: string;
-    activeOnStartup: boolean;
     hasTerrain: boolean;
     startEvent: string;
     containers: IContainer[];

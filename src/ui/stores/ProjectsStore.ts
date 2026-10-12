@@ -22,7 +22,7 @@ export class ProjectsStore {
   async getProjects(page?: any) {
     this.loading = true;
     this.dispatcher.dispatch({ kind: 'changed' });
-    const resp = await getProjectsApi(false, page);
+    const resp = await getProjectsApi(page);
     this.projects = resp;
     this.loading = false;
     this.dispatcher.dispatch({ kind: 'changed' });
@@ -43,10 +43,9 @@ export class ProjectsStore {
         name: token.name || '',
         startEvent: token.startEvent || '',
         projectId: resp.id,
-        activeOnStartup: token.activeOnStartup || true,
       };
       const levelResp = await addLevel(newLevel);
-      patchProject(resp.id, { levelId: levelResp.id });
+      await patchProject(resp.id, { levelId: levelResp.id });
 
       await this.getProjects();
     } catch (err: any) {

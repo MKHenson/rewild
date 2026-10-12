@@ -14,7 +14,6 @@ const FILES = [
 const level = (overrides: Partial<ILevel> = {}): ILevel => ({
   name: 'Level',
   projectId: 'p1',
-  activeOnStartup: false,
   hasTerrain: true,
   startEvent: '',
   containers: [],

@@ -1,12 +1,11 @@
 import { db } from '../database/database';
 import { IProject } from 'models';
 
-export async function getProjects(onlyStartup: boolean, cursor?: any) {
+export async function getProjects(cursor?: any) {
   const resp = await db.projects.getMany({
     limit: 30,
     cursor,
     sort: [['updatedAt', 'desc']],
-    where: onlyStartup ? [['activeOnStartup', '==', true]] : undefined,
   });
 
   return resp.items;
