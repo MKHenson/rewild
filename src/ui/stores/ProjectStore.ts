@@ -42,7 +42,6 @@ export class ProjectStore {
       id: createUUID(),
       name: 'New Project',
       description: '',
-      activeOnStartup: true,
       levelId: '',
       startEvent: '',
       sceneGraph: {
@@ -77,7 +76,7 @@ export class ProjectStore {
       const resp = await getProjectApi(projectId);
       this.project = resp;
 
-      await this.getLevel(resp!.id);
+      await this.getLevel(resp!.levelId);
     } catch (err: any) {
       this.error = err.toString();
     }
@@ -179,22 +178,21 @@ export class ProjectStore {
                   ) || [],
               } as IContainer)
           ) || [],
-        activeOnStartup: project.activeOnStartup,
         startEvent: project.startEvent,
       });
     } catch (err: any) {
       this.error = err.toString();
     }
 
-    await this.getLevel(project.id!);
+    await this.getLevel(project.levelId);
 
     this.loading = false;
     this.dirty = false;
     this.dispatcher.dispatch({ kind: 'changed' });
   }
 
-  async getLevel(projectId: string) {
-    const level = await getLevelApi(projectId);
+  async getLevel(levelId: string) {
+    const level = await getLevelApi(levelId);
     this.level = level;
   }
 }

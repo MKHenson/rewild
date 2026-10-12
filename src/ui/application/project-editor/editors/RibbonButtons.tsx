@@ -7,6 +7,7 @@ import {
   Card,
   Button,
   IconType,
+  navigate,
 } from 'rewild-ui';
 import { projectStore } from '../../../stores/ProjectStore';
 import { sculptStore } from '../../../stores/SculptStore';
@@ -60,6 +61,10 @@ export class RibbonButtons extends Component<Props> {
     const home = iconButton('house', () => this.props.onHome());
     const save = iconButton('save', () => projectStore.updateProject());
     const publish = iconButton('upload', () => projectStore.publish());
+    const play = iconButton('play', async () => {
+      if (projectStore.dirty) await projectStore.updateProject();
+      navigate(`/game/${projectStore.project!.id}`);
+    });
     const terrain = iconButton('mountain-snow', () => setTerrainOpen(true));
     const brushButtons = brushes.map((store, i) =>
       iconButton(
@@ -77,6 +82,7 @@ export class RibbonButtons extends Component<Props> {
           {home}
           {save}
           {publish}
+          {play}
           {terrain}
           {brushButtons[0]}
           {brushButtons[1]}
@@ -94,6 +100,7 @@ export class RibbonButtons extends Component<Props> {
       home.disabled = loading;
       save.disabled = !dirty || loading;
       publish.disabled = loading;
+      play.disabled = loading || !projectStore.project;
       terrain.disabled = noTerrain;
       brushButtons.forEach((button, i) => {
         button.disabled = noTerrain;

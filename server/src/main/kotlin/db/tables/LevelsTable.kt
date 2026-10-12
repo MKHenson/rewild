@@ -8,7 +8,6 @@ object LevelsTable : Table("levels") {
     val userId = text("user_id")
     val projectId = text("project_id")
     val name = text("name")
-    val activeOnStartup = bool("active_on_startup")
     val hasTerrain = bool("has_terrain")
     val startEvent = text("start_event")
     val containers = jsonb("containers")

@@ -80,7 +80,6 @@ class AssetRoutesTest {
             levelId = null,
             name = "Fixture Project",
             description = "",
-            activeOnStartup = false,
             startEvent = "",
             sceneGraph = SceneGraph(containers = emptyList(), atmosphere = makeAtmosphere()),
             updatedAt = 1000L
@@ -91,7 +90,6 @@ class AssetRoutesTest {
             userId = "placeholder",
             projectId = projectId,
             name = "Fixture Level",
-            activeOnStartup = false,
             hasTerrain = false,
             startEvent = "",
             containers = emptyList(),

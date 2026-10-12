@@ -4,6 +4,7 @@ import { Player } from 'src/core/routing/Player';
 import { GameManager } from 'src/core/GameManager';
 
 interface Props {
+  projectId: string;
   onUnlock: () => void;
   onDeath: () => void;
 }
@@ -29,7 +30,10 @@ export class ViewportStateMachine extends Component<Props> {
     };
 
     const onCanvasReady = async (pane3D: Pane3D) => {
-      const initialized = await this.gameManager.init(pane3D);
+      const initialized = await this.gameManager.init(
+        pane3D,
+        this.props.projectId
+      );
       this.gameManager.onUnlock = this.props.onUnlock;
       // init() swallows its own errors, so drop the overlay either way rather
       // than leaving the player staring at a shell that will never clear.

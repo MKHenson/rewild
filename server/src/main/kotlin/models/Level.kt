@@ -8,7 +8,6 @@ data class Level(
     val userId: String? = null,
     val projectId: String,
     val name: String,
-    val activeOnStartup: Boolean,
     val hasTerrain: Boolean,
     val startEvent: String,
     val containers: List<Container>,

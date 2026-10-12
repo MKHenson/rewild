@@ -1072,10 +1072,6 @@
             "com.rewild.models.Project": {
                 "type": "object",
                 "properties": {
-                    "activeOnStartup": {
-                        "type": "boolean",
-                        "title": "Boolean"
-                    },
                     "deletedAt": {
                         "type": [
                             "null",
@@ -1136,7 +1132,6 @@
                     }
                 },
                 "required": [
-                    "activeOnStartup",
                     "description",
                     "id",
                     "name",
@@ -1689,10 +1684,6 @@
             "com.rewild.models.Level": {
                 "type": "object",
                 "properties": {
-                    "activeOnStartup": {
-                        "type": "boolean",
-                        "title": "Boolean"
-                    },
                     "chunksClearedAt": {
                         "type": [
                             "null",
@@ -1762,7 +1753,6 @@
                     }
                 },
                 "required": [
-                    "activeOnStartup",
                     "containers",
                     "hasTerrain",
                     "id",

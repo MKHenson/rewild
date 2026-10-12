@@ -54,7 +54,6 @@ class SyncRoutesTest {
             levelId = null,
             name = name,
             description = "A test project",
-            activeOnStartup = false,
             startEvent = "",
             sceneGraph = SceneGraph(
                 containers = emptyList(),
@@ -76,7 +75,6 @@ class SyncRoutesTest {
             userId = "placeholder",
             projectId = "proj-1",
             name = "Test Level",
-            activeOnStartup = false,
             hasTerrain = false,
             startEvent = "",
             containers = emptyList(),

@@ -1105,8 +1105,6 @@ export interface components {
         };
         /** Project */
         "com.rewild.models.Project": {
-            /** Boolean */
-            activeOnStartup: boolean;
             /**
              * Long
              * Format: int64
@@ -1302,8 +1300,6 @@ export interface components {
         };
         /** Level */
         "com.rewild.models.Level": {
-            /** Boolean */
-            activeOnStartup: boolean;
             /**
              * Long
              * Format: int64

@@ -8,7 +8,8 @@ function buttonsOf(ribbon: RibbonButtons): HTMLElement[] {
 }
 
 const SAVE = 1;
-const SCULPT = 4;
+const PLAY = 3;
+const SCULPT = 5;
 
 describe('RibbonButtons', () => {
   beforeEach(() => {
@@ -56,8 +57,18 @@ describe('RibbonButtons', () => {
     projectStore.project = { sceneGraph: {} } as any;
     const ribbon = createRibbon();
 
-    for (const button of buttonsOf(ribbon).slice(3))
+    for (const button of buttonsOf(ribbon).slice(PLAY + 1))
       expect(button.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('plays the open project', async () => {
+    projectStore.project = { id: 'p1', sceneGraph: { terrain: {} } } as any;
+    const ribbon = createRibbon();
+
+    buttonsOf(ribbon)[PLAY].click();
+    await Promise.resolve();
+
+    expect(window.location.pathname).toBe('/game/p1');
   });
 
   it('marks the armed brush, in place', () => {

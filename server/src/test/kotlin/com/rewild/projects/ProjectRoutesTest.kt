@@ -50,7 +50,6 @@ class ProjectRoutesTest {
             levelId = null,
             name = name,
             description = "A test project",
-            activeOnStartup = false,
             startEvent = "",
             sceneGraph = SceneGraph(
                 containers = emptyList(),

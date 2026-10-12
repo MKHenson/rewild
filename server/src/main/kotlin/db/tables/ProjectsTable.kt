@@ -9,7 +9,6 @@ object ProjectsTable : Table("projects") {
     val levelId = text("level_id").nullable()
     val name = text("name")
     val description = text("description")
-    val activeOnStartup = bool("active_on_startup")
     val startEvent = text("start_event")
     val sceneGraph = jsonb("scene_graph")
     val updatedAt = long("updated_at")

@@ -9,7 +9,6 @@ data class Project(
     val levelId: String? = null,
     val name: String,
     val description: String,
-    val activeOnStartup: Boolean,
     val startEvent: String,
     val sceneGraph: SceneGraph,
     val updatedAt: Long,
