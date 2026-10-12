@@ -22,6 +22,7 @@ import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -90,11 +91,12 @@ class AssetCleanupServiceTest {
             id: String,
             updatedAt: Long = 1000L,
             deletedAt: Long? = null,
-            chunksClearedAt: Long? = null
+            chunksClearedAt: Long? = null,
+            projectId: String = PROJECT_A
         ) = Level(
             id = id,
             userId = "placeholder",
-            projectId = PROJECT_A,
+            projectId = projectId,
             name = "Fixture Level",
             hasTerrain = false,
             startEvent = "",
@@ -203,34 +205,55 @@ class AssetCleanupServiceTest {
         assertTrue(queuedPrefixes().isEmpty())
     }
 
-    // --- Tombstone sync (the path the editor actually uses) ---
+    // --- Project delete (DELETE /api/projects/{id}) ---
 
     @Test
-    fun `syncing a level tombstone cleans up its objects and asset rows`() {
-        val syncService = SyncService(projectService, levelService, cleanup)
-        levelService.upsert(USER_A, makeLevel("cl-tombstone"))
-        insertAsset("cl-tombstone-asset", "cl-tombstone", "0_0.bin")
-        bucket.objects += "levels/cl-tombstone/chunk/0_0.bin"
+    fun `deleting a project tombstones its levels and removes their files`() {
+        val projects = ProjectService(cleanup)
+        projects.upsert(USER_A, makeProject("cl-doomed-proj"))
+        levelService.upsert(USER_A, makeLevel("cl-doomed-1", projectId = "cl-doomed-proj"))
+        levelService.upsert(USER_A, makeLevel("cl-doomed-2", projectId = "cl-doomed-proj"))
+        levelService.upsert(USER_A, makeLevel("cl-survivor"))
+        insertAsset("cl-doomed-1-asset", "cl-doomed-1", "0_0.bin")
+        bucket.objects += setOf(
+            "levels/cl-doomed-1/chunk/0_0.bin",
+            "levels/cl-doomed-2/chunk/0_0.bin",
+            "levels/cl-survivor/chunk/0_0.bin"
+        )
 
-        val tombstone = makeLevel("cl-tombstone", updatedAt = 2000L, deletedAt = 2000L)
-        syncService.sync(USER_A, syncRequestFor(tombstone))
+        val result = projects.delete(USER_A, "cl-doomed-proj")
 
-        assertTrue(bucket.objects.isEmpty())
-        assertTrue(assetIdsFor("cl-tombstone").isEmpty())
+        assertEquals(com.rewild.common.DeleteResult.Success, result)
+        assertEquals(setOf("levels/cl-survivor/chunk/0_0.bin"), bucket.objects)
+        assertTrue(assetIdsFor("cl-doomed-1").isEmpty())
+        assertNotNull(levelService.getById(USER_A, "cl-doomed-1")?.deletedAt)
+        assertNotNull(levelService.getById(USER_A, "cl-doomed-2")?.deletedAt)
+        assertNull(levelService.getById(USER_A, "cl-survivor")?.deletedAt)
     }
 
     @Test
-    fun `re-syncing the same tombstone does not hit the bucket again`() {
+    fun `a project delete still succeeds when the bucket is unreachable`() {
+        val projects = ProjectService(cleanup)
+        projects.upsert(USER_A, makeProject("cl-proj-bucket-down"))
+        levelService.upsert(USER_A, makeLevel("cl-proj-bucket-down-level", projectId = "cl-proj-bucket-down"))
+        bucket.failing = true
+
+        val result = projects.delete(USER_A, "cl-proj-bucket-down")
+
+        assertEquals(com.rewild.common.DeleteResult.Success, result)
+        assertEquals(listOf("levels/cl-proj-bucket-down-level/"), queuedPrefixes())
+    }
+
+    @Test
+    fun `syncing a level tombstone from the client is ignored`() {
         val syncService = SyncService(projectService, levelService, cleanup)
-        levelService.upsert(USER_A, makeLevel("cl-resync"))
+        levelService.upsert(USER_A, makeLevel("cl-tombstone"))
+        bucket.objects += "levels/cl-tombstone/chunk/0_0.bin"
 
-        val tombstone = makeLevel("cl-resync", updatedAt = 2000L, deletedAt = 2000L)
-        syncService.sync(USER_A, syncRequestFor(tombstone))
-        // A later push of the same tombstone — updatedAt moves, deletedAt was already set.
-        val later = makeLevel("cl-resync", updatedAt = 3000L, deletedAt = 2000L)
-        syncService.sync(USER_A, syncRequestFor(later))
+        syncService.sync(USER_A, syncRequestFor(makeLevel("cl-tombstone", updatedAt = 2000L, deletedAt = 2000L)))
 
-        assertEquals(listOf("levels/cl-resync/"), bucket.prefixCalls)
+        assertTrue(bucket.prefixCalls.isEmpty())
+        assertNull(levelService.getById(USER_A, "cl-tombstone")?.deletedAt)
     }
 
     // --- Chunk clears (chunksClearedAt) ---
@@ -316,19 +339,6 @@ class AssetCleanupServiceTest {
         syncService.sync(USER_A, syncRequestFor(updated))
 
         assertTrue(bucket.prefixCalls.isEmpty())
-    }
-
-    @Test
-    fun `a sync tombstone still succeeds when the bucket is unreachable`() {
-        val syncService = SyncService(projectService, levelService, cleanup)
-        levelService.upsert(USER_A, makeLevel("cl-sync-bucket-down"))
-        bucket.failing = true
-
-        val tombstone = makeLevel("cl-sync-bucket-down", updatedAt = 2000L, deletedAt = 2000L)
-        val response = syncService.sync(USER_A, syncRequestFor(tombstone))
-
-        assertTrue(response.syncedAt > 0)
-        assertEquals(listOf("levels/cl-sync-bucket-down/"), queuedPrefixes())
     }
 
     // --- Queue drain ---

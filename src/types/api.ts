@@ -449,7 +449,7 @@ export interface paths {
         post?: never;
         /**
          * Delete project
-         * @description Deletes a project and cascades to its associated levels
+         * @description Deletes a project and its levels, and removes their files. The project stays as a tombstone so the owner's other devices drop it on their next sync
          */
         delete: {
             parameters: {

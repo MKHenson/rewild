@@ -80,13 +80,8 @@ describe('LocalLevelTable', () => {
     });
   });
 
-  it('removes the files with a tombstone from another device', async () => {
+  it('removes the files with the level', async () => {
     await levels.hardRemove(id);
-    expect(await remaining()).toEqual([]);
-  });
-
-  it('removes the files when the level is deleted here', async () => {
-    await levels.remove(id);
     expect(await remaining()).toEqual([]);
   });
 });

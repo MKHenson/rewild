@@ -41,11 +41,16 @@ class SyncService(
         //   levels.project_id  → projects(id)  NOT NULL
         //   projects.level_id  → levels(id)    nullable
         //
+        // Deletes only go through DELETE /api/projects/{id}: a client tombstone is ignored, and so
+        // is a push to a record the server has already deleted.
+        //
         // Pass 1: insert/update projects with levelId = null so that levels can satisfy
         //         their project_id FK in pass 2.
         val projectsNeedingLevelId = mutableListOf<Pair<SyncRecord, Project>>()
         for ((record, incoming) in projectRecords) {
+            if (incoming.deletedAt != null) continue
             val existing = projectService.getById(userId, record.id)
+            if (existing?.deletedAt != null) continue
             if (existing == null || record.updatedAt > existing.updatedAt) {
                 projectService.upsert(userId, incoming.copy(userId = userId, levelId = null, syncedAt = now, syncError = null))
                 if (incoming.levelId != null) projectsNeedingLevelId.add(record to incoming)
@@ -53,23 +58,19 @@ class SyncService(
         }
 
         // Pass 2: upsert levels — projects exist now so project_id FK is satisfied.
-        // Levels are tombstoned rather than hard-deleted, so the assets FK never cascades
-        // and nothing else would ever reclaim their blobs: collect newly-arrived
-        // tombstones and clean them up once the push phase has committed.
-        val newlyTombstoned = mutableListOf<String>()
         // A level whose chunk clear is newer than the server's: the client removed
         // its chunk files, so the server removes its copies too. Checked on every
         // record, so an older update that carries a newer clear still clears.
         val chunksCleared = mutableListOf<String>()
         for ((record, incoming) in levelRecords) {
+            if (incoming.deletedAt != null) continue
             val existing = levelService.getById(userId, record.id)
+            if (existing?.deletedAt != null) continue
             val clearsChunks = isNewer(incoming.chunksClearedAt, existing?.chunksClearedAt)
             if (existing == null || record.updatedAt > existing.updatedAt) {
                 // Null when another user owns the id: nothing of theirs is touched.
                 levelService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
                     ?: continue
-                // Only on the transition to deleted, so re-syncing a tombstone is a no-op.
-                if (incoming.deletedAt != null && existing?.deletedAt == null) newlyTombstoned.add(record.id)
             } else if (clearsChunks) {
                 levelService.upsert(
                     userId,
@@ -84,17 +85,12 @@ class SyncService(
         }
 
         // Pass 3: patch levelId back onto the projects that needed it — levels exist now.
-        // Skip tombstones: their levelId is irrelevant and the level may no longer exist.
         for ((_, incoming) in projectsNeedingLevelId) {
-            if (incoming.deletedAt != null) continue
             projectService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
         }
 
-        // Reclaim blobs for levels this sync just tombstoned. Never throws, so a bucket
-        // outage can't fail the sync — failures are queued for a later retry.
-        for (levelId in newlyTombstoned) cleanup?.cleanupLevel(levelId)
-        // A whole-level cleanup already took these files.
-        for (levelId in chunksCleared) if (levelId !in newlyTombstoned) cleanup?.clearChunks(levelId)
+        // Never throws, so a bucket outage can't fail the sync — failures are queued for a later retry.
+        for (levelId in chunksCleared) cleanup?.clearChunks(levelId)
 
         // Pull phase: return everything the client hasn't seen yet.
         // lastSyncedAt = 0 means first sync — return the full dataset.

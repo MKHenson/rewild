@@ -39,6 +39,7 @@ fun Route.projectRoutes(service: ProjectService) {
             }) {
                 val id = call.parameters["id"]!!
                 val project = service.getById(call.userId(), id)
+                    ?.takeIf { it.deletedAt == null }
                     ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
                 call.respond(project)
             }
@@ -66,7 +67,7 @@ fun Route.projectRoutes(service: ProjectService) {
             delete({
                 tags("Projects")
                 summary = "Delete project"
-                description = "Deletes a project and cascades to its associated levels"
+                description = "Deletes a project and its levels, and removes their files. The project stays as a tombstone so the owner's other devices drop it on their next sync"
                 request { pathParameter<String>("id") { description = "Project ID" } }
                 response {
                     code(HttpStatusCode.NoContent) { description = "Project deleted" }

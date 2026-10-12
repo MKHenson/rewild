@@ -149,19 +149,6 @@ export class LocalDataTable<T> {
     };
   }
 
-  async remove(id: string): Promise<boolean> {
-    const db = await openDatabase(this.db);
-    const tx = db.transaction(this.collection, 'readwrite');
-    const store = tx.objectStore(this.collection);
-    const raw = await idbReq<StoredRecord<T> | undefined>(store.get(id));
-    if (!raw) return false;
-    const existing = withSyncDefaults(raw);
-    // Guarantee updatedAt > syncedAt even if called in the same millisecond as markSynced.
-    const now = Math.max(Date.now(), existing.syncedAt + 1);
-    await idbReq(store.put({ ...existing, deletedAt: now, updatedAt: now }));
-    return true;
-  }
-
   async hardRemove(id: string): Promise<void> {
     const store = await this.openStore('readwrite');
     await idbReq(store.delete(id));
@@ -192,8 +179,7 @@ export class LocalDataTable<T> {
         store.put({
           ...record,
           ...token,
-          // As remove(): a patch is dirty even when this clock is behind the
-          // server's syncedAt.
+          // A patch is dirty even when this clock is behind the server's syncedAt.
           updatedAt: Math.max(Date.now(), record.syncedAt + 1),
         })
       );

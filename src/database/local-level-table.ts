@@ -12,13 +12,7 @@ export class LocalLevelTable extends LocalDataTable<ILevel> {
     super('rewild', 'levels');
   }
 
-  override async remove(id: string): Promise<boolean> {
-    const removed = await super.remove(id);
-    if (removed) await this.assets.removeByLevel(id);
-    return removed;
-  }
-
-  // A tombstone from another device: its files go with it.
+  // A delete here or a tombstone from the server: the files go with it.
   override async hardRemove(id: string): Promise<void> {
     await super.hardRemove(id);
     await this.assets.removeByLevel(id);

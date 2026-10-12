@@ -266,19 +266,6 @@ describe('SyncEngine', () => {
   });
 
   describe('tombstone handling', () => {
-    it('includes soft-deleted (tombstone) records in the push payload', async () => {
-      const p = await projects.add({ name: 'To Be Deleted' });
-      await projects.markSynced(p.id, p.updatedAt, null); // clean
-      await projects.remove(p.id); // soft delete — dirty tombstone
-
-      await engine.run();
-
-      const body = getRequestBody();
-      const pushed = body.records.find((r) => r.id === p.id);
-      expect(pushed).toBeDefined();
-      expect((pushed!.data as { deletedAt: unknown }).deletedAt).toBeGreaterThan(0);
-    });
-
     it('physically removes a tombstone received from the server', async () => {
       const serverId = 'server-tombstone-id';
       const deletedAt = Date.now();

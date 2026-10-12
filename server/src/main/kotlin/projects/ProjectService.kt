@@ -1,6 +1,8 @@
 package com.rewild.projects
 
+import com.rewild.assets.AssetCleanupService
 import com.rewild.common.DeleteResult
+import com.rewild.db.tables.LevelsTable
 import com.rewild.db.tables.ProjectsTable
 import com.rewild.models.Project
 import com.rewild.models.SceneGraph
@@ -14,7 +16,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 private val json = Json { ignoreUnknownKeys = true }
 
-class ProjectService {
+class ProjectService(private val cleanup: AssetCleanupService? = null) {
 
     fun getAll(userId: String): List<Project> = transaction {
         ProjectsTable.selectAll()
@@ -76,16 +78,38 @@ class ProjectService {
             .map { it.toProject() }
     }
 
-    fun delete(userId: String, id: String): DeleteResult = transaction {
-        val existing = ProjectsTable.selectAll()
-            .where { ProjectsTable.id eq id }
-            .firstOrNull()
-            ?: return@transaction DeleteResult.NotFound
+    // Tombstones the project and its levels, so the owner's other devices drop them on their
+    // next sync, then removes the levels' files.
+    fun delete(userId: String, id: String): DeleteResult {
+        var levelIds = emptyList<String>()
+        val result = transaction {
+            val existing = ProjectsTable.selectAll()
+                .where { ProjectsTable.id eq id }
+                .firstOrNull()
 
-        if (existing[ProjectsTable.userId] != userId) return@transaction DeleteResult.Forbidden
+            if (existing == null || existing[ProjectsTable.deletedAt] != null) return@transaction DeleteResult.NotFound
+            if (existing[ProjectsTable.userId] != userId) return@transaction DeleteResult.Forbidden
 
-        ProjectsTable.deleteWhere { ProjectsTable.id eq id }
-        DeleteResult.Success
+            val now = System.currentTimeMillis()
+            val liveLevels = (LevelsTable.projectId eq id) and LevelsTable.deletedAt.isNull()
+            levelIds = LevelsTable.selectAll().where { liveLevels }.map { it[LevelsTable.id] }
+
+            LevelsTable.update({ liveLevels }) {
+                it[deletedAt] = now
+                it[updatedAt] = now
+                it[syncedAt] = now
+            }
+            ProjectsTable.update({ ProjectsTable.id eq id }) {
+                it[deletedAt] = now
+                it[updatedAt] = now
+                it[syncedAt] = now
+            }
+            DeleteResult.Success
+        }
+
+        // Only once the tombstones are committed: a rolled-back delete must not lose files.
+        if (result == DeleteResult.Success) levelIds.forEach { cleanup?.cleanupLevel(it) }
+        return result
     }
 
     private fun ResultRow.toProject() = Project(

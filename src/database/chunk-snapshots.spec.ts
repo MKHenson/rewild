@@ -85,7 +85,7 @@ describe('createChunkSnapshotProvider', () => {
       const provider = createChunkSnapshotProvider(level.id);
       expect(await provider(0, 0)).not.toBeNull();
 
-      await db.levels.remove(level.id);
+      await db.levels.hardRemove(level.id);
 
       expect(await provider(0, 0)).toBeNull();
       const dirty = await db.assets.getDirty();
@@ -98,7 +98,7 @@ describe('createChunkSnapshotProvider', () => {
       const kept = fixtureHeights().map((h) => h * 2);
       await writeChunkSnapshot('level-keep', 1, 1, kept, SIZE);
 
-      await db.levels.remove(doomed.id);
+      await db.levels.hardRemove(doomed.id);
 
       const provider = createChunkSnapshotProvider('level-keep');
       expect(await provider(1, 1)).toEqual(kept);
