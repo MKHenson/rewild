@@ -232,6 +232,25 @@ class ProjectRoutesTest {
     }
 
     @Test
+    fun `DELETE keeps a tombstone and a second DELETE returns 404`() = testApplication {
+        installTestApp()
+        val userId = "user-delete-twice"
+        service.upsert(userId, makeProject("delete-twice-proj"))
+
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+        val first = client.delete("/api/projects/delete-twice-proj") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        val second = client.delete("/api/projects/delete-twice-proj") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+
+        assertEquals(HttpStatusCode.NoContent, first.status)
+        assertEquals(HttpStatusCode.NotFound, second.status)
+        assertNotNull(service.getById(userId, "delete-twice-proj")?.deletedAt)
+    }
+
+    @Test
     fun `DELETE missing project returns 404`() = testApplication {
         installTestApp()
         val token = jwtService.generateToken("user-del-missing", "delmissing@test.com", "user-del-missing")

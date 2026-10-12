@@ -94,7 +94,7 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
     )
     val assetCleanupService = AssetCleanupService(s3 = s3, bucketName = str("storage.bucketName"))
 
-    val projectService = ProjectService()
+    val projectService = ProjectService(assetCleanupService)
     val levelService = LevelService(assetCleanupService)
     val syncService = SyncService(projectService, levelService, assetCleanupService)
     val adminService = AdminService(authService)

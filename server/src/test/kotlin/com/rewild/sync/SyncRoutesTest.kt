@@ -20,6 +20,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SyncRoutesTest {
@@ -327,23 +328,73 @@ class SyncRoutesTest {
     }
 
     @Test
-    fun `syncing a tombstone project stores deletedAt on server`() = testApplication {
+    fun `sync ignores a tombstone from the client`() = testApplication {
         installTestApp()
         val userId = "user-tombstone-push"
         val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+        projectService.upsert(userId, makeProject("tombstone-push-proj"))
         val deletedAt = System.currentTimeMillis()
         val project = makeProject("tombstone-push-proj", updatedAt = deletedAt).copy(deletedAt = deletedAt)
 
-        client.post("/api/sync") {
+        val response = client.post("/api/sync") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(json.encodeToString(SyncRequest(lastSyncedAt = 0, records = listOf(project.toSyncRecord()))))
         }
 
-        val all = projectService.getAllNewerThan(userId, 0)
-        val stored = all.find { it.id == "tombstone-push-proj" }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val stored = projectService.getById(userId, "tombstone-push-proj")
         assertNotNull(stored)
-        assertEquals(deletedAt, stored.deletedAt)
+        assertNull(stored.deletedAt)
+        assertEquals(1000L, stored.updatedAt)
+    }
+
+    @Test
+    fun `sync does not change a project the server has deleted`() = testApplication {
+        installTestApp()
+        val userId = "user-push-to-deleted"
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+        projectService.upsert(userId, makeProject("deleted-proj", name = "Original"))
+        levelService.upsert(userId, makeLevel("deleted-proj-level").copy(projectId = "deleted-proj"))
+        projectService.delete(userId, "deleted-proj")
+        val later = System.currentTimeMillis() + 60_000
+        val edit = makeProject("deleted-proj", updatedAt = later, name = "Edited")
+        val levelEdit = makeLevel("deleted-proj-level", updatedAt = later).copy(projectId = "deleted-proj")
+
+        client.post("/api/sync") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SyncRequest(lastSyncedAt = 0, records = listOf(edit.toSyncRecord(), levelEdit.toSyncRecord()))))
+        }
+
+        val stored = projectService.getById(userId, "deleted-proj")!!
+        assertNotNull(stored.deletedAt)
+        assertEquals("Original", stored.name)
+        assertNotNull(levelService.getById(userId, "deleted-proj-level")!!.deletedAt)
+    }
+
+    @Test
+    fun `a deleted project and its levels are pulled as tombstones`() = testApplication {
+        installTestApp()
+        val userId = "user-delete-pull"
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+        projectService.upsert(userId, makeProject("delete-pull-proj"))
+        levelService.upsert(userId, makeLevel("delete-pull-level").copy(projectId = "delete-pull-proj"))
+        val before = System.currentTimeMillis() - 1
+        projectService.delete(userId, "delete-pull-proj")
+
+        val response = client.post("/api/sync") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SyncRequest(lastSyncedAt = before, records = emptyList())))
+        }
+
+        val body = json.decodeFromString<SyncResponse>(response.bodyAsText())
+        for (id in listOf("delete-pull-proj", "delete-pull-level")) {
+            val record = body.records.find { it.id == id }
+            assertNotNull(record, id)
+            assertTrue(record.data["deletedAt"] !is JsonNull)
+        }
     }
 
     @Test
@@ -385,24 +436,6 @@ class SyncRoutesTest {
         val ids = projects.map { it.id }
         assertTrue("tombstone-visible" in ids)
         assertTrue("tombstone-hidden" !in ids)
-    }
-
-    @Test
-    fun `tombstone project with levelId skips pass 3 and does not fail on missing level FK`() = testApplication {
-        installTestApp()
-        val userId = "user-tombstone-fk"
-        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
-        val deletedAt = System.currentTimeMillis()
-        // Tombstone with a levelId pointing to a level that does not exist — pass 3 must be skipped
-        val project = makeProject("tombstone-fk-proj", updatedAt = deletedAt).copy(levelId = "non-existent-level", deletedAt = deletedAt)
-
-        val response = client.post("/api/sync") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(SyncRequest(lastSyncedAt = 0, records = listOf(project.toSyncRecord()))))
-        }
-
-        assertEquals(HttpStatusCode.OK, response.status)
     }
 
     @Test

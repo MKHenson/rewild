@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run ts-check)",
+      "Bash(npx jest)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm run test:fast)"
+    ]
+  }
+}

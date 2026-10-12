@@ -24,10 +24,6 @@ export async function addLevel(token: Partial<ILevel>) {
   return await db.levels.add(token as ILevel);
 }
 
-export async function deleteLevel(id: string) {
-  await db.levels.remove(id);
-}
-
 export async function patchLevel(id: string, token: Partial<ILevel>) {
   await db.levels.patch(id, token as ILevel);
 }

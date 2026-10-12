@@ -1,8 +1,15 @@
+import type { SyncableRecord } from 'models';
 import { authService } from '../api/auth/auth-service';
+import { deleteServerProject } from '../api/projects';
 import { SyncEngine } from '../api/sync/sync-engine';
 import { LocalAssetStore } from './local-asset-store';
 import { LocalLevelTable } from './local-level-table';
 import { LocalProjectTable } from './local-project-table';
+
+/** True once a record has reached the server at least once. */
+export function isSavedOnServer(record: SyncableRecord): boolean {
+  return record.syncedAt > 0;
+}
 
 export class Database {
   readonly projects = new LocalProjectTable();
@@ -28,6 +35,24 @@ export class Database {
       // The asset pull needs the server to know the level clears first, so a
       // failed record sync skips it.
       if (await this.sync.run()) await this.assets.sync();
+    });
+  }
+
+  /**
+   * Deletes a project, its levels and their files. A project saved on the
+   * server is deleted there first, and a failure leaves the local copy in place.
+   */
+  deleteProject(id: string): Promise<void> {
+    return this.exclusive(async () => {
+      const project = await this.projects.getOne(id);
+      if (!project) return;
+      if (isSavedOnServer(project)) await deleteServerProject(id);
+
+      const levels = await this.levels.getMany({
+        where: [['projectId', '==', id]],
+      });
+      for (const level of levels.items) await this.levels.hardRemove(level.id);
+      await this.projects.hardRemove(id);
     });
   }
 

@@ -364,59 +364,18 @@ describe('Local database tests', () => {
     expect(allRows.items[0].name).toEqual('Cleo 0');
   });
 
-  it('remove returns false for a non-existent id', async () => {
-    const local = getLocalTable();
-    const result = await local.remove('does-not-exist');
-    expect(result).toBe(false);
-  });
-
-  it('remove soft-deletes the item: getOne returns null but record is kept as a tombstone', async () => {
-    const local = getLocalTable();
-    const item = await local.add({ type: 'remove-cat' });
-
-    const removed = await local.remove(item.id);
-    expect(removed).toBe(true);
-
-    const fetched = await local.getOne(item.id);
-    expect(fetched).toBeNull();
-  });
-
-  describe('soft delete (tombstoning)', () => {
-    it('remove sets deletedAt and bumps updatedAt so the tombstone is dirty', async () => {
-      const local = getLocalTable();
-      const item = await local.add({ type: 'dirty-tombstone-cat' });
-      await local.markSynced(item.id, item.updatedAt, null); // make it clean
-
-      const before = Date.now();
-      await local.remove(item.id);
-
-      const dirty = await local.getDirty();
-      const tombstone = dirty.find((r) => r.id === item.id);
-      expect(tombstone).toBeDefined();
-      expect(tombstone!.deletedAt).toBeGreaterThanOrEqual(before);
-      expect(tombstone!.updatedAt).toBeGreaterThanOrEqual(before);
-    });
-
-    it('getMany excludes tombstoned records', async () => {
+  describe('tombstones', () => {
+    it('getOne and getMany exclude tombstoned records', async () => {
       const local = getLocalTable();
       const live = await local.add({ type: 'tombstone-visible-cat' });
       const deleted = await local.add({ type: 'tombstone-visible-cat' });
-      await local.remove(deleted.id);
+      await local.putSynced({ ...deleted, deletedAt: Date.now() }, Date.now());
 
       const rows = await local.getMany({ where: [['type', '==', 'tombstone-visible-cat']] });
       const ids = rows.items.map((i) => i.id);
       expect(ids).toContain(live.id);
       expect(ids).not.toContain(deleted.id);
-    });
-
-    it('getDirty includes tombstoned records so they are pushed to the server', async () => {
-      const local = getLocalTable();
-      const item = await local.add({ type: 'sync-tombstone-cat' });
-      await local.markSynced(item.id, item.updatedAt, null); // clean
-      await local.remove(item.id); // soft delete — dirty again
-
-      const dirty = await local.getDirty();
-      expect(dirty.map((r) => r.id)).toContain(item.id);
+      expect(await local.getOne(deleted.id)).toBeNull();
     });
 
     it('hardRemove physically deletes the record so getDirty does not include it', async () => {

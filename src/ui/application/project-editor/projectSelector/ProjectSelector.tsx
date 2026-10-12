@@ -1,4 +1,4 @@
-import { IProject } from 'models';
+import { IProject, StoredRecord } from 'models';
 import {
   Loading,
   Card,
@@ -13,6 +13,8 @@ import { NewProjectForm } from '../NewProjectForm';
 import { projectsStore } from '../../../stores/ProjectsStore';
 import { ProjectStore } from 'src/ui/stores/ProjectStore';
 import { confirmationStore } from '../../../stores/ConfirmationStore';
+import { authStore } from '../../../stores/AuthStore';
+import { isSavedOnServer } from 'src/database/database';
 
 interface Props {
   open: boolean;
@@ -24,6 +26,11 @@ interface Props {
 export class ProjectSelector extends Component<Props> {
   init() {
     this.on(projectsStore.dispatcher);
+    this.on(authStore.dispatcher);
+
+    // A project saved on the server is deleted there, which needs a login.
+    const canDelete = (project: StoredRecord<IProject>) =>
+      !isSavedOnServer(project) || authStore.loggedIn;
 
     const onCreate = async () => {
       await projectsStore.addProject(newProject()!);
@@ -36,8 +43,8 @@ export class ProjectSelector extends Component<Props> {
         'Delete Project',
         `Are you sure you want to delete "${project.name}"? This action cannot be undone.`,
         async () => {
-          await projectsStore.removeProjects(project.id!);
-          setSelectedProject(null);
+          if (await projectsStore.deleteProject(project.id))
+            setSelectedProject(null);
         },
         { okLabel: 'Delete', okColor: 'error' }
       );
@@ -66,7 +73,7 @@ export class ProjectSelector extends Component<Props> {
       null
     );
     const [selectedProject, setSelectedProject] =
-      this.useState<IProject | null>(null);
+      this.useState<StoredRecord<IProject> | null>(null);
 
     return () => {
       const isProjectSelected = !!selectedProject();
@@ -143,7 +150,7 @@ export class ProjectSelector extends Component<Props> {
             </div>
 
             <div class="actions">
-              {isProjectSelected && (
+              {isProjectSelected && canDelete(selectedProject()!) && (
                 <Button
                   color="error"
                   variant="text"

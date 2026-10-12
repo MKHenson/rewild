@@ -1,21 +1,19 @@
-import { ILevel, IProject } from 'models';
+import { ILevel, IProject, StoredRecord } from 'models';
 import {
   addLevel,
   addProject as addProjectApi,
-  getProject,
-  deleteLevel,
-  deleteProject,
   getProjects as getProjectsApi,
   patchProject,
 } from '../../api';
 import { Dispatcher } from 'rewild-common';
+import { db } from '../../database/database';
 
 export type ProjectsStoreEvents = { kind: 'changed' };
 
 export class ProjectsStore {
   loading = false;
   error?: string;
-  projects: IProject[] = [];
+  projects: StoredRecord<IProject>[] = [];
 
   readonly dispatcher = new Dispatcher<ProjectsStoreEvents>();
 
@@ -56,22 +54,24 @@ export class ProjectsStore {
     this.dispatcher.dispatch({ kind: 'changed' });
   }
 
-  async removeProjects(id: string) {
+  /** Resolves false when the delete failed; `error` says why. */
+  async deleteProject(id: string): Promise<boolean> {
     this.loading = true;
     this.error = '';
     this.dispatcher.dispatch({ kind: 'changed' });
 
+    let deleted = true;
     try {
-      const project = await getProject(id);
-      await deleteProject(id);
-      await deleteLevel(project!.levelId);
+      await db.deleteProject(id);
       await this.getProjects();
     } catch (err: any) {
-      this.error = err.toString();
+      this.error = err instanceof Error ? err.message : String(err);
+      deleted = false;
     }
 
     this.loading = false;
     this.dispatcher.dispatch({ kind: 'changed' });
+    return deleted;
   }
 
   async updateProject(project: IProject) {
