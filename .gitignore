@@ -10,7 +10,7 @@ public/
 *.log
 
 .env
-
+.claude/
 node_modules/
 build/
 # Anchored: this is the root art directory (large binaries, kept out of git).
