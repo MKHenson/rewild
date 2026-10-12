@@ -61,6 +61,16 @@ describe('Popup', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('does not call onClose on a background click when backgroundCanClose is false', async () => {
+    const onClose = jest.fn();
+    const popup = createPopup({ open: true, onClose, backgroundCanClose: false });
+
+    const wrapper = popup.shadow?.querySelector('.wrapper') as HTMLDivElement;
+    await fireClick(wrapper);
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   describe('portal (top layer)', () => {
     // jsdom has no Popover API, so mock it to exercise the top-layer path.
     // Mocks must be installed before _createRenderer(), which runs init().

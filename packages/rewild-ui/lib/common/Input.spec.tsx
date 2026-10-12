@@ -25,6 +25,17 @@ describe('Input', () => {
     expect(input?.value).toBe('hello');
   });
 
+  it('applies the placeholder', () => {
+    const inputCmp = new Input({ props: { placeholder: 'Project name' } });
+
+    inputCmp._createRenderer();
+    inputCmp.render();
+
+    expect(inputCmp.shadow?.querySelector('input')?.placeholder).toBe(
+      'Project name'
+    );
+  });
+
   it('calls onChange with latest input value', async () => {
     const onChange = jest.fn();
     const props: InputProps = { onChange };

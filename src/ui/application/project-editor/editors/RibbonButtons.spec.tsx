@@ -2,14 +2,16 @@ import 'rewild-ui/compiler/jsx';
 import { RibbonButtons } from './RibbonButtons';
 import { projectStore } from '../../../stores/ProjectStore';
 import { sculptStore } from '../../../stores/SculptStore';
+import { db } from 'src/database/database';
 
 function buttonsOf(ribbon: RibbonButtons): HTMLElement[] {
   return Array.from(ribbon.shadow!.querySelectorAll('x-button'));
 }
 
-const SAVE = 1;
-const PLAY = 3;
-const SCULPT = 5;
+const SETTINGS = 1;
+const SAVE = 2;
+const PLAY = 4;
+const SCULPT = 6;
 
 describe('RibbonButtons', () => {
   beforeEach(() => {
@@ -59,6 +61,25 @@ describe('RibbonButtons', () => {
 
     for (const button of buttonsOf(ribbon).slice(PLAY + 1))
       expect(button.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('opens the project settings', async () => {
+    jest
+      .spyOn(db.levels, 'getMany')
+      .mockResolvedValue({ items: [], cursor: 0 } as never);
+    projectStore.project = {
+      id: 'p1',
+      name: 'P',
+      sceneGraph: { terrain: {} },
+    } as any;
+    const ribbon = createRibbon();
+
+    buttonsOf(ribbon)[SETTINGS].click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(
+      ribbon.shadow!.querySelector('x-project-settings-dialog')
+    ).not.toBeNull();
   });
 
   it('plays the open project', async () => {

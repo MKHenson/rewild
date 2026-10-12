@@ -3,7 +3,6 @@ declare module 'models' {
     | 'properties'
     | 'ribbon'
     | 'scene-graph'
-    | 'project-settings'
     | 'actors'
     | 'viewport';
   import type { IDragDropAction, ITreeNode, IconType } from 'rewild-ui';

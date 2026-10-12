@@ -4,6 +4,8 @@ import { theme } from '../theme';
 export interface PopupProps {
   open: boolean;
   withBackground?: boolean;
+  /** Clicking the backdrop calls onClose. Defaults to true. */
+  backgroundCanClose?: boolean;
   /**
    * When true (the default) the popup is promoted to the browser's top layer
    * (via the Popover API) so it renders above everything and escapes any
@@ -37,7 +39,9 @@ export class Popup extends Component<PopupProps> {
     return () => {
       const handleClick = (e: MouseEvent) => {
         if ((e.target as HTMLElement).classList.contains('wrapper')) {
-          this.props.onClose && this.props.onClose();
+          if (this.props.backgroundCanClose !== false) {
+            this.props.onClose && this.props.onClose();
+          }
         }
       };
 

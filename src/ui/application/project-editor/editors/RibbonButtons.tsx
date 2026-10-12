@@ -15,6 +15,7 @@ import { biomePaintStore } from '../../../stores/BiomePaintStore';
 import { scatterPaintStore } from '../../../stores/ScatterPaintStore';
 import { waterBrushStore } from '../../../stores/WaterBrushStore';
 import { TerrainSettingsDialog } from './TerrainSettingsDialog';
+import { ProjectSettingsDialog } from './ProjectSettingsDialog';
 
 interface Props {
   onHome: () => void;
@@ -31,7 +32,10 @@ export class RibbonButtons extends Component<Props> {
     this.on(scatterPaintStore.dispatcher, () => this.render());
     this.on(waterBrushStore.dispatcher, () => this.render());
 
-    const [terrainOpen, setTerrainOpen] = this.useState(false);
+    const [openDialog, setOpenDialog] = this.useState<
+      'project' | 'terrain' | null
+    >(null);
+    const closeDialog = () => setOpenDialog(null);
 
     // Built once and updated in place. Rebuilding on every store change would
     // swap a button out between its mousedown and mouseup whenever the press
@@ -65,7 +69,8 @@ export class RibbonButtons extends Component<Props> {
       if (projectStore.dirty) await projectStore.updateProject();
       navigate(`/game/${projectStore.project!.id}`);
     });
-    const terrain = iconButton('mountain-snow', () => setTerrainOpen(true));
+    const settings = iconButton('settings', () => setOpenDialog('project'));
+    const terrain = iconButton('mountain-snow', () => setOpenDialog('terrain'));
     const brushButtons = brushes.map((store, i) =>
       iconButton(
         (['trending-up-down', 'paintbrush', 'trees', 'droplets'] as const)[i],
@@ -75,14 +80,18 @@ export class RibbonButtons extends Component<Props> {
 
     const dialogSlot = (<div />) as HTMLDivElement;
     let dialog: HTMLElement | null = null;
+    let dialogKind: 'project' | 'terrain' | null = null;
 
     const elm = (
       <Card stretched>
         <ButtonGroup>
           {home}
+          {settings}
           {save}
           {publish}
+          <span class="separator" />
           {play}
+          <span class="separator" />
           {terrain}
           {brushButtons[0]}
           {brushButtons[1]}
@@ -101,20 +110,23 @@ export class RibbonButtons extends Component<Props> {
       save.disabled = !dirty || loading;
       publish.disabled = loading;
       play.disabled = loading || !projectStore.project;
+      settings.disabled = loading || !projectStore.project;
       terrain.disabled = noTerrain;
       brushButtons.forEach((button, i) => {
         button.disabled = noTerrain;
         button.classList.toggle('sculpt-active', brushes[i].enabled);
       });
 
-      if (terrainOpen() && !dialog) {
-        dialog = (
-          <TerrainSettingsDialog onClose={() => setTerrainOpen(false)} />
-        ) as HTMLElement;
-        dialogSlot.appendChild(dialog);
-      } else if (!terrainOpen() && dialog) {
-        dialog.remove();
-        dialog = null;
+      if (openDialog() !== dialogKind) {
+        dialog?.remove();
+        dialogKind = openDialog();
+        dialog =
+          dialogKind === 'project' ? (
+            <ProjectSettingsDialog onClose={closeDialog} />
+          ) : dialogKind === 'terrain' ? (
+            <TerrainSettingsDialog onClose={closeDialog} />
+          ) : null;
+        if (dialog) dialogSlot.appendChild(dialog);
       }
 
       return elm;
@@ -143,6 +155,13 @@ const StyledRibbonButtons = cssStylesheet(css`
 
   x-button:hover {
     color: ${theme?.colors.onSurface};
+  }
+
+  .separator {
+    align-self: stretch;
+    width: 1px;
+    margin: 6px 6px;
+    background: ${theme?.colors.onSurfaceBorder};
   }
 
   x-button.sculpt-active,
