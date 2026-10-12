@@ -1,5 +1,6 @@
 import { Component, register } from '../Component';
 import { underlineField } from './fieldStyle';
+import { theme } from '../theme';
 
 interface Props {
   value?: string;
@@ -47,6 +48,7 @@ export class Input extends Component<Props> {
       input.autofocus = this.props.autoFocus || false;
       input.disabled = this.props.disabled || false;
       input.value = this.props.value?.toString() || '';
+      input.placeholder = this.props.placeholder || '';
       input.onclick = onClick;
       input.onchange = this.props.onChange
         ? (e) => this.props.onChange!(input.value)
@@ -82,6 +84,11 @@ const StyledInput = cssStylesheet(css`
   }
 
   ${underlineField('input', 'input:focus', 'input:disabled')}
+
+  input::placeholder {
+    color: ${theme.colors.onSurfaceLighter};
+    opacity: 1;
+  }
 
   input[readonly] {
     border-bottom-color: transparent;

@@ -20,6 +20,9 @@ export interface ModalProps {
   cancelVariant?: ButtonVariant;
   hideOk?: boolean;
   hideCancel?: boolean;
+  okDisabled?: boolean;
+  cancelDisabled?: boolean;
+  backgroundCanClose?: boolean;
   onClose?: () => void;
   onCancel?: () => void;
   onOk?: () => void;
@@ -51,7 +54,8 @@ export class Modal extends Component<ModalProps> {
         onClose={this.props.onClose}
         withBackground={this.props.withBackground}
         portal={this.props.portal}
-        css={this.props.css}>
+        css={this.props.css}
+        backgroundCanClose={this.props.backgroundCanClose}>
         {typeof this.props.title === 'string' ? (
           <Typography variant="h3">{this.props.title}</Typography>
         ) : (
@@ -66,6 +70,7 @@ export class Modal extends Component<ModalProps> {
               <Button
                 onClick={handleCancel}
                 class="cancel"
+                disabled={this.props.cancelDisabled}
                 variant={this.props.cancelVariant || 'text'}>
                 {this.props.cancelLabel || 'Cancel'}
               </Button>
@@ -74,6 +79,7 @@ export class Modal extends Component<ModalProps> {
               <Button
                 onClick={handleOk}
                 class="ok"
+                disabled={this.props.okDisabled}
                 color={this.props.okColor}
                 variant={this.props.okVariant}>
                 {this.props.okLabel || 'Okay'}

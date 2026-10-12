@@ -2,7 +2,6 @@ import { RibbonButtons } from './editors/RibbonButtons';
 import { EditorType } from 'models';
 import { Loading, Component, register, InfoBox, SplitPane } from 'rewild-ui';
 import { SceneGraph } from './editors/SceneGraph';
-import { ProjectSettings } from './editors/ProjectSettings';
 import { projectStore } from '../../stores/ProjectStore';
 import { Properties } from './editors/Properties';
 import { ActorsTree } from './editors/ActorsTree';
@@ -30,7 +29,6 @@ export class PaneManager extends Component<Props> {
       properties: <Properties />,
       'scene-graph': <SceneGraph />,
       viewport: <EditorViewport />,
-      'project-settings': <ProjectSettings />,
       ribbon: <RibbonButtons onHome={this.props.onHome} />,
       actors: <ActorsTree />,
     };
@@ -53,10 +51,8 @@ export class PaneManager extends Component<Props> {
                 pane1={
                   <SplitPane
                     mode="horizontal"
-                    pane1={editors['project-settings']}
-                    pane2={editors.actors}
-                    pane1Title="Project Settings"
-                    pane2Title="Actors"
+                    pane1={editors.actors}
+                    pane1Title="Actors"
                   />
                 }
                 pane2={editors.viewport}

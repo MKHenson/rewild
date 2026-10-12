@@ -112,6 +112,21 @@ describe('Modal', () => {
     expect(okBtn._props?.color).toBe('error');
   });
 
+  it('disables the ok and cancel buttons', () => {
+    const modal = createModal({
+      open: true,
+      okDisabled: true,
+      cancelDisabled: true,
+    });
+
+    const buttons = modal.shadow!.querySelectorAll('x-popup x-button');
+    const [cancelBtn, okBtn] = Array.from(buttons) as (HTMLElement & {
+      _props?: any;
+    })[];
+    expect(cancelBtn._props?.disabled).toBe(true);
+    expect(okBtn._props?.disabled).toBe(true);
+  });
+
   it('passes okVariant to the ok button', () => {
     const modal = createModal({ open: true, okVariant: 'outlined' });
 
