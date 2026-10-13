@@ -12,6 +12,12 @@ export async function getProjects(cursor?: any) {
   return resp.items;
 }
 
+/** Every project on this device, newest first. */
+export async function getAllProjects() {
+  const resp = await db.projects.getMany({ sort: [['updatedAt', 'desc']] });
+  return resp.items;
+}
+
 export async function getProject(id: string) {
   const project = await db.projects.getOne(id);
   return project;
