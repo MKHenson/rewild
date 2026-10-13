@@ -19,22 +19,24 @@ class AssetService(
     private val bucketBaseUrl: String
 ) {
     fun listConfirmed(userId: String): List<Asset> = transaction {
-        AssetsTable.selectAll()
+        AssetsTable.join(LevelsTable, JoinType.INNER, AssetsTable.levelId, LevelsTable.id)
+            .selectAll()
             .where { (AssetsTable.userId eq userId) and (AssetsTable.confirmed eq true) }
             .map { it.toAsset() }
     }
 
     // Returns null if the levelId doesn't belong to the user.
     fun requestUploadUrl(userId: String, levelId: String, assetType: String, filename: String): UploadUrlResponse? = transaction {
-        val levelOwned = LevelsTable.selectAll()
+        // A deleted level takes no new files: they would outlive its cleanup.
+        val projectId = LevelsTable.selectAll()
             .where {
                 (LevelsTable.id eq levelId) and (LevelsTable.userId eq userId) and LevelsTable.deletedAt.isNull()
             }
-            .count() > 0
-        // A deleted level takes no new files: they would outlive its cleanup.
-        if (!levelOwned) return@transaction null
+            .firstOrNull()
+            ?.get(LevelsTable.projectId)
+            ?: return@transaction null
 
-        val storageKey = "levels/$levelId/$assetType/$filename"
+        val storageKey = "${StorageKeys.level(userId, projectId, levelId)}$assetType/$filename"
         val id = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
 
@@ -91,6 +93,7 @@ class AssetService(
 
     private fun ResultRow.toAsset() = Asset(
         id = this[AssetsTable.id],
+        projectId = this[LevelsTable.projectId],
         levelId = this[AssetsTable.levelId],
         assetType = this[AssetsTable.assetType],
         filename = this[AssetsTable.filename],

@@ -32,7 +32,7 @@ In this doc, "admin" always means a super admin: `UserRole.SUPER_ADMIN`, checked
 | Delete             | A project saved on the server is deleted through the API, by its logged in owner. A local only project is deleted on the device                                   |
 | Flagged project    | The project cannot be played or shared. Players see a general message that tells them to contact an admin                                                         |
 | List order         | Projects sort by `updatedAt`, newest first                                                                                                                        |
-| Project image      | The owner uploads an image in Project Settings. It is stored in the bucket under the user and the project. A new image deletes the old one. Size limit: 2 MB      |
+| Project image      | The owner sets an image in Project Settings. It syncs to the bucket under the user and the project. A new image deletes the old one. Size limit: 2 MB           |
 | Bucket layout      | All project files live under `users/{userId}/projects/{projectId}/`, level files too. There are no live projects, so there is no data migration                   |
 
 ---
@@ -76,8 +76,10 @@ The project settings pane (`ProjectSettings.tsx`) was temporary. It moves into a
 
 ### Project image
 
-- The owner picks an image file. The client uploads it to the bucket, then the image shows at once.
-- The upload control shows only for logged in users and projects saved on the server, the same rule as sharing. Other projects show a placeholder image.
+- The owner picks an image file, logged in or not. The client checks the type and size, stores it in the asset store and shows it at once.
+- The image syncs with the other assets, after the project records. The push sends it to the project image endpoints, sets `imageUrl` on the local project and removes the local file. A failed upload keeps the file dirty for the next sync.
+- Other devices get the image URL with the project record. They do not store the image file.
+- A project with no image shows a placeholder.
 - Story Mode, My Games and the admin Projects tab show the image, or the placeholder.
 
 ### Sharing tab
@@ -146,7 +148,8 @@ users/{userId}/projects/{projectId}/
 
 - `AssetService.requestUploadUrl` builds the new level key. It looks up the level's `projectId` and owner.
 - `AssetCleanupService.prefixFor` uses the new prefix. A project delete can remove the whole `users/{userId}/projects/{projectId}/` prefix.
-- The client does not change. It treats `storageKey` as an opaque value.
+- The client's asset store uses the same layout in OPFS, under `projects/{projectId}/`. Level files and the project image are both assets. An image asset has no level.
+- `GET /api/assets` returns each asset's `projectId`, so the pull can place the file.
 - Existing dev data under `levels/` is removed. There are no live projects to migrate.
 
 ### Project image
@@ -278,8 +281,8 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
 
 - [ ] **4. Bucket layout and project image**
 
-  - Scope: level files move to `users/{userId}/projects/{projectId}/levels/{levelId}/...` in `AssetService` and `AssetCleanupService`. Remove the old dev data under `levels/`. Then the project image: the `image_key` column, the upload URL and confirm endpoints, and the bucket key `users/{userId}/projects/{projectId}/image/{uuid}.{ext}`. A new image queues the old one for deletion. The project delete from ticket 2 deletes the image. The General tab gets the image upload control and a placeholder.
-  - Expect: all files for a project are under one bucket prefix, and a project delete removes that prefix. The owner uploads a PNG, JPEG or WebP image up to 2 MB and sees it at once. The bucket holds one image for each project. A file of the wrong type or size is rejected with a message.
+  - Scope: level files move to `users/{userId}/projects/{projectId}/levels/{levelId}/...` in `AssetService` and `AssetCleanupService`. Remove the old dev data under `levels/`. Then the project image: the `image_key` column, the upload URL and confirm endpoints, and the bucket key `users/{userId}/projects/{projectId}/image/{uuid}.{ext}`. A new image queues the old one for deletion. The project delete from ticket 2 deletes the image. The General tab gets the image control and a placeholder. The image is stored on the device and syncs like other project files.
+  - Expect: all files for a project are under one bucket prefix, and a project delete removes that prefix. The owner sets a PNG, JPEG or WebP image up to 2 MB, logged in or not, and sees it at once. The next sync uploads it. The bucket holds one image for each project. A file of the wrong type or size is rejected with a message.
   - Depends on: 2, 3.
 
 - [ ] **5. Public game: server and `/admin/public`**

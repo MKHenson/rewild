@@ -7,9 +7,10 @@ import {
   serializePaintMask,
 } from 'rewild-renderer/lib/renderers/terrain/PaintMask';
 import { db } from './database';
+import type { LevelRef } from './local-asset-store';
 
 // Storage name on the asset path, beside the chunk's height snapshot and biome
-// mask: levels/{levelId}/chunk/{cx}_{cy}.scatter.bin.
+// mask: projects/{projectId}/levels/{levelId}/chunk/{cx}_{cy}.scatter.bin.
 //
 // Its own blob for the same reason the biome mask has one: a chunk can be
 // planted without ever being sculpted or repainted, and three files means none
@@ -22,10 +23,10 @@ export function scatterMaskFilename(cx: number, cy: number): string {
 // is populated from the bucket by the existing sync() pull — and resolves null
 // when the chunk has never been planted (or the blob is unusable), which leaves
 // the chunk scattering from its biome rules alone.
-export function createScatterMaskProvider(levelId: string): PaintMaskProvider {
+export function createScatterMaskProvider(level: LevelRef): PaintMaskProvider {
   return async (cx: number, cy: number) => {
     const buffer = await db.assets.read(
-      levelId,
+      level,
       'chunk',
       scatterMaskFilename(cx, cy)
     );
@@ -46,13 +47,13 @@ export function createScatterMaskProvider(levelId: string): PaintMaskProvider {
 // Persists a chunk's painted scatter density on the asset path, with the same
 // local-first semantics as writeBiomeMask. Returns the asset id.
 export function writeScatterMask(
-  levelId: string,
+  level: LevelRef,
   cx: number,
   cy: number,
   mask: PaintMask
 ): Promise<string> {
   return db.assets.write(
-    levelId,
+    level,
     'chunk',
     scatterMaskFilename(cx, cy),
     serializePaintMask(mask)

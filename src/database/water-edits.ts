@@ -7,9 +7,10 @@ import {
   serializeWaterEdit,
 } from 'rewild-renderer/lib/renderers/terrain/WaterEdit';
 import { db } from './database';
+import type { LevelRef } from './local-asset-store';
 
 // Storage name on the asset path, beside the chunk's height snapshot and masks:
-// levels/{levelId}/chunk/{cx}_{cy}.water.bin.
+// projects/{projectId}/levels/{levelId}/chunk/{cx}_{cy}.water.bin.
 export function waterEditFilename(cx: number, cy: number): string {
   return `${cx}_${cy}.water.bin`;
 }
@@ -18,10 +19,10 @@ export function waterEditFilename(cx: number, cy: number): string {
 // is populated from the bucket by sync() — and resolves null when the chunk's
 // water has never been edited (or the blob is unusable), which leaves the chunk
 // with its generated water.
-export function createWaterEditProvider(levelId: string): WaterEditProvider {
+export function createWaterEditProvider(level: LevelRef): WaterEditProvider {
   return async (cx: number, cy: number) => {
     const buffer = await db.assets.read(
-      levelId,
+      level,
       'chunk',
       waterEditFilename(cx, cy)
     );
@@ -39,13 +40,13 @@ export function createWaterEditProvider(levelId: string): WaterEditProvider {
 // Persists a chunk's water edit on the asset path, local first with the same
 // semantics as writeBiomeMask. Returns the asset id.
 export function writeWaterEdit(
-  levelId: string,
+  level: LevelRef,
   cx: number,
   cy: number,
   edit: WaterEdit
 ): Promise<string> {
   return db.assets.write(
-    levelId,
+    level,
     'chunk',
     waterEditFilename(cx, cy),
     serializeWaterEdit(edit)

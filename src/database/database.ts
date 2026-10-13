@@ -34,9 +34,25 @@ export class Database {
     return this.exclusive(async () => {
       // The asset pull needs the server to know the level clears first, so a
       // failed record sync skips it.
-      if (await this.sync.run()) await this.assets.sync();
+      if (await this.sync.run()) await this.assets.sync(this.setImageUrl);
     });
   }
+
+  /** Stores a project image on the device. The next sync uploads it. */
+  setProjectImage(projectId: string, file: File): Promise<void> {
+    return this.exclusive(() => this.assets.writeProjectImage(projectId, file));
+  }
+
+  /** The image picked on this device and not yet uploaded, or null. */
+  getPendingProjectImage(projectId: string): Promise<File | null> {
+    return this.assets.readProjectImage(projectId);
+  }
+
+  // Keeps the record's dirty state: only the server sets imageUrl.
+  private setImageUrl = async (projectId: string, imageUrl: string) => {
+    const project = await this.projects.getOne(projectId);
+    if (project) await this.projects.putSynced({ ...project, imageUrl }, project.syncedAt);
+  };
 
   /**
    * Deletes a project, its levels and their files. A project saved on the
@@ -52,6 +68,7 @@ export class Database {
         where: [['projectId', '==', id]],
       });
       for (const level of levels.items) await this.levels.hardRemove(level.id);
+      await this.assets.removeByProject(id);
       await this.projects.hardRemove(id);
     });
   }

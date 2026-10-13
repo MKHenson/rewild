@@ -1,9 +1,11 @@
-import { apiFetch } from '../auth/api-client';
+import { apiFetch, responseError } from '../auth/api-client';
 import type { components } from '../../types/api';
 
 type UploadUrlResponse =
   components['schemas']['com.rewild.models.UploadUrlResponse'];
 type ServerAsset = components['schemas']['com.rewild.models.Asset'];
+type ImageUploadRequest = components['schemas']['com.rewild.models.ProjectImageUploadRequest'];
+type ImageResponse = components['schemas']['com.rewild.models.ProjectImageResponse'];
 
 // Step 1 of upload: server validates level ownership, inserts an unconfirmed
 // asset record, and returns a presigned PUT URL for direct upload to object
@@ -40,4 +42,46 @@ export async function listServerAssets(): Promise<ServerAsset[]> {
   const res = await apiFetch('/api/assets');
   if (!res.ok) throw new Error(`list assets failed: ${res.status}`);
   return res.json();
+}
+
+export const PROJECT_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+export const MAX_PROJECT_IMAGE_BYTES = 2 * 1024 * 1024;
+
+/** Returns why the file cannot be a project image, or null when it can. */
+export function projectImageProblem(file: File): string | null {
+  if (!PROJECT_IMAGE_TYPES.includes(file.type))
+    return 'The image must be a PNG, JPEG or WebP file';
+  if (file.size > MAX_PROJECT_IMAGE_BYTES) return 'The image must be 2 MB or smaller';
+  return null;
+}
+
+/** Uploads the image of a project saved on the server. Resolves to its URL. */
+export async function uploadProjectImage(projectId: string, file: File): Promise<string> {
+  const problem = projectImageProblem(file);
+  if (problem) throw new Error(problem);
+
+  const base = `/api/projects/${encodeURIComponent(projectId)}/image`;
+  const urlRes = await apiFetch(`${base}/upload-url`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contentType: file.type, size: file.size } satisfies ImageUploadRequest),
+  });
+  if (!urlRes.ok) throw await responseError(urlRes, 'Could not upload the image');
+  const { uploadUrl, storageKey } = (await urlRes.json()) as UploadUrlResponse;
+
+  const putRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  });
+  if (!putRes.ok) throw new Error(`Could not upload the image (${putRes.status})`);
+
+  const confirmRes = await apiFetch(`${base}/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ storageKey }),
+  });
+  if (!confirmRes.ok) throw await responseError(confirmRes, 'Could not upload the image');
+  const { imageUrl } = (await confirmRes.json()) as ImageResponse;
+  return imageUrl;
 }

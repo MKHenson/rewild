@@ -45,6 +45,7 @@ import { projectStore } from 'src/ui/stores/ProjectStore';
 import { waterBrushStore } from 'src/ui/stores/WaterBrushStore';
 import { BrushCursor, pickTerrain } from './BrushCursor';
 import { ChunkHeightLoader } from './ChunkHeights';
+import { startLevelRef } from 'src/database/local-asset-store';
 
 // Stamp pacing, mirroring the paint brushes.
 const MAX_STAMP_DT = 0.1; // seconds
@@ -257,18 +258,18 @@ export class TerrainWaterBrushController {
     const stroke = this.stroke;
     this.stroke = null;
     if (!stroke) return;
-    const levelId = projectStore.project?.levelId;
+    const level = startLevelRef(projectStore.project);
     const rules = this.renderer.terrainRenderer.waterRules;
 
     if (stroke.kind === 'level') {
       if (!(await stroke.picking)) return;
       while (stroke.applying) await stroke.applying;
-      if (!levelId) return this.warnUnsaved();
+      if (!level) return this.warnUnsaved();
       await Promise.all([
         ...[...stroke.chunks.values()].map((t) =>
-          writeWaterEdit(levelId, t.cx, t.cy, t.edit)
+          writeWaterEdit(level, t.cx, t.cy, t.edit)
         ),
-        writeWaterBodies(levelId, rules.savedBodies()),
+        writeWaterBodies(level, rules.savedBodies()),
       ]);
       this.markDirty();
       return;
@@ -278,19 +279,19 @@ export class TerrainWaterBrushController {
     else if (stroke.type === 'reset') this.bankCut(stroke);
 
     if (stroke.touched.size === 0 && stroke.heights.size === 0) return;
-    if (!levelId) return this.warnUnsaved();
+    if (!level) return this.warnUnsaved();
     const size = this.renderer.terrainRenderer.mapChunkSizeLod;
     await Promise.all([
       ...[...stroke.touched.values()].map((t) =>
-        writeWaterEdit(levelId, t.cx, t.cy, t.edit)
+        writeWaterEdit(level, t.cx, t.cy, t.edit)
       ),
       ...[...stroke.heights.values()].map((t) =>
-        writeChunkSnapshot(levelId, t.cx, t.cy, t.heights, size)
+        writeChunkSnapshot(level, t.cx, t.cy, t.heights, size)
       ),
     ]);
     if (stroke.newBody) {
       await rules.setRecord(stroke.newBody);
-      await writeWaterBodies(levelId, rules.savedBodies());
+      await writeWaterBodies(level, rules.savedBodies());
     }
     this.markDirty();
   }

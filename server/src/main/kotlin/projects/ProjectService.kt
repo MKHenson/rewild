@@ -16,7 +16,10 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 private val json = Json { ignoreUnknownKeys = true }
 
-class ProjectService(private val cleanup: AssetCleanupService? = null) {
+class ProjectService(
+    private val cleanup: AssetCleanupService? = null,
+    private val bucketBaseUrl: String = ""
+) {
 
     fun getAll(userId: String): List<Project> = transaction {
         ProjectsTable.selectAll()
@@ -79,7 +82,7 @@ class ProjectService(private val cleanup: AssetCleanupService? = null) {
     }
 
     // Tombstones the project and its levels, so the owner's other devices drop them on their
-    // next sync, then removes the levels' files.
+    // next sync, then removes every file under the project's prefix.
     fun delete(userId: String, id: String): DeleteResult {
         var levelIds = emptyList<String>()
         val result = transaction {
@@ -103,12 +106,13 @@ class ProjectService(private val cleanup: AssetCleanupService? = null) {
                 it[deletedAt] = now
                 it[updatedAt] = now
                 it[syncedAt] = now
+                it[imageKey] = null
             }
             DeleteResult.Success
         }
 
         // Only once the tombstones are committed: a rolled-back delete must not lose files.
-        if (result == DeleteResult.Success) levelIds.forEach { cleanup?.cleanupLevel(it) }
+        if (result == DeleteResult.Success) cleanup?.cleanupProject(userId, id, levelIds)
         return result
     }
 
@@ -123,6 +127,7 @@ class ProjectService(private val cleanup: AssetCleanupService? = null) {
         updatedAt = this[ProjectsTable.updatedAt],
         syncedAt = this[ProjectsTable.syncedAt],
         deletedAt = this[ProjectsTable.deletedAt],
-        syncError = this[ProjectsTable.syncError]
+        syncError = this[ProjectsTable.syncError],
+        imageUrl = this[ProjectsTable.imageKey]?.let { "$bucketBaseUrl/$it" }
     )
 }

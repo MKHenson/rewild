@@ -82,6 +82,7 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
     }
 
     fun delete(userId: String, id: String): DeleteResult {
+        var projectId = ""
         val result = transaction {
             val existing = LevelsTable.selectAll()
                 .where { LevelsTable.id eq id }
@@ -90,12 +91,13 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
 
             if (existing[LevelsTable.userId] != userId) return@transaction DeleteResult.Forbidden
 
+            projectId = existing[LevelsTable.projectId]
             LevelsTable.deleteWhere { LevelsTable.id eq id }
             DeleteResult.Success
         }
 
         // Only once the row is committed gone — a rolled-back delete must not lose blobs.
-        if (result == DeleteResult.Success) cleanup?.cleanupLevel(id)
+        if (result == DeleteResult.Success) cleanup?.cleanupLevel(userId, projectId, id)
         return result
     }
 

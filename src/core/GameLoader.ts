@@ -46,7 +46,8 @@ export async function loadInitialLevels(
     renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
     renderer.terrainRenderer.climatePreset =
       project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
-    renderer.terrainRenderer.seaLevel = project.sceneGraph.terrain.seaLevel ?? 0;
+    renderer.terrainRenderer.seaLevel =
+      project.sceneGraph.terrain.seaLevel ?? 0;
   }
 
   applyAtmosphere(renderer, project.sceneGraph.atmosphere);
@@ -54,23 +55,26 @@ export async function loadInitialLevels(
   registerDebugCommands(renderer, project);
 
   renderer.terrainRenderer.enabled = level ? level.hasTerrain : true;
-  renderer.terrainRenderer.snapshotProvider = level?.id
-    ? createChunkSnapshotProvider(level.id)
+  const levelRef = level?.id
+    ? { projectId: project.id, levelId: level.id }
     : null;
-  renderer.terrainRenderer.biomeMaskProvider = level?.id
-    ? createBiomeMaskProvider(level.id)
+  renderer.terrainRenderer.snapshotProvider = levelRef
+    ? createChunkSnapshotProvider(levelRef)
     : null;
-  renderer.terrainRenderer.scatterMaskProvider = level?.id
-    ? createScatterMaskProvider(level.id)
+  renderer.terrainRenderer.biomeMaskProvider = levelRef
+    ? createBiomeMaskProvider(levelRef)
     : null;
-  renderer.terrainRenderer.waterEditProvider = level?.id
-    ? createWaterEditProvider(level.id)
+  renderer.terrainRenderer.scatterMaskProvider = levelRef
+    ? createScatterMaskProvider(levelRef)
     : null;
-  renderer.terrainRenderer.waterBodyProvider = level?.id
-    ? createWaterBodyProvider(level.id)
+  renderer.terrainRenderer.waterEditProvider = levelRef
+    ? createWaterEditProvider(levelRef)
     : null;
-  renderer.terrainRenderer.scatterKillProvider = level?.id
-    ? createScatterKillProvider(level.id)
+  renderer.terrainRenderer.waterBodyProvider = levelRef
+    ? createWaterBodyProvider(levelRef)
+    : null;
+  renderer.terrainRenderer.scatterKillProvider = levelRef
+    ? createScatterKillProvider(levelRef)
     : null;
 
   const levelRouter = new InGameLevel(

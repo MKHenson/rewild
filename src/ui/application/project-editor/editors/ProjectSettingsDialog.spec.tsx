@@ -3,6 +3,7 @@ import { Input, Modal, Select } from 'rewild-ui';
 import { ProjectSettingsDialog } from './ProjectSettingsDialog';
 import { projectStore } from '../../../stores/ProjectStore';
 import { db } from 'src/database/database';
+import { authService } from '../../../../api/auth/auth-service';
 
 const LEVELS = [
   { id: 'level-1', name: 'Valley', projectId: 'p1' },
@@ -163,5 +164,86 @@ describe('ProjectSettingsDialog', () => {
     expect(projectStore.project!.name).toBe('Old name');
     expect(updateProject).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+  describe('image', () => {
+    let setProjectImage: jest.SpyInstance;
+    let syncAll: jest.SpyInstance;
+
+    const pickFile = (comp: ProjectSettingsDialog, file: File) => {
+      const input = comp.shadow!.querySelector(
+        'input[type="file"]'
+      ) as HTMLInputElement;
+      Object.defineProperty(input, 'files', { value: [file], configurable: true });
+      (input.onchange as () => void)();
+    };
+
+    const image = (comp: ProjectSettingsDialog) =>
+      comp.shadow!.querySelector('img.image') as HTMLImageElement | null;
+
+    const png = () => new File(['x'], 'cover.png', { type: 'image/png' });
+
+    beforeEach(() => {
+      URL.createObjectURL = jest.fn(() => 'blob:preview');
+      URL.revokeObjectURL = jest.fn();
+      setProjectImage = jest.spyOn(db, 'setProjectImage').mockResolvedValue();
+      syncAll = jest.spyOn(db, 'syncAll').mockResolvedValue();
+      jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
+      jest.spyOn(authService, 'getToken').mockReturnValue(null);
+    });
+
+    it('shows a placeholder and the upload control when there is no image', () => {
+      const { comp } = createDialog();
+
+      expect(comp.shadow!.querySelector('.placeholder')).not.toBeNull();
+      expect(comp.shadow!.textContent).toContain('Change Image');
+    });
+
+    it("shows the project's image", () => {
+      projectStore.project!.imageUrl = 'https://cdn/old.png';
+      const { comp } = createDialog();
+
+      expect(image(comp)!.src).toBe('https://cdn/old.png');
+    });
+
+    it('stores a picked image on the device and shows it at once, signed out', async () => {
+      const { comp } = createDialog();
+
+      pickFile(comp, png());
+      await flush();
+
+      expect(setProjectImage).toHaveBeenCalledWith('p1', expect.any(File));
+      expect(image(comp)!.src).toBe('blob:preview');
+      expect(comp.shadow!.textContent).toContain('Uploads when the project syncs');
+      expect(syncAll).not.toHaveBeenCalled();
+    });
+
+    it('starts a sync after a pick when signed in', async () => {
+      (authService.getToken as jest.Mock).mockReturnValue('token');
+      const { comp } = createDialog();
+
+      pickFile(comp, png());
+      await flush();
+
+      expect(syncAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows an image still waiting for upload', async () => {
+      (db.getPendingProjectImage as jest.Mock).mockResolvedValue(png());
+      projectStore.project!.imageUrl = 'https://cdn/old.png';
+      const { comp } = createDialog();
+      await flush();
+
+      expect(image(comp)!.src).toBe('blob:preview');
+    });
+
+    it('rejects a file of the wrong type with a message', async () => {
+      const { comp } = createDialog();
+
+      pickFile(comp, new File(['x'], 'cover.gif', { type: 'image/gif' }));
+      await flush();
+
+      expect(setProjectImage).not.toHaveBeenCalled();
+      expect(comp.shadow!.querySelector('.error')?.textContent).toContain('PNG');
+    });
   });
 });
