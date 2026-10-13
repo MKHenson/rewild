@@ -303,7 +303,7 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
   - Expect: any player, logged in or not, plays the public game from the main menu. Start is disabled when no game is promoted.
   - Depends on: 4, 6.
 
-- [ ] **8. `/launch` screen: My Games tab (own projects)**
+- [x] **8. `/launch` screen: My Games tab (own projects)**
 
   - Scope: a table of the player's projects, newest first, with a details side that shows the image, the author, the dates and the levels. Start opens `/game/{projectId}`.
   - Expect: a player starts any of their own projects from the main menu, logged in or not. The 'Shared Games' filter is not there yet.

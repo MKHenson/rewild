@@ -16,13 +16,16 @@ export interface TableProps<T> {
   emptyMessage?: string;
   /** Makes rows clickable and keyboard-activatable. */
   onRowClick?: (row: T) => void;
+  /** Highlights the rows it returns true for. */
+  isSelected?: (row: T) => boolean;
 }
 
 @register('x-table')
 export class Table<T = any> extends Component<TableProps<T>> {
   init() {
     return () => {
-      const { columns, rows, loading, emptyMessage, onRowClick } = this.props;
+      const { columns, rows, loading, emptyMessage, onRowClick, isSelected } =
+        this.props;
       const span = String(columns.length);
 
       let body: JSX.ChildElement | JSX.ChildElement[];
@@ -50,8 +53,14 @@ export class Table<T = any> extends Component<TableProps<T>> {
             </tr>
           ) as HTMLTableRowElement;
 
+          if (isSelected) {
+            const selected = isSelected(row);
+            tr.classList.toggle('selected', selected);
+            tr.setAttribute('aria-selected', String(selected));
+          }
+
           if (onRowClick) {
-            tr.className = 'clickable';
+            tr.classList.add('clickable');
             tr.tabIndex = 0;
             tr.onclick = () => onRowClick(row);
             tr.onkeydown = (e: KeyboardEvent) => {
@@ -141,6 +150,11 @@ const StyledTable = cssStylesheet(css`
 
   tr.clickable:hover {
     background: color-mix(in srgb, currentColor 6%, transparent);
+  }
+
+  tr.selected,
+  tr.selected:hover {
+    background: color-mix(in srgb, ${theme.colors.primary500} 14%, transparent);
   }
 
   tr.clickable:focus-visible {

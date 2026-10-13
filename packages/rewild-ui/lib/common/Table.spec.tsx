@@ -74,4 +74,19 @@ describe('Table', () => {
     const tr = table.shadow!.querySelector('tbody tr') as HTMLElement;
     expect(tr.classList.contains('clickable')).toBe(false);
   });
+
+  it('marks the rows isSelected picks', () => {
+    const table = renderTable({
+      rows: [
+        { id: '1', name: 'Ada' },
+        { id: '2', name: 'Grace' },
+      ],
+      isSelected: (row) => row.id === '2',
+    });
+    const rows = table.shadow!.querySelectorAll('tbody tr');
+    expect(rows[0].classList.contains('selected')).toBe(false);
+    expect(rows[0].getAttribute('aria-selected')).toBe('false');
+    expect(rows[1].classList.contains('selected')).toBe(true);
+    expect(rows[1].getAttribute('aria-selected')).toBe('true');
+  });
 });

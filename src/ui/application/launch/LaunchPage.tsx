@@ -1,5 +1,6 @@
 import { Component, Modal, register, Tab, Tabs } from 'rewild-ui';
 import { StoryModePanel } from './StoryModePanel';
+import { MyGamesPanel } from './MyGamesPanel';
 
 type Props = {
   onStart: (projectId: string) => void;
@@ -47,6 +48,9 @@ export class LaunchPage extends Component<Props> {
           }}>
           <Tab label="Story Mode">
             <StoryModePanel onSelect={selectFor(0)} />
+          </Tab>
+          <Tab label="My Games">
+            <MyGamesPanel onSelect={selectFor(1)} />
           </Tab>
         </Tabs>
       </Modal>
