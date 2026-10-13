@@ -2,7 +2,7 @@ import type { SyncableRecord } from 'models';
 import { authService } from '../api/auth/auth-service';
 import { deleteServerProject } from '../api/projects';
 import { SyncEngine } from '../api/sync/sync-engine';
-import { LocalAssetStore } from './local-asset-store';
+import { AssetReader, LevelRef, LocalAssetStore } from './local-asset-store';
 import { LocalLevelTable } from './local-level-table';
 import { LocalProjectTable } from './local-project-table';
 
@@ -84,6 +84,11 @@ export class Database {
 }
 
 export const db = new Database();
+
+/** Reads a level's files from this device. */
+export function localAssetReader(level: LevelRef): AssetReader {
+  return (assetType, filename) => db.assets.read(level, assetType, filename);
+}
 
 // Sync is auth-gated and local-first: edits made while logged out sit dirty in
 // IndexedDB/OPFS. Flush them promptly once a user is authenticated (login,

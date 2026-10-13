@@ -7,7 +7,7 @@ import {
   serializeScatterKillSet,
 } from 'rewild-renderer/lib/renderers/terrain/ScatterKillSet';
 import { db } from './database';
-import type { LevelRef } from './local-asset-store';
+import type { AssetReader, LevelRef } from './local-asset-store';
 
 // Storage name on the asset path, beside the chunk's height snapshot, biome
 // mask and scatter density: projects/{projectId}/levels/{levelId}/chunk/{cx}_{cy}.kills.bin.
@@ -19,17 +19,12 @@ export function scatterKillsFilename(cx: number, cy: number): string {
   return `${cx}_${cy}.kills.bin`;
 }
 
-// Bridges the renderer's kill-set lookup to the asset store. OPFS-only — the
-// cache is populated from the bucket by the existing sync() pull — and resolves
-// null when nothing has been plucked here (or the blob is unusable), which
-// grows the chunk in full.
-export function createScatterKillProvider(level: LevelRef): ScatterKillSetProvider {
+// Bridges the renderer's kill-set lookup to the level's files. Resolves null
+// when nothing has been plucked here (or the blob is unusable), which grows the
+// chunk in full.
+export function createScatterKillProvider(read: AssetReader): ScatterKillSetProvider {
   return async (cx: number, cy: number) => {
-    const buffer = await db.assets.read(
-      level,
-      'chunk',
-      scatterKillsFilename(cx, cy)
-    );
+    const buffer = await read('chunk', scatterKillsFilename(cx, cy));
     if (!buffer) return null;
 
     try {

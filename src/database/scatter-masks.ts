@@ -7,7 +7,7 @@ import {
   serializePaintMask,
 } from 'rewild-renderer/lib/renderers/terrain/PaintMask';
 import { db } from './database';
-import type { LevelRef } from './local-asset-store';
+import type { AssetReader, LevelRef } from './local-asset-store';
 
 // Storage name on the asset path, beside the chunk's height snapshot and biome
 // mask: projects/{projectId}/levels/{levelId}/chunk/{cx}_{cy}.scatter.bin.
@@ -19,17 +19,12 @@ export function scatterMaskFilename(cx: number, cy: number): string {
   return `${cx}_${cy}.scatter.bin`;
 }
 
-// Bridges the renderer's mask lookup to the asset store. OPFS-only — the cache
-// is populated from the bucket by the existing sync() pull — and resolves null
-// when the chunk has never been planted (or the blob is unusable), which leaves
-// the chunk scattering from its biome rules alone.
-export function createScatterMaskProvider(level: LevelRef): PaintMaskProvider {
+// Bridges the renderer's mask lookup to the level's files. Resolves null when
+// the chunk has never been planted (or the blob is unusable), which leaves the
+// chunk scattering from its biome rules alone.
+export function createScatterMaskProvider(read: AssetReader): PaintMaskProvider {
   return async (cx: number, cy: number) => {
-    const buffer = await db.assets.read(
-      level,
-      'chunk',
-      scatterMaskFilename(cx, cy)
-    );
+    const buffer = await read('chunk', scatterMaskFilename(cx, cy));
     if (!buffer) return null;
 
     try {

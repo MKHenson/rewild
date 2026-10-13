@@ -1,13 +1,9 @@
 import { IProject, Vector3 } from 'models';
 import { DEFAULT_CLIMATE_PRESET, PointLight, Renderer } from 'rewild-renderer';
 import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
-import { createChunkSnapshotProvider } from 'src/database/chunk-snapshots';
-import { createBiomeMaskProvider } from 'src/database/biome-masks';
-import { createScatterMaskProvider } from 'src/database/scatter-masks';
-import { createWaterEditProvider } from 'src/database/water-edits';
-import { createWaterBodyProvider } from 'src/database/water-bodies';
-import { createScatterKillProvider } from 'src/database/scatter-kills';
 import { startLevelRef } from 'src/database/local-asset-store';
+import { localAssetReader } from 'src/database/database';
+import { setTerrainProviders } from 'src/core/TerrainProviders';
 import { registerDebugCommands } from 'src/core/debug';
 import { applyAtmosphere } from 'src/core/AtmosphereSync';
 
@@ -24,24 +20,7 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
   if (atmosphere) applyAtmosphere(renderer, atmosphere);
 
   const levelRef = startLevelRef(project);
-  renderer.terrainRenderer.snapshotProvider = levelRef
-    ? createChunkSnapshotProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.biomeMaskProvider = levelRef
-    ? createBiomeMaskProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.scatterMaskProvider = levelRef
-    ? createScatterMaskProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.waterEditProvider = levelRef
-    ? createWaterEditProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.waterBodyProvider = levelRef
-    ? createWaterBodyProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.scatterKillProvider = levelRef
-    ? createScatterKillProvider(levelRef)
-    : null;
+  setTerrainProviders(renderer, levelRef ? localAssetReader(levelRef) : null);
   registerDebugCommands(renderer, project);
 
   project.sceneGraph.containers.forEach((container) => {

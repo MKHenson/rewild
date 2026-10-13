@@ -13,6 +13,8 @@ import com.rewild.db.DatabaseFactory
 import com.rewild.levels.LevelService
 import com.rewild.levels.levelRoutes
 import com.rewild.models.*
+import com.rewild.play.PlayService
+import com.rewild.play.playRoutes
 import com.rewild.projects.ProjectImageService
 import com.rewild.projects.ProjectService
 import com.rewild.projects.projectRoutes
@@ -110,6 +112,7 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
     val syncService = SyncService(projectService, levelService, assetCleanupService)
     val adminService = AdminService(authService, str("storage.bucketBaseUrl"))
     val publicGameService = PublicGameService(str("storage.bucketBaseUrl"))
+    val playService = PlayService(projectService, levelService, assetService, publicGameService)
 
     val corsOrigin = environment.config.propertyOrNull("cors.allowedOrigin")?.getString()
     install(CORS) {
@@ -150,6 +153,9 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
             publicGameRoutes(publicGameService)
 
             if (protected) {
+                authenticate("auth-jwt", optional = true) {
+                    playRoutes(playService)
+                }
                 authenticate("auth-jwt") {
                     projectRoutes(projectService, projectImageService)
                     levelRoutes(levelService)
@@ -159,6 +165,7 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                     publicGameAdminRoutes(publicGameService, adminService::isSuperAdmin)
                 }
             } else {
+                playRoutes(playService)
                 projectRoutes(projectService, projectImageService)
                 levelRoutes(levelService)
                 syncRoutes(syncService)

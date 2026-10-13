@@ -9,6 +9,9 @@ export interface LevelRef {
   levelId: string;
 }
 
+/** Reads one of a level's files, or resolves null when the level has no such file. */
+export type AssetReader = (assetType: string, filename: string) => Promise<ArrayBuffer | null>;
+
 /** The ref of a project's start level, or null when it has none. */
 export function startLevelRef(project: { id?: string; levelId?: string } | null | undefined): LevelRef | null {
   return project?.id && project.levelId ? { projectId: project.id, levelId: project.levelId } : null;

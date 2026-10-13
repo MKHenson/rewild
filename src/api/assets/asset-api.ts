@@ -3,7 +3,7 @@ import type { components } from '../../types/api';
 
 type UploadUrlResponse =
   components['schemas']['com.rewild.models.UploadUrlResponse'];
-type ServerAsset = components['schemas']['com.rewild.models.Asset'];
+export type ServerAsset = components['schemas']['com.rewild.models.Asset'];
 type ImageUploadRequest = components['schemas']['com.rewild.models.ProjectImageUploadRequest'];
 type ImageResponse = components['schemas']['com.rewild.models.ProjectImageResponse'];
 

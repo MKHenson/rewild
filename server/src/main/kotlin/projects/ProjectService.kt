@@ -35,6 +35,14 @@ class ProjectService(
             ?.toProject()
     }
 
+    /** A live project, whoever owns it. */
+    fun getLive(id: String): Project? = transaction {
+        ProjectsTable.selectAll()
+            .where { (ProjectsTable.id eq id) and ProjectsTable.deletedAt.isNull() }
+            .firstOrNull()
+            ?.toProject()
+    }
+
     // Returns null if the id is already owned by a different user.
     fun upsert(userId: String, project: Project): Project? = transaction {
         val existing = ProjectsTable.selectAll()

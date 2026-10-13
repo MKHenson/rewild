@@ -25,6 +25,15 @@ class AssetService(
             .map { it.toAsset() }
     }
 
+    /** The confirmed files of the given levels, whoever owns them. */
+    fun listConfirmedForLevels(levelIds: List<String>): List<Asset> = transaction {
+        if (levelIds.isEmpty()) return@transaction emptyList()
+        AssetsTable.join(LevelsTable, JoinType.INNER, AssetsTable.levelId, LevelsTable.id)
+            .selectAll()
+            .where { (AssetsTable.levelId inList levelIds) and (AssetsTable.confirmed eq true) }
+            .map { it.toAsset() }
+    }
+
     // Returns null if the levelId doesn't belong to the user.
     fun requestUploadUrl(userId: String, levelId: String, assetType: String, filename: String): UploadUrlResponse? = transaction {
         // A deleted level takes no new files: they would outlive its cleanup.
@@ -75,6 +84,7 @@ class AssetService(
             (AssetsTable.storageKey eq storageKey) and (AssetsTable.userId eq userId)
         }) {
             it[confirmed] = true
+            it[updatedAt] = System.currentTimeMillis()
         }
 
         if (updated > 0) {
@@ -97,6 +107,7 @@ class AssetService(
         levelId = this[AssetsTable.levelId],
         assetType = this[AssetsTable.assetType],
         filename = this[AssetsTable.filename],
-        publicUrl = "$bucketBaseUrl/${this[AssetsTable.storageKey]}"
+        publicUrl = "$bucketBaseUrl/${this[AssetsTable.storageKey]}?v=${this[AssetsTable.updatedAt]}",
+        updatedAt = this[AssetsTable.updatedAt]
     )
 }

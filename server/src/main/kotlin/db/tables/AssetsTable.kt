@@ -11,6 +11,7 @@ object AssetsTable : Table("assets") {
     val storageKey = text("storage_key")
     val confirmed = bool("confirmed").default(false)
     val createdAt = long("created_at")
+    val updatedAt = long("updated_at").default(0)
 
     override val primaryKey = PrimaryKey(id)
 }

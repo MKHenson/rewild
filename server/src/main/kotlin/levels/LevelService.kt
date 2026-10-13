@@ -23,6 +23,12 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
             .map { it.toLevel() }
     }
 
+    fun getLiveByProject(projectId: String): List<Level> = transaction {
+        LevelsTable.selectAll()
+            .where { (LevelsTable.projectId eq projectId) and LevelsTable.deletedAt.isNull() }
+            .map { it.toLevel() }
+    }
+
     fun getById(userId: String, id: String): Level? = transaction {
         LevelsTable.selectAll()
             .where { (LevelsTable.id eq id) and (LevelsTable.userId eq userId) }
