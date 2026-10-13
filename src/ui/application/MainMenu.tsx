@@ -43,11 +43,8 @@ export class MainMenu extends Component<Props> {
               saving the planet
             </Typography>
             <InfoBox variant="warning" title="Attention">
-              For now the game requires access to a restricted database. You can
-              however use the editor and build a local experience which you can
-              run yourself. Just open the editor, save your work and then click
-              the New Game button. You will need at least one container in order
-              to experience anything.
+              New Game plays Story Mode. You can also build your own experience
+              in the editor and play it from there
             </InfoBox>
           </div>
           {authStore.loading ? (
@@ -57,7 +54,7 @@ export class MainMenu extends Component<Props> {
           ) : (
             <div class="styled-buttons">
               <Button onClick={props.onStart} fullWidth>
-                <span>New Game (WIP)</span>
+                <span>New Game</span>
               </Button>
               <Button onClick={props.onOptions} fullWidth>
                 <Icon size="s" icon="settings" />
