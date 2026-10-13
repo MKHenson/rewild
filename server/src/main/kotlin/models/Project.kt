@@ -14,5 +14,18 @@ data class Project(
     val updatedAt: Long,
     val syncedAt: Long = 0,
     val deletedAt: Long? = null,
-    val syncError: String? = null
+    val syncError: String? = null,
+    // Set by the server from the uploaded image. Ignored on writes.
+    val imageUrl: String? = null
+)
+
+@Serializable
+data class ProjectImageUploadRequest(
+    val contentType: String,
+    val size: Long
+)
+
+@Serializable
+data class ProjectImageResponse(
+    val imageUrl: String
 )

@@ -1,5 +1,5 @@
 import { db } from '../database/database';
-import { apiFetch } from './auth/api-client';
+import { apiFetch, responseError } from './auth/api-client';
 import { IProject } from 'models';
 
 export async function getProjects(cursor?: any) {
@@ -33,6 +33,5 @@ export async function deleteServerProject(id: string): Promise<void> {
   });
   if (res.ok || res.status === 404) return;
 
-  const body = (await res.json().catch(() => null)) as { error?: string } | null;
-  throw new Error(body?.error || `Could not delete the project (${res.status})`);
+  throw await responseError(res, 'Could not delete the project');
 }

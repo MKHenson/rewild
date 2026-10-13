@@ -14,6 +14,7 @@ import {
 } from 'rewild-renderer/lib/renderers/terrain/WaterEdit';
 import { writeWaterBodies } from 'src/database/water-bodies';
 import { writeWaterEdit } from 'src/database/water-edits';
+import { startLevelRef } from 'src/database/local-asset-store';
 
 // Console commands that write water edits the way the water brush will: stamp
 // the loaded chunks under a disc, rebuild their water, and save the edits. Also
@@ -30,8 +31,8 @@ export function registerWaterEditDevCommands(
     radius: number,
     level: number | undefined
   ) => {
-    const levelId = project.levelId;
-    if (!levelId) {
+    const levelRef = startLevelRef(project);
+    if (!levelRef) {
       console.warn(
         'No levelId on the current project — water edits not saved.'
       );
@@ -98,7 +99,7 @@ export function registerWaterEditDevCommands(
     await Promise.all(
       touched.map((t) => {
         terrain.refreshChunkWater(t.cx, t.cy);
-        return writeWaterEdit(levelId, t.cx, t.cy, t.edit);
+        return writeWaterEdit(levelRef, t.cx, t.cy, t.edit);
       })
     );
     if (type === 'add' && touched.length > 0) {
@@ -109,7 +110,7 @@ export function registerWaterEditDevCommands(
           typeWeights.map((w) => w * 255)
         )
       );
-      await writeWaterBodies(levelId, terrain.waterRules.savedBodies());
+      await writeWaterBodies(levelRef, terrain.waterRules.savedBodies());
     }
     console.log(
       `${type}Water: ${
@@ -150,7 +151,7 @@ export function registerWaterEditDevCommands(
   };
 
   (window as any).settleWater = async (x?: number, z?: number, radius = 20) => {
-    const levelId = project.levelId;
+    const levelRef = startLevelRef(project);
     const terrain = renderer.terrainRenderer;
     const p = at(x, z);
     const settled = await terrain.waterRules.settle(
@@ -159,12 +160,12 @@ export function registerWaterEditDevCommands(
       p.x + radius,
       p.z + radius
     );
-    if (levelId) {
+    if (levelRef) {
       await Promise.all(
-        settled.chunks.map((t) => writeWaterEdit(levelId, t.cx, t.cy, t.edit))
+        settled.chunks.map((t) => writeWaterEdit(levelRef, t.cx, t.cy, t.edit))
       );
       if (settled.outcomes.length > 0)
-        await writeWaterBodies(levelId, terrain.waterRules.savedBodies());
+        await writeWaterBodies(levelRef, terrain.waterRules.savedBodies());
     } else console.warn('No levelId on the current project — not saved.');
     for (const o of settled.outcomes)
       console.log(

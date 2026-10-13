@@ -124,6 +124,8 @@ declare module 'models' {
     name: string;
     description: string;
     startEvent: string;
+    /** Set by the server when the owner uploads an image. */
+    imageUrl?: string | null;
     sceneGraph: {
       containers: IContainer[];
       atmosphere: {
@@ -158,7 +160,9 @@ declare module 'models' {
   }
 
   export interface IAsset {
-    levelId: string;
+    projectId: string;
+    /** Null for a project file, such as the project image. */
+    levelId: string | null;
     assetType: string;
     filename: string;
   }

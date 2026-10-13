@@ -10,7 +10,8 @@ import { db } from './database';
 import { installOPFSMock } from './opfs-mock';
 import { clearDatabase } from './local-db';
 
-const LEVEL_ID = 'level1';
+const LEVEL = { projectId: 'p1', levelId: 'level1' };
+const ref = (levelId: string) => ({ projectId: 'p1', levelId });
 const SIZE = 9;
 
 function fixtureHeights(): Float32Array {
@@ -35,30 +36,30 @@ describe('createChunkSnapshotProvider', () => {
 
   it('returns the stored heights for a saved chunk', async () => {
     const heights = fixtureHeights();
-    await db.assets.write(LEVEL_ID, 'chunk', '32_16.bin', serializeChunkSnapshot(heights, SIZE, SIZE));
+    await db.assets.write(LEVEL, 'chunk', '32_16.bin', serializeChunkSnapshot(heights, SIZE, SIZE));
 
-    const provider = createChunkSnapshotProvider(LEVEL_ID);
+    const provider = createChunkSnapshotProvider(LEVEL);
     const result = await provider(32, 16);
 
     expect(result).toEqual(heights);
   });
 
   it('resolves null for a chunk with no snapshot (clean no-op → generate)', async () => {
-    const provider = createChunkSnapshotProvider(LEVEL_ID);
+    const provider = createChunkSnapshotProvider(LEVEL);
     expect(await provider(5, -3)).toBeNull();
   });
 
   it('does not leak snapshots across levels', async () => {
-    await db.assets.write('other-level', 'chunk', '0_0.bin', serializeChunkSnapshot(fixtureHeights(), SIZE, SIZE));
+    await db.assets.write(ref('other-level'), 'chunk', '0_0.bin', serializeChunkSnapshot(fixtureHeights(), SIZE, SIZE));
 
-    const provider = createChunkSnapshotProvider(LEVEL_ID);
+    const provider = createChunkSnapshotProvider(LEVEL);
     expect(await provider(0, 0)).toBeNull();
   });
 
   it('resolves null (and warns) for a corrupt blob', async () => {
-    await db.assets.write(LEVEL_ID, 'chunk', '0_0.bin', new Uint8Array([1, 2, 3]).buffer);
+    await db.assets.write(LEVEL, 'chunk', '0_0.bin', new Uint8Array([1, 2, 3]).buffer);
 
-    const provider = createChunkSnapshotProvider(LEVEL_ID);
+    const provider = createChunkSnapshotProvider(LEVEL);
     expect(await provider(0, 0)).toBeNull();
     expect(warnSpy).toHaveBeenCalled();
   });
@@ -66,9 +67,9 @@ describe('createChunkSnapshotProvider', () => {
   it('resolves null for a snapshot with the reserved compressed flag set', async () => {
     const blob = serializeChunkSnapshot(fixtureHeights(), SIZE, SIZE);
     new DataView(blob).setUint32(12, CHUNK_SNAPSHOT_FLAG_COMPRESSED, true);
-    await db.assets.write(LEVEL_ID, 'chunk', '0_0.bin', blob);
+    await db.assets.write(LEVEL, 'chunk', '0_0.bin', blob);
 
-    const provider = createChunkSnapshotProvider(LEVEL_ID);
+    const provider = createChunkSnapshotProvider(LEVEL);
     expect(await provider(0, 0)).toBeNull();
     expect(warnSpy).toHaveBeenCalled();
   });
@@ -80,9 +81,9 @@ describe('createChunkSnapshotProvider', () => {
         projectId: 'p1',
         hasTerrain: true,
       } as any);
-      await writeChunkSnapshot(level.id, 0, 0, fixtureHeights(), SIZE);
+      await writeChunkSnapshot(ref(level.id), 0, 0, fixtureHeights(), SIZE);
 
-      const provider = createChunkSnapshotProvider(level.id);
+      const provider = createChunkSnapshotProvider(ref(level.id));
       expect(await provider(0, 0)).not.toBeNull();
 
       await db.levels.hardRemove(level.id);
@@ -94,13 +95,13 @@ describe('createChunkSnapshotProvider', () => {
 
     it('deleting a level leaves another level\'s snapshots intact', async () => {
       const doomed = await db.levels.add({ name: 'doomed', projectId: 'p1' } as any);
-      await writeChunkSnapshot(doomed.id, 0, 0, fixtureHeights(), SIZE);
+      await writeChunkSnapshot(ref(doomed.id), 0, 0, fixtureHeights(), SIZE);
       const kept = fixtureHeights().map((h) => h * 2);
-      await writeChunkSnapshot('level-keep', 1, 1, kept, SIZE);
+      await writeChunkSnapshot(ref('level-keep'), 1, 1, kept, SIZE);
 
       await db.levels.hardRemove(doomed.id);
 
-      const provider = createChunkSnapshotProvider('level-keep');
+      const provider = createChunkSnapshotProvider(ref('level-keep'));
       expect(await provider(1, 1)).toEqual(kept);
     });
   });
@@ -108,14 +109,14 @@ describe('createChunkSnapshotProvider', () => {
   describe('writeChunkSnapshot', () => {
     it('round-trips: written heights come back through the provider', async () => {
       const heights = fixtureHeights();
-      await writeChunkSnapshot(LEVEL_ID, 5, -3, heights, SIZE);
+      await writeChunkSnapshot(LEVEL, 5, -3, heights, SIZE);
 
-      const provider = createChunkSnapshotProvider(LEVEL_ID);
+      const provider = createChunkSnapshotProvider(LEVEL);
       expect(await provider(5, -3)).toEqual(heights);
     });
 
     it('writes are dirty so the next sync pushes them', async () => {
-      await writeChunkSnapshot(LEVEL_ID, 0, 0, fixtureHeights(), SIZE);
+      await writeChunkSnapshot(LEVEL, 0, 0, fixtureHeights(), SIZE);
 
       const dirty = await db.assets.getDirty();
       expect(dirty).toHaveLength(1);
@@ -125,7 +126,7 @@ describe('createChunkSnapshotProvider', () => {
 
     it('re-edits override: same asset row re-dirtied, latest heights win', async () => {
       const first = fixtureHeights();
-      const id = await writeChunkSnapshot(LEVEL_ID, 0, 0, first, SIZE);
+      const id = await writeChunkSnapshot(LEVEL, 0, 0, first, SIZE);
 
       // Simulate a completed sync, then wait so the re-write's updatedAt advances.
       const record = await db.assets.getOne(id);
@@ -134,13 +135,13 @@ describe('createChunkSnapshotProvider', () => {
       await new Promise((r) => setTimeout(r, 5));
 
       const second = fixtureHeights().map((h) => h + 10);
-      const secondId = await writeChunkSnapshot(LEVEL_ID, 0, 0, second, SIZE);
+      const secondId = await writeChunkSnapshot(LEVEL, 0, 0, second, SIZE);
 
       expect(secondId).toBe(id); // same metadata row, same storage key
       const dirty = await db.assets.getDirty();
       expect(dirty).toHaveLength(1);
 
-      const provider = createChunkSnapshotProvider(LEVEL_ID);
+      const provider = createChunkSnapshotProvider(LEVEL);
       expect(await provider(0, 0)).toEqual(second);
     });
   });

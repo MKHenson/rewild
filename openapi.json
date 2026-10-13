@@ -413,6 +413,178 @@
                 "deprecated": false
             }
         },
+        "/api/projects/{id}/image/upload-url": {
+            "post": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Request project image upload URL",
+                "description": "Owner only. Returns a presigned PUT URL for a PNG, JPEG or WebP image up to 2 MB. The upload must send the requested Content-Type",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.ProjectImageUploadRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.UploadUrlResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/projects/{id}/image/confirm": {
+            "post": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Confirm project image upload",
+                "description": "Owner only. Checks the uploaded object, sets it as the project image and deletes the previous one",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.ConfirmRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.ProjectImageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/api/levels": {
             "get": {
                 "tags": [
@@ -1088,6 +1260,13 @@
                         "type": "string",
                         "title": "String"
                     },
+                    "imageUrl": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
                     "levelId": {
                         "type": [
                             "null",
@@ -1681,6 +1860,74 @@
                 ],
                 "title": "WorldGenConfig"
             },
+            "com.rewild.models.ProjectImageUploadRequest": {
+                "type": "object",
+                "properties": {
+                    "contentType": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "size": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    }
+                },
+                "required": [
+                    "contentType",
+                    "size"
+                ],
+                "title": "ProjectImageUploadRequest"
+            },
+            "com.rewild.models.UploadUrlResponse": {
+                "type": "object",
+                "properties": {
+                    "publicUrl": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "storageKey": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "uploadUrl": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "publicUrl",
+                    "storageKey",
+                    "uploadUrl"
+                ],
+                "title": "UploadUrlResponse"
+            },
+            "com.rewild.models.ConfirmRequest": {
+                "type": "object",
+                "properties": {
+                    "storageKey": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "storageKey"
+                ],
+                "title": "ConfirmRequest"
+            },
+            "com.rewild.models.ProjectImageResponse": {
+                "type": "object",
+                "properties": {
+                    "imageUrl": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "imageUrl"
+                ],
+                "title": "ProjectImageResponse"
+            },
             "com.rewild.models.Level": {
                 "type": "object",
                 "properties": {
@@ -1857,6 +2104,10 @@
                         "type": "string",
                         "title": "String"
                     },
+                    "projectId": {
+                        "type": "string",
+                        "title": "String"
+                    },
                     "publicUrl": {
                         "type": "string",
                         "title": "String"
@@ -1867,6 +2118,7 @@
                     "filename",
                     "id",
                     "levelId",
+                    "projectId",
                     "publicUrl"
                 ],
                 "title": "Asset"
@@ -1893,42 +2145,6 @@
                     "levelId"
                 ],
                 "title": "UploadUrlRequest"
-            },
-            "com.rewild.models.UploadUrlResponse": {
-                "type": "object",
-                "properties": {
-                    "publicUrl": {
-                        "type": "string",
-                        "title": "String"
-                    },
-                    "storageKey": {
-                        "type": "string",
-                        "title": "String"
-                    },
-                    "uploadUrl": {
-                        "type": "string",
-                        "title": "String"
-                    }
-                },
-                "required": [
-                    "publicUrl",
-                    "storageKey",
-                    "uploadUrl"
-                ],
-                "title": "UploadUrlResponse"
-            },
-            "com.rewild.models.ConfirmRequest": {
-                "type": "object",
-                "properties": {
-                    "storageKey": {
-                        "type": "string",
-                        "title": "String"
-                    }
-                },
-                "required": [
-                    "storageKey"
-                ],
-                "title": "ConfirmRequest"
             },
             "com.rewild.admin.UserAccount": {
                 "type": "object",

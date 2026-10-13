@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Asset(
     val id: String,
+    val projectId: String,
     val levelId: String,
     val assetType: String,
     val filename: String,

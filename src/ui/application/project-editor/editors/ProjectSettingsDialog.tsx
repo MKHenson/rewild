@@ -7,11 +7,16 @@ import {
   Select,
   Tabs,
   Tab,
+  Button,
+  Icon,
   theme,
 } from 'rewild-ui';
 import { ILevel, StoredRecord } from 'models';
 import { projectStore } from '../../../stores/ProjectStore';
 import { getLevels } from '../../../../api/levels';
+import { PROJECT_IMAGE_TYPES, projectImageProblem } from '../../../../api/assets/asset-api';
+import { authService } from '../../../../api/auth/auth-service';
+import { db } from '../../../../database/database';
 
 interface Props {
   onClose: () => void;
@@ -29,11 +34,59 @@ export class ProjectSettingsDialog extends Component<Props> {
     const [levels, setLevels] = this.useState<StoredRecord<ILevel>[]>([]);
     const [saving, setSaving] = this.useState(false);
     const [nameMissing, setNameMissing] = this.useState(false);
+    const [imageUrl, setImageUrl] = this.useState(project.imageUrl ?? null);
+    const [imagePending, setImagePending] = this.useState(false);
+    const [imageError, setImageError] = this.useState<string | null>(null);
+    // A blob URL for an image picked on this device and not yet uploaded.
+    let previewUrl: string | null = null;
     // Set by a Save that failed validation, so the Modal's close that follows is skipped.
     let keepOpen = false;
 
+    const fileInput = (
+      <input type="file" accept={PROJECT_IMAGE_TYPES.join(',')} hidden />
+    ) as HTMLInputElement;
+
+    const showPending = (file: File) => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(file);
+      setImagePending(true, false);
+      setImageUrl(previewUrl);
+    };
+
+    // The image applies at once, independent of Save and Cancel. Sync uploads it.
+    const onFilePicked = async (file: File) => {
+      const problem = projectImageProblem(file);
+      if (problem) {
+        setImageError(problem);
+        return;
+      }
+
+      setImageError(null);
+      try {
+        await db.setProjectImage(project.id, file);
+      } catch (err) {
+        setImageError(err instanceof Error ? err.message : String(err));
+        return;
+      }
+      showPending(file);
+      if (authService.getToken())
+        db.syncAll().catch((err) => console.warn('Image sync failed:', err));
+    };
+
+    fileInput.onchange = () => {
+      const file = fileInput.files?.[0];
+      fileInput.value = '';
+      if (file) onFilePicked(file);
+    };
+
     this.onMount = async () => {
       setLevels(await getLevels(project.id));
+      const pending = await db.getPendingProjectImage(project.id);
+      if (pending) showPending(pending);
+    };
+
+    this.onCleanup = () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
 
     const onSave = async () => {
@@ -104,6 +157,26 @@ export class ProjectSettingsDialog extends Component<Props> {
           <Tabs orientation="vertical">
             <Tab label="General">
               {field(
+                'Image',
+                <div class="image-row">
+                  {imageUrl() ? (
+                    <img class="image" src={imageUrl()!} alt="Project image" />
+                  ) : (
+                    <div class="image placeholder">
+                      <Icon icon="mountain" />
+                    </div>
+                  )}
+                  <Button variant="outlined" onClick={() => fileInput.click()}>
+                    Change Image
+                  </Button>
+                  {fileInput}
+                </div>,
+                imagePending()
+                  ? 'PNG, JPEG or WebP, up to 2 MB. Uploads when the project syncs'
+                  : 'PNG, JPEG or WebP, up to 2 MB',
+                imageError() ?? undefined
+              )}
+              {field(
                 'Name',
                 <Input
                   fullWidth
@@ -171,6 +244,28 @@ const StyledProjectSettingsDialog = cssStylesheet(css`
 
   .hint {
     margin-top: 0.5rem;
+  }
+
+  .image-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 0.25rem;
+  }
+
+  .image {
+    width: 192px;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: ${theme.sizes.radius};
+  }
+
+  .placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed ${theme.colors.onSurfaceBorder};
+    color: ${theme.colors.onSurfaceLight};
   }
 
   .error {

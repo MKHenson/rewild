@@ -13,6 +13,7 @@ import com.rewild.db.DatabaseFactory
 import com.rewild.levels.LevelService
 import com.rewild.levels.levelRoutes
 import com.rewild.models.*
+import com.rewild.projects.ProjectImageService
 import com.rewild.projects.ProjectService
 import com.rewild.projects.projectRoutes
 import com.rewild.sync.SyncService
@@ -94,7 +95,14 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
     )
     val assetCleanupService = AssetCleanupService(s3 = s3, bucketName = str("storage.bucketName"))
 
-    val projectService = ProjectService(assetCleanupService)
+    val projectService = ProjectService(assetCleanupService, str("storage.bucketBaseUrl"))
+    val projectImageService = ProjectImageService(
+        signer = s3,
+        inspector = s3,
+        bucketName = str("storage.bucketName"),
+        bucketBaseUrl = str("storage.bucketBaseUrl"),
+        cleanup = assetCleanupService
+    )
     val levelService = LevelService(assetCleanupService)
     val syncService = SyncService(projectService, levelService, assetCleanupService)
     val adminService = AdminService(authService)
@@ -138,14 +146,14 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
 
             if (protected) {
                 authenticate("auth-jwt") {
-                    projectRoutes(projectService)
+                    projectRoutes(projectService, projectImageService)
                     levelRoutes(levelService)
                     syncRoutes(syncService)
                     assetRoutes(assetService)
                     adminRoutes(adminService)
                 }
             } else {
-                projectRoutes(projectService)
+                projectRoutes(projectService, projectImageService)
                 levelRoutes(levelService)
                 syncRoutes(syncService)
                 assetRoutes(assetService)

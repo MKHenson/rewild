@@ -28,7 +28,7 @@ describe('LocalLevelTable', () => {
   const remaining = async () => {
     const left: string[] = [];
     for (const name of FILES)
-      if (await assets.read(id, 'chunk', name)) left.push(name);
+      if (await assets.read({ projectId: 'p1', levelId: id }, 'chunk', name)) left.push(name);
     return left;
   };
 
@@ -39,7 +39,7 @@ describe('LocalLevelTable', () => {
     assets = new LocalAssetStore();
     id = (await levels.add(level())).id;
     for (const name of FILES)
-      await assets.write(id, 'chunk', name, new Uint8Array([1]).buffer);
+      await assets.write({ projectId: 'p1', levelId: id }, 'chunk', name, new Uint8Array([1]).buffer);
   });
 
   describe('markCleared', () => {

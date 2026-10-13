@@ -7,17 +7,16 @@ import {
   serializeChunkSnapshot,
 } from 'rewild-renderer/lib/renderers/terrain/ChunkSnapshot';
 import { db } from './database';
+import type { LevelRef } from './local-asset-store';
 
 // Bridges the renderer's snapshot lookup to the asset store. The read is
 // OPFS-only — the cache is populated from the bucket by the existing sync()
 // pull — and resolves null when the chunk has no snapshot (or the blob is
 // unusable), which makes the chunk fall back to generation.
-export function createChunkSnapshotProvider(
-  levelId: string
-): ChunkSnapshotProvider {
+export function createChunkSnapshotProvider(level: LevelRef): ChunkSnapshotProvider {
   return async (cx: number, cy: number) => {
     const buffer = await db.assets.read(
-      levelId,
+      level,
       'chunk',
       chunkSnapshotFilename(cx, cy)
     );
@@ -37,14 +36,14 @@ export function createChunkSnapshotProvider(
 // so the next authenticated sync pushes it to the bucket — re-writes overwrite
 // the same OPFS file and bucket object (latest edit wins). Returns the asset id.
 export function writeChunkSnapshot(
-  levelId: string,
+  level: LevelRef,
   cx: number,
   cy: number,
   heights: Float32Array,
   size: number
 ): Promise<string> {
   return db.assets.write(
-    levelId,
+    level,
     'chunk',
     chunkSnapshotFilename(cx, cy),
     serializeChunkSnapshot(heights, size, size)

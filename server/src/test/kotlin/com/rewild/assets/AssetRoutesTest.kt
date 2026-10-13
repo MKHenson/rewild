@@ -41,7 +41,7 @@ class AssetRoutesTest {
 
         // Returns a fixed URL so tests never hit real AWS.
         private val fakeS3 = object : S3Signer {
-            override fun presignPut(bucket: String, key: String, ttlMinutes: Long) =
+            override fun presignPut(bucket: String, key: String, ttlMinutes: Long, contentType: String?) =
                 "https://fake-s3/presigned/$key"
         }
 
@@ -164,6 +164,7 @@ class AssetRoutesTest {
         val assets = json.decodeFromString<List<Asset>>(response.bodyAsText())
         assertEquals(1, assets.size)
         assertEquals("list-asset-1", assets[0].id)
+        assertEquals("list-assets-proj", assets[0].projectId)
     }
 
     @Test
@@ -193,7 +194,7 @@ class AssetRoutesTest {
 
         val body = json.decodeFromString<UploadUrlResponse>(response.bodyAsText())
         assertTrue(body.uploadUrl.startsWith("https://fake-s3/presigned/"))
-        assertTrue(body.storageKey.contains(LEVEL_A))
+        assertEquals("users/$USER_A/projects/$PROJECT_A/levels/$LEVEL_A/chunk/terrain.bin", body.storageKey)
         assertTrue(body.publicUrl.startsWith("https://fake-s3/public/"))
     }
 
@@ -254,7 +255,7 @@ class AssetRoutesTest {
         }
 
         // Confirm it
-        val storageKey = "levels/$levelId/chunk/new.bin"
+        val storageKey = "users/$userId/projects/confirm-proj/levels/$levelId/chunk/new.bin"
         val confirmResponse = client.post("/api/assets/confirm") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)

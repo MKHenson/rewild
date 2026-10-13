@@ -34,3 +34,9 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
 
   return fetch(url, withBearer(init, newToken));
 }
+
+/** An Error carrying the server's message, or the fallback with the status. */
+export async function responseError(res: Response, fallback: string): Promise<Error> {
+  const body = (await res.json().catch(() => null)) as { error?: string } | null;
+  return new Error(body?.error || `${fallback} (${res.status})`);
+}

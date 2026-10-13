@@ -103,7 +103,8 @@ export class ProjectStore {
 
   async updateProject() {
     const project = this.project!;
-    const { id, ...token } = project;
+    // imageUrl is set by the image sync; a copy held here can be stale.
+    const { id, imageUrl, ...token } = project;
     const containerNodes = sceneGraphStore.nodes.find(
       (n) => n.name === 'Containers'
     )!.children;

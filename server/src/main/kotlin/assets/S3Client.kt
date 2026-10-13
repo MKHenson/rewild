@@ -6,9 +6,12 @@ import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Configuration
 import software.amazon.awssdk.services.s3.model.Delete
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import software.amazon.awssdk.services.s3.model.S3Exception
 import software.amazon.awssdk.services.s3.presigner.S3Presigner
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest
 import java.net.URI
@@ -16,7 +19,15 @@ import java.time.Duration
 import software.amazon.awssdk.services.s3.S3Client as AwsS3Client
 
 interface S3Signer {
-    fun presignPut(bucket: String, key: String, ttlMinutes: Long = 15): String
+    // A non-null contentType is signed, so the upload must send that Content-Type.
+    fun presignPut(bucket: String, key: String, ttlMinutes: Long = 15, contentType: String? = null): String
+}
+
+data class ObjectHead(val size: Long, val contentType: String?)
+
+interface S3Inspector {
+    // Returns null when the object does not exist.
+    fun head(bucket: String, key: String): ObjectHead?
 }
 
 interface S3Deleter {
@@ -29,7 +40,7 @@ class S3Client(
     accessKey: String, 
     secretKey: String,
     region: String = "fr-par"
-) : S3Signer, S3Deleter {
+) : S3Signer, S3Deleter, S3Inspector {
     private val presigner: S3Presigner
     private val client: AwsS3Client
 
@@ -57,13 +68,22 @@ class S3Client(
             .build()
     }
 
-    override fun presignPut(bucket: String, key: String, ttlMinutes: Long): String {
-        val putRequest = PutObjectRequest.builder().bucket(bucket).key(key).build()
+    override fun presignPut(bucket: String, key: String, ttlMinutes: Long, contentType: String?): String {
+        val putRequest = PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build()
         val presignRequest = PutObjectPresignRequest.builder()
             .signatureDuration(Duration.ofMinutes(ttlMinutes))
             .putObjectRequest(putRequest)
             .build()
         return presigner.presignPutObject(presignRequest).url().toString()
+    }
+
+    override fun head(bucket: String, key: String): ObjectHead? = try {
+        val response = client.headObject(HeadObjectRequest.builder().bucket(bucket).key(key).build())
+        ObjectHead(size = response.contentLength(), contentType = response.contentType())
+    } catch (e: NoSuchKeyException) {
+        null
+    } catch (e: S3Exception) {
+        if (e.statusCode() == 404) null else throw e
     }
 
     // S3 has no prefix delete, despite what the name suggests: list the prefix, then

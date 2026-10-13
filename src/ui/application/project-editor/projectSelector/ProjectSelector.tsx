@@ -15,6 +15,7 @@ import { ProjectStore } from 'src/ui/stores/ProjectStore';
 import { confirmationStore } from '../../../stores/ConfirmationStore';
 import { authStore } from '../../../stores/AuthStore';
 import { isSavedOnServer } from 'src/database/database';
+import { ProjectImage } from '../../common/ProjectImage';
 
 interface Props {
   open: boolean;
@@ -130,9 +131,15 @@ export class ProjectSelector extends Component<Props> {
                         <Card
                           button
                           raised
+                          css={ProjectCardOverrides}
                           onClick={(e) => setSelectedProject(item)}
                           pushed={selectedProject()?.id === item.id}>
-                          <Typography variant="h4">{item.name}</Typography>
+                          <div class="project-card">
+                            <ProjectImage project={item} />
+                            <div class="project-name">
+                              <Typography variant="label">{item.name}</Typography>
+                            </div>
+                          </div>
                         </Card>
                       ))
                     : null}
@@ -218,6 +225,25 @@ export class ProjectSelector extends Component<Props> {
         margin: 2px;
       }
 
+      .project-card {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+      }
+
+      .project-card x-project-image {
+        flex: 1;
+        min-height: 0;
+      }
+
+      .project-name {
+        padding: 0.5rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
       .actions {
         align-self: end;
       }
@@ -232,3 +258,10 @@ export class ProjectSelector extends Component<Props> {
     `;
   }
 }
+
+const ProjectCardOverrides = css`
+  :host {
+    padding: 0;
+    overflow: hidden;
+  }
+`;

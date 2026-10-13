@@ -19,6 +19,7 @@ import { writeScatterKills } from 'src/database/scatter-kills';
 import { projectStore } from 'src/ui/stores/ProjectStore';
 import { scatterPaintStore } from 'src/ui/stores/ScatterPaintStore';
 import { BrushCursor, pickTerrain } from './BrushCursor';
+import { startLevelRef } from 'src/database/local-asset-store';
 
 // Stamp pacing, mirroring the biome paint controller.
 const MAX_STAMP_DT = 0.1; // seconds
@@ -153,8 +154,8 @@ export class TerrainScatterPaintController {
     if (!stroke || (stroke.touched.size === 0 && stroke.killed.size === 0))
       return;
 
-    const levelId = projectStore.project?.levelId;
-    if (!levelId) {
+    const level = startLevelRef(projectStore.project);
+    if (!level) {
       console.warn(
         'No levelId on the current project — scatter edits not saved.'
       );
@@ -163,10 +164,10 @@ export class TerrainScatterPaintController {
 
     await Promise.all([
       ...[...stroke.touched.values()].map((t) =>
-        writeScatterMask(levelId, t.cx, t.cy, t.mask)
+        writeScatterMask(level, t.cx, t.cy, t.mask)
       ),
       ...[...stroke.killed.values()].map((k) =>
-        writeScatterKills(levelId, k.cx, k.cy, k.kills)
+        writeScatterKills(level, k.cx, k.cy, k.kills)
       ),
     ]);
 

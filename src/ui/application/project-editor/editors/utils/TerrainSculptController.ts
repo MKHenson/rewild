@@ -13,6 +13,7 @@ import { writeWaterBodies } from 'src/database/water-bodies';
 import { writeWaterEdit } from 'src/database/water-edits';
 import { projectStore } from 'src/ui/stores/ProjectStore';
 import { sculptStore } from 'src/ui/stores/SculptStore';
+import { startLevelRef } from 'src/database/local-asset-store';
 
 // Stamp pacing. Amounts are time-scaled so sculpting feels the same at any
 // pointer-event rate; dt is clamped so a stall doesn't produce a giant stamp.
@@ -143,8 +144,8 @@ export class TerrainSculptController {
     this.stroke = null;
     if (!stroke || stroke.touched.size === 0) return;
 
-    const levelId = projectStore.project?.levelId;
-    if (!levelId) {
+    const level = startLevelRef(projectStore.project);
+    if (!level) {
       console.warn(
         'No levelId on the current project — sculpt edits not saved.'
       );
@@ -155,7 +156,7 @@ export class TerrainSculptController {
     const size = terrain.mapChunkSizeLod;
     await Promise.all(
       [...stroke.touched.values()].map((t) =>
-        writeChunkSnapshot(levelId, t.cx, t.cy, t.heights, size)
+        writeChunkSnapshot(level, t.cx, t.cy, t.heights, size)
       )
     );
 
@@ -168,10 +169,10 @@ export class TerrainSculptController {
         stroke.maxRadius
       );
       await Promise.all(
-        settled.chunks.map((t) => writeWaterEdit(levelId, t.cx, t.cy, t.edit))
+        settled.chunks.map((t) => writeWaterEdit(level, t.cx, t.cy, t.edit))
       );
       if (settled.outcomes.length > 0)
-        await writeWaterBodies(levelId, terrain.waterRules.savedBodies());
+        await writeWaterBodies(level, terrain.waterRules.savedBodies());
       for (const o of settled.outcomes)
         if (o.drained)
           console.log(

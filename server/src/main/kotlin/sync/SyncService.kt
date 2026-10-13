@@ -90,7 +90,10 @@ class SyncService(
         }
 
         // Never throws, so a bucket outage can't fail the sync — failures are queued for a later retry.
-        for (levelId in chunksCleared) cleanup?.clearChunks(levelId)
+        for (levelId in chunksCleared) {
+            val projectId = levelService.getById(userId, levelId)?.projectId ?: continue
+            cleanup?.clearChunks(userId, projectId, levelId)
+        }
 
         // Pull phase: return everything the client hasn't seen yet.
         // lastSyncedAt = 0 means first sync — return the full dataset.

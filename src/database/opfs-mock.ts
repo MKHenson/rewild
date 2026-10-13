@@ -1,9 +1,19 @@
+function readBlob(blob: Blob): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
 class MockWritable {
   private chunks: Uint8Array[] = [];
 
   constructor(private onClose: (data: Uint8Array) => void) {}
 
-  async write(data: ArrayBuffer | Uint8Array) {
+  async write(data: ArrayBuffer | Uint8Array | Blob) {
+    if (data instanceof Blob) data = await readBlob(data);
     const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
     this.chunks.push(bytes);
   }

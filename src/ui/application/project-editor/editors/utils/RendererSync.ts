@@ -7,6 +7,7 @@ import { createScatterMaskProvider } from 'src/database/scatter-masks';
 import { createWaterEditProvider } from 'src/database/water-edits';
 import { createWaterBodyProvider } from 'src/database/water-bodies';
 import { createScatterKillProvider } from 'src/database/scatter-kills';
+import { startLevelRef } from 'src/database/local-asset-store';
 import { registerDebugCommands } from 'src/core/debug';
 import { applyAtmosphere } from 'src/core/AtmosphereSync';
 
@@ -22,23 +23,24 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
   const atmosphere = project.sceneGraph?.atmosphere;
   if (atmosphere) applyAtmosphere(renderer, atmosphere);
 
-  renderer.terrainRenderer.snapshotProvider = project.levelId
-    ? createChunkSnapshotProvider(project.levelId)
+  const levelRef = startLevelRef(project);
+  renderer.terrainRenderer.snapshotProvider = levelRef
+    ? createChunkSnapshotProvider(levelRef)
     : null;
-  renderer.terrainRenderer.biomeMaskProvider = project.levelId
-    ? createBiomeMaskProvider(project.levelId)
+  renderer.terrainRenderer.biomeMaskProvider = levelRef
+    ? createBiomeMaskProvider(levelRef)
     : null;
-  renderer.terrainRenderer.scatterMaskProvider = project.levelId
-    ? createScatterMaskProvider(project.levelId)
+  renderer.terrainRenderer.scatterMaskProvider = levelRef
+    ? createScatterMaskProvider(levelRef)
     : null;
-  renderer.terrainRenderer.waterEditProvider = project.levelId
-    ? createWaterEditProvider(project.levelId)
+  renderer.terrainRenderer.waterEditProvider = levelRef
+    ? createWaterEditProvider(levelRef)
     : null;
-  renderer.terrainRenderer.waterBodyProvider = project.levelId
-    ? createWaterBodyProvider(project.levelId)
+  renderer.terrainRenderer.waterBodyProvider = levelRef
+    ? createWaterBodyProvider(levelRef)
     : null;
-  renderer.terrainRenderer.scatterKillProvider = project.levelId
-    ? createScatterKillProvider(project.levelId)
+  renderer.terrainRenderer.scatterKillProvider = levelRef
+    ? createScatterKillProvider(levelRef)
     : null;
   registerDebugCommands(renderer, project);
 

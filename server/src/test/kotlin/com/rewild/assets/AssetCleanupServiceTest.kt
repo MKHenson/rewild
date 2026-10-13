@@ -50,6 +50,7 @@ class AssetCleanupServiceTest {
 
         const val USER_A = "cleanup-user-a"
         const val PROJECT_A = "cleanup-proj-a"
+        const val L = "users/$USER_A/projects/$PROJECT_A"
 
         @BeforeClass
         @JvmStatic
@@ -113,7 +114,7 @@ class AssetCleanupServiceTest {
                 it[AssetsTable.levelId] = levelId
                 it[AssetsTable.assetType] = "chunk"
                 it[AssetsTable.filename] = filename
-                it[AssetsTable.storageKey] = "levels/$levelId/chunk/$filename"
+                it[AssetsTable.storageKey] = "$L/levels/$levelId/chunk/$filename"
                 it[AssetsTable.confirmed] = true
                 it[AssetsTable.createdAt] = System.currentTimeMillis()
             }
@@ -149,15 +150,15 @@ class AssetCleanupServiceTest {
         levelService.upsert(USER_A, makeLevel("cl-delete-me"))
         levelService.upsert(USER_A, makeLevel("cl-keep-me"))
         bucket.objects += setOf(
-            "levels/cl-delete-me/chunk/0_0.bin",
-            "levels/cl-delete-me/chunk/0_1.bin",
-            "levels/cl-keep-me/chunk/0_0.bin"
+            "$L/levels/cl-delete-me/chunk/0_0.bin",
+            "$L/levels/cl-delete-me/chunk/0_1.bin",
+            "$L/levels/cl-keep-me/chunk/0_0.bin"
         )
 
         levelService.delete(USER_A, "cl-delete-me")
 
-        assertEquals(setOf("levels/cl-keep-me/chunk/0_0.bin"), bucket.objects)
-        assertEquals(listOf("levels/cl-delete-me/"), bucket.prefixCalls)
+        assertEquals(setOf("$L/levels/cl-keep-me/chunk/0_0.bin"), bucket.objects)
+        assertEquals(listOf("$L/levels/cl-delete-me/"), bucket.prefixCalls)
     }
 
     @Test
@@ -166,22 +167,22 @@ class AssetCleanupServiceTest {
         // keeps the prefix from spilling into sibling ids.
         levelService.upsert(USER_A, makeLevel("cl-lvl-1"))
         levelService.upsert(USER_A, makeLevel("cl-lvl-10"))
-        bucket.objects += setOf("levels/cl-lvl-1/chunk/a.bin", "levels/cl-lvl-10/chunk/a.bin")
+        bucket.objects += setOf("$L/levels/cl-lvl-1/chunk/a.bin", "$L/levels/cl-lvl-10/chunk/a.bin")
 
         levelService.delete(USER_A, "cl-lvl-1")
 
-        assertEquals(setOf("levels/cl-lvl-10/chunk/a.bin"), bucket.objects)
+        assertEquals(setOf("$L/levels/cl-lvl-10/chunk/a.bin"), bucket.objects)
     }
 
     @Test
     fun `a failed delete for another user's level never touches the bucket`() {
         levelService.upsert(USER_A, makeLevel("cl-not-yours"))
-        bucket.objects += "levels/cl-not-yours/chunk/a.bin"
+        bucket.objects += "$L/levels/cl-not-yours/chunk/a.bin"
 
         levelService.delete("cleanup-user-b", "cl-not-yours")
 
         assertTrue(bucket.prefixCalls.isEmpty())
-        assertEquals(setOf("levels/cl-not-yours/chunk/a.bin"), bucket.objects)
+        assertEquals(setOf("$L/levels/cl-not-yours/chunk/a.bin"), bucket.objects)
     }
 
     @Test
@@ -193,7 +194,7 @@ class AssetCleanupServiceTest {
 
         assertEquals(com.rewild.common.DeleteResult.Success, result)
         assertNull(levelService.getById(USER_A, "cl-bucket-down"))
-        assertEquals(listOf("levels/cl-bucket-down/"), queuedPrefixes())
+        assertEquals(listOf("$L/levels/cl-bucket-down/"), queuedPrefixes())
     }
 
     @Test
@@ -215,16 +216,19 @@ class AssetCleanupServiceTest {
         levelService.upsert(USER_A, makeLevel("cl-doomed-2", projectId = "cl-doomed-proj"))
         levelService.upsert(USER_A, makeLevel("cl-survivor"))
         insertAsset("cl-doomed-1-asset", "cl-doomed-1", "0_0.bin")
+        val doomed = "users/$USER_A/projects/cl-doomed-proj"
         bucket.objects += setOf(
-            "levels/cl-doomed-1/chunk/0_0.bin",
-            "levels/cl-doomed-2/chunk/0_0.bin",
-            "levels/cl-survivor/chunk/0_0.bin"
+            "$doomed/levels/cl-doomed-1/chunk/0_0.bin",
+            "$doomed/levels/cl-doomed-2/chunk/0_0.bin",
+            "$doomed/image/cover.png",
+            "$L/levels/cl-survivor/chunk/0_0.bin"
         )
 
         val result = projects.delete(USER_A, "cl-doomed-proj")
 
         assertEquals(com.rewild.common.DeleteResult.Success, result)
-        assertEquals(setOf("levels/cl-survivor/chunk/0_0.bin"), bucket.objects)
+        assertEquals(setOf("$L/levels/cl-survivor/chunk/0_0.bin"), bucket.objects)
+        assertEquals(listOf("$doomed/"), bucket.prefixCalls)
         assertTrue(assetIdsFor("cl-doomed-1").isEmpty())
         assertNotNull(levelService.getById(USER_A, "cl-doomed-1")?.deletedAt)
         assertNotNull(levelService.getById(USER_A, "cl-doomed-2")?.deletedAt)
@@ -241,14 +245,14 @@ class AssetCleanupServiceTest {
         val result = projects.delete(USER_A, "cl-proj-bucket-down")
 
         assertEquals(com.rewild.common.DeleteResult.Success, result)
-        assertEquals(listOf("levels/cl-proj-bucket-down-level/"), queuedPrefixes())
+        assertEquals(listOf("users/$USER_A/projects/cl-proj-bucket-down/"), queuedPrefixes())
     }
 
     @Test
     fun `syncing a level tombstone from the client is ignored`() {
         val syncService = SyncService(projectService, levelService, cleanup)
         levelService.upsert(USER_A, makeLevel("cl-tombstone"))
-        bucket.objects += "levels/cl-tombstone/chunk/0_0.bin"
+        bucket.objects += "$L/levels/cl-tombstone/chunk/0_0.bin"
 
         syncService.sync(USER_A, syncRequestFor(makeLevel("cl-tombstone", updatedAt = 2000L, deletedAt = 2000L)))
 
@@ -262,9 +266,9 @@ class AssetCleanupServiceTest {
         levelService.upsert(USER_A, makeLevel(levelId))
         for (name in listOf("0_0.bin", "0_0.biome.bin", "0_0.water.bin", "water-bodies.json")) {
             insertAsset("$levelId-$name", levelId, name)
-            bucket.objects += "levels/$levelId/chunk/$name"
+            bucket.objects += "$L/levels/$levelId/chunk/$name"
         }
-        bucket.objects += "levels/$levelId/other/keep.bin"
+        bucket.objects += "$L/levels/$levelId/other/keep.bin"
     }
 
     @Test
@@ -274,7 +278,7 @@ class AssetCleanupServiceTest {
 
         syncService.sync(USER_A, syncRequestFor(makeLevel("cl-reset", updatedAt = 2000L, chunksClearedAt = 2000L)))
 
-        assertEquals(setOf("levels/cl-reset/other/keep.bin"), bucket.objects)
+        assertEquals(setOf("$L/levels/cl-reset/other/keep.bin"), bucket.objects)
         assertTrue(assetIdsFor("cl-reset").isEmpty())
         assertEquals(2000L, levelService.getById(USER_A, "cl-reset")?.chunksClearedAt)
     }
@@ -286,12 +290,12 @@ class AssetCleanupServiceTest {
         val cleared = makeLevel("cl-reclear", updatedAt = 2000L, chunksClearedAt = 2000L)
         syncService.sync(USER_A, syncRequestFor(cleared))
         insertAsset("cl-reclear-new", "cl-reclear", "0_0.bin")
-        bucket.objects += "levels/cl-reclear/chunk/0_0.bin"
+        bucket.objects += "$L/levels/cl-reclear/chunk/0_0.bin"
 
         syncService.sync(USER_A, syncRequestFor(cleared.copy(updatedAt = 3000L)))
 
         assertEquals(listOf("cl-reclear-new"), assetIdsFor("cl-reclear"))
-        assertTrue("levels/cl-reclear/chunk/0_0.bin" in bucket.objects)
+        assertTrue("$L/levels/cl-reclear/chunk/0_0.bin" in bucket.objects)
     }
 
     @Test
@@ -327,7 +331,7 @@ class AssetCleanupServiceTest {
         syncService.sync(USER_A, syncRequestFor(makeLevel("cl-clear-down", updatedAt = 2000L, chunksClearedAt = 2000L)))
 
         assertTrue(assetIdsFor("cl-clear-down").isEmpty())
-        assertEquals(listOf("levels/cl-clear-down/chunk/"), queuedPrefixes())
+        assertEquals(listOf("$L/levels/cl-clear-down/chunk/"), queuedPrefixes())
     }
 
     @Test
@@ -346,10 +350,10 @@ class AssetCleanupServiceTest {
     @Test
     fun `retryPending drains a prefix once the bucket recovers`() {
         levelService.upsert(USER_A, makeLevel("cl-retry"))
-        bucket.objects += "levels/cl-retry/chunk/a.bin"
+        bucket.objects += "$L/levels/cl-retry/chunk/a.bin"
         bucket.failing = true
         levelService.delete(USER_A, "cl-retry")
-        assertEquals(listOf("levels/cl-retry/"), queuedPrefixes())
+        assertEquals(listOf("$L/levels/cl-retry/"), queuedPrefixes())
 
         bucket.failing = false
         val drained = cleanup.retryPending()
@@ -368,10 +372,10 @@ class AssetCleanupServiceTest {
         val drained = cleanup.retryPending()
 
         assertEquals(0, drained)
-        assertEquals(listOf("levels/cl-retry-fail/"), queuedPrefixes())
+        assertEquals(listOf("$L/levels/cl-retry-fail/"), queuedPrefixes())
         val attempts = transaction {
             AssetCleanupQueueTable.selectAll()
-                .where { AssetCleanupQueueTable.prefix eq "levels/cl-retry-fail/" }
+                .where { AssetCleanupQueueTable.prefix eq "$L/levels/cl-retry-fail/" }
                 .single()[AssetCleanupQueueTable.attempts]
         }
         // One from the failed delete, one from the failed retry.
@@ -415,7 +419,7 @@ class AssetCleanupServiceTest {
         insertAsset("cl-rows-1", "cl-rows-target", "a.bin")
         insertAsset("cl-rows-2", "cl-rows-other", "b.bin")
 
-        cleanup.cleanupLevel("cl-rows-target")
+        cleanup.cleanupLevel(USER_A, PROJECT_A, "cl-rows-target")
 
         assertTrue(assetIdsFor("cl-rows-target").isEmpty())
         assertEquals(listOf("cl-rows-2"), assetIdsFor("cl-rows-other"))

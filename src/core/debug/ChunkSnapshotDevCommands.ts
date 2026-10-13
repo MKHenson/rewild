@@ -4,6 +4,7 @@ import { generateBiomeBlendedHeightMap } from 'rewild-renderer/lib/renderers/ter
 import { Vector2 } from 'rewild-common';
 import { db } from 'src/database/database';
 import { writeChunkSnapshot } from 'src/database/chunk-snapshots';
+import { startLevelRef } from 'src/database/local-asset-store';
 
 // Dev/verification console commands for the chunk-snapshot round-trip
 // (#173 read, #174 write). writeChunkSnapshotFixture simulates an edit the way
@@ -18,8 +19,8 @@ export function registerChunkSnapshotDevCommands(
     cx: number = 0,
     cy: number = 0
   ) => {
-    const levelId = project.levelId;
-    if (!levelId) {
+    const levelRef = startLevelRef(project);
+    if (!levelRef) {
       console.warn('No levelId on the current project — cannot write a snapshot.');
       return;
     }
@@ -57,7 +58,7 @@ export function registerChunkSnapshotDevCommands(
       }
     }
 
-    await writeChunkSnapshot(levelId, cx, cy, heights, size);
+    await writeChunkSnapshot(levelRef, cx, cy, heights, size);
 
     // Show the change without a reload: apply the edited heights to the loaded
     // chunk and rebuild only its meshes. If it isn't loaded, it will mesh from
