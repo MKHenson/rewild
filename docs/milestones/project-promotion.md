@@ -297,7 +297,7 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
   - Expect: a logged in or logged out player opens `/game/{publicProjectId}` and plays the public project without it being stored on the device. After the creator saves, the next start shows the change, and only the changed files download again. Shares and admin access plug into the same endpoint in tickets 9 and 10.
   - Depends on: 1, 5.
 
-- [ ] **7. `/launch` screen: Story Mode tab**
+- [x] **7. `/launch` screen: Story Mode tab**
 
   - Scope: New Game opens `/launch`, a modal with vertical tabs and a way back to the main menu. The Story Mode tab shows the image, the description and Start. Start opens `/game/{projectId}` with the public project's id.
   - Expect: any player, logged in or not, plays the public game from the main menu. Start is disabled when no game is promoted.

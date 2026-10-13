@@ -8,6 +8,7 @@ import { ResetPassword } from './ResetPassword';
 import { SettingsPanel } from './SettingsPanel';
 import { PerfPanel } from './PerfPanel';
 import { AdminPage } from './admin/AdminPage';
+import { LaunchPage } from './launch/LaunchPage';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
 import {
   audio,
@@ -15,7 +16,6 @@ import {
   loadAudioTemplates,
 } from '../../core/audio/audio';
 import { registerAudioDebugCommands } from '../../core/debug/AudioDebugCommands';
-import { getProjects } from '../../api/projects';
 
 interface Props {}
 
@@ -30,10 +30,12 @@ export class Application extends Component<Props> {
     loadAudioTemplates();
     registerAudioDebugCommands(audio);
 
-    // Plays the most recently updated project.
-    const onStart = async () => {
-      const [project] = await getProjects();
-      navigate(project ? `/game/${project.id}` : '/editor');
+    const onNewGame = () => {
+      navigate('/launch');
+    };
+
+    const onPlay = (projectId: string) => {
+      navigate(`/game/${projectId}`);
     };
 
     const onEditor = () => {
@@ -81,12 +83,16 @@ export class Application extends Component<Props> {
             onRender={(params) => (
               <MainMenu
                 open
-                onStart={onStart}
+                onStart={onNewGame}
                 onOptions={onOptions}
                 onEditor={onEditor}
                 onAdmin={onAdmin}
               />
             )}
+          />
+          <Route
+            path="/launch"
+            onRender={() => <LaunchPage onStart={onPlay} onBack={onQuit} />}
           />
           <Route
             path="/settings"
