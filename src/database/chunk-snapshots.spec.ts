@@ -6,7 +6,7 @@ import {
   createChunkSnapshotProvider,
   writeChunkSnapshot,
 } from './chunk-snapshots';
-import { db } from './database';
+import { db, localAssetReader } from './database';
 import { installOPFSMock } from './opfs-mock';
 import { clearDatabase } from './local-db';
 
@@ -38,28 +38,28 @@ describe('createChunkSnapshotProvider', () => {
     const heights = fixtureHeights();
     await db.assets.write(LEVEL, 'chunk', '32_16.bin', serializeChunkSnapshot(heights, SIZE, SIZE));
 
-    const provider = createChunkSnapshotProvider(LEVEL);
+    const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
     const result = await provider(32, 16);
 
     expect(result).toEqual(heights);
   });
 
   it('resolves null for a chunk with no snapshot (clean no-op → generate)', async () => {
-    const provider = createChunkSnapshotProvider(LEVEL);
+    const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
     expect(await provider(5, -3)).toBeNull();
   });
 
   it('does not leak snapshots across levels', async () => {
     await db.assets.write(ref('other-level'), 'chunk', '0_0.bin', serializeChunkSnapshot(fixtureHeights(), SIZE, SIZE));
 
-    const provider = createChunkSnapshotProvider(LEVEL);
+    const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
     expect(await provider(0, 0)).toBeNull();
   });
 
   it('resolves null (and warns) for a corrupt blob', async () => {
     await db.assets.write(LEVEL, 'chunk', '0_0.bin', new Uint8Array([1, 2, 3]).buffer);
 
-    const provider = createChunkSnapshotProvider(LEVEL);
+    const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
     expect(await provider(0, 0)).toBeNull();
     expect(warnSpy).toHaveBeenCalled();
   });
@@ -69,7 +69,7 @@ describe('createChunkSnapshotProvider', () => {
     new DataView(blob).setUint32(12, CHUNK_SNAPSHOT_FLAG_COMPRESSED, true);
     await db.assets.write(LEVEL, 'chunk', '0_0.bin', blob);
 
-    const provider = createChunkSnapshotProvider(LEVEL);
+    const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
     expect(await provider(0, 0)).toBeNull();
     expect(warnSpy).toHaveBeenCalled();
   });
@@ -83,7 +83,7 @@ describe('createChunkSnapshotProvider', () => {
       } as any);
       await writeChunkSnapshot(ref(level.id), 0, 0, fixtureHeights(), SIZE);
 
-      const provider = createChunkSnapshotProvider(ref(level.id));
+      const provider = createChunkSnapshotProvider(localAssetReader(ref(level.id)));
       expect(await provider(0, 0)).not.toBeNull();
 
       await db.levels.hardRemove(level.id);
@@ -101,7 +101,7 @@ describe('createChunkSnapshotProvider', () => {
 
       await db.levels.hardRemove(doomed.id);
 
-      const provider = createChunkSnapshotProvider(ref('level-keep'));
+      const provider = createChunkSnapshotProvider(localAssetReader(ref('level-keep')));
       expect(await provider(1, 1)).toEqual(kept);
     });
   });
@@ -111,7 +111,7 @@ describe('createChunkSnapshotProvider', () => {
       const heights = fixtureHeights();
       await writeChunkSnapshot(LEVEL, 5, -3, heights, SIZE);
 
-      const provider = createChunkSnapshotProvider(LEVEL);
+      const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
       expect(await provider(5, -3)).toEqual(heights);
     });
 
@@ -141,7 +141,7 @@ describe('createChunkSnapshotProvider', () => {
       const dirty = await db.assets.getDirty();
       expect(dirty).toHaveLength(1);
 
-      const provider = createChunkSnapshotProvider(LEVEL);
+      const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
       expect(await provider(0, 0)).toEqual(second);
     });
   });

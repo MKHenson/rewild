@@ -17,6 +17,8 @@ export class GameManager {
   renderer: Renderer;
   stateMachine: StateMachine;
   hasInitialized: boolean;
+  /** Why init() failed, or null. */
+  loadError: Error | null = null;
   player: Player;
   clock: Clock;
   /** Every sound this game plays; it fades out when the game is disposed. */
@@ -78,6 +80,7 @@ export class GameManager {
       return true;
     } catch (err: unknown) {
       console.error(err);
+      this.loadError = err instanceof Error ? err : new Error(String(err));
       return false;
     }
   }

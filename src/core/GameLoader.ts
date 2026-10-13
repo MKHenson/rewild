@@ -1,5 +1,3 @@
-import { getLevel } from '../api/levels';
-import { getProject } from '../api/projects';
 import { StateMachine } from 'rewild-routing';
 import { InGameLevel } from './routing/InGameLevel';
 import { Asset3D } from './routing/Asset3D';
@@ -9,12 +7,8 @@ import { TemplateLoader } from './TemplateLoader';
 import { ContainerWithState } from './routing/ContainerWithState';
 import { StateMachineData } from './routing/Types';
 import { GameManager } from './GameManager';
-import { createChunkSnapshotProvider } from '../database/chunk-snapshots';
-import { createBiomeMaskProvider } from '../database/biome-masks';
-import { createScatterMaskProvider } from '../database/scatter-masks';
-import { createWaterEditProvider } from '../database/water-edits';
-import { createWaterBodyProvider } from '../database/water-bodies';
-import { createScatterKillProvider } from '../database/scatter-kills';
+import { setTerrainProviders } from './TerrainProviders';
+import { loadGameSource } from './GameSource';
 import { registerDebugCommands } from './debug';
 import { applyAtmosphere } from './AtmosphereSync';
 
@@ -29,12 +23,9 @@ export async function loadInitialLevels(
   const renderer: Renderer = gameManager.renderer;
   await templateLoader.load();
 
-  const project = await getProject(projectId);
-  if (!project) throw new Error(`Project ${projectId} not found`);
-
   // A project without a start level falls back to a bare world: default sky,
   // the project's terrain, no actors. The Player places itself on the surface.
-  const level = project.levelId ? await getLevel(project.levelId) : null;
+  const { project, level, read } = await loadGameSource(projectId);
 
   const stateMachine = new StateMachine<StateMachineData>({
     renderer,
@@ -55,27 +46,7 @@ export async function loadInitialLevels(
   registerDebugCommands(renderer, project);
 
   renderer.terrainRenderer.enabled = level ? level.hasTerrain : true;
-  const levelRef = level?.id
-    ? { projectId: project.id, levelId: level.id }
-    : null;
-  renderer.terrainRenderer.snapshotProvider = levelRef
-    ? createChunkSnapshotProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.biomeMaskProvider = levelRef
-    ? createBiomeMaskProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.scatterMaskProvider = levelRef
-    ? createScatterMaskProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.waterEditProvider = levelRef
-    ? createWaterEditProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.waterBodyProvider = levelRef
-    ? createWaterBodyProvider(levelRef)
-    : null;
-  renderer.terrainRenderer.scatterKillProvider = levelRef
-    ? createScatterKillProvider(levelRef)
-    : null;
+  setTerrainProviders(renderer, read);
 
   const levelRouter = new InGameLevel(
     level?.name ?? 'Untitled Level',

@@ -291,7 +291,7 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
   - Expect: an admin promotes a project or clears the promotion. A logged out request to `GET /api/public-game` returns the promoted project's summary and nothing else. The public project cannot be deleted.
   - Depends on: 2.
 
-- [ ] **6. Remote project loading**
+- [x] **6. Remote project loading**
 
   - Scope: `GET /api/play/{projectId}` with optional auth, which returns the project, its levels and their asset lists. It allows the public project and the owner. The `updated_at` column on `assets`, set on confirm, and `?v={updatedAt}` on every `publicUrl`. The loader falls back to the play endpoint when the project is not in the local DB, and uses remote terrain providers that fetch by URL. An error screen for `404`.
   - Expect: a logged in or logged out player opens `/game/{publicProjectId}` and plays the public project without it being stored on the device. After the creator saves, the next start shows the change, and only the changed files download again. Shares and admin access plug into the same endpoint in tickets 9 and 10.

@@ -9,7 +9,9 @@ data class Asset(
     val levelId: String,
     val assetType: String,
     val filename: String,
-    val publicUrl: String
+    // Carries ?v={updatedAt}, so a changed file gets a new URL.
+    val publicUrl: String,
+    val updatedAt: Long
 )
 
 @Serializable

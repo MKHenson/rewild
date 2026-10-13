@@ -2,11 +2,13 @@ import { Component, Loading, Pane3D, register } from 'rewild-ui';
 import { Renderer } from 'rewild-renderer';
 import { Player } from 'src/core/routing/Player';
 import { GameManager } from 'src/core/GameManager';
+import { GameLoadError } from './GameLoadError';
 
 interface Props {
   projectId: string;
   onUnlock: () => void;
   onDeath: () => void;
+  onQuit: () => void;
 }
 
 @register('x-viewport-statemachine')
@@ -39,6 +41,13 @@ export class ViewportStateMachine extends Component<Props> {
       // than leaving the player staring at a shell that will never clear.
       setLoading(false);
       if (initialized) window.requestAnimationFrame(onFrame);
+      else if (this.gameManager.loadError)
+        toReturn.appendChild(
+          <GameLoadError
+            error={this.gameManager.loadError}
+            onQuit={this.props.onQuit}
+          />
+        );
     };
 
     // Answers getActiveRenderer() the same way the editor viewport does, so UI

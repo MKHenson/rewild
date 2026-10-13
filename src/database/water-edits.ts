@@ -7,7 +7,7 @@ import {
   serializeWaterEdit,
 } from 'rewild-renderer/lib/renderers/terrain/WaterEdit';
 import { db } from './database';
-import type { LevelRef } from './local-asset-store';
+import type { AssetReader, LevelRef } from './local-asset-store';
 
 // Storage name on the asset path, beside the chunk's height snapshot and masks:
 // projects/{projectId}/levels/{levelId}/chunk/{cx}_{cy}.water.bin.
@@ -15,17 +15,12 @@ export function waterEditFilename(cx: number, cy: number): string {
   return `${cx}_${cy}.water.bin`;
 }
 
-// Bridges the renderer's edit lookup to the asset store. OPFS-only — the cache
-// is populated from the bucket by sync() — and resolves null when the chunk's
-// water has never been edited (or the blob is unusable), which leaves the chunk
-// with its generated water.
-export function createWaterEditProvider(level: LevelRef): WaterEditProvider {
+// Bridges the renderer's edit lookup to the level's files. Resolves null when
+// the chunk's water has never been edited (or the blob is unusable), which
+// leaves the chunk with its generated water.
+export function createWaterEditProvider(read: AssetReader): WaterEditProvider {
   return async (cx: number, cy: number) => {
-    const buffer = await db.assets.read(
-      level,
-      'chunk',
-      waterEditFilename(cx, cy)
-    );
+    const buffer = await read('chunk', waterEditFilename(cx, cy));
     if (!buffer) return null;
 
     try {

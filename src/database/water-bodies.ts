@@ -7,21 +7,17 @@ import {
   serializeWaterBodies,
 } from 'rewild-renderer/lib/renderers/terrain/WaterBodies';
 import { db } from './database';
-import type { LevelRef } from './local-asset-store';
+import type { AssetReader, LevelRef } from './local-asset-store';
 
 // One blob per level beside the chunk edits it describes, so clearing a level's
 // chunks clears it too: projects/{projectId}/levels/{levelId}/chunk/water-bodies.json.
 export const WATER_BODIES_FILENAME = 'water-bodies.json';
 
-// OPFS-only, like the chunk providers. Resolves no records when none were
-// saved or the blob is unusable.
-export function createWaterBodyProvider(level: LevelRef): WaterBodyProvider {
+// Reads the level's files, like the chunk providers. Resolves no records when
+// none were saved or the blob is unusable.
+export function createWaterBodyProvider(read: AssetReader): WaterBodyProvider {
   return async () => {
-    const buffer = await db.assets.read(
-      level,
-      'chunk',
-      WATER_BODIES_FILENAME
-    );
+    const buffer = await read('chunk', WATER_BODIES_FILENAME);
     if (!buffer) return [];
 
     try {

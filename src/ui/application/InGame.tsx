@@ -35,6 +35,7 @@ export class InGame extends Component<Props> {
           projectId={this.props.projectId}
           onUnlock={onUnlock}
           onDeath={onDeath}
+          onQuit={onQuit}
         />
       ) as ViewportStateMachine;
 
