@@ -4,6 +4,7 @@ import type { components } from '../types/api';
 export type UserAccount = components['schemas']['com.rewild.admin.UserAccount'];
 export type UpdateUserRequest =
   components['schemas']['com.rewild.admin.UpdateUserRequest'];
+export type AdminProject = components['schemas']['com.rewild.admin.AdminProject'];
 
 async function toError(res: Response, fallback: string): Promise<Error> {
   const body = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -41,4 +42,10 @@ export async function sendAdminPasswordReset(id: string): Promise<void> {
     { method: 'POST' }
   );
   if (!res.ok) throw await toError(res, 'Could not send password reset');
+}
+
+export async function getAdminProjects(): Promise<AdminProject[]> {
+  const res = await apiFetch('/api/admin/projects');
+  if (!res.ok) throw await toError(res, 'Could not load projects');
+  return res.json();
 }

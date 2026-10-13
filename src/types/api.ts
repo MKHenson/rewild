@@ -329,6 +329,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/public-game": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the public game
+         * @description Returns the summary of the project promoted to Story Mode. No auth
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.models.PublicGame"];
+                    };
+                };
+                /** @description No project is promoted */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /**
+         * Set the public game
+         * @description Promotes a project saved on the server to Story Mode, or clears the promotion with a null projectId. Super admin only.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["com.rewild.models.SetPublicGameRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.models.PublicGame"];
+                    };
+                };
+                /** @description The promotion is cleared */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -449,7 +543,7 @@ export interface paths {
         post?: never;
         /**
          * Delete project
-         * @description Deletes a project and its levels, and removes their files. The project stays as a tombstone so the owner's other devices drop it on their next sync
+         * @description Deletes a project and its levels, and removes their files. The project stays as a tombstone so the owner's other devices drop it on their next sync. The public game cannot be deleted
          */
         delete: {
             parameters: {
@@ -479,6 +573,14 @@ export interface paths {
                     };
                 };
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -998,6 +1100,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List projects
+         * @description Returns every live project of every user, newest first. Super admin only.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.admin.AdminProject"][];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/users": {
         parameters: {
             query?: never;
@@ -1256,6 +1404,17 @@ export interface components {
         "com.rewild.auth.GoogleAuthRequest": {
             /** String */
             idToken: string;
+        };
+        /** PublicGame */
+        "com.rewild.models.PublicGame": {
+            /** String */
+            description: string;
+            /** String */
+            id: string;
+            /** String */
+            imageUrl?: null | string;
+            /** String */
+            name: string;
         };
         /** Project */
         "com.rewild.models.Project": {
@@ -1582,6 +1741,26 @@ export interface components {
             /** String */
             levelId: string;
         };
+        /** AdminProject */
+        "com.rewild.admin.AdminProject": {
+            /** String */
+            authorId: string;
+            /** String */
+            authorName: string;
+            /** String */
+            description: string;
+            /** String */
+            id: string;
+            /** String */
+            imageUrl?: null | string;
+            /** String */
+            name: string;
+            /**
+             * Long
+             * Format: int64
+             */
+            updatedAt: number;
+        };
         /** UserAccount */
         "com.rewild.admin.UserAccount": {
             /**
@@ -1615,6 +1794,11 @@ export interface components {
             displayName: string;
             /** String */
             role: string;
+        };
+        /** SetPublicGameRequest */
+        "com.rewild.models.SetPublicGameRequest": {
+            /** String */
+            projectId?: null | string;
         };
     };
     responses: never;

@@ -16,6 +16,20 @@ fun Route.adminRoutes(service: AdminService) {
     route("/admin") {
         install(SuperAdminGuard) { isSuperAdmin = service::isSuperAdmin }
 
+        route("/projects") {
+            get({
+                tags("Admin")
+                summary = "List projects"
+                description = "Returns every live project of every user, newest first. Super admin only."
+                response {
+                    code(HttpStatusCode.OK) { body<List<AdminProject>>() }
+                    code(HttpStatusCode.Forbidden) { body<ErrorResponse>() }
+                }
+            }) {
+                call.respond(service.listProjects())
+            }
+        }
+
         route("/users") {
             get({
                 tags("Admin")

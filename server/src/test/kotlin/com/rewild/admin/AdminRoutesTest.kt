@@ -3,6 +3,7 @@ package com.rewild.admin
 import com.rewild.auth.AuthService
 import com.rewild.auth.JwtService
 import com.rewild.auth.UserRole
+import com.rewild.db.tables.ProjectsTable
 import com.rewild.db.tables.UsersTable
 import com.rewild.installTestAuth
 import com.rewild.makeTestJwtService
@@ -35,7 +36,7 @@ class AdminRoutesTest {
         fun setup() {
             postgres = startTestDatabase()
             jwtService = makeTestJwtService()
-            service = AdminService(AuthService(jwtService))
+            service = AdminService(AuthService(jwtService), "https://cdn")
         }
 
         @AfterClass
@@ -173,5 +174,50 @@ class AdminRoutesTest {
             header(HttpHeaders.Authorization, "Bearer ${tokenFor("admin-resetter-2")}")
         }
         assertEquals(HttpStatusCode.NoContent, response.status)
+    }
+
+    private fun insertProject(id: String, userId: String, updatedAt: Long, deletedAt: Long? = null) = transaction {
+        ProjectsTable.insert {
+            it[ProjectsTable.id] = id
+            it[ProjectsTable.userId] = userId
+            it[name] = "Project $id"
+            it[description] = "About $id"
+            it[startEvent] = ""
+            it[sceneGraph] = "{}"
+            it[imageKey] = "users/$userId/projects/$id/image/cover.png"
+            it[ProjectsTable.updatedAt] = updatedAt
+            it[ProjectsTable.deletedAt] = deletedAt
+        }
+    }
+
+    @Test
+    fun `super admin lists live projects of all users, newest first`() = testApplication {
+        installTestApp()
+        insertUser("admin-projects", UserRole.SUPER_ADMIN)
+        insertUser("admin-projects-author")
+        insertProject("admin-old-proj", "admin-projects-author", updatedAt = 5_000_000_000_000)
+        insertProject("admin-new-proj", "admin-projects", updatedAt = 5_000_000_000_001)
+        insertProject("admin-gone-proj", "admin-projects-author", updatedAt = 5_000_000_000_002, deletedAt = 1)
+
+        val response = client.get("/api/admin/projects") {
+            header(HttpHeaders.Authorization, "Bearer ${tokenFor("admin-projects")}")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val projects = json.decodeFromString<List<AdminProject>>(response.bodyAsText())
+        assertEquals(listOf("admin-new-proj", "admin-old-proj"), projects.take(2).map { it.id })
+        assertEquals("admin-projects-author", projects[1].authorName)
+        assertEquals("About admin-old-proj", projects[1].description)
+        assertEquals("https://cdn/users/admin-projects-author/projects/admin-old-proj/image/cover.png", projects[1].imageUrl)
+        assertTrue(projects.none { it.id == "admin-gone-proj" })
+    }
+
+    @Test
+    fun `regular user cannot list projects`() = testApplication {
+        installTestApp()
+        insertUser("admin-projects-regular")
+        val response = client.get("/api/admin/projects") {
+            header(HttpHeaders.Authorization, "Bearer ${tokenFor("admin-projects-regular")}")
+        }
+        assertEquals(HttpStatusCode.Forbidden, response.status)
     }
 }

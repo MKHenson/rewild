@@ -78,6 +78,7 @@ fun Route.levelRoutes(service: LevelService) {
                 when (service.delete(call.userId(), id)) {
                     DeleteResult.NotFound -> return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
                     DeleteResult.Forbidden -> return@delete call.respond(HttpStatusCode.Forbidden, ErrorResponse("Forbidden"))
+                    DeleteResult.Conflict -> return@delete call.respond(HttpStatusCode.Conflict, ErrorResponse("Conflict"))
                     DeleteResult.Success -> call.respond(HttpStatusCode.NoContent)
                 }
             }

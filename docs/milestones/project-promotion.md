@@ -285,9 +285,9 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
   - Expect: all files for a project are under one bucket prefix, and a project delete removes that prefix. The owner sets a PNG, JPEG or WebP image up to 2 MB, logged in or not, and sees it at once. The next sync uploads it. The bucket holds one image for each project. A file of the wrong type or size is rejected with a message.
   - Depends on: 2, 3.
 
-- [ ] **5. Public game: server and `/admin/public`**
+- [x] **5. Public game: server and `/admin/public`**
 
-  - Scope: `public_game` table. `GET /api/public-game` with no auth, which returns the promoted project's id, name, description and image URL. `PUT /api/public-game` for super admins only (`SuperAdminGuard`). The delete API returns `409` for the public project. A Public tab at `/admin/public` with a project picker and a Save button.
+  - Scope: `public_game` table. `GET /api/public-game` with no auth, which returns the promoted project's id, name, description and image URL. `PUT /api/public-game` for super admins only (`SuperAdminGuard`). The delete API returns `409` for the public project. A Public tab at `/admin/public` with a project picker and a Save button. The picker lists projects from `GET /api/admin/projects`: all live projects, newest first, with no paging.
   - Expect: an admin promotes a project or clears the promotion. A logged out request to `GET /api/public-game` returns the promoted project's summary and nothing else. The public project cannot be deleted.
   - Depends on: 2.
 
@@ -311,7 +311,7 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
 
 - [ ] **9. Admin projects tab and flagging**
 
-  - Scope: `flagged_at` and `flagged_by` columns. Flag and unflag endpoints for super admins only. `GET /api/admin/projects` with paging and sorting. The play endpoint allows super admins. A Projects tab at `/admin/projects` with a run link and a Flag / Unflag action behind a confirm dialog. The play endpoint returns a general "contact an admin" error for a flagged project to all callers except the owner and super admins. The public project cannot be flagged.
+  - Scope: `flagged_at` and `flagged_by` columns. Flag and unflag endpoints for super admins only. Paging, sorting and the flag state on `GET /api/admin/projects`. `PUT /api/public-game` rejects a flagged project. The play endpoint allows super admins. A Projects tab at `/admin/projects` with a run link and a Flag / Unflag action behind a confirm dialog. The play endpoint returns a general "contact an admin" error for a flagged project to all callers except the owner and super admins. The public project cannot be flagged.
   - Expect: an admin finds any project, runs it, and blocks it in a few clicks. Players cannot start a flagged project.
   - Depends on: 6. Must ship before ticket 10 goes live.
 
