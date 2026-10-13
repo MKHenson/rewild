@@ -4,6 +4,7 @@ import com.rewild.auth.AuthService
 import com.rewild.auth.UserRole
 import com.rewild.db.tables.ProjectsTable
 import com.rewild.db.tables.UsersTable
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.and
@@ -18,7 +19,10 @@ sealed interface UpdateUserResult {
     data class Invalid(val reason: String) : UpdateUserResult
 }
 
-class AdminService(private val authService: AuthService) {
+class AdminService(
+    private val authService: AuthService,
+    private val bucketBaseUrl: String = ""
+) {
 
     fun isSuperAdmin(userId: String): Boolean = transaction {
         UsersTable.select(UsersTable.role)
@@ -64,6 +68,28 @@ class AdminService(private val authService: AuthService) {
         val user = getUser(id) ?: return false
         authService.forgotPassword(user.email)
         return true
+    }
+
+    fun listProjects(): List<AdminProject> = transaction {
+        ProjectsTable
+            .join(UsersTable, JoinType.INNER, ProjectsTable.userId, UsersTable.id)
+            .select(
+                ProjectsTable.id, ProjectsTable.name, ProjectsTable.description, ProjectsTable.imageKey,
+                ProjectsTable.userId, ProjectsTable.updatedAt, UsersTable.displayName
+            )
+            .where { ProjectsTable.deletedAt.isNull() }
+            .orderBy(ProjectsTable.updatedAt, SortOrder.DESC)
+            .map {
+                AdminProject(
+                    id = it[ProjectsTable.id],
+                    name = it[ProjectsTable.name],
+                    description = it[ProjectsTable.description],
+                    imageUrl = it[ProjectsTable.imageKey]?.let { key -> "$bucketBaseUrl/$key" },
+                    authorId = it[ProjectsTable.userId],
+                    authorName = it[UsersTable.displayName],
+                    updatedAt = it[ProjectsTable.updatedAt],
+                )
+            }
     }
 
     private fun projectCounts(userId: String?): Map<String, Long> {

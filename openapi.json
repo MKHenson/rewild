@@ -238,6 +238,88 @@
                 "deprecated": false
             }
         },
+        "/api/public-game": {
+            "get": {
+                "tags": [
+                    "Public Game"
+                ],
+                "summary": "Get the public game",
+                "description": "Returns the summary of the project promoted to Story Mode. No auth",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.PublicGame"
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "No project is promoted",
+                        "headers": {}
+                    }
+                },
+                "deprecated": false
+            },
+            "put": {
+                "tags": [
+                    "Public Game"
+                ],
+                "summary": "Set the public game",
+                "description": "Promotes a project saved on the server to Story Mode, or clears the promotion with a null projectId. Super admin only.",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.SetPublicGameRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.PublicGame"
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "The promotion is cleared",
+                        "headers": {}
+                    },
+                    "400": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/api/projects": {
             "get": {
                 "tags": [
@@ -369,7 +451,7 @@
                     "Projects"
                 ],
                 "summary": "Delete project",
-                "description": "Deletes a project and its levels, and removes their files. The project stays as a tombstone so the owner's other devices drop it on their next sync",
+                "description": "Deletes a project and its levels, and removes their files. The project stays as a tombstone so the owner's other devices drop it on their next sync. The public game cannot be deleted",
                 "parameters": [
                     {
                         "name": "id",
@@ -400,6 +482,16 @@
                         }
                     },
                     "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
                         "headers": {},
                         "content": {
                             "application/json": {
@@ -910,6 +1002,43 @@
                 "deprecated": false
             }
         },
+        "/api/admin/projects": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "List projects",
+                "description": "Returns every live project of every user, newest first. Super admin only.",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/com.rewild.admin.AdminProject"
+                                    },
+                                    "title": "List<AdminProject>"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/api/admin/users": {
             "get": {
                 "tags": [
@@ -1240,6 +1369,36 @@
                     "idToken"
                 ],
                 "title": "GoogleAuthRequest"
+            },
+            "com.rewild.models.PublicGame": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "imageUrl": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "description",
+                    "id",
+                    "name"
+                ],
+                "title": "PublicGame"
             },
             "com.rewild.models.Project": {
                 "type": "object",
@@ -2146,6 +2305,52 @@
                 ],
                 "title": "UploadUrlRequest"
             },
+            "com.rewild.admin.AdminProject": {
+                "type": "object",
+                "properties": {
+                    "authorId": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "authorName": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "imageUrl": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "updatedAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    }
+                },
+                "required": [
+                    "authorId",
+                    "authorName",
+                    "description",
+                    "id",
+                    "name",
+                    "updatedAt"
+                ],
+                "title": "AdminProject"
+            },
             "com.rewild.admin.UserAccount": {
                 "type": "object",
                 "properties": {
@@ -2220,6 +2425,19 @@
                     "role"
                 ],
                 "title": "UpdateUserRequest"
+            },
+            "com.rewild.models.SetPublicGameRequest": {
+                "type": "object",
+                "properties": {
+                    "projectId": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    }
+                },
+                "title": "SetPublicGameRequest"
             }
         },
         "examples": {}

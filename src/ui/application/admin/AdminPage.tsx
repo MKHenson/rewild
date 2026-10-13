@@ -10,6 +10,7 @@ import {
   Tabs,
 } from 'rewild-ui';
 import { authStore } from '../../stores/AuthStore';
+import { PUBLIC_PATH, PublicGamePanel } from './PublicGamePanel';
 import { UserDetailPage } from './UserDetailPage';
 import { UserList } from './UserList';
 
@@ -18,6 +19,13 @@ type Props = {
 };
 
 const USERS_PATH = '/admin';
+const TAB_PATHS = [USERS_PATH, PUBLIC_PATH];
+
+/** The tab for the current URL. Users is the fallback, as it owns `/admin` and `/admin/users/...`. */
+function activeTabIndex(): number {
+  const path = window.location.pathname;
+  return path === PUBLIC_PATH || path.startsWith(PUBLIC_PATH + '/') ? 1 : 0;
+}
 
 /**
  * The `/admin` route and everything under it. Each admin section is a tab whose
@@ -29,9 +37,21 @@ export class AdminPage extends Component<Props> {
   init() {
     this.on(authStore.dispatcher);
 
-    let sections: JSX.Element | null = null;
+    let sections: Tabs | null = null;
     const denied = <AdminAccessDenied />;
     const body = <div class="body" />;
+
+    const syncTab = () => {
+      if (sections) sections.props = { ...sections.props, activeIndex: activeTabIndex() };
+    };
+
+    this.onMount = () => {
+      window.addEventListener('history-pushed', syncTab);
+    };
+
+    this.onCleanup = () => {
+      window.removeEventListener('history-pushed', syncTab);
+    };
 
     const modal = (
       <Modal
@@ -48,7 +68,10 @@ export class AdminPage extends Component<Props> {
     return () => {
       if (authStore.isSuperAdmin && !sections) {
         sections = (
-          <Tabs orientation="vertical">
+          <Tabs
+            orientation="vertical"
+            activeIndex={activeTabIndex()}
+            onChange={(index) => navigate(TAB_PATHS[index])}>
             <Tab label="User Management">
               <RouterSwitch>
                 <Route
@@ -70,8 +93,16 @@ export class AdminPage extends Component<Props> {
                 />
               </RouterSwitch>
             </Tab>
+            <Tab label="Public">
+              <RouterSwitch>
+                <Route
+                  path={PUBLIC_PATH}
+                  onRender={() => <PublicGamePanel />}
+                />
+              </RouterSwitch>
+            </Tab>
           </Tabs>
-        );
+        ) as Tabs;
       }
 
       const content = authStore.isSuperAdmin ? sections! : denied;

@@ -33,6 +33,9 @@ export class ProjectSelector extends Component<Props> {
     const canDelete = (project: StoredRecord<IProject>) =>
       !isSavedOnServer(project) || authStore.loggedIn;
 
+    const isPublic = (project: StoredRecord<IProject>) =>
+      project.id === projectsStore.publicProjectId;
+
     const onCreate = async () => {
       await projectsStore.addProject(newProject()!);
       setNewProject(null);
@@ -162,9 +165,16 @@ export class ProjectSelector extends Component<Props> {
                   color="error"
                   variant="text"
                   fullWidth
+                  disabled={isPublic(selectedProject()!)}
                   onClick={onDelete}>
                   Delete
                 </Button>
+              )}
+              {isProjectSelected && isPublic(selectedProject()!) && (
+                <Typography variant="info">
+                  This is the public game. An admin must remove it from Story
+                  Mode before it can be deleted.
+                </Typography>
               )}
 
               {isProjectSelected && (

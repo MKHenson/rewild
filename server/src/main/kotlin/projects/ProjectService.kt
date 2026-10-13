@@ -4,6 +4,7 @@ import com.rewild.assets.AssetCleanupService
 import com.rewild.common.DeleteResult
 import com.rewild.db.tables.LevelsTable
 import com.rewild.db.tables.ProjectsTable
+import com.rewild.db.tables.PublicGameTable
 import com.rewild.models.Project
 import com.rewild.models.SceneGraph
 import kotlinx.serialization.encodeToString
@@ -92,6 +93,7 @@ class ProjectService(
 
             if (existing == null || existing[ProjectsTable.deletedAt] != null) return@transaction DeleteResult.NotFound
             if (existing[ProjectsTable.userId] != userId) return@transaction DeleteResult.Forbidden
+            if (PublicGameTable.selectAll().where { PublicGameTable.projectId eq id }.any()) return@transaction DeleteResult.Conflict
 
             val now = System.currentTimeMillis()
             val liveLevels = (LevelsTable.projectId eq id) and LevelsTable.deletedAt.isNull()

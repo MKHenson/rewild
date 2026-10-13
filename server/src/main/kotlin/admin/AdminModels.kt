@@ -17,3 +17,14 @@ data class UserAccount(
 
 @Serializable
 data class UpdateUserRequest(val displayName: String, val role: String)
+
+@Serializable
+data class AdminProject(
+    val id: String,
+    val name: String,
+    val description: String,
+    val imageUrl: String?,
+    val authorId: String,
+    val authorName: String,
+    val updatedAt: Long,
+)

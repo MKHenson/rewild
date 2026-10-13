@@ -123,18 +123,23 @@ fun Route.projectRoutes(service: ProjectService, imageService: ProjectImageServi
             delete({
                 tags("Projects")
                 summary = "Delete project"
-                description = "Deletes a project and its levels, and removes their files. The project stays as a tombstone so the owner's other devices drop it on their next sync"
+                description = "Deletes a project and its levels, and removes their files. The project stays as a tombstone so the owner's other devices drop it on their next sync. The public game cannot be deleted"
                 request { pathParameter<String>("id") { description = "Project ID" } }
                 response {
                     code(HttpStatusCode.NoContent) { description = "Project deleted" }
                     code(HttpStatusCode.NotFound) { body<ErrorResponse>() }
                     code(HttpStatusCode.Forbidden) { body<ErrorResponse>() }
+                    code(HttpStatusCode.Conflict) { body<ErrorResponse>() }
                 }
             }) {
                 val id = call.parameters["id"]!!
                 when (service.delete(call.userId(), id)) {
                     DeleteResult.NotFound -> return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
                     DeleteResult.Forbidden -> return@delete call.respond(HttpStatusCode.Forbidden, ErrorResponse("Forbidden"))
+                    DeleteResult.Conflict -> return@delete call.respond(
+                        HttpStatusCode.Conflict,
+                        ErrorResponse("This project is the public game. An admin must remove it from Story Mode before it can be deleted")
+                    )
                     DeleteResult.Success -> call.respond(HttpStatusCode.NoContent)
                 }
             }

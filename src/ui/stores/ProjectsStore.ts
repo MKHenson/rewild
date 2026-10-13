@@ -7,6 +7,7 @@ import {
 } from '../../api';
 import { Dispatcher } from 'rewild-common';
 import { db } from '../../database/database';
+import { getPublicGame } from '../../api/public-game';
 
 export type ProjectsStoreEvents = { kind: 'changed' };
 
@@ -14,14 +15,20 @@ export class ProjectsStore {
   loading = false;
   error?: string;
   projects: StoredRecord<IProject>[] = [];
+  /** The project promoted to Story Mode. It cannot be deleted. */
+  publicProjectId: string | null = null;
 
   readonly dispatcher = new Dispatcher<ProjectsStoreEvents>();
 
   async getProjects(page?: any) {
     this.loading = true;
     this.dispatcher.dispatch({ kind: 'changed' });
-    const resp = await getProjectsApi(page);
+    const [resp, publicGame] = await Promise.all([
+      getProjectsApi(page),
+      getPublicGame().catch(() => undefined),
+    ]);
     this.projects = resp;
+    if (publicGame !== undefined) this.publicProjectId = publicGame?.id ?? null;
     this.loading = false;
     this.dispatcher.dispatch({ kind: 'changed' });
   }
