@@ -11,10 +11,19 @@ export class GameNotFoundError extends Error {
   }
 }
 
+/** A super admin blocked the project. Carries the server's message for the player. */
+export class GameBlockedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GameBlockedError';
+  }
+}
+
 /** Loads a project that is not on this device, with its levels and their files. */
 export async function getPlayProject(projectId: string): Promise<PlayProject> {
   const res = await apiFetch(`/api/play/${encodeURIComponent(projectId)}`);
   if (res.status === 404) throw new GameNotFoundError();
+  if (res.status === 403) throw new GameBlockedError((await responseError(res, 'This game is not available')).message);
   if (!res.ok) throw await responseError(res, 'Could not load the game');
   return res.json();
 }

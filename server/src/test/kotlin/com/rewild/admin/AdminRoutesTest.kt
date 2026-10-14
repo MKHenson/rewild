@@ -6,6 +6,7 @@ import com.rewild.auth.UserRole
 import com.rewild.db.tables.ProjectsTable
 import com.rewild.db.tables.UsersTable
 import com.rewild.installTestAuth
+import com.rewild.publicgame.PublicGameService
 import com.rewild.makeTestJwtService
 import com.rewild.startTestDatabase
 import io.ktor.client.request.*
@@ -16,11 +17,14 @@ import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.AfterClass
 import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AdminRoutesTest {
@@ -57,7 +61,10 @@ class AdminRoutesTest {
     }
 
     private fun ApplicationTestBuilder.installTestApp() {
-        installTestAuth(jwtService) { adminRoutes(service) }
+        installTestAuth(jwtService) {
+            adminRoutes(service)
+            projectFlagRoutes(service)
+        }
     }
 
     private fun tokenFor(id: String) = jwtService.generateToken(id, "$id@test.com", id)
@@ -176,11 +183,17 @@ class AdminRoutesTest {
         assertEquals(HttpStatusCode.NoContent, response.status)
     }
 
-    private fun insertProject(id: String, userId: String, updatedAt: Long, deletedAt: Long? = null) = transaction {
+    private fun insertProject(
+        id: String,
+        userId: String,
+        updatedAt: Long,
+        deletedAt: Long? = null,
+        name: String = "Project $id"
+    ) = transaction {
         ProjectsTable.insert {
             it[ProjectsTable.id] = id
             it[ProjectsTable.userId] = userId
-            it[name] = "Project $id"
+            it[ProjectsTable.name] = name
             it[description] = "About $id"
             it[startEvent] = ""
             it[sceneGraph] = "{}"
@@ -203,12 +216,128 @@ class AdminRoutesTest {
             header(HttpHeaders.Authorization, "Bearer ${tokenFor("admin-projects")}")
         }
         assertEquals(HttpStatusCode.OK, response.status)
-        val projects = json.decodeFromString<List<AdminProject>>(response.bodyAsText())
+        val projects = json.decodeFromString<AdminProjectPage>(response.bodyAsText()).items
         assertEquals(listOf("admin-new-proj", "admin-old-proj"), projects.take(2).map { it.id })
         assertEquals("admin-projects-author", projects[1].authorName)
         assertEquals("About admin-old-proj", projects[1].description)
         assertEquals("https://cdn/users/admin-projects-author/projects/admin-old-proj/image/cover.png", projects[1].imageUrl)
         assertTrue(projects.none { it.id == "admin-gone-proj" })
+    }
+
+    private suspend fun ApplicationTestBuilder.listProjects(query: String, as_: String = "admin-pager") =
+        json.decodeFromString<AdminProjectPage>(
+            client.get("/api/admin/projects?$query") {
+                header(HttpHeaders.Authorization, "Bearer ${tokenFor(as_)}")
+            }.bodyAsText()
+        )
+
+    @Test
+    fun `projects come in pages with a total`() = testApplication {
+        installTestApp()
+        insertUser("admin-pager", UserRole.SUPER_ADMIN)
+        insertProject("pager-1", "admin-pager", updatedAt = 7_000_000_000_003)
+        insertProject("pager-2", "admin-pager", updatedAt = 7_000_000_000_002)
+        insertProject("pager-3", "admin-pager", updatedAt = 7_000_000_000_001)
+
+        val first = listProjects("pageSize=2&page=0")
+        val second = listProjects("pageSize=2&page=1")
+
+        assertEquals(listOf("pager-1", "pager-2"), first.items.map { it.id })
+        assertEquals("pager-3", second.items.first().id)
+        assertTrue(first.total >= 3)
+        assertEquals(first.total, second.total)
+    }
+
+    @Test
+    fun `projects sort by name, author and flag state`() = testApplication {
+        installTestApp()
+        insertUser("admin-sorter", UserRole.SUPER_ADMIN)
+        insertUser("aaa-author")
+        insertProject("sort-b", "admin-sorter", updatedAt = 1, name = "AAA b")
+        insertProject("sort-a", "aaa-author", updatedAt = 2, name = "aaa a")
+        service.flagProject("admin-sorter", "sort-b")
+
+        val byName = listProjects("sort=name&order=asc", "admin-sorter").items.map { it.id }
+        val byAuthor = listProjects("sort=author&order=asc", "admin-sorter").items.map { it.id }
+        val flaggedFirst = listProjects("sort=flagged&order=desc&pageSize=100", "admin-sorter").items
+        val flaggedLast = listProjects("sort=flagged&order=asc&pageSize=100", "admin-sorter").items
+
+        assertEquals(listOf("sort-a", "sort-b"), byName.take(2))
+        assertEquals("sort-a", byAuthor.first())
+        assertNotNull(flaggedFirst.first().flaggedAt)
+        assertTrue(flaggedFirst.dropWhile { it.flaggedAt != null }.all { it.flaggedAt == null })
+        assertNull(flaggedLast.first().flaggedAt)
+        assertTrue(flaggedLast.dropWhile { it.flaggedAt == null }.all { it.flaggedAt != null })
+    }
+
+    @Test
+    fun `unknown sort is rejected`() = testApplication {
+        installTestApp()
+        insertUser("admin-bad-sort", UserRole.SUPER_ADMIN)
+        val response = client.get("/api/admin/projects?sort=size") {
+            header(HttpHeaders.Authorization, "Bearer ${tokenFor("admin-bad-sort")}")
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
+    private fun flaggedBy(id: String) = transaction {
+        ProjectsTable.selectAll().where { ProjectsTable.id eq id }.single()[ProjectsTable.flaggedBy]
+    }
+
+    @Test
+    fun `super admin flags and unflags a project`() = testApplication {
+        installTestApp()
+        insertUser("admin-flagger", UserRole.SUPER_ADMIN)
+        insertProject("flag-me", "admin-flagger", updatedAt = 1)
+
+        val flag = client.post("/api/projects/flag-me/flag") {
+            header(HttpHeaders.Authorization, "Bearer ${tokenFor("admin-flagger")}")
+        }
+        assertEquals(HttpStatusCode.NoContent, flag.status)
+        assertEquals("admin-flagger", flaggedBy("flag-me"))
+
+        val unflag = client.delete("/api/projects/flag-me/flag") {
+            header(HttpHeaders.Authorization, "Bearer ${tokenFor("admin-flagger")}")
+        }
+        assertEquals(HttpStatusCode.NoContent, unflag.status)
+        assertNull(flaggedBy("flag-me"))
+    }
+
+    @Test
+    fun `flagging is super admin only`() = testApplication {
+        installTestApp()
+        insertUser("flag-regular")
+        insertProject("flag-own", "flag-regular", updatedAt = 1)
+
+        val response = client.post("/api/projects/flag-own/flag") {
+            header(HttpHeaders.Authorization, "Bearer ${tokenFor("flag-regular")}")
+        }
+        assertEquals(HttpStatusCode.Forbidden, response.status)
+        assertNull(flaggedBy("flag-own"))
+    }
+
+    @Test
+    fun `the public game and missing projects cannot be flagged`() = testApplication {
+        installTestApp()
+        insertUser("admin-public-flag", UserRole.SUPER_ADMIN)
+        insertProject("flag-public", "admin-public-flag", updatedAt = 1)
+        val publicGame = PublicGameService()
+        publicGame.set("flag-public")
+
+        try {
+            val public = client.post("/api/projects/flag-public/flag") {
+                header(HttpHeaders.Authorization, "Bearer ${tokenFor("admin-public-flag")}")
+            }
+            assertEquals(HttpStatusCode.Conflict, public.status)
+            assertNull(flaggedBy("flag-public"))
+        } finally {
+            publicGame.set(null)
+        }
+
+        val missing = client.post("/api/projects/flag-nothing/flag") {
+            header(HttpHeaders.Authorization, "Bearer ${tokenFor("admin-public-flag")}")
+        }
+        assertEquals(HttpStatusCode.NotFound, missing.status)
     }
 
     @Test

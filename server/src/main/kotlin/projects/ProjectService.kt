@@ -138,6 +138,7 @@ class ProjectService(
         syncedAt = this[ProjectsTable.syncedAt],
         deletedAt = this[ProjectsTable.deletedAt],
         syncError = this[ProjectsTable.syncError],
-        imageUrl = this[ProjectsTable.imageKey]?.let { "$bucketBaseUrl/$it" }
+        imageUrl = this[ProjectsTable.imageKey]?.let { "$bucketBaseUrl/$it" },
+        flaggedAt = this[ProjectsTable.flaggedAt]
     )
 }

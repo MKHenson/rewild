@@ -11,6 +11,7 @@ import {
 } from 'rewild-ui';
 import { authStore } from '../../stores/AuthStore';
 import { PUBLIC_PATH, PublicGamePanel } from './PublicGamePanel';
+import { PROJECTS_PATH, ProjectList } from './ProjectList';
 import { UserDetailPage } from './UserDetailPage';
 import { UserList } from './UserList';
 
@@ -19,12 +20,15 @@ type Props = {
 };
 
 const USERS_PATH = '/admin';
-const TAB_PATHS = [USERS_PATH, PUBLIC_PATH];
+const TAB_PATHS = [USERS_PATH, PROJECTS_PATH, PUBLIC_PATH];
 
 /** The tab for the current URL. Users is the fallback, as it owns `/admin` and `/admin/users/...`. */
 function activeTabIndex(): number {
   const path = window.location.pathname;
-  return path === PUBLIC_PATH || path.startsWith(PUBLIC_PATH + '/') ? 1 : 0;
+  const index = TAB_PATHS.findIndex(
+    (tabPath) => tabPath !== USERS_PATH && (path === tabPath || path.startsWith(tabPath + '/'))
+  );
+  return index < 0 ? 0 : index;
 }
 
 /**
@@ -89,6 +93,16 @@ export class AdminPage extends Component<Props> {
                     <UserList
                       onSelect={(user) => navigate(`/admin/users/${user.id}`)}
                     />
+                  )}
+                />
+              </RouterSwitch>
+            </Tab>
+            <Tab label="Projects">
+              <RouterSwitch>
+                <Route
+                  path={PROJECTS_PATH}
+                  onRender={() => (
+                    <ProjectList onRun={(id) => navigate(`/game/${id}`)} />
                   )}
                 />
               </RouterSwitch>

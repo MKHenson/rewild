@@ -4,14 +4,24 @@ import com.rewild.auth.AuthService
 import com.rewild.auth.UserRole
 import com.rewild.db.tables.ProjectsTable
 import com.rewild.db.tables.UsersTable
+import com.rewild.db.tables.PublicGameTable
+import org.jetbrains.exposed.sql.Expression
 import org.jetbrains.exposed.sql.JoinType
+import org.jetbrains.exposed.sql.lowerCase
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.count
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+
+private const val DEFAULT_PAGE_SIZE = 25
+private const val MAX_PAGE_SIZE = 100
+
+enum class FlagResult { Success, NotFound, PublicGame }
 
 sealed interface UpdateUserResult {
     data class Success(val user: UserAccount) : UpdateUserResult
@@ -70,15 +80,33 @@ class AdminService(
         return true
     }
 
-    fun listProjects(): List<AdminProject> = transaction {
-        ProjectsTable
+    /** One page of every live project, sorted by [sort]. Ties fall back to newest first. */
+    fun listProjects(
+        page: Int = 0,
+        pageSize: Int = DEFAULT_PAGE_SIZE,
+        sort: AdminProjectSort = AdminProjectSort.UPDATED,
+        descending: Boolean = true,
+    ): AdminProjectPage = transaction {
+        val size = pageSize.coerceIn(1, MAX_PAGE_SIZE)
+        // Nulls sort as smallest, so the two directions are exact reverses: flagged first descending, last ascending.
+        val order = if (descending) SortOrder.DESC_NULLS_LAST else SortOrder.ASC_NULLS_FIRST
+        val sortColumn: Expression<*> = when (sort) {
+            AdminProjectSort.NAME -> ProjectsTable.name.lowerCase()
+            AdminProjectSort.AUTHOR -> UsersTable.displayName.lowerCase()
+            AdminProjectSort.UPDATED -> ProjectsTable.updatedAt
+            AdminProjectSort.FLAGGED -> ProjectsTable.flaggedAt
+        }
+
+        val query = ProjectsTable
             .join(UsersTable, JoinType.INNER, ProjectsTable.userId, UsersTable.id)
-            .select(
-                ProjectsTable.id, ProjectsTable.name, ProjectsTable.description, ProjectsTable.imageKey,
-                ProjectsTable.userId, ProjectsTable.updatedAt, UsersTable.displayName
-            )
+            .selectAll()
             .where { ProjectsTable.deletedAt.isNull() }
-            .orderBy(ProjectsTable.updatedAt, SortOrder.DESC)
+        val total = query.count()
+
+        val items = query
+            .orderBy(sortColumn to order, ProjectsTable.updatedAt to SortOrder.DESC, ProjectsTable.id to SortOrder.ASC)
+            .limit(size)
+            .offset(page.coerceAtLeast(0).toLong() * size)
             .map {
                 AdminProject(
                     id = it[ProjectsTable.id],
@@ -88,8 +116,32 @@ class AdminService(
                     authorId = it[ProjectsTable.userId],
                     authorName = it[UsersTable.displayName],
                     updatedAt = it[ProjectsTable.updatedAt],
+                    flaggedAt = it[ProjectsTable.flaggedAt],
                 )
             }
+        AdminProjectPage(items, total)
+    }
+
+    /** Blocks a live project. The public game cannot be flagged. */
+    fun flagProject(actorId: String, id: String): FlagResult = transaction {
+        val live = (ProjectsTable.id eq id) and ProjectsTable.deletedAt.isNull()
+        if (ProjectsTable.selectAll().where { live }.empty()) return@transaction FlagResult.NotFound
+        if (PublicGameTable.selectAll().where { PublicGameTable.projectId eq id }.any()) return@transaction FlagResult.PublicGame
+
+        ProjectsTable.update({ live and ProjectsTable.flaggedAt.isNull() }) {
+            it[flaggedAt] = System.currentTimeMillis()
+            it[flaggedBy] = actorId
+        }
+        FlagResult.Success
+    }
+
+    fun unflagProject(id: String): FlagResult = transaction {
+        val live = (ProjectsTable.id eq id) and ProjectsTable.deletedAt.isNull()
+        val updated = ProjectsTable.update({ live }) {
+            it[flaggedAt] = null
+            it[flaggedBy] = null
+        }
+        if (updated == 0) FlagResult.NotFound else FlagResult.Success
     }
 
     private fun projectCounts(userId: String?): Map<String, Long> {

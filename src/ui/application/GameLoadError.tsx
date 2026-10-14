@@ -1,5 +1,5 @@
 import { Button, Component, Modal, register, Typography } from 'rewild-ui';
-import { GameNotFoundError } from '../../api/play';
+import { GameBlockedError, GameNotFoundError } from '../../api/play';
 
 type Props = {
   error: Error;
@@ -13,7 +13,7 @@ export class GameLoadError extends Component<Props> {
     return () => {
       const { error } = this.props;
       const message =
-        error instanceof GameNotFoundError
+        error instanceof GameNotFoundError || error instanceof GameBlockedError
           ? error.message
           : `Something went wrong while loading the game. ${error.message}`;
 

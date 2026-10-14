@@ -2,6 +2,7 @@ package com.rewild
 
 import com.rewild.admin.AdminService
 import com.rewild.admin.adminRoutes
+import com.rewild.admin.projectFlagRoutes
 import com.rewild.assets.AssetCleanupService
 import com.rewild.assets.AssetService
 import com.rewild.assets.S3Client
@@ -112,7 +113,7 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
     val syncService = SyncService(projectService, levelService, assetCleanupService)
     val adminService = AdminService(authService, str("storage.bucketBaseUrl"))
     val publicGameService = PublicGameService(str("storage.bucketBaseUrl"))
-    val playService = PlayService(projectService, levelService, assetService, publicGameService)
+    val playService = PlayService(projectService, levelService, assetService, publicGameService, adminService::isSuperAdmin)
 
     val corsOrigin = environment.config.propertyOrNull("cors.allowedOrigin")?.getString()
     install(CORS) {
@@ -163,6 +164,7 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                     assetRoutes(assetService)
                     adminRoutes(adminService)
                     publicGameAdminRoutes(publicGameService, adminService::isSuperAdmin)
+                    projectFlagRoutes(adminService)
                 }
             } else {
                 playRoutes(playService)
@@ -172,6 +174,7 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                 assetRoutes(assetService)
                 adminRoutes(adminService)
                 publicGameAdminRoutes(publicGameService, adminService::isSuperAdmin)
+                projectFlagRoutes(adminService)
             }
         }
     }

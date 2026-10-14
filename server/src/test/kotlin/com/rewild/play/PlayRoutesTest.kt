@@ -3,6 +3,8 @@ package com.rewild.play
 import com.rewild.assets.AssetService
 import com.rewild.assets.S3Signer
 import com.rewild.auth.JwtService
+import com.rewild.common.ErrorResponse
+import com.rewild.db.tables.ProjectsTable
 import com.rewild.installTestAuth
 import com.rewild.levels.LevelService
 import com.rewild.makeTestJwtService
@@ -23,6 +25,8 @@ import io.ktor.server.testing.*
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import org.junit.AfterClass
 import org.junit.Before
 import org.junit.BeforeClass
@@ -43,6 +47,7 @@ class PlayRoutesTest {
         private lateinit var service: PlayService
         private const val BASE_URL = "https://fake-s3/public"
         private const val OWNER = "play-owner"
+        private const val ADMIN = "play-admin"
         private val json = Json { ignoreUnknownKeys = true }
 
         private val signer = object : S3Signer {
@@ -59,7 +64,7 @@ class PlayRoutesTest {
             levels = LevelService()
             assets = AssetService(signer, "test-bucket", BASE_URL)
             publicGame = PublicGameService(BASE_URL)
-            service = PlayService(projects, levels, assets, publicGame)
+            service = PlayService(projects, levels, assets, publicGame) { it == ADMIN }
         }
 
         @AfterClass
@@ -204,5 +209,43 @@ class PlayRoutesTest {
 
         val after = decode(play("play-reupload", OWNER)).assets.single().publicUrl
         assertNotEquals(before, after)
+    }
+
+    private fun flag(projectId: String) = transaction {
+        ProjectsTable.update({ ProjectsTable.id eq projectId }) {
+            it[flaggedAt] = System.currentTimeMillis()
+            it[flaggedBy] = ADMIN
+        }
+    }
+
+    @Test
+    fun `a super admin loads any project`() = testApplication {
+        installTestApp()
+        seed("play-admin-run")
+
+        assertEquals(HttpStatusCode.OK, play("play-admin-run", ADMIN).status)
+    }
+
+    @Test
+    fun `a flagged project still loads for its owner and super admins`() = testApplication {
+        installTestApp()
+        seed("play-flagged-own")
+        flag("play-flagged-own")
+
+        assertEquals(HttpStatusCode.OK, play("play-flagged-own", OWNER).status)
+        assertEquals(HttpStatusCode.OK, play("play-flagged-own", ADMIN).status)
+        assertEquals(HttpStatusCode.NotFound, play("play-flagged-own", "play-stranger").status)
+    }
+
+    @Test
+    fun `a flagged project tells everyone else to contact an admin`() = testApplication {
+        installTestApp()
+        seed("play-flagged-public")
+        publicGame.set("play-flagged-public")
+        flag("play-flagged-public")
+
+        val response = play("play-flagged-public")
+        assertEquals(HttpStatusCode.Forbidden, response.status)
+        assertTrue(json.decodeFromString<ErrorResponse>(response.bodyAsText()).error.contains("Contact an admin"))
     }
 }

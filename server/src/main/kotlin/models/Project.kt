@@ -16,7 +16,9 @@ data class Project(
     val deletedAt: Long? = null,
     val syncError: String? = null,
     // Set by the server from the uploaded image. Ignored on writes.
-    val imageUrl: String? = null
+    val imageUrl: String? = null,
+    // Set when a super admin blocks the project. Ignored on writes.
+    val flaggedAt: Long? = null
 )
 
 @Serializable

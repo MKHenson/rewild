@@ -35,6 +35,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PublicGameRoutesTest {
 
@@ -160,6 +161,18 @@ class PublicGameRoutesTest {
         val response = promote("pg-local-only")
         assertEquals(HttpStatusCode.BadRequest, response.status)
         assertEquals("The project is not saved on the server", json.decodeFromString<ErrorResponse>(response.bodyAsText()).error)
+        assertNull(service.get())
+    }
+
+    @Test
+    fun `PUT rejects a flagged project`() = testApplication {
+        installTestApp()
+        projectService.upsert(OWNER, makeProject("pg-flagged"))
+        adminService.flagProject(ADMIN, "pg-flagged")
+
+        val response = promote("pg-flagged")
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertTrue(json.decodeFromString<ErrorResponse>(response.bodyAsText()).error.contains("flagged"))
         assertNull(service.get())
     }
 
