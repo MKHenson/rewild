@@ -2,7 +2,7 @@ import { Icon } from "./Icon";
 import { Component, register } from "../Component";
 import { theme } from "../theme";
 
-type AvatarSize = 's' | 'm' | 'l';
+type AvatarSize = 'xs' | 's' | 'm' | 'l';
 
 interface Props {
   src?: string;
@@ -56,6 +56,12 @@ const StyledAvatar = cssStylesheet(css`
     width: 56px;
     height: 56px;
     border: 4px solid ${theme?.colors.secondary400};
+  }
+  :host([data-size='xs']) {
+    width: 24px;
+    height: 24px;
+    border: 1px solid ${theme?.colors.secondary400};
+    font-size: 0.75rem;
   }
   :host([data-size='s']) {
     width: 32px;

@@ -21,7 +21,7 @@ const columns: TableColumn<UserAccount>[] = [
   {
     label: '',
     width: '48px',
-    render: (user) => <Avatar src={user.photoUrl ?? undefined} size="s" />,
+    render: (user) => <Avatar src={user.photoUrl ?? undefined} size="xs" />,
   },
   { label: 'Name', render: (user) => user.displayName },
   { label: 'Email', width: '30%', render: (user) => user.email },

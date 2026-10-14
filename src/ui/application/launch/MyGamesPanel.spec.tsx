@@ -3,6 +3,7 @@ import { ILevel, IProject } from 'models';
 import { Table } from 'rewild-ui';
 import { MyGamesPanel } from './MyGamesPanel';
 import { authStore } from '../../stores/AuthStore';
+import { authService } from '../../../api/auth/auth-service';
 import { db } from 'src/database/database';
 import { clearDatabase } from 'src/database/local-db';
 
@@ -30,12 +31,22 @@ async function createPanel() {
 const table = (comp: MyGamesPanel) => comp.shadow!.querySelector('x-table') as Table;
 const rowNames = (comp: MyGamesPanel) =>
   Array.from(table(comp).shadow!.querySelectorAll('tbody tr')).map((tr) => tr.querySelector('td')!.textContent);
+const filterButton = (comp: MyGamesPanel, label: string) =>
+  Array.from(comp.shadow!.querySelectorAll('x-button')).find((b) => b.textContent?.trim() === label) as HTMLElement;
+
+const json = (body: unknown, status = 200) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: async () => body,
+});
+
 const details = (comp: MyGamesPanel) => comp.shadow!.querySelector('.details')!.textContent ?? '';
 
 describe('MyGamesPanel', () => {
   beforeEach(async () => {
     await clearDatabase('rewild');
     authStore.loggedIn = false;
+    jest.spyOn(authService, 'getToken').mockReturnValue(null);
     jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
   });
 
@@ -82,6 +93,59 @@ describe('MyGamesPanel', () => {
     const { comp } = await createPanel();
 
     expect(details(comp)).toContain('Mat');
+  });
+
+  it('shows no filter to logged out players', async () => {
+    const { comp } = await createPanel();
+
+    expect(comp.shadow!.querySelector('x-button-group')).toBeNull();
+  });
+
+  it('lists the games shared with a logged in player', async () => {
+    authStore.loggedIn = true;
+    await addProject('Mine', 1000);
+    const fetchMock = jest.fn(async (url: string) => {
+      if (url.endsWith('/api/projects?scope=shared'))
+        return json([
+          { id: 's2', name: 'Newer Share', description: 'From a friend', authorName: 'Ana', updatedAt: 2000 },
+          { id: 's1', name: 'Older Share', description: '', authorName: 'Ben', updatedAt: 1000 },
+        ]);
+      if (url.endsWith('/api/play/s2')) return json({ project: {}, levels: [{ id: 'l1', name: 'Fjord' }], assets: [] });
+      return json(null, 404);
+    });
+    global.fetch = fetchMock as never;
+
+    const { comp, onSelect } = await createPanel();
+    expect(rowNames(comp)).toEqual(['Mine']);
+
+    filterButton(comp, 'Shared Games').click();
+    for (let i = 0; i < 6; i++) await flush();
+
+    expect(rowNames(comp)).toEqual(['Newer Share', 'Older Share']);
+    expect(onSelect).toHaveBeenLastCalledWith('s2');
+    expect(details(comp)).toContain('Ana');
+    expect(details(comp)).toContain('Fjord');
+    expect(details(comp)).not.toContain('Saved to your account');
+
+    filterButton(comp, 'My Games').click();
+    for (let i = 0; i < 6; i++) await flush();
+
+    expect(rowNames(comp)).toEqual(['Mine']);
+  });
+
+  it('shows why the levels of a blocked shared game cannot load', async () => {
+    authStore.loggedIn = true;
+    global.fetch = jest.fn(async (url: string) => {
+      if (url.endsWith('/api/projects?scope=shared'))
+        return json([{ id: 's1', name: 'Blocked', description: '', authorName: 'Ana', updatedAt: 1000 }]);
+      return json({ error: 'This game is not available' }, 403);
+    }) as never;
+
+    const { comp } = await createPanel();
+    filterButton(comp, 'Shared Games').click();
+    for (let i = 0; i < 6; i++) await flush();
+
+    expect(details(comp)).toContain('This game is not available');
   });
 
   it('selects nothing when there are no projects', async () => {

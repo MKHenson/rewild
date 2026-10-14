@@ -17,6 +17,7 @@ import { getLevels } from '../../../../api/levels';
 import { PROJECT_IMAGE_TYPES, projectImageProblem } from '../../../../api/assets/asset-api';
 import { authService } from '../../../../api/auth/auth-service';
 import { db } from '../../../../database/database';
+import { ProjectSharingPanel } from './ProjectSharingPanel';
 
 interface Props {
   onClose: () => void;
@@ -37,10 +38,14 @@ export class ProjectSettingsDialog extends Component<Props> {
     const [imageUrl, setImageUrl] = this.useState(project.imageUrl ?? null);
     const [imagePending, setImagePending] = this.useState(false);
     const [imageError, setImageError] = this.useState<string | null>(null);
+    const [tab, setTab] = this.useState(0);
     // A blob URL for an image picked on this device and not yet uploaded.
     let previewUrl: string | null = null;
     // Set by a Save that failed validation, so the Modal's close that follows is skipped.
     let keepOpen = false;
+
+    // Built once, so a re-render of the dialog keeps its shares and the picker's text.
+    const sharingPanel = <ProjectSharingPanel project={project} />;
 
     const fileInput = (
       <input type="file" accept={PROJECT_IMAGE_TYPES.join(',')} hidden />
@@ -93,6 +98,7 @@ export class ProjectSettingsDialog extends Component<Props> {
       const trimmedName = name().trim();
       if (!trimmedName) {
         keepOpen = true;
+        setTab(0, false);
         setNameMissing(true);
         return;
       }
@@ -154,7 +160,10 @@ export class ProjectSettingsDialog extends Component<Props> {
           onClose={onModalClose}
           backgroundCanClose={false}
           css={ProjectSettingsModalOverrides}>
-          <Tabs orientation="vertical">
+          <Tabs
+            orientation="vertical"
+            activeIndex={tab()}
+            onChange={(index) => setTab(index)}>
             <Tab label="General">
               {field(
                 'Image',
@@ -216,6 +225,7 @@ export class ProjectSettingsDialog extends Component<Props> {
                 />
               )}
             </Tab>
+            <Tab label="Sharing">{sharingPanel}</Tab>
           </Tabs>
         </Modal>
       );

@@ -3,6 +3,7 @@ export * from './theme';
 export * from './utils/createUUID';
 export * from './utils/nautilus';
 export * from './utils/dragDrop';
+export * from './common/Autocomplete';
 export * from './common/Avatar';
 export * from './common/Breadcrumbs';
 export * from './common/Button';
