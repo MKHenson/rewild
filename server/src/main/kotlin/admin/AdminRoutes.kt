@@ -2,6 +2,7 @@ package com.rewild.admin
 
 import com.rewild.common.ErrorResponse
 import com.rewild.common.userId
+import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.put
@@ -20,13 +21,37 @@ fun Route.adminRoutes(service: AdminService) {
             get({
                 tags("Admin")
                 summary = "List projects"
-                description = "Returns every live project of every user, newest first. Super admin only."
+                description = "Returns one page of every live project of every user. Super admin only."
+                request {
+                    queryParameter<Int>("page") { description = "Zero-based page. Defaults to 0" }
+                    queryParameter<Int>("pageSize") { description = "Defaults to 25, at most 100" }
+                    queryParameter<String>("sort") { description = "name, author, updated or flagged. Defaults to updated" }
+                    queryParameter<String>("order") { description = "asc or desc. Defaults to desc" }
+                }
                 response {
-                    code(HttpStatusCode.OK) { body<List<AdminProject>>() }
+                    code(HttpStatusCode.OK) { body<AdminProjectPage>() }
+                    code(HttpStatusCode.BadRequest) { body<ErrorResponse>() }
                     code(HttpStatusCode.Forbidden) { body<ErrorResponse>() }
                 }
             }) {
-                call.respond(service.listProjects())
+                val params = call.request.queryParameters
+                val sort = params["sort"]?.let { value ->
+                    AdminProjectSort.entries.find { it.name.equals(value, ignoreCase = true) }
+                        ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Unknown sort"))
+                } ?: AdminProjectSort.UPDATED
+                val descending = when (params["order"]?.lowercase()) {
+                    null, "desc" -> true
+                    "asc" -> false
+                    else -> return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Unknown order"))
+                }
+                call.respond(
+                    service.listProjects(
+                        page = params["page"]?.toIntOrNull() ?: 0,
+                        pageSize = params["pageSize"]?.toIntOrNull() ?: 25,
+                        sort = sort,
+                        descending = descending,
+                    )
+                )
             }
         }
 
@@ -104,4 +129,49 @@ fun Route.adminRoutes(service: AdminService) {
             }
         }
     }
+}
+
+/** `/projects/{id}/flag`, beside the owner's project routes. Super admin only. */
+fun Route.projectFlagRoutes(service: AdminService) {
+    route("/projects/{id}/flag") {
+        install(SuperAdminGuard) { isSuperAdmin = service::isSuperAdmin }
+
+        post({
+            tags("Admin")
+            summary = "Flag project"
+            description = "Blocks a project: only its owner and super admins can play it. The public game cannot be flagged. Super admin only."
+            request { pathParameter<String>("id") { description = "Project ID" } }
+            response {
+                code(HttpStatusCode.NoContent) { description = "Flagged" }
+                code(HttpStatusCode.NotFound) { body<ErrorResponse>() }
+                code(HttpStatusCode.Conflict) { body<ErrorResponse>() }
+                code(HttpStatusCode.Forbidden) { body<ErrorResponse>() }
+            }
+        }) {
+            call.respondFlagResult(service.flagProject(call.userId(), call.parameters["id"]!!))
+        }
+
+        delete({
+            tags("Admin")
+            summary = "Unflag project"
+            description = "Lifts the block on a project. Super admin only."
+            request { pathParameter<String>("id") { description = "Project ID" } }
+            response {
+                code(HttpStatusCode.NoContent) { description = "Unflagged" }
+                code(HttpStatusCode.NotFound) { body<ErrorResponse>() }
+                code(HttpStatusCode.Forbidden) { body<ErrorResponse>() }
+            }
+        }) {
+            call.respondFlagResult(service.unflagProject(call.parameters["id"]!!))
+        }
+    }
+}
+
+private suspend fun ApplicationCall.respondFlagResult(result: FlagResult) = when (result) {
+    FlagResult.Success -> respond(HttpStatusCode.NoContent)
+    FlagResult.NotFound -> respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+    FlagResult.PublicGame -> respond(
+        HttpStatusCode.Conflict,
+        ErrorResponse("This project is the public game. Remove it from Story Mode before you flag it")
+    )
 }

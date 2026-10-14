@@ -26,7 +26,7 @@ const columns: TableColumn<Project>[] = [
   {
     label: 'Last modified',
     width: '220px',
-    render: (p) => <DateView date={p.updatedAt} />,
+    render: (p) => <DateView date={p.updatedAt} variant="short" />,
   },
 ];
 

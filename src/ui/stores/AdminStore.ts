@@ -23,6 +23,9 @@ export class AdminStore {
   loading = false;
   error?: string;
   users: UserAccount[] = [];
+  /** The user list's paging. Kept here so it survives a visit to a user's page. */
+  usersPage = 0;
+  usersPerPage = 25;
 
   readonly dispatcher = new Dispatcher<AdminStoreEvents>();
 
@@ -38,6 +41,17 @@ export class AdminStore {
     }
 
     this.loading = false;
+    this.dispatcher.dispatch({ kind: 'changed' });
+  }
+
+  setUsersPage(page: number) {
+    this.usersPage = page;
+    this.dispatcher.dispatch({ kind: 'changed' });
+  }
+
+  setUsersPerPage(rowsPerPage: number) {
+    this.usersPerPage = rowsPerPage;
+    this.usersPage = 0;
     this.dispatcher.dispatch({ kind: 'changed' });
   }
 

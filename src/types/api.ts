@@ -432,7 +432,7 @@ export interface paths {
         };
         /**
          * Load a project to play
-         * @description Returns the project, its levels and their files. Auth is optional. Allowed for the public game and the owner. Everyone else gets 404
+         * @description Returns the project, its levels and their files. Auth is optional. Allowed for the public game, the owner and super admins. Everyone else gets 404. A flagged project gets 403 for everyone but the owner and super admins
          */
         get: {
             parameters: {
@@ -452,6 +452,14 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["com.rewild.models.PlayProject"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
                     };
                 };
                 404: {
@@ -1158,11 +1166,20 @@ export interface paths {
         };
         /**
          * List projects
-         * @description Returns every live project of every user, newest first. Super admin only.
+         * @description Returns one page of every live project of every user. Super admin only.
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Zero-based page. Defaults to 0 */
+                    page?: number;
+                    /** @description Defaults to 25, at most 100 */
+                    pageSize?: number;
+                    /** @description name, author, updated or flagged. Defaults to updated */
+                    sort?: string;
+                    /** @description asc or desc. Defaults to desc */
+                    order?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -1174,7 +1191,15 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["com.rewild.admin.AdminProject"][];
+                        "application/json": components["schemas"]["com.rewild.admin.AdminProjectPage"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
                     };
                 };
                 403: {
@@ -1407,6 +1432,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{id}/flag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Flag project
+         * @description Blocks a project: only its owner and super admins can play it. The public game cannot be flagged. Super admin only.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Flagged */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /**
+         * Unflag project
+         * @description Lifts the block on a project. Super admin only.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Unflagged */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1610,6 +1739,11 @@ export interface components {
             deletedAt?: null | number;
             /** String */
             description: string;
+            /**
+             * Long
+             * Format: int64
+             */
+            flaggedAt?: null | number;
             /** String */
             id: string;
             /** String */
@@ -1811,6 +1945,11 @@ export interface components {
             authorName: string;
             /** String */
             description: string;
+            /**
+             * Long
+             * Format: int64
+             */
+            flaggedAt?: null | number;
             /** String */
             id: string;
             /** String */
@@ -1822,6 +1961,16 @@ export interface components {
              * Format: int64
              */
             updatedAt: number;
+        };
+        /** AdminProjectPage */
+        "com.rewild.admin.AdminProjectPage": {
+            /** List<AdminProject> */
+            items: components["schemas"]["com.rewild.admin.AdminProject"][];
+            /**
+             * Long
+             * Format: int64
+             */
+            total: number;
         };
         /** UserAccount */
         "com.rewild.admin.UserAccount": {

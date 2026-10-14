@@ -1,7 +1,7 @@
 import 'rewild-ui/compiler/jsx';
 import { Button } from 'rewild-ui';
 import { GameLoadError } from './GameLoadError';
-import { GameNotFoundError } from '../../api/play';
+import { GameBlockedError, GameNotFoundError } from '../../api/play';
 
 function createError(error: Error) {
   const onQuit = jest.fn();
@@ -20,6 +20,12 @@ describe('GameLoadError', () => {
   it('tells the player a missing or private game was not found', () => {
     const { comp } = createError(new GameNotFoundError());
     expect(comp.shadow!.textContent).toContain('This game could not be found');
+  });
+
+  it('shows the message for a flagged game as is', () => {
+    const { comp } = createError(new GameBlockedError('Contact an admin'));
+    expect(comp.shadow!.textContent).toContain('Contact an admin');
+    expect(comp.shadow!.textContent).not.toContain('Something went wrong');
   });
 
   it('shows the reason for any other failure', () => {

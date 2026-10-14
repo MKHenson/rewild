@@ -33,10 +33,11 @@ export class PublicGamePanel extends Component {
 
     const load = async () => {
       try {
-        const [list, game] = await Promise.all([
-          getAdminProjects(),
+        const [page, game] = await Promise.all([
+          getAdminProjects({ pageSize: 100 }),
           getPublicGame(),
         ]);
+        const list = page.items.filter((p) => !p.flaggedAt);
         setSavedId(game?.id ?? NONE, false);
         setSelected(game?.id ?? NONE, false);
         setProjects(list);

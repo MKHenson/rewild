@@ -25,6 +25,8 @@ const PROJECTS = [
   },
 ];
 
+const FLAGGED = { ...PROJECTS[0], id: 'p3', name: 'Blocked', flaggedAt: 5 };
+
 const json = (body: unknown, status = 200) => ({
   ok: status >= 200 && status < 300,
   status,
@@ -68,7 +70,8 @@ describe('PublicGamePanel', () => {
     jest.spyOn(authService, 'getToken').mockReturnValue(null);
     jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
     fetchMock = jest.fn(async (url: string, init?: RequestInit) => {
-      if (url.endsWith('/api/admin/projects')) return json(PROJECTS);
+      if (url.includes('/api/admin/projects'))
+        return json({ items: [...PROJECTS, FLAGGED], total: 3 });
       if (init?.method === 'PUT') {
         const body = JSON.parse(init.body as string);
         putBodies.push(body);
@@ -85,7 +88,7 @@ describe('PublicGamePanel', () => {
     jest.restoreAllMocks();
   });
 
-  it('preselects the public game and lists every project with its author', async () => {
+  it('preselects the public game and lists every unflagged project with its author', async () => {
     const comp = await createPanel();
     const select = getSelect(comp);
 

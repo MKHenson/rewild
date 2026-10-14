@@ -27,4 +27,14 @@ data class AdminProject(
     val authorId: String,
     val authorName: String,
     val updatedAt: Long,
+    val flaggedAt: Long?,
 )
+
+@Serializable
+data class AdminProjectPage(
+    val items: List<AdminProject>,
+    // Live projects across all pages.
+    val total: Long,
+)
+
+enum class AdminProjectSort { NAME, AUTHOR, UPDATED, FLAGGED }

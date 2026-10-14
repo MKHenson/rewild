@@ -326,7 +326,7 @@
                     "Play"
                 ],
                 "summary": "Load a project to play",
-                "description": "Returns the project, its levels and their files. Auth is optional. Allowed for the public game and the owner. Everyone else gets 404",
+                "description": "Returns the project, its levels and their files. Auth is optional. Allowed for the public game, the owner and super admins. Everyone else gets 404. A flagged project gets 403 for everyone but the owner and super admins",
                 "parameters": [
                     {
                         "name": "projectId",
@@ -353,6 +353,16 @@
                         }
                     },
                     "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
                         "headers": {},
                         "content": {
                             "application/json": {
@@ -1054,19 +1064,76 @@
                     "Admin"
                 ],
                 "summary": "List projects",
-                "description": "Returns every live project of every user, newest first. Super admin only.",
-                "parameters": [],
+                "description": "Returns one page of every live project of every user. Super admin only.",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Zero-based page. Defaults to 0",
+                        "required": false,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "title": "Int"
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Defaults to 25, at most 100",
+                        "required": false,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "title": "Int"
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "name, author, updated or flagged. Defaults to updated",
+                        "required": false,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "description": "asc or desc. Defaults to desc",
+                        "required": false,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "headers": {},
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/com.rewild.admin.AdminProject"
-                                    },
-                                    "title": "List<AdminProject>"
+                                    "$ref": "#/components/schemas/com.rewild.admin.AdminProjectPage"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
                                 }
                             }
                         }
@@ -1276,6 +1343,114 @@
                 "responses": {
                     "204": {
                         "description": "Reset email sent",
+                        "headers": {}
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/projects/{id}/flag": {
+            "post": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Flag project",
+                "description": "Blocks a project: only its owner and super admins can play it. The public game cannot be flagged. Super admin only.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Flagged",
+                        "headers": {}
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "delete": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Unflag project",
+                "description": "Lifts the block on a project. Super admin only.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Unflagged",
                         "headers": {}
                     },
                     "404": {
@@ -1815,6 +1990,14 @@
                     "description": {
                         "type": "string",
                         "title": "String"
+                    },
+                    "flaggedAt": {
+                        "type": [
+                            "null",
+                            "integer"
+                        ],
+                        "format": "int64",
+                        "title": "Long"
                     },
                     "id": {
                         "type": "string",
@@ -2400,6 +2583,14 @@
                         "type": "string",
                         "title": "String"
                     },
+                    "flaggedAt": {
+                        "type": [
+                            "null",
+                            "integer"
+                        ],
+                        "format": "int64",
+                        "title": "Long"
+                    },
                     "id": {
                         "type": "string",
                         "title": "String"
@@ -2430,6 +2621,28 @@
                     "updatedAt"
                 ],
                 "title": "AdminProject"
+            },
+            "com.rewild.admin.AdminProjectPage": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/com.rewild.admin.AdminProject"
+                        },
+                        "title": "List<AdminProject>"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    }
+                },
+                "required": [
+                    "items",
+                    "total"
+                ],
+                "title": "AdminProjectPage"
             },
             "com.rewild.admin.UserAccount": {
                 "type": "object",

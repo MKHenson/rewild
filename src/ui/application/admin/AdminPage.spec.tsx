@@ -38,8 +38,8 @@ describe('AdminPage', () => {
       ok: true,
       status: 200,
       json: async () =>
-        url.endsWith('/api/admin/projects')
-          ? PROJECTS
+        url.includes('/api/admin/projects')
+          ? { items: PROJECTS, total: PROJECTS.length }
           : { id: 'p1', name: 'Valley', description: '', imageUrl: null },
     })) as never;
     jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);

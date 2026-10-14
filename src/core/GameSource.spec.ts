@@ -1,6 +1,6 @@
 import { ILevel, IProject } from 'models';
 import { loadGameSource } from './GameSource';
-import { GameNotFoundError } from '../api/play';
+import { GameBlockedError, GameNotFoundError } from '../api/play';
 import { authService } from '../api/auth/auth-service';
 import { db } from '../database/database';
 import { installOPFSMock } from '../database/opfs-mock';
@@ -44,7 +44,13 @@ describe('loadGameSource', () => {
     installOPFSMock();
     jest.spyOn(authService, 'getToken').mockReturnValue(null);
     fetchMock = jest.fn(async (url: string) =>
-      url.includes('/api/play/remote-p') ? json(playResponse) : url.includes('/api/play/') ? json({ error: 'Not found' }, 404) : json(null)
+      url.includes('/api/play/remote-p')
+        ? json(playResponse)
+        : url.includes('/api/play/blocked-p')
+          ? json({ error: 'Contact an admin' }, 403)
+          : url.includes('/api/play/')
+            ? json({ error: 'Not found' }, 404)
+            : json(null)
     );
     global.fetch = fetchMock as never;
   });
@@ -74,6 +80,12 @@ describe('loadGameSource', () => {
     expect(fetchMock).toHaveBeenLastCalledWith('https://cdn/start/0_0.bin?v=1');
     expect(await source.read!('chunk', '1_0.bin')).toBeNull();
     expect(await db.projects.getOne('remote-p')).toBeFalsy();
+  });
+
+  it('throws GameBlockedError with the server message for a flagged project', async () => {
+    const error = await loadGameSource('blocked-p').catch((e) => e);
+    expect(error).toBeInstanceOf(GameBlockedError);
+    expect(error.message).toBe('Contact an admin');
   });
 
   it('throws GameNotFoundError when the server does not let the player load it', async () => {

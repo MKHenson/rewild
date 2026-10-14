@@ -33,15 +33,16 @@ class PublicGameService(private val bucketBaseUrl: String = "") {
             }
     }
 
-    /** Promotes a project saved on the server, or clears the promotion when [projectId] is null. */
+    /** Promotes a live, unflagged project, or clears the promotion when [projectId] is null. */
     fun set(projectId: String?): SetPublicGameResult {
         if (projectId != null) {
-            val saved = transaction {
+            val project = transaction {
                 ProjectsTable.selectAll()
                     .where { (ProjectsTable.id eq projectId) and ProjectsTable.deletedAt.isNull() }
-                    .any()
-            }
-            if (!saved) return SetPublicGameResult.Invalid("The project is not saved on the server")
+                    .firstOrNull()
+            } ?: return SetPublicGameResult.Invalid("The project is not saved on the server")
+            if (project[ProjectsTable.flaggedAt] != null)
+                return SetPublicGameResult.Invalid("The project is flagged. Unflag it before you promote it")
         }
 
         transaction {

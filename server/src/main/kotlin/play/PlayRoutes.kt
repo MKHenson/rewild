@@ -15,16 +15,22 @@ fun Route.playRoutes(service: PlayService) {
         get({
             tags("Play")
             summary = "Load a project to play"
-            description = "Returns the project, its levels and their files. Auth is optional. Allowed for the public game and the owner. Everyone else gets 404"
+            description = "Returns the project, its levels and their files. Auth is optional. Allowed for the public game, the owner and super admins. Everyone else gets 404. A flagged project gets 403 for everyone but the owner and super admins"
             request { pathParameter<String>("projectId") { description = "Project ID" } }
             response {
                 code(HttpStatusCode.OK) { body<PlayProject>() }
                 code(HttpStatusCode.NotFound) { body<ErrorResponse>() }
+                code(HttpStatusCode.Forbidden) { body<ErrorResponse>() }
             }
         }) {
-            val data = service.load(call.userIdOrNull(), call.parameters["projectId"]!!)
-                ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
-            call.respond(data)
+            when (val result = service.load(call.userIdOrNull(), call.parameters["projectId"]!!)) {
+                is PlayResult.Success -> call.respond(result.data)
+                PlayResult.NotFound -> call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+                PlayResult.Flagged -> call.respond(
+                    HttpStatusCode.Forbidden,
+                    ErrorResponse("This game is not available. Contact an admin if you think this is a mistake")
+                )
+            }
         }
     }
 }

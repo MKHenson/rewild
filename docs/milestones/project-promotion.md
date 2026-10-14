@@ -309,7 +309,7 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
   - Expect: a player starts any of their own projects from the main menu, logged in or not. The 'Shared Games' filter is not there yet.
   - Depends on: 1, 7.
 
-- [ ] **9. Admin projects tab and flagging**
+- [x] **9. Admin projects tab and flagging**
 
   - Scope: `flagged_at` and `flagged_by` columns. Flag and unflag endpoints for super admins only. Paging, sorting and the flag state on `GET /api/admin/projects`. `PUT /api/public-game` rejects a flagged project. The play endpoint allows super admins. A Projects tab at `/admin/projects` with a run link and a Flag / Unflag action behind a confirm dialog. The play endpoint returns a general "contact an admin" error for a flagged project to all callers except the owner and super admins. The public project cannot be flagged.
   - Expect: an admin finds any project, runs it, and blocks it in a few clicks. Players cannot start a flagged project.
