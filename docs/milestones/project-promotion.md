@@ -315,7 +315,7 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
   - Expect: an admin finds any project, runs it, and blocks it in a few clicks. Players cannot start a flagged project.
   - Depends on: 6. Must ship before ticket 10 goes live.
 
-- [ ] **10. Sharing: server and user search**
+- [x] **10. Sharing: server and user search**
 
   - Scope: `project_shares` table and the owner endpoints to list, add and revoke. `GET /api/projects?scope=mine|shared`. The play endpoint allows users with a share. `GET /api/users/search` with the privacy rules. Shares are rejected for flagged projects and for projects not saved on the server.
   - Expect: a user starts a project shared with them through the play endpoint. After a revoke or a flag, their next start fails with an error. The search never returns another user's email.

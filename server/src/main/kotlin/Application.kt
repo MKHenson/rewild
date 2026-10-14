@@ -22,8 +22,12 @@ import com.rewild.projects.projectRoutes
 import com.rewild.publicgame.PublicGameService
 import com.rewild.publicgame.publicGameAdminRoutes
 import com.rewild.publicgame.publicGameRoutes
+import com.rewild.shares.ShareService
+import com.rewild.shares.shareRoutes
 import com.rewild.sync.SyncService
 import com.rewild.sync.syncRoutes
+import com.rewild.users.UserService
+import com.rewild.users.userRoutes
 import io.github.smiley4.ktoropenapi.OpenApi
 import io.github.smiley4.ktoropenapi.openApi
 import io.github.smiley4.ktoropenapi.post
@@ -113,7 +117,9 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
     val syncService = SyncService(projectService, levelService, assetCleanupService)
     val adminService = AdminService(authService, str("storage.bucketBaseUrl"))
     val publicGameService = PublicGameService(str("storage.bucketBaseUrl"))
-    val playService = PlayService(projectService, levelService, assetService, publicGameService, adminService::isSuperAdmin)
+    val shareService = ShareService()
+    val userService = UserService()
+    val playService = PlayService(projectService, levelService, assetService, publicGameService, shareService, adminService::isSuperAdmin)
 
     val corsOrigin = environment.config.propertyOrNull("cors.allowedOrigin")?.getString()
     install(CORS) {
@@ -165,6 +171,8 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                     adminRoutes(adminService)
                     publicGameAdminRoutes(publicGameService, adminService::isSuperAdmin)
                     projectFlagRoutes(adminService)
+                    shareRoutes(shareService)
+                    userRoutes(userService)
                 }
             } else {
                 playRoutes(playService)
@@ -175,6 +183,8 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                 adminRoutes(adminService)
                 publicGameAdminRoutes(publicGameService, adminService::isSuperAdmin)
                 projectFlagRoutes(adminService)
+                shareRoutes(shareService)
+                userRoutes(userService)
             }
         }
     }

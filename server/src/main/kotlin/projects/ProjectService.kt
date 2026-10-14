@@ -3,8 +3,10 @@ package com.rewild.projects
 import com.rewild.assets.AssetCleanupService
 import com.rewild.common.DeleteResult
 import com.rewild.db.tables.LevelsTable
+import com.rewild.db.tables.ProjectSharesTable
 import com.rewild.db.tables.ProjectsTable
 import com.rewild.db.tables.PublicGameTable
+import com.rewild.db.tables.UsersTable
 import com.rewild.models.Project
 import com.rewild.models.SceneGraph
 import kotlinx.serialization.encodeToString
@@ -17,15 +19,27 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 private val json = Json { ignoreUnknownKeys = true }
 
+enum class ProjectScope { MINE, SHARED }
+
 class ProjectService(
     private val cleanup: AssetCleanupService? = null,
     private val bucketBaseUrl: String = ""
 ) {
 
-    fun getAll(userId: String): List<Project> = transaction {
-        ProjectsTable.selectAll()
-            .where { (ProjectsTable.userId eq userId) and ProjectsTable.deletedAt.isNull() }
-            .map { it.toProject() }
+    /** Live projects the caller owns, or that are shared with the caller, newest first, with the author's name. */
+    fun list(userId: String, scope: ProjectScope): List<Project> = transaction {
+        val live = ProjectsTable.deletedAt.isNull()
+        val base = ProjectsTable.join(UsersTable, JoinType.LEFT, ProjectsTable.userId, UsersTable.id)
+        val query = when (scope) {
+            ProjectScope.MINE -> base.selectAll().where { live and (ProjectsTable.userId eq userId) }
+            ProjectScope.SHARED -> base
+                .join(ProjectSharesTable, JoinType.INNER, ProjectsTable.id, ProjectSharesTable.projectId)
+                .selectAll()
+                .where { live and (ProjectSharesTable.userId eq userId) }
+        }
+        query
+            .orderBy(ProjectsTable.updatedAt to SortOrder.DESC, ProjectsTable.id to SortOrder.ASC)
+            .map { it.toProject().copy(authorName = it[UsersTable.displayName]) }
     }
 
     fun getById(userId: String, id: String): Project? = transaction {
@@ -118,6 +132,7 @@ class ProjectService(
                 it[syncedAt] = now
                 it[imageKey] = null
             }
+            ProjectSharesTable.deleteWhere { projectId eq id }
             DeleteResult.Success
         }
 

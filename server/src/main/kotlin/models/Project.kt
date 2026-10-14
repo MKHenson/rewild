@@ -18,7 +18,9 @@ data class Project(
     // Set by the server from the uploaded image. Ignored on writes.
     val imageUrl: String? = null,
     // Set when a super admin blocks the project. Ignored on writes.
-    val flaggedAt: Long? = null
+    val flaggedAt: Long? = null,
+    // The owner's display name, set by the server on project lists. Ignored on writes.
+    val authorName: String? = null
 )
 
 @Serializable

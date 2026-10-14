@@ -15,6 +15,7 @@ import com.rewild.models.Project
 import com.rewild.models.SceneGraph
 import com.rewild.projects.ProjectService
 import com.rewild.publicgame.PublicGameService
+import com.rewild.shares.ShareService
 import com.rewild.startTestDatabase
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -64,7 +65,7 @@ class PlayRoutesTest {
             levels = LevelService()
             assets = AssetService(signer, "test-bucket", BASE_URL)
             publicGame = PublicGameService(BASE_URL)
-            service = PlayService(projects, levels, assets, publicGame) { it == ADMIN }
+            service = PlayService(projects, levels, assets, publicGame, ShareService()) { it == ADMIN }
         }
 
         @AfterClass

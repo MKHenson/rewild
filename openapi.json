@@ -326,7 +326,7 @@
                     "Play"
                 ],
                 "summary": "Load a project to play",
-                "description": "Returns the project, its levels and their files. Auth is optional. Allowed for the public game, the owner and super admins. Everyone else gets 404. A flagged project gets 403 for everyone but the owner and super admins",
+                "description": "Returns the project, its levels and their files. Auth is optional. Allowed for the public game, the owner, users it is shared with and super admins. Everyone else gets 404. A flagged project gets 403 for everyone but the owner and super admins",
                 "parameters": [
                     {
                         "name": "projectId",
@@ -382,8 +382,21 @@
                     "Projects"
                 ],
                 "summary": "List projects",
-                "description": "Returns all projects for the authenticated user",
-                "parameters": [],
+                "description": "Returns the live projects the caller owns, or that are shared with the caller, newest first",
+                "parameters": [
+                    {
+                        "name": "scope",
+                        "in": "query",
+                        "description": "mine or shared. Defaults to mine",
+                        "required": false,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "headers": {},
@@ -395,6 +408,16 @@
                                         "$ref": "#/components/schemas/com.rewild.models.Project"
                                     },
                                     "title": "List<Project>"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
                                 }
                             }
                         }
@@ -1476,6 +1499,252 @@
                 },
                 "deprecated": false
             }
+        },
+        "/api/projects/{id}/shares": {
+            "get": {
+                "tags": [
+                    "Shares"
+                ],
+                "summary": "List shares",
+                "description": "Owner only. Returns the users the project is shared with, newest first",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/com.rewild.models.ProjectShare"
+                                    },
+                                    "title": "List<ProjectShare>"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "post": {
+                "tags": [
+                    "Shares"
+                ],
+                "summary": "Add share",
+                "description": "Owner only. Gives a user play access to the project. Adding an existing share returns it. A flagged project cannot be shared",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.AddShareRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.ProjectShare"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/projects/{id}/shares/{userId}": {
+            "delete": {
+                "tags": [
+                    "Shares"
+                ],
+                "summary": "Revoke share",
+                "description": "Owner only. Removes a user's play access. It takes effect on their next start",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    },
+                    {
+                        "name": "userId",
+                        "in": "path",
+                        "description": "User ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Share revoked",
+                        "headers": {}
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/users/search": {
+            "get": {
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Search users",
+                "description": "Matches a display name by prefix (2 characters minimum) or an email exactly. Returns at most 10 users, never the caller and never an email",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Display name prefix or exact email",
+                        "required": false,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/com.rewild.models.UserSummary"
+                                    },
+                                    "title": "List<UserSummary>"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
         }
     },
     "components": {
@@ -1979,6 +2248,13 @@
             "com.rewild.models.Project": {
                 "type": "object",
                 "properties": {
+                    "authorName": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
                     "deletedAt": {
                         "type": [
                             "null",
@@ -2731,6 +3007,87 @@
                     }
                 },
                 "title": "SetPublicGameRequest"
+            },
+            "com.rewild.models.ProjectShare": {
+                "type": "object",
+                "properties": {
+                    "createdAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    },
+                    "displayName": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "grantedBy": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "grantedByName": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "photoUrl": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "userId": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "createdAt",
+                    "displayName",
+                    "grantedBy",
+                    "userId"
+                ],
+                "title": "ProjectShare"
+            },
+            "com.rewild.models.AddShareRequest": {
+                "type": "object",
+                "properties": {
+                    "userId": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "userId"
+                ],
+                "title": "AddShareRequest"
+            },
+            "com.rewild.models.UserSummary": {
+                "type": "object",
+                "properties": {
+                    "displayName": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "photoUrl": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "displayName",
+                    "id"
+                ],
+                "title": "UserSummary"
             }
         },
         "examples": {}
