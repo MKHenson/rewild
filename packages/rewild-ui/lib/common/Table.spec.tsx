@@ -1,5 +1,5 @@
 import '../../compiler/jsx';
-import { Table, TableColumn, TableProps } from './Table';
+import { nextSort, Table, TableColumn, TableProps } from './Table';
 
 type Row = { id: string; name: string };
 
@@ -73,6 +73,49 @@ describe('Table', () => {
     const table = renderTable({ rows: [{ id: '1', name: 'Ada' }] });
     const tr = table.shadow!.querySelector('tbody tr') as HTMLElement;
     expect(tr.classList.contains('clickable')).toBe(false);
+  });
+
+  describe('sorting', () => {
+    const sortable: TableColumn<Row>[] = [
+      { label: 'ID', render: (row) => row.id },
+      { label: 'Name', sortKey: 'name', render: (row) => row.name },
+    ];
+
+    const headers = (table: Table<Row>) => table.shadow!.querySelectorAll('th');
+
+    it('makes only columns with a sortKey clickable', () => {
+      const table = renderTable({ columns: sortable });
+      expect(headers(table)[0].querySelector('button')).toBeNull();
+      expect(headers(table)[1].querySelector('button.sort')).not.toBeNull();
+      expect(headers(table)[1].getAttribute('aria-sort')).toBe('none');
+    });
+
+    it('marks the sorted column and its direction', () => {
+      const asc = renderTable({ columns: sortable, sort: { key: 'name', direction: 'asc' } });
+      const desc = renderTable({ columns: sortable, sort: { key: 'name', direction: 'desc' } });
+
+      expect(headers(asc)[1].getAttribute('aria-sort')).toBe('ascending');
+      expect(headers(asc)[1].querySelector('button')!.classList.contains('active')).toBe(true);
+      expect((headers(asc)[1].querySelector('x-icon') as any).props.icon).toBe('chevron-up');
+      expect(headers(desc)[1].getAttribute('aria-sort')).toBe('descending');
+      expect((headers(desc)[1].querySelector('x-icon') as any).props.icon).toBe('chevron-down');
+    });
+
+    it('reports the next sort on a header click', () => {
+      const onSortChange = jest.fn();
+      const table = renderTable({ columns: sortable, sort: { key: 'name', direction: 'asc' }, onSortChange });
+
+      (headers(table)[1].querySelector('button') as HTMLButtonElement).click();
+
+      expect(onSortChange).toHaveBeenCalledWith({ key: 'name', direction: 'desc' });
+    });
+
+    it('cycles ascending, descending, then off', () => {
+      expect(nextSort(null, 'name')).toEqual({ key: 'name', direction: 'asc' });
+      expect(nextSort({ key: 'name', direction: 'asc' }, 'name')).toEqual({ key: 'name', direction: 'desc' });
+      expect(nextSort({ key: 'name', direction: 'desc' }, 'name')).toBeNull();
+      expect(nextSort({ key: 'age', direction: 'desc' }, 'name')).toEqual({ key: 'name', direction: 'asc' });
+    });
   });
 
   it('marks the rows isSelected picks', () => {

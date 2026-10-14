@@ -1,4 +1,5 @@
 import { Loading } from './Loading';
+import { Icon } from './Icon';
 import { Component, register } from '../Component';
 import { theme } from '../theme';
 
@@ -7,6 +8,21 @@ export interface TableColumn<T> {
   render: (row: T) => JSX.ChildElement;
   /** Any CSS width, e.g. `120px` or `20%`. Columns without one share the rest. */
   width?: string;
+  /** Makes the header a sort control that reports this key. */
+  sortKey?: string;
+}
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface TableSort {
+  key: string;
+  direction: SortDirection;
+}
+
+/** The sort after a click on `key`'s header: ascending, then descending, then off. */
+export function nextSort(current: TableSort | null, key: string): TableSort | null {
+  if (current?.key !== key) return { key, direction: 'asc' };
+  return current.direction === 'asc' ? { key, direction: 'desc' } : null;
 }
 
 export interface TableProps<T> {
@@ -18,14 +34,26 @@ export interface TableProps<T> {
   onRowClick?: (row: T) => void;
   /** Highlights the rows it returns true for. */
   isSelected?: (row: T) => boolean;
+  /** The active sort, shown on its column's header. The owner sorts the rows. */
+  sort?: TableSort | null;
+  /** Called with the next sort when a sortable header is clicked. */
+  onSortChange?: (sort: TableSort | null) => void;
 }
 
 @register('x-table')
 export class Table<T = any> extends Component<TableProps<T>> {
   init() {
     return () => {
-      const { columns, rows, loading, emptyMessage, onRowClick, isSelected } =
-        this.props;
+      const {
+        columns,
+        rows,
+        loading,
+        emptyMessage,
+        onRowClick,
+        isSelected,
+        sort,
+        onSortChange,
+      } = this.props;
       const span = String(columns.length);
 
       let body: JSX.ChildElement | JSX.ChildElement[];
@@ -85,9 +113,31 @@ export class Table<T = any> extends Component<TableProps<T>> {
           </colgroup>
           <thead>
             <tr>
-              {columns.map((column) => (
-                <th>{column.label}</th>
-              ))}
+              {columns.map((column) => {
+                if (!column.sortKey) return <th>{column.label}</th>;
+
+                const key = column.sortKey;
+                const direction = sort?.key === key ? sort.direction : null;
+                const th = (
+                  <th>
+                    <button
+                      type="button"
+                      class={direction ? 'sort active' : 'sort'}
+                      onclick={() => onSortChange?.(nextSort(sort ?? null, key))}>
+                      <span>{column.label}</span>
+                      <Icon
+                        icon={direction === 'desc' ? 'chevron-down' : 'chevron-up'}
+                        size="xs"
+                      />
+                    </button>
+                  </th>
+                ) as HTMLTableCellElement;
+                th.setAttribute(
+                  'aria-sort',
+                  direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : 'none'
+                );
+                return th;
+              })}
             </tr>
           </thead>
           <tbody>{body}</tbody>
@@ -124,6 +174,49 @@ const StyledTable = cssStylesheet(css`
     font-weight: 500;
     color: ${theme.colors.onSurfaceLight};
     border-bottom: 1px solid ${theme.colors.subtle600};
+  }
+
+  /* After MUI's TableSortLabel: the arrow shows faintly on hover and fully on the sorted column. */
+  .sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    max-width: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .sort span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sort x-icon {
+    flex: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+
+  .sort:hover,
+  .sort.active {
+    color: ${theme.colors.onSurface};
+  }
+
+  .sort:hover x-icon {
+    opacity: 0.5;
+  }
+
+  .sort.active x-icon {
+    opacity: 1;
+  }
+
+  .sort:focus-visible {
+    outline: 2px solid ${theme.colors.primary400};
+    outline-offset: 2px;
   }
 
   th,
