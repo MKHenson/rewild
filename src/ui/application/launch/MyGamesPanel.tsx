@@ -1,5 +1,7 @@
-import { ILevel, IProject, StoredRecord } from 'models';
+import { IProject, StoredRecord } from 'models';
 import {
+  Button,
+  ButtonGroup,
   Component,
   Date as DateView,
   InfoBox,
@@ -11,10 +13,15 @@ import {
 } from 'rewild-ui';
 import { getAllProjects } from '../../../api/projects';
 import { getLevels } from '../../../api/levels';
+import { getPlayProject } from '../../../api/play';
+import { getSharedProjects, SharedProject } from '../../../api/shares';
 import { authStore } from '../../stores/AuthStore';
 import { ProjectImage } from '../common/ProjectImage';
 
-type Project = StoredRecord<IProject>;
+type LocalProject = StoredRecord<IProject>;
+type Project = LocalProject | SharedProject;
+type Filter = 'mine' | 'shared';
+type LevelSummary = { id: string; name: string };
 
 type Props = {
   /** Called with the project Start should play, or null when there is none. */
@@ -30,37 +37,72 @@ const columns: TableColumn<Project>[] = [
   },
 ];
 
-/** The My Games tab: the player's own projects, newest first, with the details of the selected one. */
+/**
+ * The My Games tab: the player's own projects, or those other players shared with them, newest first,
+ * with the details of the selected one. Logged out players see only their own.
+ */
 @register('x-my-games-panel')
 export class MyGamesPanel extends Component<Props> {
   init() {
-    this.on(authStore.dispatcher);
-
+    const [filter, setFilter] = this.useState<Filter>('mine');
     const [projects, setProjects] = this.useState<Project[] | null>(null);
     const [selected, setSelected] = this.useState<Project | null>(null);
-    const [levels, setLevels] = this.useState<StoredRecord<ILevel>[]>([]);
+    const [levels, setLevels] = this.useState<LevelSummary[]>([]);
+    const [levelsError, setLevelsError] = this.useState<string | null>(null);
     const [error, setError] = this.useState<string | null>(null);
+
+    const loadLevels = async (project: Project): Promise<LevelSummary[]> =>
+      filter() === 'shared'
+        ? (await getPlayProject(project.id)).levels
+        : getLevels(project.id);
 
     const select = async (project: Project | null) => {
       setSelected(project);
       setLevels([], false);
+      setLevelsError(null, false);
       this.props.onSelect(project?.id ?? null);
       if (!project) return;
 
-      const projectLevels = await getLevels(project.id);
-      if (selected() === project) setLevels(projectLevels);
+      try {
+        const projectLevels = await loadLevels(project);
+        if (selected() === project) setLevels(projectLevels);
+      } catch (err) {
+        if (selected() === project)
+          setLevelsError(err instanceof Error ? err.message : String(err));
+      }
     };
 
-    this.onMount = async () => {
+    const load = async (next: Filter) => {
+      setFilter(next, false);
+      setProjects(null);
+      setError(null);
+      await select(null);
       try {
-        const list = await getAllProjects();
+        const list: Project[] =
+          next === 'shared'
+            ? await getSharedProjects()
+            : await getAllProjects();
+        if (filter() !== next) return;
         setProjects(list);
         await select(list[0] ?? null);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        if (filter() !== next) return;
+        setError(err instanceof Error ? err.message : String(err));
         setProjects([]);
-        this.props.onSelect(null);
       }
+    };
+
+    this.on(authStore.dispatcher, () => {
+      if (!authStore.loggedIn && filter() === 'shared') load('mine');
+      else this.render();
+    });
+
+    this.onMount = () => load(filter());
+
+    const author = (project: Project) => {
+      if (filter() === 'shared')
+        return (project as SharedProject).authorName ?? 'Unknown';
+      return authStore.loggedIn ? authStore.user.displayName : 'You';
     };
 
     const details = (project: Project) => (
@@ -74,22 +116,26 @@ export class MyGamesPanel extends Component<Props> {
         ) : null}
         <dl>
           <dt>Author</dt>
-          <dd>{authStore.loggedIn ? authStore.user.displayName : 'You'}</dd>
+          <dd>{author(project)}</dd>
           <dt>Last modified</dt>
           <dd>
             <DateView date={project.updatedAt} />
           </dd>
-          <dt>Saved to your account</dt>
-          <dd>
-            {project.syncedAt > 0 ? (
-              <DateView date={project.syncedAt} />
-            ) : (
-              'Only on this device'
-            )}
-          </dd>
+          {filter() === 'mine' ? <dt>Saved to your account</dt> : null}
+          {filter() === 'mine' ? (
+            <dd>
+              {(project as LocalProject).syncedAt > 0 ? (
+                <DateView date={(project as LocalProject).syncedAt} />
+              ) : (
+                'Only on this device'
+              )}
+            </dd>
+          ) : null}
           <dt>Levels</dt>
           <dd>
-            {levels().length ? (
+            {levelsError() ? (
+              levelsError()
+            ) : levels().length ? (
               <ul>
                 {levels().map((level) => (
                   <li>
@@ -111,16 +157,37 @@ export class MyGamesPanel extends Component<Props> {
     return () => {
       const list = projects();
       const current = selected();
+      const shared = filter() === 'shared';
 
       return (
         <div class={current ? 'panel' : 'panel no-details'}>
           <div class="list">
-            <Typography variant="info">
-              Games you made in the editor. Start plays the selected game from
-              its start level.
-            </Typography>
+            {authStore.loggedIn ? (
+              <ButtonGroup>
+                <Button
+                  variant="outlined"
+                  size="s"
+                  selected={!shared}
+                  onClick={() => shared && load('mine')}>
+                  My Games
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="s"
+                  selected={shared}
+                  onClick={() => !shared && load('shared')}>
+                  Shared Games
+                </Button>
+              </ButtonGroup>
+            ) : null}
             {error() ? (
-              <InfoBox variant="error" title="Could not load your games">
+              <InfoBox
+                variant="error"
+                title={
+                  shared
+                    ? 'Could not load the shared games'
+                    : 'Could not load your games'
+                }>
                 {error()}
               </InfoBox>
             ) : null}
@@ -128,7 +195,11 @@ export class MyGamesPanel extends Component<Props> {
               columns={columns}
               rows={list ?? []}
               loading={!list}
-              emptyMessage="You have no games yet. Make one in the editor."
+              emptyMessage={
+                shared
+                  ? 'No games are shared with you yet.'
+                  : 'You have no games yet. Make one in the editor.'
+              }
               onRowClick={(project) => select(project)}
               isSelected={(project) => project.id === current?.id}
             />
@@ -168,6 +239,7 @@ const StyledMyGamesPanel = cssStylesheet(css`
   }
 
   .list x-typography,
+  .list x-button-group,
   .list x-info-box {
     display: block;
     margin: 0 0 ${theme.space.m} 0;

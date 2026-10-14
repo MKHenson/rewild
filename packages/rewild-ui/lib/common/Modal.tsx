@@ -104,6 +104,6 @@ const StyledModal = cssStylesheet(css`
     margin: 0 0 0 4px;
   }
   .content {
-    padding: 0rem 0 1.5rem 0;
+    padding: 1rem 0 1.5rem 0;
   }
 `);

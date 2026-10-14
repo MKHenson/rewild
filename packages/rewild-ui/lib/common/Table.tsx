@@ -161,7 +161,8 @@ const StyledTable = cssStylesheet(css`
     border-collapse: collapse;
     table-layout: fixed;
     font-family: var(--font-family);
-    font-size: ${theme.colors.fontSizeMedium};
+    /* A step below fields, so data reads denser than the form around it. */
+    font-size: 13px;
   }
 
   th {
@@ -170,7 +171,7 @@ const StyledTable = cssStylesheet(css`
     z-index: 1;
     background: ${theme.colors.surface};
     text-align: left;
-    font-size: 13px;
+    font-size: ${theme.colors.fontSizeSmall};
     font-weight: 500;
     color: ${theme.colors.onSurfaceLight};
     border-bottom: 1px solid ${theme.colors.subtle600};
@@ -221,7 +222,7 @@ const StyledTable = cssStylesheet(css`
 
   th,
   td {
-    padding: ${theme.space.s} ${theme.space.m};
+    padding: 6px ${theme.space.m};
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -321,7 +321,7 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
   - Expect: a user starts a project shared with them through the play endpoint. After a revoke or a flag, their next start fails with an error. The search never returns another user's email.
   - Depends on: 6, 9.
 
-- [ ] **11. Sharing: UI**
+- [x] **11. Sharing: UI**
   - Scope: a generic `Autocomplete` in `rewild-ui` and an app `UserPicker` on top of it. The Sharing tab in Project Settings lists, adds and revokes shares. The 'Shared Games' filter in My Games.
   - Expect: an owner shares a project by name or exact email, and the other user starts it from My Games. The Sharing tab explains why it is not available to logged out users and to local only projects. `UserPicker` has no sharing logic, so other screens can use it.
   - Depends on: 3, 8, 10.
