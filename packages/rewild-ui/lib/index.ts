@@ -29,6 +29,7 @@ export * from './common/RouterProvider';
 export * from './common/RouterSwitch';
 export * from './common/Switch';
 export * from './common/Table';
+export * from './common/TablePagination';
 export * from './common/Tabs';
 export * from './common/Tree';
 export * from './common/TreeNode';
