@@ -15,7 +15,7 @@ fun Route.playRoutes(service: PlayService) {
         get({
             tags("Play")
             summary = "Load a project to play"
-            description = "Returns the project, its levels and their files. Auth is optional. Allowed for the public game, the owner and super admins. Everyone else gets 404. A flagged project gets 403 for everyone but the owner and super admins"
+            description = "Returns the project, its levels and their files. Auth is optional. Allowed for the public game, the owner, users it is shared with and super admins. Everyone else gets 404. A flagged project gets 403 for everyone but the owner and super admins"
             request { pathParameter<String>("projectId") { description = "Project ID" } }
             response {
                 code(HttpStatusCode.OK) { body<PlayProject>() }

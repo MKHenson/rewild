@@ -5,6 +5,7 @@ import com.rewild.levels.LevelService
 import com.rewild.models.PlayProject
 import com.rewild.projects.ProjectService
 import com.rewild.publicgame.PublicGameService
+import com.rewild.shares.ShareService
 
 sealed interface PlayResult {
     data class Success(val data: PlayProject) : PlayResult
@@ -17,6 +18,7 @@ class PlayService(
     private val levels: LevelService,
     private val assets: AssetService,
     private val publicGame: PublicGameService,
+    private val shares: ShareService,
     private val isSuperAdmin: (String) -> Boolean
 ) {
     /**
@@ -27,7 +29,9 @@ class PlayService(
         val project = projects.getLive(projectId) ?: return PlayResult.NotFound
         val owner = userId != null && project.userId == userId
         val admin = userId != null && isSuperAdmin(userId)
-        if (!owner && !admin && !publicGame.isPublic(projectId)) return PlayResult.NotFound
+        val allowed = owner || admin || publicGame.isPublic(projectId) ||
+            (userId != null && shares.isSharedWith(projectId, userId))
+        if (!allowed) return PlayResult.NotFound
         if (project.flaggedAt != null && !owner && !admin) return PlayResult.Flagged
 
         val projectLevels = levels.getLiveByProject(projectId)

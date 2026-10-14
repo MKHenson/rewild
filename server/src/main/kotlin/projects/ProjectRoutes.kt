@@ -32,12 +32,18 @@ fun Route.projectRoutes(service: ProjectService, imageService: ProjectImageServi
         get({
             tags("Projects")
             summary = "List projects"
-            description = "Returns all projects for the authenticated user"
+            description = "Returns the live projects the caller owns, or that are shared with the caller, newest first"
+            request { queryParameter<String>("scope") { description = "mine or shared. Defaults to mine" } }
             response {
                 code(HttpStatusCode.OK) { body<List<Project>>() }
+                code(HttpStatusCode.BadRequest) { body<ErrorResponse>() }
             }
         }) {
-            call.respond(service.getAll(call.userId()))
+            val scope = call.request.queryParameters["scope"]?.let { value ->
+                ProjectScope.entries.find { it.name.equals(value, ignoreCase = true) }
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Unknown scope"))
+            } ?: ProjectScope.MINE
+            call.respond(service.list(call.userId(), scope))
         }
 
         route("/{id}") {

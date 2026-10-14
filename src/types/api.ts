@@ -432,7 +432,7 @@ export interface paths {
         };
         /**
          * Load a project to play
-         * @description Returns the project, its levels and their files. Auth is optional. Allowed for the public game, the owner and super admins. Everyone else gets 404. A flagged project gets 403 for everyone but the owner and super admins
+         * @description Returns the project, its levels and their files. Auth is optional. Allowed for the public game, the owner, users it is shared with and super admins. Everyone else gets 404. A flagged project gets 403 for everyone but the owner and super admins
          */
         get: {
             parameters: {
@@ -489,11 +489,14 @@ export interface paths {
         };
         /**
          * List projects
-         * @description Returns all projects for the authenticated user
+         * @description Returns the live projects the caller owns, or that are shared with the caller, newest first
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description mine or shared. Defaults to mine */
+                    scope?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -506,6 +509,14 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["com.rewild.models.Project"][];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
                     };
                 };
             };
@@ -1536,6 +1547,223 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List shares
+         * @description Owner only. Returns the users the project is shared with, newest first
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.models.ProjectShare"][];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Add share
+         * @description Owner only. Gives a user play access to the project. Adding an existing share returns it. A flagged project cannot be shared
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["com.rewild.models.AddShareRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.models.ProjectShare"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{id}/shares/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke share
+         * @description Owner only. Removes a user's play access. It takes effect on their next start
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project ID */
+                    id: string;
+                    /** @description User ID */
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Share revoked */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search users
+         * @description Matches a display name by prefix (2 characters minimum) or an email exactly. Returns at most 10 users, never the caller and never an email
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Display name prefix or exact email */
+                    q?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.models.UserSummary"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1732,6 +1960,8 @@ export interface components {
         };
         /** Project */
         "com.rewild.models.Project": {
+            /** String */
+            authorName?: null | string;
             /**
              * Long
              * Format: int64
@@ -2010,6 +2240,38 @@ export interface components {
         "com.rewild.models.SetPublicGameRequest": {
             /** String */
             projectId?: null | string;
+        };
+        /** ProjectShare */
+        "com.rewild.models.ProjectShare": {
+            /**
+             * Long
+             * Format: int64
+             */
+            createdAt: number;
+            /** String */
+            displayName: string;
+            /** String */
+            grantedBy: string;
+            /** String */
+            grantedByName?: null | string;
+            /** String */
+            photoUrl?: null | string;
+            /** String */
+            userId: string;
+        };
+        /** AddShareRequest */
+        "com.rewild.models.AddShareRequest": {
+            /** String */
+            userId: string;
+        };
+        /** UserSummary */
+        "com.rewild.models.UserSummary": {
+            /** String */
+            displayName: string;
+            /** String */
+            id: string;
+            /** String */
+            photoUrl?: null | string;
         };
     };
     responses: never;
