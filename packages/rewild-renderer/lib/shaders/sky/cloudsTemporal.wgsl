@@ -335,9 +335,10 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     var tStart: f32;
     var tEnd: f32;
     var isInsideClouds = false;
+    var crossesDeck = true;
 
     if (camHeight < ATM_START) {
-        if (!hitInner.hit) { return vec4f(0.0); }
+        crossesDeck = hitInner.hit;
         tStart = hitInner.tFar;
         tEnd = hitOuter.tFar;
     } else if (camHeight <= ATM_END) {
@@ -345,34 +346,24 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
         tStart = 0.0;
         tEnd = hitOuter.tFar;
     } else {
-        if (!hitOuter.hit || hitOuter.tNear < 0.0) { return vec4f(0.0); }
+        crossesDeck = hitOuter.hit && hitOuter.tNear >= 0.0;
         tStart = hitOuter.tNear;
         tEnd = hitOuter.tFar;
     }
 
-    if (tStart >= tEnd || tEnd <= 0.0) { return vec4f(0.0); }
-
     let hitEarth = intersectSphereBoth(cameraPos, dir, earthCenter, EARTH_RADIUS);
     if (hitEarth.hit && hitEarth.tNear > 0.0) {
         tEnd = min(tEnd, hitEarth.tNear);
-        if (tStart >= tEnd) { return vec4f(0.0); }
     }
 
-    // From inside or above, the uniform march covers NEAR_MARCH_DISTANCE past the
-    // entry point and the far loop below the remainder.
-    let nearEnd = select(tEnd, min(tEnd, tStart + NEAR_MARCH_DISTANCE), camHeight >= ATM_START);
-    let rayLength = nearEnd - tStart;
-    var nbSample = i32(f32(NUM_CLOUD_SAMPLES) * min(1.0, rayLength / 2000.0));
-    if (isInsideClouds) {
-        nbSample = i32(f32(nbSample) * 0.3);
+    // A ray that misses the deck skips the march but still draws the cirrus, sky
+    // and sun behind it — from above the deck, that is every ray above its horizon.
+    crossesDeck = crossesDeck && tStart < tEnd && tEnd > 0.0;
+    if (!crossesDeck) {
+        tStart = 0.0;
+        tEnd = 0.0;
     }
-    nbSample = max(nbSample, 8);
 
-    // Dynamic LOD: scale sample count by screen position, ray distance, and view angle
-    let lod = calculateCloudLOD(currentFragCoord, dir, rayLength);
-    nbSample = max(i32(mix(f32(nbSample), ${ CLOUD_LOD_SAMPLES }, lod)), ${ CLOUD_MIN_SAMPLES });
-
-    let stepS = rayLength / f32(nbSample);
     let mu = dot(sun_direction, dir);
 
     // pow() is undefined for a negative base in WGSL (it evaluates as
@@ -398,36 +389,56 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     // pixel's noise, so consecutive samples decorrelate.
     var litCount = 0.0;
 
-    // No empty-space skipping: an empty sample already returns before the noise volumes and
-    // the light ray, and the deck's interior is full of eroded pockets that any
-    // stride would leap from one to the next, dropping the cloud in between.
-    var t = tStart + stepS * marchNoise;
-    for (var i = 0; i < nbSample; i++) {
-        let position = cameraPos + dir * t;
-        let cloudSample = clouds(position, t * pixelCone);
-        if (cloudSample.density > 0.0) {
-            accumulateSample(&march, &lighting, cloudSample, position, t, stepS, fract(lightNoise + litCount * 0.618034));
-            litCount += 1.0;
-            if (march.transmittance <= CLOUD_TRANSMITTANCE_FLOOR) { break; }
+    if (crossesDeck) {
+        // From inside or above, the uniform march covers NEAR_MARCH_DISTANCE past
+        // the entry point and the far loop below the remainder.
+        let nearEnd = select(tEnd, min(tEnd, tStart + NEAR_MARCH_DISTANCE), camHeight >= ATM_START);
+        let rayLength = nearEnd - tStart;
+        var nbSample = i32(f32(NUM_CLOUD_SAMPLES) * min(1.0, rayLength / 2000.0));
+        if (isInsideClouds) {
+            nbSample = i32(f32(nbSample) * 0.3);
         }
-        t += stepS;
-    }
+        nbSample = max(nbSample, 8);
 
-    // Geometric steps from nearEnd to the end of the ray: step length grows with
-    // distance, so the far deck costs a fixed sample count however long the ray.
-    if (tEnd > nearEnd && march.transmittance > CLOUD_TRANSMITTANCE_FLOOR) {
-        let growth = pow(tEnd / nearEnd, 1.0 / f32(NUM_FAR_SAMPLES));
-        var tFar = nearEnd * pow(growth, marchNoise);
-        for (var i = 0; i < NUM_FAR_SAMPLES; i++) {
-            let tNext = tFar * growth;
-            let position = cameraPos + dir * tFar;
-            let cloudSample = clouds(position, tFar * pixelCone);
+        // Dynamic LOD: scale sample count by screen position, ray distance, and view angle
+        let lod = calculateCloudLOD(currentFragCoord, dir, rayLength);
+        nbSample = max(i32(mix(f32(nbSample), ${ CLOUD_LOD_SAMPLES }, lod)), ${ CLOUD_MIN_SAMPLES });
+
+        let stepS = rayLength / f32(nbSample);
+
+        // No empty-space skipping: an empty sample already returns before the noise
+        // volumes and the light ray, and the deck's interior is full of eroded
+        // pockets that any stride would leap from one to the next, dropping the
+        // cloud in between.
+        var t = tStart + stepS * marchNoise;
+        for (var i = 0; i < nbSample; i++) {
+            let position = cameraPos + dir * t;
+            let cloudSample = clouds(position, t * pixelCone);
             if (cloudSample.density > 0.0) {
-                accumulateSample(&march, &lighting, cloudSample, position, tFar, tNext - tFar, fract(lightNoise + litCount * 0.618034));
+                accumulateSample(&march, &lighting, cloudSample, position, t, stepS, fract(lightNoise + litCount * 0.618034));
                 litCount += 1.0;
                 if (march.transmittance <= CLOUD_TRANSMITTANCE_FLOOR) { break; }
             }
-            tFar = tNext;
+            t += stepS;
+        }
+
+        // Geometric steps from nearEnd to the end of the ray: step length grows
+        // with distance, so the far deck costs a fixed sample count however long
+        // the ray.
+        if (tEnd > nearEnd && march.transmittance > CLOUD_TRANSMITTANCE_FLOOR) {
+            let growth = pow(tEnd / nearEnd, 1.0 / f32(NUM_FAR_SAMPLES));
+            var tFar = nearEnd * pow(growth, marchNoise);
+            for (var i = 0; i < NUM_FAR_SAMPLES; i++) {
+                let tNext = tFar * growth;
+                let position = cameraPos + dir * tFar;
+                let cloudSample = clouds(position, tFar * pixelCone);
+                if (cloudSample.density > 0.0) {
+                    accumulateSample(&march, &lighting, cloudSample, position, tFar, tNext - tFar, fract(lightNoise + litCount * 0.618034));
+                    litCount += 1.0;
+                    if (march.transmittance <= CLOUD_TRANSMITTANCE_FLOOR) { break; }
+                }
+                tFar = tNext;
+            }
         }
     }
 
