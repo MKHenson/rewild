@@ -581,12 +581,12 @@ fn cirrusRaySample(cameraPos: vec3f, dir: vec3f, sunDirection: vec3f) -> vec4f {
     let mu          = dot(sunDirection, dir);
     let basis       = cirrusBasis();
 
-    const CIR_INNER: f32 = EARTH_RADIUS + CIRRUS_ALT;
-    const CIR_OUTER: f32 = CIR_INNER + CIRRUS_THICK;
-    const CIR_MID:   f32 = CIR_INNER + CIRRUS_THICK * 0.5;
+    const CIR_MID: f32 = EARTH_RADIUS + CIRRUS_ALT + CIRRUS_THICK * 0.5;
 
-    // Inside the layer: thin tint on the ice sheet itself.
-    if (camHeight > CIR_INNER && camHeight < CIR_OUTER) {
+    // Inside the deck the taps tie to: thin tint on the ice sheet itself. Tested
+    // against CIR_DECK, not CIRRUS_THICK, which only places the midplane; the
+    // wider shell blanked the sheet for any camera between 6 and 56 km.
+    if (abs(camHeight - CIR_MID) < CIR_DECK * 0.5) {
         let sheet = cirSheet(cameraPos, basis);
         let reg   = cirrusRegime(sheet);
         let d     = cirrusDensityAt(sheet, cirSwirl(sheet, reg.swirl), 0.0, 1.0, reg);
@@ -635,7 +635,7 @@ fn cirrusRaySample(cameraPos: vec3f, dir: vec3f, sunDirection: vec3f) -> vec4f {
     for (var i = 0; i < CIR_TAPS; i++) {
         let frac = (f32(i) + 0.5) / f32(CIR_TAPS) - 0.5 + jitter;
         sum += cirrusDensityAt(
-            cirSheet(hitPos + dir * (frac * spread), basis),
+            cirSheet(cameraPos + dir * max(t + frac * spread, 0.0), basis),
             swirl,
             frac,
             fine,
