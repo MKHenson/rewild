@@ -93,6 +93,49 @@ export function resolveLayerWeights(
 }
 
 /**
+ * resolveLayerWeights for ground seen from too far for noise patches to
+ * resolve: each noise selector is taken at its mean coverage,
+ * `noiseCoverage[i]` (see meanNoiseCoverage), instead of at a sample.
+ */
+export function resolveMeanLayerWeights(
+  biome: BiomeParams,
+  height: number,
+  slopeDegrees: number,
+  noiseCoverage: Float64Array,
+  out: Float64Array
+): void {
+  const layers = biome.layers;
+  let remaining = 1;
+
+  for (let i = layers.length - 1; i > 0; i--) {
+    const layer = layers[i];
+    const covered =
+      bandCoverage(layer.slope, slopeDegrees) *
+      bandCoverage(layer.height, height) *
+      (layer.noise ? noiseCoverage[i] : 1) *
+      remaining;
+    out[i] = covered;
+    remaining -= covered;
+  }
+
+  out[0] = remaining;
+}
+
+const MEAN_NOISE_STEPS = 64;
+
+/**
+ * The share of the ground a layer's noise selector covers, averaged over noise
+ * values spread evenly across 0..1. 1 for a layer without one.
+ */
+export function meanNoiseCoverage(layer: BiomeLayer): number {
+  if (!layer.noise) return 1;
+  let sum = 0;
+  for (let i = 0; i < MEAN_NOISE_STEPS; i++)
+    sum += rampCoverage(layer.noise.band, (i + 0.5) / MEAN_NOISE_STEPS);
+  return sum / MEAN_NOISE_STEPS;
+}
+
+/**
  * A scatter rule's density at a single sample, in 0..1 of what the layer's
  * footprint allows.
  *

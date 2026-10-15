@@ -1,6 +1,7 @@
 import { packHorizonParams } from '../../materials/uniforms/HorizonUniforms';
 import {
   CHUNK_MASK_SIZE,
+  INFINITE_EDGE,
   buildHorizonRing,
   chunkMaskIndex,
   oceanSlopeVariance,
@@ -8,30 +9,41 @@ import {
 
 describe('buildHorizonRing', () => {
   const segments = 16;
-  const ring = buildHorizonRing(segments);
+  const bands = 4;
+  const spokes = segments + 1;
+  const ring = buildHorizonRing(segments, bands);
 
-  it('pairs an inner and an outer vertex per spoke, closing the loop', () => {
-    expect(ring.vertices.length).toBe((segments + 1) * 2 * 3);
-    for (let i = 0; i <= segments; i++) {
-      const inner = ring.vertices.subarray(i * 6, i * 6 + 3);
-      const outer = ring.vertices.subarray(i * 6 + 3, i * 6 + 6);
-      expect(Math.hypot(inner[0], inner[1])).toBeCloseTo(1, 6);
-      expect(inner[2]).toBe(0);
-      expect(outer[0]).toBe(inner[0]);
-      expect(outer[1]).toBe(inner[1]);
-      expect(outer[2]).toBe(1);
+  it('lays out the finite rings from 0 to 1, then one at infinity', () => {
+    expect(ring.vertices.length).toBe(spokes * (bands + 2) * 3);
+    for (let k = 0; k <= bands + 1; k++) {
+      for (let i = 0; i < spokes; i++) {
+        const v = (k * spokes + i) * 3;
+        expect(Math.hypot(ring.vertices[v], ring.vertices[v + 1])).toBeCloseTo(
+          1,
+          6
+        );
+        expect(ring.vertices[v]).toBeCloseTo(ring.vertices[i * 3], 6);
+        expect(ring.vertices[v + 2]).toBe(k <= bands ? k / bands : INFINITE_EDGE);
+      }
     }
-    expect(ring.vertices[segments * 6]).toBeCloseTo(ring.vertices[0], 6);
-    expect(ring.vertices[segments * 6 + 1]).toBeCloseTo(ring.vertices[1], 6);
   });
 
-  it('spans every segment with two triangles over its four vertices', () => {
-    expect(ring.indices.length).toBe(segments * 6);
-    for (let i = 0; i < segments; i++) {
-      const quad = Array.from(ring.indices.subarray(i * 6, i * 6 + 6));
-      expect(new Set(quad)).toEqual(
-        new Set([i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 3])
-      );
+  it('closes each ring on its first spoke', () => {
+    const last = segments * 3;
+    expect(ring.vertices[last]).toBeCloseTo(ring.vertices[0], 6);
+    expect(ring.vertices[last + 1]).toBeCloseTo(ring.vertices[1], 6);
+  });
+
+  it('spans each cell with two triangles, inner rings first', () => {
+    expect(ring.indices.length).toBe(segments * (bands + 1) * 6);
+    for (let k = 0; k <= bands; k++) {
+      for (let i = 0; i < segments; i++) {
+        const t = (k * segments + i) * 6;
+        const inner = k * spokes + i;
+        expect(new Set(ring.indices.subarray(t, t + 6))).toEqual(
+          new Set([inner, inner + 1, inner + spokes, inner + spokes + 1])
+        );
+      }
     }
   });
 });
@@ -57,11 +69,15 @@ describe('packHorizonParams', () => {
       maskOriginZ: -4,
       scatter: [0.5, 0.25, 0.125],
       slopeVariance: 0.03125,
+      outerRadius: 24000,
+      fadeStart: 16000,
+      fogged: true,
+      paletteLayers: [3, 1, 4, 1, 5, 9, 2, 6],
     });
-    expect(packed.byteLength).toBe(80);
+    expect(packed.byteLength).toBe(128);
     expect(Array.from(packed)).toEqual([
       1, 2, 1360, 480, 5, 6, 16000, 7, 8, 9, 131072, 0.25, 0.5, 0.125, 3, -4,
-      0.5, 0.25, 0.125, 0.03125,
+      0.5, 0.25, 0.125, 0.03125, 24000, 16000, 1, 0, 3, 1, 4, 1, 5, 9, 2, 6,
     ]);
   });
 });

@@ -1,6 +1,8 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass, SceneCategory } from './IMaterialPass';
 import shader from '../shaders/water-horizon.wgsl';
+import skyConstants from '../shaders/sky/skyConstants.wgsl';
+import fogShader from '../shaders/sky/fog.wgsl';
 import { Renderer } from '..';
 import { ProjModelView } from './uniforms/ProjModelView';
 import { PerMeshTracker } from './PerMeshTracker';
@@ -15,9 +17,9 @@ const horizonGroupIndex = 1;
 const lightingGroupIndex = 2;
 const environmentGroupIndex = 3;
 
-// The ocean ring past the terrain chunks. Opaque and depth-writing, ordered with
-// the chunk water; the two never overlap, since the ring discards wherever a
-// chunk drew.
+// The ground and sea past the terrain chunks. Opaque and depth-writing, ordered
+// with the chunk water; the two never overlap, since the ring discards wherever
+// a chunk drew.
 export class HorizonOceanPass implements IMaterialPass {
   profileCategory: SceneCategory = 'water';
 
@@ -48,7 +50,9 @@ export class HorizonOceanPass implements IMaterialPass {
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
     const { device, sceneColorFormat } = renderer;
-    const module = device.createShaderModule({ code: shader });
+    const module = device.createShaderModule({
+      code: skyConstants + fogShader + shader,
+    });
 
     this.pipeline = device.createRenderPipeline({
       label: 'horizon ocean pipeline',
