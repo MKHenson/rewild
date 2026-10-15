@@ -21,7 +21,11 @@ import { ShaderDefines, wgslF32, wgslI32 } from '../../utils/shaderDefines';
 interface SkyQualityTier {
   /** View-ray steps through the cumulus deck. The dominant cost in the sky. */
   cloudSamples: number;
-  /** Steps along the sun ray per lit cumulus sample — multiplies with the above. */
+  /**
+   * Steps along the sun ray per lit cumulus sample — multiplies with the above.
+   * Quadratically spaced over 600 m, so a handful covers what equal steps needed
+   * a few dozen for.
+   */
   cloudLightSamples: number;
   /** Sample count the dynamic LOD collapses toward at screen edges and distance. */
   cloudLodSamples: number;
@@ -172,7 +176,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
   // high's setting would spend the extra pixels and then smooth them away.
   ultra: {
     cloudSamples: 112,
-    cloudLightSamples: 32,
+    cloudLightSamples: 10,
     cloudLodSamples: 64,
     cloudMinSamples: 24,
     cloudResolutionScale: 1.0,
@@ -188,7 +192,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
   },
   high: {
     cloudSamples: 80,
-    cloudLightSamples: 25,
+    cloudLightSamples: 8,
     cloudLodSamples: 40,
     cloudMinSamples: 16,
     cloudResolutionScale: 0.7,
@@ -204,7 +208,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
   },
   medium: {
     cloudSamples: 56,
-    cloudLightSamples: 16,
+    cloudLightSamples: 6,
     cloudLodSamples: 28,
     cloudMinSamples: 12,
     cloudResolutionScale: 0.6,
@@ -220,7 +224,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
   },
   low: {
     cloudSamples: 36,
-    cloudLightSamples: 10,
+    cloudLightSamples: 4,
     cloudLodSamples: 20,
     cloudMinSamples: 8,
     cloudResolutionScale: 0.5,

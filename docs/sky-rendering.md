@@ -22,7 +22,9 @@ Atmospheric rendering system for the Rewild engine supporting realistic sky/clou
 
 **Cloud Shadows**: Cascaded shadow map approach — density map over a fixed 5000 m ground extent, orthographic projection from sun. Edge and update period both come from the quality tier: 1024² every 2 frames on `ultra` down to 256² every 6 on `low`. Measurement puts this pass at roughly four fifths of the sky's GPU time on `ultra`, so it is the first thing to turn down.
 
-**Altitude Handling**: Three cases (below/inside/above clouds) with adaptive sample counts — fewer samples when inside clouds (30% reduction)
+**Altitude Handling**: Three cases (below/inside/above clouds) share one draw distance. Each ray runs to where it leaves the deck or meets the earth. From inside or above, the first 2 km are marched in uniform steps (30% of the usual count when inside) and the rest in `cloudSamples / 2` geometrically growing ones. Distant cloud is faded by aerial perspective at its absorption-weighted depth, the same from every height.
+
+**Cloud March Sampling**: Light rays take quadratically spaced steps over 600 m; all but the first two samples use the shape-only density (`cloudDensityShape`, no fine-detail fbm), as does the cloud shadow map. The ray start is dithered with white noise reseeded on every march, so the temporal accumulation averages out the banding.
 
 **God Rays**: Quarter-res radial blur toward sun with cloud transmittance masking — disabled at night
 
