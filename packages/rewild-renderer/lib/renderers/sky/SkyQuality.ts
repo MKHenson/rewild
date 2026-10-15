@@ -44,6 +44,13 @@ interface SkyQualityTier {
    */
   cloudResolutionScale: number;
 
+  /**
+   * Edge of the 3D shape-noise volume, in texels. 128³ is 8 MB, which overflows
+   * the caches of integrated GPUs; 64³ is 1 MB and costs the faintest Worley
+   * octave its sharpness, at 2 texels per cell.
+   */
+  cloudShapeVolumeSize: number;
+
   /** Taps through the cirrus fallstreak deck. 1 = a flat sheet. */
   cirrusTaps: number;
   /**
@@ -180,6 +187,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cloudLodSamples: 64,
     cloudMinSamples: 24,
     cloudResolutionScale: 1.0,
+    cloudShapeVolumeSize: 128,
     cirrusTaps: 4,
     cirrusDetailBias: 1.0,
     cloudShadowSamples: 48,
@@ -196,6 +204,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cloudLodSamples: 40,
     cloudMinSamples: 16,
     cloudResolutionScale: 0.7,
+    cloudShapeVolumeSize: 128,
     cirrusTaps: 3,
     cirrusDetailBias: 1.0,
     cloudShadowSamples: 32,
@@ -212,6 +221,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cloudLodSamples: 28,
     cloudMinSamples: 12,
     cloudResolutionScale: 0.6,
+    cloudShapeVolumeSize: 64,
     cirrusTaps: 2,
     cirrusDetailBias: 0.8,
     cloudShadowSamples: 24,
@@ -228,6 +238,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cloudLodSamples: 20,
     cloudMinSamples: 8,
     cloudResolutionScale: 0.5,
+    cloudShapeVolumeSize: 64,
     cirrusTaps: 1,
     cirrusDetailBias: 0.6,
     cloudShadowSamples: 16,
@@ -291,6 +302,10 @@ export function cloudShaderDefines(quality: RenderQuality): ShaderDefines {
 /** Cloud render-target scale, as a fraction of canvas. */
 export function cloudResolutionScale(quality: RenderQuality): number {
   return TIERS[quality].cloudResolutionScale;
+}
+
+export function cloudShapeVolumeSize(quality: RenderQuality): number {
+  return TIERS[quality].cloudShapeVolumeSize;
 }
 
 /**

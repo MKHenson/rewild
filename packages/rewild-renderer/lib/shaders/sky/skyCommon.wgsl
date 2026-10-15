@@ -108,29 +108,6 @@ fn proceduralNoise3D( p: vec3f ) -> f32 {
 
 
 
-/**
- * The fbm function generates fractal Brownian motion (fbm) noise.
- * This function is used to create complex, natural-looking textures by combining multiple layers of noise.
- *
- * @param p2 - The input 3D vector used to generate the noise.
- * @return The generated fbm noise value.
- */
-fn fbm( position: vec3f )  -> f32 {
-    var p = position;
-    let m = mat3x3<f32>( 0.00,  0.80,  0.60,
-              -0.80,  0.36, -0.48,
-              -0.60, -0.48,  0.64 );    
-    var f: f32;
-    f  = 0.5000 * noise3( p ); 
-    p = m * p * 2.02;
-    
-    f += 0.2500 * noise3( p ); 
-    p = m * p * 2.03;
-    
-    f += 0.1250 * noise3( p );
-    return f;
-}
-
 @vertex
 fn vs( @builtin(vertex_index) vertexIndex : u32 ) -> VaryingsStruct {
 	let pos = array(

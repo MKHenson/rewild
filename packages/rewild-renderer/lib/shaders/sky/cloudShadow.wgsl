@@ -22,8 +22,9 @@ struct CloudShadowUniforms {
 
 @group(0) @binding(0) var<uniform> shadow: CloudShadowUniforms;
 @group(0) @binding(1) var noiseSampler: sampler;
-@group(0) @binding(2) var noiseTexture: texture_2d<f32>;
 @group(0) @binding(3) var pebblesTexture: texture_2d<f32>;
+@group(0) @binding(4) var shapeVolume: texture_3d<f32>;
+@group(0) @binding(5) var detailVolume: texture_3d<f32>;
 
 struct VertexShaderOutput {
   @builtin(position) position: vec4f,
@@ -65,6 +66,9 @@ const NUM_SHADOW_SAMPLES: i32 = ${ SHADOW_SAMPLES };
   @builtin(position) fragCoord: vec4f,
   @location(0) relativeXZ: vec2f,
 ) -> @location(0) vec4f {
+  // Ground width one texel covers: picks the noise volumes' mip level.
+  let footprint = abs(dpdx(relativeXZ.x));
+
   // Sun direction (pointing toward the sun)
   let sunDir = normalize(vec3f(shadow.sunDirX, shadow.sunDirY, shadow.sunDirZ));
 
@@ -94,7 +98,7 @@ const NUM_SHADOW_SAMPLES: i32 = ${ SHADOW_SAMPLES };
     // Offset XZ based on sun angle: at height h, light arrives from an XZ offset
     let xzOffset = sunDir.xz * (h * invSunY);
     let samplePos = vec3f(relativeXZ.x + xzOffset.x, sampleY, relativeXZ.y + xzOffset.y);
-    let density = cloudDensityShape(samplePos, vec2f(shadow.centerX, shadow.centerZ), shadow.cloudiness, vec2f(shadow.driftX, shadow.driftZ), shadow.front).density;
+    let density = cloudDensityShape(samplePos, vec2f(shadow.centerX, shadow.centerZ), shadow.cloudiness, vec2f(shadow.driftX, shadow.driftZ), shadow.front, footprint).density;
     totalDensity += density * stepSize;
   }
 

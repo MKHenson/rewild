@@ -10,6 +10,7 @@ import temporalShader from '../../shaders/sky/cloudsTemporal.wgsl';
 import { RenderQuality } from '../../utils/RenderQuality';
 import { composeShader } from '../../utils/shaderDefines';
 import { cloudShaderDefines } from './SkyQuality';
+import { CloudNoiseVolumes } from './CloudNoiseVolumes';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Temporal uniform layout (matches TemporalUniforms struct in cloudsTemporal.wgsl):
@@ -209,7 +210,11 @@ export class TemporalCloudRenderer {
   // Init
   // ────────────────────────────────────────────
 
-  init(renderer: Renderer, uniformBuffer: GPUBuffer): void {
+  init(
+    renderer: Renderer,
+    uniformBuffer: GPUBuffer,
+    noiseVolumes: CloudNoiseVolumes
+  ): void {
     // The history texture below is recreated empty, so anything accumulated by
     // a previous init (a resize, or a quality change) no longer corresponds to
     // it. Without this reset the first frames blend fresh marches against a
@@ -321,6 +326,8 @@ export class TemporalCloudRenderer {
           binding: 5,
           resource: renderer.samplerManager.get('depth-comparison'),
         },
+        { binding: 6, resource: noiseVolumes.shape.createView() },
+        { binding: 7, resource: noiseVolumes.detail.createView() },
       ],
     });
 
