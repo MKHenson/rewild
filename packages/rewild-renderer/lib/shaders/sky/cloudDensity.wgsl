@@ -33,7 +33,7 @@ fn frontCloudiness(position: vec3f, cloudiness: f32, front: vec4f) -> f32 {
 // The erosion thresholds below were tuned against three octaves of [0, 1] value
 // noise, so both volumes are remapped to that noise's mean and deviation. The
 // shape-only density subtracts the mean in place of the detail term, so it
-// matches the full density on average. Measured by scripts/cloud-noise-stats.mjs.
+// matches the full density on average.
 const EROSION_NOISE_MEAN: f32 = 0.4376;
 const EROSION_NOISE_STD: f32 = 0.1058;
 const SHAPE_NOISE_MEAN: f32 = 0.8307;
