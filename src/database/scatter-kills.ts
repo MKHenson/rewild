@@ -48,9 +48,7 @@ export function writeScatterKills(
   kills: ScatterKillSet
 ): Promise<string> {
   return db.assets.write(
-    level,
-    'chunk',
-    scatterKillsFilename(cx, cy),
+    { ...level, assetType: 'chunk', filename: scatterKillsFilename(cx, cy) },
     serializeScatterKillSet(kills)
   );
 }

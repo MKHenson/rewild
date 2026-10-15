@@ -165,6 +165,10 @@ declare module 'models' {
     levelId: string | null;
     assetType: string;
     filename: string;
+    /** Defaults to application/octet-stream. */
+    contentType?: string;
+    /** The server version (`updatedAt`) of the copy on this device. Unset until it syncs. */
+    version?: number;
   }
 
   export type ResourceType = 'container' | 'actor' | 'player-start';

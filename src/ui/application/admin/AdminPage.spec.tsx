@@ -42,7 +42,7 @@ describe('AdminPage', () => {
           ? { items: PROJECTS, total: PROJECTS.length }
           : { id: 'p1', name: 'Valley', description: '', imageUrl: null },
     })) as never;
-    jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
+    jest.spyOn(db, 'getProjectImage').mockResolvedValue(null);
   });
 
   afterEach(() => {

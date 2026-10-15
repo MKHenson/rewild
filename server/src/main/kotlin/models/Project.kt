@@ -15,21 +15,10 @@ data class Project(
     val syncedAt: Long = 0,
     val deletedAt: Long? = null,
     val syncError: String? = null,
-    // Set by the server from the uploaded image. Ignored on writes.
+    // The URL of the project's image asset, set by the server. Ignored on writes.
     val imageUrl: String? = null,
     // Set when a super admin blocks the project. Ignored on writes.
     val flaggedAt: Long? = null,
     // The owner's display name, set by the server on project lists. Ignored on writes.
     val authorName: String? = null
-)
-
-@Serializable
-data class ProjectImageUploadRequest(
-    val contentType: String,
-    val size: Long
-)
-
-@Serializable
-data class ProjectImageResponse(
-    val imageUrl: String
 )

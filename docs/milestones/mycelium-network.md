@@ -326,40 +326,54 @@ npm run assets:push
 
 Binary assets follow the same offline-first principle as records. The [Origin Private File System (OPFS)](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system) is the local store for all binary data — terrain chunks, heightmaps, and any other large binary files. OPFS is designed for this use case: it handles large sequential reads and writes efficiently, has higher storage limits than IndexedDB, and is well-suited to game-scale data.
 
-Assets are always written to OPFS first. This works fully offline with no authentication required. Each asset is tracked with local metadata (id, levelId, assetType, filename, syncedAt) so the sync layer knows what has and hasn't been pushed to the server.
+Assets are always written to OPFS first. This works fully offline with no authentication required. Each asset is tracked with local metadata (projectId, levelId, assetType, filename, contentType, version, syncedAt) so the sync layer knows what has and hasn't been pushed to the server. The copy on the device has primacy: the server copy exists for the owner's other devices and for players of the project.
 
-On login, the sync engine pushes any unsynced local assets to object storage and caches any server-side assets the client is missing locally. The presigned URL flow is the upload mechanism for this sync — not a direct write path.
+Every asset is saved and synced the same way, whatever its type. A level file (terrain chunk, mask) belongs to a level; a project file (the project image) has no level. The asset type decides only where the file lives and which rules the server enforces.
+
+On sync, the client pushes every pending asset to object storage, then pulls every server asset it lacks or holds an older version of. A pull never replaces an asset with changes the device has not uploaded.
 
 ```
 Offline / unauthenticated:
   write binary data → OPFS (always available)
 
 On login / sync:
-  unsynced local assets → presigned PUT URL → object storage
-  server assets not in OPFS → fetch public URL → cache in OPFS
+  pending local assets → presigned PUT URL → object storage
+  server assets missing or older in OPFS → fetch versioned public URL → OPFS
 ```
 
-**Single public bucket, organized by level**
+**Single public bucket, organized by project**
 
-All binary assets (e.g. terrain chunks, heightmaps) live in a single Scaleway Object Storage bucket (`rewild-assets`). The bucket is publicly readable — any object can be fetched by URL without authentication. Writes are always authenticated through Ktor.
+All binary assets live in a single Scaleway Object Storage bucket (`rewild-assets`). The bucket is publicly readable — any object can be fetched by URL without authentication. Writes are always authenticated through Ktor.
 
 The key structure mirrors the data hierarchy:
 
 ```
-levels/{levelId}/{assetType}/{filename}
+users/{userId}/projects/{projectId}/{assetType}/{filename}                     project file
+users/{userId}/projects/{projectId}/levels/{levelId}/{assetType}/{filename}    level file
 ```
 
 For example:
 ```
-levels/a7f3c2d1-.../chunks/32_16.bin
-levels/a7f3c2d1-.../chunks/32_17.bin
+users/u1/projects/p1/image/image
+users/u1/projects/p1/levels/l1/chunk/32_16.bin
 ```
 
-The public URL is deterministic: `{BUCKET_BASE_URL}/levels/{levelId}/chunks/32_16.bin`. No auth is required to fetch it — possession of the URL is sufficient. Since `levelId` is a UUID, URLs are not guessable or enumerable.
+An asset keeps its key across uploads. Its public URL is `{BUCKET_BASE_URL}/{storage_key}?v={updatedAt}`, so a new upload gets a new URL and no cache serves an old file.
+
+**Asset types**
+
+`AssetTypes` holds one rule per type: its scope (project or level), the content types it accepts, a maximum size and a filename pattern. The server checks the request against the rule, and checks the uploaded object again on confirm.
+
+| Type | Scope | Content types | Max size | Filename |
+|---|---|---|---|---|
+| `chunk` | level | `application/octet-stream` | 16 MB | any safe name |
+| `image` | project | PNG, JPEG, WebP | 2 MB | `image` (one per project) |
+
+A new kind of file is a new rule, not a new endpoint.
 
 **The DB owns the relationships, not the bucket**
 
-The bucket has no inherent concept of ownership or access. PostgreSQL records which assets exist, which level they belong to, and what their storage key is. Clients derive the public URL from the storage key. The bucket is a dumb byte store.
+The bucket has no inherent concept of ownership or access. PostgreSQL records which assets exist, which project and level they belong to, and what their storage key is. The bucket is a dumb byte store. Project read APIs return the project image's URL from its asset row.
 
 **Upload flow**
 
@@ -367,40 +381,44 @@ Binary assets are never routed through Ktor — proxying them through the server
 
 ```
 1. Client → POST /api/assets/upload-url  (JWT required)
-            body: { levelId, assetType, filename }
+            body: { projectId, levelId?, assetType, filename, contentType, size }
 
-2. Server → validates JWT + ownership of levelId
-            inserts unconfirmed asset record into DB (storage_key, levelId, confirmed: false)
-            generates presigned PUT URL (15 min TTL)
-            returns: { uploadUrl, publicUrl }
+2. Server → validates ownership of the live project (and level)
+            checks the request against the asset type's rule
+            inserts an unconfirmed asset record, or reuses the file's record
+            generates a presigned PUT URL that signs the content type (15 min TTL)
+            returns: { uploadUrl, publicUrl, storageKey }
 
-3. Client → PUT {uploadUrl}  binary body direct to object storage — no Ktor involved
+3. Client → PUT {uploadUrl}  with that Content-Type, direct to object storage
 
 4. Client → POST /api/assets/confirm  (JWT required)
             body: { storageKey }
-            server sets confirmed: true on the DB record
+            server checks the object's size and type against the rule
+            sets confirmed and updated_at, and returns the asset
 ```
 
-The confirm step ensures the DB only reflects completed uploads. If step 3 fails, the unconfirmed record stays and the client retries from step 1. Unconfirmed records older than 1 hour can be purged by a background job.
+The confirm step ensures the DB only reflects completed uploads. A rejected object is deleted. A re-upload keeps the confirmed version listed until it is confirmed. Records never confirmed within 1 hour are purged.
 
 **DB schema for assets**
 
 | Column | Type | Purpose |
 |---|---|---|
 | `id` | `text` | Primary key (UUID) |
-| `level_id` | `text` | FK to levels — scopes ownership, cascade deletes |
-| `asset_type` | `text` | e.g. `"chunk"`, `"heightmap"` |
-| `storage_key` | `text` | Full object key, e.g. `levels/{id}/chunks/32_16.bin` |
-| `confirmed` | `boolean` | True once upload completed successfully |
-| `created_at` | `bigint` | ms timestamp |
-
-The public URL is always `{BUCKET_BASE_URL}/{storage_key}`. `BUCKET_BASE_URL` is an env var — never hardcoded.
+| `project_id` | `text` | FK to projects — scopes ownership, cascade deletes |
+| `level_id` | `text` | FK to levels, null for a project file |
+| `asset_type` | `text` | Selects the rule, e.g. `"chunk"`, `"image"` |
+| `filename` | `text` | Name within the type's folder |
+| `storage_key` | `text` | Full object key |
+| `content_type` | `text` | The type of the confirmed object |
+| `confirmed` | `boolean` | True once an upload completed successfully |
+| `created_at` | `bigint` | ms timestamp of the last upload request |
+| `updated_at` | `bigint` | ms timestamp of the last confirm: the version |
 
 **Deletion**
 
-When a level is deleted, all its assets are removed by deleting the `levels/{levelId}/` prefix. S3 has no native prefix delete, so this is a `ListObjectsV2` over the prefix followed by a `DeleteObjects` batch per page — 1000 keys per round-trip, driven entirely off the prefix and never off the DB records. The `assets` DB rows are removed by cascading FK delete on `level_id` when the level row is hard-deleted; a level tombstoned via sync keeps its row, so its asset rows are deleted explicitly.
+When a level is deleted, its assets are removed by deleting the level prefix; a project delete removes the whole project prefix. S3 has no native prefix delete, so this is a `ListObjectsV2` over the prefix followed by a `DeleteObjects` batch per page — 1000 keys per round-trip, driven entirely off the prefix and never off the DB records. Tombstoned projects and levels keep their rows, so their asset rows are deleted explicitly.
 
-Deletion must never be blocked by object storage. A prefix whose delete fails is parked in `asset_cleanup_queue` and retried by `AssetCleanupService.retryPending()` — without it, a failed delete would be unreclaimable, since once the level id is gone nothing else knows the prefix exists. No reaper is scheduled yet; the queue is drained manually for now.
+Deletion must never be blocked by object storage. A prefix whose delete fails is parked in `asset_cleanup_queue` and retried by `AssetCleanupService.retryPending()` — without it, a failed delete would be unreclaimable, since once the id is gone nothing else knows the prefix exists. No reaper is scheduled yet; the queue is drained manually for now.
 
 **Local development**
 
@@ -465,7 +483,7 @@ server/
       AuthRoutes.kt         — /api/auth/login, /refresh, /logout
       JwtService.kt         — token issuance and validation
     assets/
-      AssetRoutes.kt        — /api/assets/upload-url, /api/assets/confirm
+      AssetRoutes.kt        — /api/assets, /api/assets/upload-url, /api/assets/confirm
       AssetService.kt       — presigned URL generation, DB record management
       S3Client.kt           — S3-compatible client (Scaleway / MinIO)
     sync/

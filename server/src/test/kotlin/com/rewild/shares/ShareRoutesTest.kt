@@ -17,7 +17,6 @@ import com.rewild.play.PlayService
 import com.rewild.play.playRoutes
 import com.rewild.projects.ProjectService
 import com.rewild.projects.projectRoutes
-import com.rewild.projects.ProjectImageService
 import com.rewild.publicgame.PublicGameService
 import com.rewild.startTestDatabase
 import io.ktor.client.request.*
@@ -112,7 +111,7 @@ class ShareRoutesTest {
     private fun ApplicationTestBuilder.installTestApp() {
         installTestAuth(jwtService) {
             shareRoutes(shares)
-            projectRoutes(projects, ProjectImageService(null, null, "test-bucket", BASE_URL))
+            projectRoutes(projects)
         }
         routing {
             route("/api") {

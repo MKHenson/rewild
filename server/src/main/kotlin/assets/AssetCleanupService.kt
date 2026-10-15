@@ -34,10 +34,10 @@ class AssetCleanupService(
         deletePrefix(StorageKeys.level(userId, projectId, levelId))
     }
 
-    // Removes every file of a project: its levels' files and its image. Call after the
+    // Removes every file of a project, on the project and on its levels. Call after the
     // project's deletion has been committed. Never throws.
-    fun cleanupProject(userId: String, projectId: String, levelIds: List<String>) {
-        deleteAssetRows(levelIds)
+    fun cleanupProject(userId: String, projectId: String) {
+        transaction { AssetsTable.deleteWhere { AssetsTable.projectId eq projectId } }
         deletePrefix(StorageKeys.project(userId, projectId))
     }
 

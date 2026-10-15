@@ -166,7 +166,7 @@ describe('ProjectSettingsDialog', () => {
     expect(onClose).toHaveBeenCalled();
   });
   describe('image', () => {
-    let setProjectImage: jest.SpyInstance;
+    let writeAsset: jest.SpyInstance;
     let syncAll: jest.SpyInstance;
 
     const pickFile = (comp: ProjectSettingsDialog, file: File) => {
@@ -185,9 +185,10 @@ describe('ProjectSettingsDialog', () => {
     beforeEach(() => {
       URL.createObjectURL = jest.fn(() => 'blob:preview');
       URL.revokeObjectURL = jest.fn();
-      setProjectImage = jest.spyOn(db, 'setProjectImage').mockResolvedValue();
+      writeAsset = jest.spyOn(db, 'writeAsset').mockResolvedValue('asset-id');
       syncAll = jest.spyOn(db, 'syncAll').mockResolvedValue();
-      jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
+      jest.spyOn(db, 'getProjectImage').mockResolvedValue(null);
+      jest.spyOn(db.assets, 'isPending').mockResolvedValue(false);
       jest.spyOn(authService, 'getToken').mockReturnValue(null);
     });
 
@@ -198,11 +199,15 @@ describe('ProjectSettingsDialog', () => {
       expect(comp.shadow!.textContent).toContain('Change Image');
     });
 
-    it("shows the project's image", () => {
+    it("shows the project's image", async () => {
+      (db.getProjectImage as jest.Mock).mockResolvedValue(png());
       projectStore.project!.imageUrl = 'https://cdn/old.png';
       const { comp } = createDialog();
+      await flush();
 
-      expect(image(comp)!.src).toBe('https://cdn/old.png');
+      expect(db.getProjectImage).toHaveBeenCalledWith(projectStore.project);
+      expect(image(comp)!.src).toBe('blob:preview');
+      expect(comp.shadow!.textContent).not.toContain('Uploads when the project syncs');
     });
 
     it('stores a picked image on the device and shows it at once, signed out', async () => {
@@ -211,7 +216,10 @@ describe('ProjectSettingsDialog', () => {
       pickFile(comp, png());
       await flush();
 
-      expect(setProjectImage).toHaveBeenCalledWith('p1', expect.any(File));
+      expect(writeAsset).toHaveBeenCalledWith(
+        { projectId: 'p1', levelId: null, assetType: 'image', filename: 'image', contentType: 'image/png' },
+        expect.any(File)
+      );
       expect(image(comp)!.src).toBe('blob:preview');
       expect(comp.shadow!.textContent).toContain('Uploads when the project syncs');
       expect(syncAll).not.toHaveBeenCalled();
@@ -228,13 +236,16 @@ describe('ProjectSettingsDialog', () => {
     });
 
     it('shows an image still waiting for upload', async () => {
-      (db.getPendingProjectImage as jest.Mock).mockResolvedValue(png());
+      (db.getProjectImage as jest.Mock).mockResolvedValue(png());
+      (db.assets.isPending as jest.Mock).mockResolvedValue(true);
       projectStore.project!.imageUrl = 'https://cdn/old.png';
       const { comp } = createDialog();
       await flush();
 
       expect(image(comp)!.src).toBe('blob:preview');
+      expect(comp.shadow!.textContent).toContain('Uploads when the project syncs');
     });
+
 
     it('rejects a file of the wrong type with a message', async () => {
       const { comp } = createDialog();
@@ -242,7 +253,7 @@ describe('ProjectSettingsDialog', () => {
       pickFile(comp, new File(['x'], 'cover.gif', { type: 'image/gif' }));
       await flush();
 
-      expect(setProjectImage).not.toHaveBeenCalled();
+      expect(writeAsset).not.toHaveBeenCalled();
       expect(comp.shadow!.querySelector('.error')?.textContent).toContain('PNG');
     });
   });

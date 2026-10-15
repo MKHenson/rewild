@@ -72,7 +72,7 @@ describe('ProjectSelector', () => {
     getProjects = jest
       .spyOn(projectsStore, 'getProjects')
       .mockResolvedValue(undefined);
-    jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
+    jest.spyOn(db, 'getProjectImage').mockResolvedValue(null);
   });
 
   afterEach(() => {

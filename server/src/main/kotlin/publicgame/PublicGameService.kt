@@ -1,5 +1,6 @@
 package com.rewild.publicgame
 
+import com.rewild.assets.projectImageUrls
 import com.rewild.db.tables.ProjectsTable
 import com.rewild.db.tables.PublicGameTable
 import com.rewild.models.PublicGame
@@ -28,7 +29,7 @@ class PublicGameService(private val bucketBaseUrl: String = "") {
                     id = it[ProjectsTable.id],
                     name = it[ProjectsTable.name],
                     description = it[ProjectsTable.description],
-                    imageUrl = it[ProjectsTable.imageKey]?.let { key -> "$bucketBaseUrl/$key" }
+                    imageUrl = projectImageUrls(bucketBaseUrl, listOf(it[ProjectsTable.id]))[it[ProjectsTable.id]]
                 )
             }
     }

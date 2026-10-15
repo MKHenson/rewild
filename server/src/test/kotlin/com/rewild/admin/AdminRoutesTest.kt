@@ -3,6 +3,7 @@ package com.rewild.admin
 import com.rewild.auth.AuthService
 import com.rewild.auth.JwtService
 import com.rewild.auth.UserRole
+import com.rewild.db.tables.AssetsTable
 import com.rewild.db.tables.ProjectsTable
 import com.rewild.db.tables.UsersTable
 import com.rewild.installTestAuth
@@ -197,9 +198,20 @@ class AdminRoutesTest {
             it[description] = "About $id"
             it[startEvent] = ""
             it[sceneGraph] = "{}"
-            it[imageKey] = "users/$userId/projects/$id/image/cover.png"
             it[ProjectsTable.updatedAt] = updatedAt
             it[ProjectsTable.deletedAt] = deletedAt
+        }
+        AssetsTable.insert {
+            it[AssetsTable.id] = "$id-image"
+            it[AssetsTable.userId] = userId
+            it[projectId] = id
+            it[assetType] = "image"
+            it[filename] = "image"
+            it[storageKey] = "users/$userId/projects/$id/image/image"
+            it[contentType] = "image/png"
+            it[confirmed] = true
+            it[createdAt] = 1L
+            it[AssetsTable.updatedAt] = 5L
         }
     }
 
@@ -220,7 +232,7 @@ class AdminRoutesTest {
         assertEquals(listOf("admin-new-proj", "admin-old-proj"), projects.take(2).map { it.id })
         assertEquals("admin-projects-author", projects[1].authorName)
         assertEquals("About admin-old-proj", projects[1].description)
-        assertEquals("https://cdn/users/admin-projects-author/projects/admin-old-proj/image/cover.png", projects[1].imageUrl)
+        assertEquals("https://cdn/users/admin-projects-author/projects/admin-old-proj/image/image?v=5", projects[1].imageUrl)
         assertTrue(projects.none { it.id == "admin-gone-proj" })
     }
 

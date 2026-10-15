@@ -61,7 +61,7 @@ describe('loadGameSource', () => {
     const project = await db.projects.add({ name: 'Mine', description: '', startEvent: '', sceneGraph: { containers: [] } } as unknown as IProject);
     const level = await db.levels.add({ name: 'Start', projectId: project.id, hasTerrain: true, startEvent: '', containers: [] } as ILevel);
     await db.projects.patch(project.id, { levelId: level.id } as IProject);
-    await db.assets.write({ projectId: project.id, levelId: level.id }, 'chunk', '0_0.bin', new Uint8Array([4]).buffer);
+    await db.assets.write({ projectId: project.id, levelId: level.id, assetType: 'chunk', filename: '0_0.bin' }, new Uint8Array([4]).buffer);
 
     const source = await loadGameSource(project.id);
 

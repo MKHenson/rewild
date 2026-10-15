@@ -38,9 +38,7 @@ export function writeChunkSnapshot(
   size: number
 ): Promise<string> {
   return db.assets.write(
-    level,
-    'chunk',
-    chunkSnapshotFilename(cx, cy),
+    { ...level, assetType: 'chunk', filename: chunkSnapshotFilename(cx, cy) },
     serializeChunkSnapshot(heights, size, size)
   );
 }

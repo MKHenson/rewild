@@ -47,7 +47,7 @@ describe('MyGamesPanel', () => {
     await clearDatabase('rewild');
     authStore.loggedIn = false;
     jest.spyOn(authService, 'getToken').mockReturnValue(null);
-    jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
+    jest.spyOn(db, 'getProjectImage').mockResolvedValue(null);
   });
 
   afterEach(() => {

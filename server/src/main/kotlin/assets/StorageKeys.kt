@@ -6,5 +6,9 @@ object StorageKeys {
 
     fun level(userId: String, projectId: String, levelId: String) = "${project(userId, projectId)}levels/$levelId/"
 
-    fun image(userId: String, projectId: String) = "${project(userId, projectId)}image/"
+    /** A project file sits under the project, a level file under its level. */
+    fun asset(userId: String, projectId: String, levelId: String?, assetType: String, filename: String): String {
+        val parent = if (levelId == null) project(userId, projectId) else level(userId, projectId, levelId)
+        return "$parent$assetType/$filename"
+    }
 }

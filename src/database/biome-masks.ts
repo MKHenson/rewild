@@ -49,9 +49,7 @@ export function writeBiomeMask(
   mask: PaintMask
 ): Promise<string> {
   return db.assets.write(
-    level,
-    'chunk',
-    biomeMaskFilename(cx, cy),
+    { ...level, assetType: 'chunk', filename: biomeMaskFilename(cx, cy) },
     serializePaintMask(mask)
   );
 }

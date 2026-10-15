@@ -1,5 +1,6 @@
 package com.rewild.admin
 
+import com.rewild.assets.projectImageUrls
 import com.rewild.auth.AuthService
 import com.rewild.auth.UserRole
 import com.rewild.db.tables.ProjectsTable
@@ -103,16 +104,18 @@ class AdminService(
             .where { ProjectsTable.deletedAt.isNull() }
         val total = query.count()
 
-        val items = query
+        val rows = query
             .orderBy(sortColumn to order, ProjectsTable.updatedAt to SortOrder.DESC, ProjectsTable.id to SortOrder.ASC)
             .limit(size)
             .offset(page.coerceAtLeast(0).toLong() * size)
-            .map {
+            .toList()
+        val images = projectImageUrls(bucketBaseUrl, rows.map { it[ProjectsTable.id] })
+        val items = rows.map {
                 AdminProject(
                     id = it[ProjectsTable.id],
                     name = it[ProjectsTable.name],
                     description = it[ProjectsTable.description],
-                    imageUrl = it[ProjectsTable.imageKey]?.let { key -> "$bucketBaseUrl/$key" },
+                    imageUrl = images[it[ProjectsTable.id]],
                     authorId = it[ProjectsTable.userId],
                     authorName = it[UsersTable.displayName],
                     updatedAt = it[ProjectsTable.updatedAt],

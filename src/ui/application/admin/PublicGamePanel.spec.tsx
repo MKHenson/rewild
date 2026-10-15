@@ -68,7 +68,7 @@ describe('PublicGamePanel', () => {
     putBodies = [];
     publicId = 'p1';
     jest.spyOn(authService, 'getToken').mockReturnValue(null);
-    jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
+    jest.spyOn(db, 'getProjectImage').mockResolvedValue(null);
     fetchMock = jest.fn(async (url: string, init?: RequestInit) => {
       if (url.includes('/api/admin/projects'))
         return json({ items: [...PROJECTS, FLAGGED], total: 3 });

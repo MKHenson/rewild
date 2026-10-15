@@ -15,7 +15,6 @@ import com.rewild.models.SceneGraph
 import com.rewild.models.SetPublicGameRequest
 import com.rewild.projects.ProjectService
 import com.rewild.projects.projectRoutes
-import com.rewild.projects.ProjectImageService
 import com.rewild.startTestDatabase
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -106,7 +105,7 @@ class PublicGameRoutesTest {
 
     private fun ApplicationTestBuilder.installTestApp() {
         installTestAuth(jwtService) {
-            projectRoutes(projectService, ProjectImageService(null, null, "test-bucket", BASE_URL))
+            projectRoutes(projectService)
             publicGameAdminRoutes(service, adminService::isSuperAdmin)
         }
         routing { route("/api") { publicGameRoutes(service) } }

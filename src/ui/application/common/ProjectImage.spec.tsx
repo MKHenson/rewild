@@ -15,12 +15,12 @@ function createImage(project: { id?: string; imageUrl?: string | null }) {
 const img = (comp: ProjectImage) => comp.shadow!.querySelector('img');
 
 describe('ProjectImage', () => {
-  let pending: jest.SpyInstance;
+  let getProjectImage: jest.SpyInstance;
 
   beforeEach(() => {
-    URL.createObjectURL = jest.fn(() => 'blob:pending');
+    URL.createObjectURL = jest.fn(() => 'blob:image');
     URL.revokeObjectURL = jest.fn();
-    pending = jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
+    getProjectImage = jest.spyOn(db, 'getProjectImage').mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -36,21 +36,27 @@ describe('ProjectImage', () => {
     expect(comp.shadow!.querySelector('.placeholder x-icon')).not.toBeNull();
   });
 
-  it('shows the uploaded image', async () => {
+  it('shows the image the database resolves, and releases it on removal', async () => {
+    getProjectImage.mockResolvedValue(new Blob(['x']));
+    const project = { id: 'p1', imageUrl: 'https://cdn/a.png' };
+    const comp = createImage(project);
+    await flush();
+
+    expect(getProjectImage).toHaveBeenCalledWith(project);
+    expect(img(comp)!.src).toBe('blob:image');
+
+    comp.remove();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:image');
+  });
+
+  it('reloads when the image URL changes', async () => {
+    getProjectImage.mockResolvedValue(new Blob(['x']));
     const comp = createImage({ id: 'p1', imageUrl: 'https://cdn/a.png' });
     await flush();
 
-    expect(img(comp)!.src).toBe('https://cdn/a.png');
-  });
-
-  it('prefers an image waiting for upload, and releases it on removal', async () => {
-    pending.mockResolvedValue(new File(['x'], 'image.png', { type: 'image/png' }));
-    const comp = createImage({ id: 'p1', imageUrl: 'https://cdn/old.png' });
+    comp.props = { project: { id: 'p1', imageUrl: 'https://cdn/b.png' } };
     await flush();
 
-    expect(img(comp)!.src).toBe('blob:pending');
-
-    comp.remove();
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:pending');
+    expect(getProjectImage).toHaveBeenCalledTimes(2);
   });
 });
