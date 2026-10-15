@@ -24,18 +24,24 @@ fn pcfSample3x3(
 }
 
 /**
- * One tap, for receivers that cannot show the difference.
+ * Four bilinear taps 1.5 texels off centre, for foliage receivers.
  *
- * A 3x3 kernel softens a shadow edge over three atlas texels. Foliage is a
- * cutout the size of a few texels drawn several layers deep, so that softening
- * lands on noise, and the nine taps are paid on every layer. Grass concedes the
- * point already: the ground-cover layers do not cast at all.
+ * Leaf cards cast a stochastic cutout: a dither that only reads as shade once
+ * it is averaged. Each tap blends a 2x2 block, so the four together cover a
+ * 4x4 block of the atlas, enough to hold that average steady as the dither
+ * slides under the receiver, at under half the 3x3 kernel's taps.
  */
-fn pcfSample1(
+fn pcfSample4(
   shadowMap: texture_depth_2d,
   shadowSampler: sampler_comparison,
   uv: vec2f,
   depth: f32
 ) -> f32 {
-  return textureSampleCompare(shadowMap, shadowSampler, uv, depth);
+  let _ts = 1.5 / f32(textureDimensions(shadowMap).x);
+  var _sum = 0.0;
+  _sum += textureSampleCompare(shadowMap, shadowSampler, uv + vec2f(-_ts, -_ts), depth);
+  _sum += textureSampleCompare(shadowMap, shadowSampler, uv + vec2f( _ts, -_ts), depth);
+  _sum += textureSampleCompare(shadowMap, shadowSampler, uv + vec2f(-_ts,  _ts), depth);
+  _sum += textureSampleCompare(shadowMap, shadowSampler, uv + vec2f( _ts,  _ts), depth);
+  return _sum * 0.25;
 }

@@ -45,12 +45,12 @@
   let _shadowUV = _cascadeUV * 0.5 + _uvOffset;
   let _shadowDepth = _projCoords.z; // already [0,1] from WebGPU-correct ortho matrix
   let _bias = 0.0002;
-  // Nine taps on a receiver a few texels across, drawn several layers deep, is
-  // filtering that lands on noise. HAS_FOLIAGE_SHADING is declared by every
-  // host that includes this, as a literal false where it cannot be foliage.
+  // Foliage is drawn several layers deep, so it takes a cheaper kernel; see
+  // pcfSample4. HAS_FOLIAGE_SHADING is declared by every host that includes
+  // this, as a literal false where it cannot be foliage.
   var _shadowSample = 0.0;
   if (HAS_FOLIAGE_SHADING) {
-    _shadowSample = pcfSample1(shadowAtlas, shadowSampler, _shadowUV, _shadowDepth - _bias);
+    _shadowSample = pcfSample4(shadowAtlas, shadowSampler, _shadowUV, _shadowDepth - _bias);
   } else {
     _shadowSample = pcfSample3x3(shadowAtlas, shadowSampler, _shadowUV, _shadowDepth - _bias);
   }
@@ -66,7 +66,8 @@
   let _sunElevationFade = smoothstep(0.0, 0.3, directionalShadowParams.cascadeSplits.w);
   directionalShadowFactor = mix(1.0, directionalShadowFactor, _sunElevationFade);
   // Clamp shadow darkness — prevents pitch-black shadows where ambient light would exist.
-  directionalShadowFactor = mix(0.25, 1.0, directionalShadowFactor);
+  // A canopy lets light through and between its leaves, so foliage keeps more.
+  directionalShadowFactor = mix(select(0.25, 0.475, HAS_FOLIAGE_SHADING), 1.0, directionalShadowFactor);
   // Debug tint: colours each cascade region (red=0, green=1, blue=2) when debugMode is on.
   var cascadeDebugTint = vec3f(0.0);
   if (directionalShadowParams.debugMode != 0u) {
