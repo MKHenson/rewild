@@ -22,7 +22,11 @@ import { Mesh } from '../../core/Mesh';
 //   fadeStart       f32    offset 84
 //   fogged          f32    offset 88
 //   paletteLayers   2 × vec4f offset 96
-const PARAMS_FLOATS = 32;
+//   detailLayer     f32    offset 128
+//   detailYSign     f32    offset 132
+//   detailTile      f32    offset 136
+//   detailStrength  f32    offset 140
+const PARAMS_FLOATS = 36;
 const PALETTE_OFFSET = 24;
 const PALETTE_SIZE = 8;
 
@@ -59,6 +63,14 @@ export interface HorizonParams {
   fogged: boolean;
   /** Albedo array layer of each palette channel. */
   paletteLayers: readonly number[];
+  /** Normal and ARM array layer of the material tiled over the far ground. */
+  detailLayer: number;
+  /** -1 where that material's normal map is OpenGL-convention, else 1. */
+  detailYSign: number;
+  /** Metres across one tile of it. */
+  detailTile: number;
+  /** How hard its normal and occlusion apply, 0 to 1. */
+  detailStrength: number;
 }
 
 export function packHorizonParams(
@@ -91,6 +103,10 @@ export function packHorizonParams(
   out[22] = params.fogged ? 1 : 0;
   for (let c = 0; c < PALETTE_SIZE; c++)
     out[PALETTE_OFFSET + c] = params.paletteLayers[c] ?? 0;
+  out[32] = params.detailLayer;
+  out[33] = params.detailYSign;
+  out[34] = params.detailTile;
+  out[35] = params.detailStrength;
   return out;
 }
 
@@ -107,6 +123,9 @@ export class HorizonUniforms implements ISharedUniformBuffer {
   private _nearGround: GPUTexture | null = null;
   private _wideGround: GPUTexture | null = null;
   private _albedo: GPUTexture | null = null;
+  private _normal: GPUTexture | null = null;
+  private _arm: GPUTexture | null = null;
+  private _detailSampler: GPUSampler | null = null;
   private _chunkMask: GPUTexture | null = null;
   private _atmosphere: GPUBuffer | null = null;
   private _atmosphereFallback: GPUBuffer | null = null;
@@ -132,10 +151,16 @@ export class HorizonUniforms implements ISharedUniformBuffer {
     this.requiresBuild = true;
   }
 
-  /** The terrain albedo array, whose smallest mip is each material's average. */
-  setAlbedo(albedo: GPUTexture) {
-    if (albedo === this._albedo) return;
+  /**
+   * The terrain material arrays: albedo, whose smallest mip is each material's
+   * average, and the normal and ARM the far ground's detail is tiled from.
+   */
+  setMaterials(albedo: GPUTexture, normal: GPUTexture, arm: GPUTexture) {
+    if (albedo === this._albedo && normal === this._normal && arm === this._arm)
+      return;
     this._albedo = albedo;
+    this._normal = normal;
+    this._arm = arm;
     this.requiresBuild = true;
   }
 
@@ -160,6 +185,16 @@ export class HorizonUniforms implements ISharedUniformBuffer {
       label: 'horizon params',
       size: PARAMS_FLOATS * 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    // Tiled and seen at grazing angles, so repeating and anisotropic.
+    this._detailSampler ??= device.createSampler({
+      label: 'horizon detail',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'linear',
+      addressModeU: 'repeat',
+      addressModeV: 'repeat',
+      maxAnisotropy: 16,
     });
     if (!this._atmosphere && !this._atmosphereFallback)
       this._atmosphereFallback = device.createBuffer({
@@ -195,6 +230,15 @@ export class HorizonUniforms implements ISharedUniformBuffer {
         {
           binding: 8,
           resource: this._albedo!.createView({ dimension: '2d-array' }),
+        },
+        { binding: 9, resource: this._detailSampler },
+        {
+          binding: 10,
+          resource: this._normal!.createView({ dimension: '2d-array' }),
+        },
+        {
+          binding: 11,
+          resource: this._arm!.createView({ dimension: '2d-array' }),
         },
       ],
     });

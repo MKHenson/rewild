@@ -5,8 +5,8 @@
 // Land stands at the far map's ground height, flattening to sea level by the
 // outer radius. Open sea is shaded like deep chunk water with its far features
 // only, land as a matte surface in the average colours of the materials the
-// chunks' splat rules put there, broken up by a world-space tint, and blended
-// across the coast.
+// chunks' splat rules put there, with a tiled detail material's relief, and
+// blended across the coast.
 //
 // Every pixel writes the same depth (far-ground.wgsl) and rings draw inner
 // first, so the first surface drawn on a pixel keeps it: nearer ground hides
@@ -37,12 +37,11 @@ const SHORE_RISE_MAX: f32 = 8.0;
 // Vertex radial parameter at or above this marks the edge at infinity.
 const INFINITE_EDGE: f32 = 1.5;
 
-// Metres across the land tint's broad and fine patches, how far each moves
-// brightness either way, and the warmth that comes with brightness.
-const TINT_BROAD: f32 = 900.0;
-const TINT_FINE: f32 = 130.0;
-const TINT_STRENGTH: f32 = 0.8;
-const TINT_WARMTH: vec3f = vec3f(1.0, 0.85, 0.65);
+// The detail material's second, broader tap: its size against the first, its
+// share of the slope, and a turn so the two tilings never line up.
+const DETAIL_BROAD_SCALE: f32 = 4.3;
+const DETAIL_BROAD_WEIGHT: f32 = 0.6;
+const DETAIL_BROAD_ROTATION: mat2x2f = mat2x2f(0.7986, 0.6018, -0.6018, 0.7986);
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -83,6 +82,12 @@ struct HorizonParams {
   fogged : f32,
   // Albedo array layer of palette channels 0-3 and 4-7.
   paletteLayers : array<vec4f, 2>,
+  // Normal and ARM array layer of the material tiled over the far ground, its
+  // normal map's green sign, metres per tile, and strength.
+  detailLayer : f32,
+  detailYSign : f32,
+  detailTile : f32,
+  detailStrength : f32,
 }
 
 struct VertexInput {
@@ -112,6 +117,9 @@ struct VertexOutput {
 @group(1) @binding(7) var<uniform> object : FinalUniformStruct;
 // The terrain materials' albedo; its smallest mip is each one's average colour.
 @group(1) @binding(8) var albedoArray : texture_2d_array<f32>;
+@group(1) @binding(9) var detailSampler : sampler;
+@group(1) @binding(10) var normalArray : texture_2d_array<f32>;
+@group(1) @binding(11) var armArray : texture_2d_array<f32>;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -244,29 +252,21 @@ fn landColour(p: vec2f) -> vec3f {
   return colour / max(dot(lo, vec4f(1.0)) + dot(hi, vec4f(1.0)), 1e-3);
 }
 
-fn tintHash(c: vec2i) -> f32 {
-  var h = (u32(c.x) * 1597334677u) ^ (u32(c.y) * 3812015801u);
-  h = (h ^ (h >> 16u)) * 2246822519u;
-  h = h ^ (h >> 13u);
-  return f32(h) / 4294967295.0;
-}
-
-fn tintNoise(q: vec2f) -> f32 {
-  let cell = vec2i(floor(q));
-  let f = fract(q);
-  let u = f * f * (3.0 - 2.0 * f);
-  return mix(
-    mix(tintHash(cell), tintHash(cell + vec2i(1, 0)), u.x),
-    mix(tintHash(cell + vec2i(0, 1)), tintHash(cell + vec2i(1, 1)), u.x),
-    u.y
-  );
-}
-
-// Patchy brightness over the far ground, which the averaged materials alone
-// leave flat. Brighter patches run warmer, as sunlit dry ground does.
-fn landTint(p: vec2f) -> vec3f {
-  let n = tintNoise(p / TINT_BROAD) * 0.65 + tintNoise(p / TINT_FINE) * 0.35;
-  return vec3f(1.0) + (n - 0.5) * 2.0 * TINT_STRENGTH * TINT_WARMTH;
+// Relief finer than the far map's heights: the detail material's tangent slope
+// (xy, +x and +z in world) and occlusion (z) at p, tiled at its size and again
+// broader and turned.
+fn sampleDetail(p: vec2f) -> vec3f {
+  let layer = u32(horizon.detailLayer);
+  let fineUV = p / horizon.detailTile;
+  let broadUV = DETAIL_BROAD_ROTATION * p / (horizon.detailTile * DETAIL_BROAD_SCALE);
+  let greenSign = vec2f(1.0, horizon.detailYSign);
+  let fine = (textureSample(normalArray, detailSampler, fineUV, layer).xy * 2.0 - 1.0) * greenSign;
+  let broad = (textureSample(normalArray, detailSampler, broadUV, layer).xy * 2.0 - 1.0) * greenSign;
+  let occlusion = textureSample(armArray, detailSampler, fineUV, layer).r
+                * textureSample(armArray, detailSampler, broadUV, layer).r;
+  // The broad tap's slope is in its turned frame; turn it back.
+  let slope = fine + DETAIL_BROAD_WEIGHT * (transpose(DETAIL_BROAD_ROTATION) * broad);
+  return vec3f(slope, occlusion);
 }
 
 // 1 on open sea, 0 inland: the continent's own land weight, inverted.
@@ -294,7 +294,10 @@ fn fs(input: VertexOutput) -> FragmentOutput {
   let roughness = sqrt(alpha);
 
   let viewPosition = input.view.xyz / max(input.view.w, 1e-6);
-  let worldNormal = normalize(mix(surfaceNormal(p), vec3f(0.0, 1.0, 0.0), ocean));
+  let detail = sampleDetail(p);
+  let land = horizon.detailStrength * (1.0 - ocean);
+  let detailed = normalize(surfaceNormal(p) + vec3f(detail.x, 0.0, detail.y) * land);
+  let worldNormal = normalize(mix(detailed, vec3f(0.0, 1.0, 0.0), ocean));
   let normal = normalize(uniforms.normalMatrix * worldNormal);
 
   #include "./shader-lib/cloud-shadow.frag.wgsl"
@@ -313,7 +316,8 @@ fn fs(input: VertexOutput) -> FragmentOutput {
   surface.specularNormal = normal;
   surface.geometricNormal = normal;
   surface.viewPosition = viewPosition;
-  surface.diffuseColor = mix(landColour(p) * landTint(p), horizon.scatter.rgb, ocean);
+  let landAlbedo = landColour(p) * mix(1.0, detail.z, land);
+  surface.diffuseColor = mix(landAlbedo, horizon.scatter.rgb, ocean);
   surface.f0 = vec3f(mix(LAND_F0, WATER_F0, ocean));
   surface.alpha = alpha;
 

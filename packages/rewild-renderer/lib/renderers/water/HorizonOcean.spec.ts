@@ -73,11 +73,16 @@ describe('packHorizonParams', () => {
       fadeStart: 16000,
       fogged: true,
       paletteLayers: [3, 1, 4, 1, 5, 9, 2, 6],
+      detailLayer: 5,
+      detailYSign: -1,
+      detailTile: 160,
+      detailStrength: 0.75,
     });
-    expect(packed.byteLength).toBe(128);
+    expect(packed.byteLength).toBe(144);
     expect(Array.from(packed)).toEqual([
       1, 2, 1360, 480, 5, 6, 16000, 7, 8, 9, 131072, 0.25, 0.5, 0.125, 3, -4,
       0.5, 0.25, 0.125, 0.03125, 24000, 16000, 1, 0, 3, 1, 4, 1, 5, 9, 2, 6,
+      5, -1, 160, 0.75,
     ]);
   });
 });
