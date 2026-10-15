@@ -64,7 +64,7 @@ export class LambertInstancedPass implements IMaterialPass {
       fragment: {
         entryPoint: 'fs',
         module,
-        targets: [
+        targets: renderer.sceneTargets(
           {
             format: sceneColorFormat,
             blend: {
@@ -80,7 +80,8 @@ export class LambertInstancedPass implements IMaterialPass {
               },
             },
           },
-        ],
+          true
+        ),
       },
       multisample: { count: renderer.sampleCount },
       primitive: {

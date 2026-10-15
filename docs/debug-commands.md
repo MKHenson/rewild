@@ -76,8 +76,8 @@ resolution rather than 0.7x, which is roughly twice the cloud pixels.
 ### Per-subsystem overrides
 
 Individual subsystems can sit on their own tier — `clouds` (which covers the
-bilateral that cleans them up), `cloudShadows`, `godRays`, `bloom` and
-`terrain`. They are read through `renderer.quality.aspect('clouds')` rather than
+bilateral that cleans them up), `cloudShadows`, `godRays`, `bloom`, `terrain`,
+`water` and `ao`. They are read through `renderer.quality.aspect('clouds')` rather than
 `.level`, and stored separately under `rewild.render.quality.overrides`.
 
 `terrain` is the one that moves the frame most on an open view, because terrain
@@ -232,6 +232,36 @@ identical. Turning shadows off leaves the light and takes the map away, which te
 the two apart in one A/B.
 
 See [Lighting (Foxfire)](./milestones/foxfire-lighting.md).
+
+---
+
+## Ambient occlusion
+
+Registered in `AoDebugCommands.ts`.
+
+```js
+setAoEnabled(false); // A/B the frame without SSAO
+showAoBuffer('raw'); // raw | blurred | off — the half-res AO target, full screen
+tuneAo(1.25, 1, 0.3); // exponent on visibility, tier radius multiplier, share on sunlight
+setShadowFloors(0.12, 0.3); // ground, foliage: the floors in force right now
+```
+
+`showAoBuffer` draws over the finished frame: white is open sky. `raw` shows the
+4×4 rotation pattern, which `blurred` should remove completely; if `blurred` still
+crawls when the camera moves, the blur and the pattern have gone out of step.
+
+`directStrength`, the third `tuneAo` argument, is how much of the AO also darkens
+direct light: 0 is ambient only, so contact darkening vanishes in full sun. Sunlit
+ground turns dirty and haloed if it is pushed too high.
+
+`setShadowFloors` sets whichever pair is in force — the AO pair while AO is
+applied, the base pair otherwise — so toggle `setAoEnabled` to tune the other. AO
+is never applied on the `low` tier or while a material debug channel is showing.
+
+The perf panel shows the three passes as `ao`, `ao blur` and `ao resolve` under
+`gpu · scene`.
+
+See [Materials & Shading (Lichen)](./milestones/lichen.md#screen-space-ambient-occlusion).
 
 ---
 

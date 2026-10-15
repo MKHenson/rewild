@@ -32,6 +32,7 @@ const HAS_WIND: bool = ${ HAS_WIND };
 #include "./shader-lib/tbn.frag.wgsl"
 #include "./shader-lib/parallax.frag.wgsl"
 #include "./shader-lib/ibl.wgsl"
+#include "./shader-lib/scene-output.wgsl"
 #include "./shader-lib/water-light.wgsl"
 #include "./shader-lib/rain-wet.wgsl"
 #include "./shader-lib/caustics.wgsl"
@@ -298,7 +299,7 @@ fn fs(
   @location(5) fade: vec2f,
   @builtin(front_facing) isFrontFacing: bool,
   @builtin(position) fragCoord: vec4f
-) -> @location(0) vec4f {
+) -> SceneFragment {
   if (!lodFadeKeeps(fragCoord.xy, fade)) {
     discard;
   }
@@ -330,7 +331,8 @@ fn fs(
     let tier = min(u32(uniforms.debug.x), 3u);
     let luma = dot(outColor.rgb, vec3f(0.299, 0.587, 0.114));
     outColor = vec4f(TIER_TINTS[tier] * (0.35 * uniforms.debug.z + luma), outColor.a);
+    sceneIndirect = vec3f(0.0);
   }
 
-  return outColor;
+  return sceneFragment(outColor);
 }

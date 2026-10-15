@@ -34,6 +34,7 @@ const HAS_FOLIAGE_NORMAL_MAP: bool = ${ HAS_FOLIAGE_NORMAL_MAP };
 #include "./shader-lib/tbn.frag.wgsl"
 #include "./shader-lib/parallax.frag.wgsl"
 #include "./shader-lib/ibl.wgsl"
+#include "./shader-lib/scene-output.wgsl"
 #include "./shader-lib/water-light.wgsl"
 #include "./shader-lib/rain-wet.wgsl"
 #include "./shader-lib/caustics.wgsl"
@@ -191,7 +192,7 @@ fn fs(
   @location(3) vertexColor: vec4f,
   @location(4) tangent: vec4f,
   @builtin(front_facing) isFrontFacing: bool
-) -> @location(0) vec4f {
+) -> SceneFragment {
 
   // Shadow factors first: these are statement fragments, so they have to be
   // spliced into an entry point rather than called, and shadeStandardSurface
@@ -215,5 +216,5 @@ fn fs(
     outColor = vec4f(mix(outColor.rgb, cascadeDebugTint, 0.5), outColor.a);
   }
 
-  return applySelectionTint(outColor, 0.35f);
+  return sceneFragment(applySelectionTint(outColor, 0.35f));
 }

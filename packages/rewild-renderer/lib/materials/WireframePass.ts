@@ -62,7 +62,7 @@ export class WireframePass implements IMaterialPass {
       fragment: {
         entryPoint: 'fs',
         module,
-        targets: [
+        targets: renderer.sceneTargets(
           {
             format: sceneColorFormat,
             blend: {
@@ -78,7 +78,8 @@ export class WireframePass implements IMaterialPass {
               },
             },
           },
-        ],
+          true
+        ),
       },
       multisample: {
         count: renderer.sampleCount,

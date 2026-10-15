@@ -121,7 +121,10 @@ export class ScatterInstancedPass extends StandardPassBase {
       fragment: {
         entryPoint: 'fs',
         module,
-        targets: [{ format: sceneColorFormat, blend: this.blendState() }],
+        targets: renderer.sceneTargets(
+          { format: sceneColorFormat, blend: this.blendState() },
+          !this.transparent
+        ),
       },
       multisample: { count: renderer.sampleCount },
       primitive: this.primitiveState(),

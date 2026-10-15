@@ -4,6 +4,7 @@
 const HAS_FOLIAGE_SHADING: bool = false;
 
 #include "./shader-lib/total-lighting.wgsl"
+#include "./shader-lib/scene-output.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
@@ -69,7 +70,7 @@ fn fs(
   @location(0) fragUV: vec2f,
   @location(1) normal: vec3f,
   @location(2) viewPosition: vec3f
-) -> @location(0) vec4f {
+) -> SceneFragment {
   let normalizedNormal = normalize(normal);
 
   #include "./shader-lib/total-lighting.frag.wgsl"
@@ -85,5 +86,5 @@ fn fs(
   if (directionalShadowParams.debugMode != 0u) {
     color = vec4f(mix(color.rgb, cascadeDebugTint, 0.5), 1.0);
   }
-  return color;
+  return sceneFragment(color);
 }

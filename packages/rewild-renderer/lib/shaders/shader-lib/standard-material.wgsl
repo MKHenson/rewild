@@ -16,6 +16,7 @@
 //   - brdf.wgsl, pbr-lighting.wgsl, tbn.frag.wgsl, parallax.frag.wgsl,
 //     ibl.wgsl, foliage-lighting.wgsl and water-light.wgsl, which this calls into, plus the IBL
 //     bindings ibl.wgsl names
+//   - scene-output.wgsl, for sceneIndirect
 //   - the `lighting` storage binding those two need, and spotLightShadowParams,
 //     which says which light in it the spot atlas belongs to
 //   - HAS_VERTEX_TANGENTS, HAS_PARALLAX, HAS_AUTHORED_NORMALS,
@@ -264,6 +265,7 @@ fn shadeStandardSurface(
   // sky — that fixes that. Perceptual roughness rather than surface.alpha,
   // because that is what the prefiltered chain and the BRDF map are indexed by.
   let indirect = evaluateIbl(surface, roughness) * occlusion * water.sky;
+  sceneIndirect = indirect;
   color += indirect;
 
   let emissiveSample = textureSample(emissiveMap, mySampler, uv).rgb;

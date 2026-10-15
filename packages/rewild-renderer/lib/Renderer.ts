@@ -34,6 +34,7 @@ import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowR
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
 import { FrameCompositor } from './post-processes/FrameCompositor';
 import { RefractionCapture } from './renderers/water/RefractionCapture';
+import { AmbientOcclusion } from './renderers/ao/AmbientOcclusion';
 import { QualitySettings } from './utils/QualitySettings';
 import { sortFrontToBack } from './utils/frontToBack';
 
@@ -75,6 +76,13 @@ export class Renderer {
   sceneColorFormat: GPUTextureFormat = 'rgba16float';
 
   /**
+   * Format of the scene pass's second target, the occludable ambient SSAO
+   * scales back (scene-output.wgsl). rg11b10ufloat where the adapter can render
+   * to it; the ambient is never negative and needs no alpha.
+   */
+  sceneIndirectFormat: GPUTextureFormat = 'rgba16float';
+
+  /**
    * App-wide render quality. Every subsystem that scales with quality — sky,
    * clouds, bloom, and materials in future — reads its tier from here. Set
    * `renderer.quality.level` and each one rebuilds on its next frame.
@@ -89,6 +97,8 @@ export class Renderer {
   /** HDR colour target the scene pass renders into. */
   private sceneColorTexture: GPUTexture | undefined;
   private sceneColorView: GPUTextureView | undefined;
+  private sceneIndirectTexture: GPUTexture | undefined;
+  private sceneIndirectView: GPUTextureView | undefined;
   /** Bloom + whole-frame tone curve; turns the HDR frame into the displayed image. */
   frameCompositor: FrameCompositor;
   private initialized: boolean;
@@ -111,12 +121,16 @@ export class Renderer {
 
   // GPU time for the shadow and main scene passes. Terrain is not its own pass —
   // its LOD meshes draw through renderGroupings in the main one — so 'scene'
-  // covers the lot. When water is in view, 'refraction' and 'water' time the
-  // copy and the pass it and the transparent meshes draw in.
+  // covers the opaque lot. The 'ao' rows are SSAO's three passes. When water is
+  // in view, 'refraction' times its copy, and 'water' the pass water and the
+  // transparent meshes draw in.
   sceneGpuTimer: GpuPassTimer = new GpuPassTimer(this.metrics, 'gpu/scene');
 
   /** The opaque scene copied for water to refract, when water is in view. */
   readonly refraction = new RefractionCapture();
+
+  /** SSAO on the sky ambient, between the opaque scene and water. */
+  readonly ambientOcclusion = new AmbientOcclusion();
 
   // Scene categories held back from every pass, shadows included. Attribution
   // by ablation: hide one and the `scene` row falls by what it was costing.
@@ -252,6 +266,26 @@ export class Renderer {
     return this.sceneColorTexture!;
   }
 
+  /**
+   * Colour targets for a pipeline drawn in the scene or water pass, which both
+   * carry the indirect target in slot 1. Every opaque pipeline passes
+   * `writesIndirect` and returns SceneFragment (scene-output.wgsl), even with
+   * no ambient to occlude, or it would keep what a surface behind it wrote.
+   * Pipelines drawn in the water pass leave it false.
+   */
+  sceneTargets(
+    color: GPUColorTargetState,
+    writesIndirect = false
+  ): GPUColorTargetState[] {
+    return [
+      color,
+      {
+        format: this.sceneIndirectFormat,
+        writeMask: writesIndirect ? GPUColorWrite.ALL : 0,
+      },
+    ];
+  }
+
   constructor() {
     this.autoFrame = true;
     this.onFrameHandler = this.onFrame.bind(this);
@@ -303,6 +337,11 @@ export class Renderer {
     if (adapter?.features.has('timestamp-query')) {
       requiredFeatures.push('timestamp-query');
     }
+    const indirectFeature = 'rg11b10ufloat-renderable' as GPUFeatureName;
+    if (adapter?.features.has(indirectFeature)) {
+      requiredFeatures.push(indirectFeature);
+      this.sceneIndirectFormat = 'rg11b10ufloat';
+    }
     const device = await adapter?.requestDevice({ requiredFeatures });
     if (!device) throw new Error('need a browser that supports WebGPU');
 
@@ -329,7 +368,15 @@ export class Renderer {
     this.context = context;
     this.device = device;
 
-    this.sceneGpuTimer.init(device, ['shadow', 'scene', 'refraction', 'water']);
+    this.sceneGpuTimer.init(device, [
+      'shadow',
+      'scene',
+      'ao',
+      'ao blur',
+      'ao resolve',
+      'refraction',
+      'water',
+    ]);
     this.declareMetrics();
 
     this.textureManager = new TextureManager();
@@ -434,10 +481,12 @@ export class Renderer {
     this.spotLightShadowRenderer.dispose();
     this.sceneGpuTimer.dispose();
     this.refraction.dispose();
+    this.ambientOcclusion.dispose();
     this.frameCompositor.dispose();
     this.disposed = true;
     this.initialized = false;
     this.sceneColorTexture?.destroy();
+    this.sceneIndirectTexture?.destroy();
     this.depthTexture?.destroy();
     this.device.destroy();
     this.renderGroups.length = 0; // Clear the render groups
@@ -505,6 +554,17 @@ export class Renderer {
 
     this.sceneColorTexture = sceneColorTexture;
     this.sceneColorView = sceneColorTexture.createView();
+
+    this.sceneIndirectTexture?.destroy();
+    this.sceneIndirectTexture = device.createTexture({
+      label: 'scene-indirect',
+      size: [currentWidth, currentHeight],
+      sampleCount: this.sampleCount,
+      format: this.sceneIndirectFormat,
+      usage:
+        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+    this.sceneIndirectView = this.sceneIndirectTexture.createView();
 
     if (this.depthTexture) this.depthTexture.destroy();
 
@@ -1020,6 +1080,12 @@ export class Renderer {
             loadOp: 'clear',
             storeOp: 'store',
           },
+          {
+            view: this.sceneIndirectView!,
+            clearValue: [0.0, 0.0, 0.0, 0.0],
+            loadOp: 'clear',
+            storeOp: 'store',
+          },
         ],
         depthStencilAttachment: {
           view: this.depthTexture.createView(),
@@ -1034,23 +1100,27 @@ export class Renderer {
 
       this.terrainRenderer.render(this, pass, camera.camera);
 
-      // Water refracts the opaque scene, so when any is in view the pass ends
-      // after the opaque groups, they are copied, and water and the
-      // transparent groups draw over them in a pass of their own.
+      // The scene pass ends after the opaque groups, so SSAO occludes them
+      // alone. Water refracts the opaque scene, so when any is in view it is
+      // copied next, and water and the transparent groups draw over it in a
+      // pass of their own.
       let opaqueEnd = 0;
       while (opaqueEnd < renderList.length && drawRank(renderList[opaqueEnd]) === 0)
         opaqueEnd++;
       const hasWater =
         opaqueEnd < renderList.length && drawRank(renderList[opaqueEnd]) === 1;
 
-      this.renderGroupings(
-        renderList,
-        pass,
-        camera.camera,
-        0,
-        hasWater ? opaqueEnd : renderList.length
-      );
+      this.renderGroupings(renderList, pass, camera.camera, 0, opaqueEnd);
       pass.end();
+
+      this.ambientOcclusion.render(
+        this,
+        encoder,
+        camera.camera,
+        this.depthTexture,
+        this.sceneIndirectTexture!,
+        sceneColorView
+      );
 
       if (hasWater) {
         this.refraction.capture(
@@ -1061,10 +1131,18 @@ export class Renderer {
           camera.camera,
           this.sceneGpuTimer.writes('refraction')
         );
+      }
+
+      if (opaqueEnd < renderList.length) {
         const waterPass = encoder.beginRenderPass({
           label: 'water pass',
           colorAttachments: [
             { view: sceneColorView, loadOp: 'load', storeOp: 'store' },
+            {
+              view: this.sceneIndirectView!,
+              loadOp: 'clear',
+              storeOp: 'discard',
+            },
           ],
           depthStencilAttachment: {
             view: this.depthTexture.createView(),
@@ -1282,6 +1360,8 @@ export class Renderer {
 
       // Captured sky cubemap viewer — likewise inert unless switched on.
       this.sky.skyRenderer.cubeDebugRenderer.render(this);
+
+      this.ambientOcclusion.renderDebug(this);
 
       this.flushScreenshots();
     }

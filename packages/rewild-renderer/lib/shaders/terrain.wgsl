@@ -24,6 +24,7 @@ const HAS_TERRAIN_NO_TILE: bool = ${ HAS_TERRAIN_NO_TILE };
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/ibl.wgsl"
+#include "./shader-lib/scene-output.wgsl"
 #include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
@@ -498,7 +499,7 @@ fn fs(
   @location(2) viewPosition: vec3f,
   @location(3) objectNormal: vec3f,
   @location(4) objectHeight: f32
-) -> @location(0) vec4f {
+) -> SceneFragment {
   // --- Uniform control flow: everything needing implicit derivatives ---------
   //
   // Below, layers are skipped by weight, which is non-uniform control flow —
@@ -1174,11 +1175,12 @@ fn fs(
   // maps, so multiplying it there would double-darken every crevice.
   let ibl = evaluateIblTerms(surface, shadingRoughness);
   let indirect = (ibl.diffuse * wet.skyPassed + ibl.specular * dry) * shadingOcclusion;
+  sceneIndirect = indirect;
   shaded += indirect;
 
   // Channel visualisation
   if (iblParams.debugChannel != DEBUG_CHANNEL_OFF) {
-    return materialDebugColor(
+    return sceneFragment(materialDebugColor(
       blendedColor,
       // Pinned at 0 by this shader, so the channel reports the constant rather
       // than the ARM map's unauthored B.
@@ -1189,7 +1191,7 @@ fn fs(
       vec3f(0.0), // terrain has no emissive slot
       direct,
       indirect
-    );
+    ));
   }
 
   // No multiply by albedo here, unlike the Phong path this replaced. The BRDF
@@ -1199,5 +1201,5 @@ fn fs(
   if (directionalShadowParams.debugMode != 0u) {
     color = vec4f(mix(color.rgb, cascadeDebugTint, 0.5), 1.0);
   }
-  return color;
+  return sceneFragment(color);
 }

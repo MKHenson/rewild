@@ -46,6 +46,42 @@ describe('shader host contract', () => {
   }
 });
 
+// Fragments that write sceneIndirect, which scene-output.wgsl declares. The
+// include does not dedupe, so the host includes it once itself.
+const SCENE_OUTPUT_USERS = [
+  'standard-material.wgsl',
+  'foliage-lighting.wgsl',
+  'SceneFragment',
+];
+
+describe('scene output contract', () => {
+  it('includes scene-output.wgsl once in every host that writes it', () => {
+    const missing: string[] = [];
+    for (const host of hosts) {
+      const source = readFileSync(join(SHADER_DIR, host), 'utf8');
+      if (!SCENE_OUTPUT_USERS.some((user) => source.includes(user))) continue;
+      const includes = source.match(
+        /#include "\.\/shader-lib\/scene-output\.wgsl"/g
+      );
+      if (includes?.length !== 1) missing.push(host);
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('ends every SceneFragment entry point through sceneFragment()', () => {
+    const bare: string[] = [];
+    for (const host of hosts) {
+      const source = readFileSync(join(SHADER_DIR, host), 'utf8');
+      const entry = source.match(/\) -> SceneFragment \{([\s\S]*?)\n\}/);
+      if (!entry) continue;
+      for (const ret of entry[1].matchAll(/return\s+([^;]*);/g))
+        if (!ret[1].startsWith('sceneFragment('))
+          bare.push(`${host}: ${ret[0]}`);
+    }
+    expect(bare).toEqual([]);
+  });
+});
+
 // WGSL reserves these as identifiers (a subset of the spec's list: the ones a
 // shader author could plausibly reach for). Tint rejects them only when the
 // device compiles the module, long after the edit that introduced them.

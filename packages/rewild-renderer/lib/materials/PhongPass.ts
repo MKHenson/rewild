@@ -70,7 +70,7 @@ export class PhongPass implements IMaterialPass {
       fragment: {
         entryPoint: 'fs',
         module,
-        targets: [
+        targets: renderer.sceneTargets(
           {
             format: sceneColorFormat,
             blend: {
@@ -86,7 +86,8 @@ export class PhongPass implements IMaterialPass {
               },
             },
           },
-        ],
+          true
+        ),
       },
       multisample: { count: renderer.sampleCount },
       primitive: {
