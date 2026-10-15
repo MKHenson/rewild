@@ -94,7 +94,7 @@
     "lodDistances": [
       60
     ],
-    "cullDistance": 1600,
+    "cullDistance": 2600,
     "impostor": {
       "fromDistance": 400,
       "views": 8,
@@ -246,7 +246,7 @@
     "lodDistances": [
       70
     ],
-    "cullDistance": 1800,
+    "cullDistance": 2800,
     "impostor": {
       "fromDistance": 800,
       "views": 8,
@@ -290,7 +290,7 @@
     "lodDistances": [
       70
     ],
-    "cullDistance": 1800,
+    "cullDistance": 2800,
     "impostor": {
       "fromDistance": 800,
       "views": 8,
@@ -1580,7 +1580,7 @@
     "lodDistances": [
       70
     ],
-    "cullDistance": 1600,
+    "cullDistance": 2600,
     "impostor": {
       "fromDistance": 400,
       "views": 8,
