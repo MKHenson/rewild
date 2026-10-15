@@ -18,15 +18,18 @@ import { cloudShaderDefines } from './SkyQuality';
 //  offset 64  – currentSampleIndex : u32           (4 bytes)
 //  offset 68  – historyValid       : u32           (4 bytes)
 //  offset 72  – blendFactor        : f32           (4 bytes)
-//  offset 76  – _padding           : f32           (4 bytes)
+//  offset 76  – frameIndex         : u32           (4 bytes)
 //  offset 80  – jitter             : vec2<f32>     (8 bytes)
 //  total: 88 bytes → 96 with the struct's 16-byte alignment → rounded up to 256
-//
-// jitter sits at 80 rather than reusing _padding at 76 because a vec2<f32> needs
-// an 8-byte-aligned offset; 76 is not one.
 // ──────────────────────────────────────────────────────────────────────────────
 
 const TEMPORAL_UNIFORM_BYTE_SIZE = 96;
+
+/**
+ * Wrap for frameIndex. The shader scales it into a screen-space offset, so it is
+ * kept small enough for that to stay exact in f32.
+ */
+const FRAME_INDEX_PERIOD = 1024;
 const ALIGNED_TEMPORAL_UNIFORM_SIZE =
   Math.ceil(TEMPORAL_UNIFORM_BYTE_SIZE / 256) * 256;
 
@@ -176,6 +179,9 @@ export class TemporalCloudRenderer {
 
   /** Cursor into JITTER_OFFSETS, advanced once per rendered frame. */
   private jitterIndex = 0;
+
+  /** Seeds the march dither so each march of a texel uses a new offset. */
+  private frameIndex = 0;
 
   /** Jitter amplitude for this frame, interpolated with camera movement. */
   private currentJitterScale = JITTER_SCALE_STILL;
@@ -472,6 +478,7 @@ export class TemporalCloudRenderer {
     this.historyValid = true;
     this.currentFrame = (this.currentFrame + 1) % 4;
     this.jitterIndex = (this.jitterIndex + 1) % JITTER_SEQUENCE_LENGTH;
+    this.frameIndex = (this.frameIndex + 1) % FRAME_INDEX_PERIOD;
   }
 
   // ────────────────────────────────────────────
@@ -494,8 +501,8 @@ export class TemporalCloudRenderer {
     // blendFactor at byte offset 72 → float32 index 18
     f32[18] = this.currentBlendFactor;
 
-    // _padding at byte offset 76 → float32 index 19
-    f32[19] = 0.0;
+    // frameIndex at byte offset 76 → uint32 index 19
+    u32[19] = this.frameIndex;
 
     // jitter at byte offset 80 → float32 indices 20-21
     const offset = this.jitterIndex * 2;

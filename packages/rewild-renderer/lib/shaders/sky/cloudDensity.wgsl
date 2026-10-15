@@ -29,7 +29,22 @@ fn frontCloudiness(position: vec3f, cloudiness: f32, front: vec4f) -> f32 {
   return saturate(cloudiness + front.w * x * inverseSqrt(1.0 + x * x));
 }
 
+// Mean of the fine-detail fbm (three octaves of [0, 1] noise weighted 0.5, 0.25,
+// 0.125). The shape-only density subtracts this in place of the fbm itself, so it
+// matches the full density on average.
+const FINE_DETAIL_FBM_MEAN: f32 = 0.4375;
+
 fn cloudDensity(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f) -> CloudDensityResult {
+  return cloudDensityDetail(position, domainOffset, skyCloudiness, drift, front, true);
+}
+
+// cloudDensity without the fine-detail octaves: one fbm fewer per sample. For
+// consumers that blur the result anyway — shadow maps, distant light-ray samples.
+fn cloudDensityShape(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f) -> CloudDensityResult {
+  return cloudDensityDetail(position, domainOffset, skyCloudiness, drift, front, false);
+}
+
+fn cloudDensityDetail(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f, fineDetail: bool) -> CloudDensityResult {
   let cloudiness = frontCloudiness(position, skyCloudiness, front);
   // Single coherent wind offset — all layers move together as one mass
   let windOffset = vec3f(drift.x, 0.0, drift.y);
@@ -87,7 +102,11 @@ fn cloudDensity(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift:
   }
 
   // Calculate the final cloud density using fbm (slightly more turbulence on fine detail)
-  den = max(0.0, den - 0.2 * fbm((p + turbulenceOffset * 2.0) * 0.05));
+  if (fineDetail) {
+    den = max(0.0, den - 0.2 * fbm((p + turbulenceOffset * 2.0) * 0.05));
+  } else {
+    den = max(0.0, den - 0.2 * FINE_DETAIL_FBM_MEAN);
+  }
 
   // Calculate the final density value based on the cloud density and weather pattern
   result.density = largeWeather * 0.2 * min(1.0, 5.0 * den);

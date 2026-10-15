@@ -1,8 +1,4 @@
-// Temporal cloud rendering shader (Phase 5).
-//
-// This is a self-contained variant of clouds.wgsl.  It duplicates the raymarching
-// helper functions (skyRay, lightRay, drawCloudsHorizonFog, etc.) so it can be
-// built independently without pulling in clouds.wgsl.
+// Temporal cloud rendering shader.
 //
 // Build order for TemporalCloudRenderer:
 //   cloudsTemporal.wgsl + skyConstants.wgsl + fog.wgsl + skyCommon.wgsl + cloudDensity.wgsl
@@ -11,14 +7,17 @@
 // skyConstants.wgsl provides: EARTH_RADIUS, CLOUD_START, CLOUD_HEIGHT, SUN_POWER, FOG_*, etc.
 // fog.wgsl provides: intersectSphere, intersectSphereBoth, getFogColor, getAtmosphereColor
 // cloudDensity.wgsl provides: CloudDensityResult, cloudDensity()
-//
-// SYNC NOTE: if skyRay() or drawCloudsHorizonFog() change in clouds.wgsl, mirror the
-// changes here.  The LOD system (calculateCloudLOD) must be kept identical.
 
 // Supplied by the pipeline (SkyQuality.ts). Both bound loops, so they have to be
 // WGSL consts rather than uniforms — changing tier recompiles the module.
 const NUM_CLOUD_SAMPLES = ${ CLOUD_SAMPLES };
 const NUM_LIGHT_SAMPLES = ${ CLOUD_LIGHT_SAMPLES };
+
+// With the camera inside or above the deck, the first NEAR_MARCH_DISTANCE metres
+// of the ray through it are marched in uniform steps and the rest in
+// NUM_FAR_SAMPLES geometrically growing ones.
+const NEAR_MARCH_DISTANCE: f32 = 2000.0;
+const NUM_FAR_SAMPLES = NUM_CLOUD_SAMPLES / 2;
 
 // The view march stops once this little light is still getting through — a pure
 // perf cut-off, since the remaining contribution is negligible. It is *not* a
@@ -79,7 +78,7 @@ const WIND_BLEND_BOOST_MAX: f32 = 0.12;
 
 // ──────────────────────────────────────────────
 // Group 0: standard cloud shader bindings
-// (identical to clouds.wgsl so the same SkyRenderer uniform buffer is reused)
+//
 // ──────────────────────────────────────────────
 
 @group(0) @binding(0)
@@ -109,7 +108,7 @@ struct TemporalUniforms {
     currentSampleIndex: u32,           // which 1/16 group to refresh this frame (0-15)
     historyValid: u32,                 // 0 = history empty (first frame / after teleport)
     blendFactor: f32,                  // EMA weight for reprojected pixels (e.g. 0.15)
-    _padding: f32,
+    frameIndex: u32,                   // increments every frame; seeds the march dither
     jitter: vec2<f32>,                 // sub-texel march offset, in cloud texels, [-0.5, 0.5]
 };
 
@@ -133,16 +132,18 @@ struct TemporalOutput {
 };
 
 // ──────────────────────────────────────────────
-// Module-level private state (mirrors clouds.wgsl)
+// Module-level private state
 // ──────────────────────────────────────────────
 
 var<private> varyings: VaryingsStruct;
 var<private> output: TemporalOutput;
 var<private> sunDotUp: f32;
 var<private> currentFragCoord: vec2<f32>;
+var<private> marchNoise: f32;
+var<private> lightNoise: f32;
 
 // ──────────────────────────────────────────────
-// Dynamic LOD (identical to clouds.wgsl)
+// Dynamic LOD
 // ──────────────────────────────────────────────
 
 fn calculateCloudLOD(fragCoord: vec2<f32>, dir: vec3<f32>, rayLength: f32) -> f32 {
@@ -156,7 +157,7 @@ fn calculateCloudLOD(fragCoord: vec2<f32>, dir: vec3<f32>, rayLength: f32) -> f3
 }
 
 // ──────────────────────────────────────────────
-// Raymarching helpers (mirrors clouds.wgsl)
+// Raymarching helpers
 // ──────────────────────────────────────────────
 
 fn numericalMieFit(costh: f32) -> f32 {
@@ -186,19 +187,42 @@ fn clouds(position: vec3f) -> CloudDensityResult {
     return cloudDensity(position, object.cameraPosition.xz, object.cloudiness, object.cloudDrift, object.cloudFront);
 }
 
-fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_direction: vec3f, cloudHeight2: f32) -> f32 {
-    var rayStartPos = rayStartPosition;
-    var nbSampleLight = NUM_LIGHT_SAMPLES;
-    let zMaxl: f32 = 600.0;
-    let stepL: f32 = zMaxl / f32(nbSampleLight);
-    var lighRayDen: f32 = 0.0;
-    rayStartPos += sun_direction * stepL * hash1(dot(rayStartPos, vec3f(12.256, 2.646, 6.356)) + object.iTime * 0.00001);
+fn cloudsShape(position: vec3f) -> CloudDensityResult {
+    return cloudDensityShape(position, object.cameraPosition.xz, object.cloudiness, object.cloudDrift, object.cloudFront);
+}
+
+// The shading terms below were tuned against a density sum over 25 equal steps
+// of LIGHT_RAY_LENGTH. Optical depth is divided by that reference step to recover
+// it, so the look does not depend on how the light ray is sampled.
+const LIGHT_RAY_LENGTH: f32 = 600.0;
+const LIGHT_REFERENCE_STEP: f32 = LIGHT_RAY_LENGTH / 25.0;
+
+// Light samples evaluated with full detail; the rest use the shape-only density.
+// Their steps are long enough that the fine octaves only add noise.
+const LIGHT_DETAIL_SAMPLES = 2;
+
+fn lightRay(rayStartPos: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_direction: vec3f, cloudHeight2: f32, dither: f32) -> f32 {
+    // Quadratic spacing: sample j covers [L (j/N)^2, L ((j+1)/N)^2], so steps are
+    // short where self-shadowing changes fastest and lengthen toward the far end.
+    let invN = 1.0 / f32(NUM_LIGHT_SAMPLES);
+    var opticalDepth: f32 = 0.0;
     var cloudHeight: f32 = 0.0;
-    for (var j = 0; j < nbSampleLight; j++) {
-        let result = clouds(rayStartPos + sun_direction * f32(j) * stepL);
+    for (var j = 0; j < NUM_LIGHT_SAMPLES; j++) {
+        let u = (f32(j) + dither) * invN;
+        let stepL = LIGHT_RAY_LENGTH * f32(2 * j + 1) * invN * invN;
+        let samplePos = rayStartPos + sun_direction * (LIGHT_RAY_LENGTH * u * u);
+        var result: CloudDensityResult;
+        if (j < LIGHT_DETAIL_SAMPLES) {
+            result = clouds(samplePos);
+        } else {
+            result = cloudsShape(samplePos);
+        }
         cloudHeight = result.cloudHeight;
-        lighRayDen += result.density;
+        opticalDepth += result.density * stepL;
+        // Above the deck with the sun climbing, every remaining sample is empty.
+        if (cloudHeight >= 1.0 && sun_direction.y > 0.05) { break; }
     }
+    let lighRayDen = opticalDepth / LIGHT_REFERENCE_STEP;
     let sunAngle = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
 
     // The cloud deck sits at 500-1100m, so it stays in direct sunlight for roughly a
@@ -220,11 +244,70 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
     // The two softer lobes approximate multiple scattering and barely attenuate, so
     // they keep a cloud's underside sunlit. Scaled back toward the base.
     let baseScatter = mix(CLOUD_BASE_SCATTER, 1.0, smoothstep(0.0, 0.6, cloudHeight2));
-    let beersLaw: f32 = exp(-stepL * lighRayDen) + baseScatter * scatterAmount * (0.9 * exp(-0.1 * stepL * lighRayDen) + 0.5 * exp(-0.02 * stepL * lighRayDen));
+    let beersLaw: f32 = exp(-opticalDepth) + baseScatter * scatterAmount * (0.9 * exp(-0.1 * opticalDepth) + 0.5 * exp(-0.02 * opticalDepth));
     // Thin cloud absorption: caps forward-scattered sun brightness for low-density clouds.
     // Low lighRayDen → 0.25 floor; thick clouds → 1.0 (unchanged). Tune 1.2 and 0.25.
     let thinCloudDim = mix(0.25, 1.0, 1.0 - exp(-lighRayDen * 1.2));
     return sunIntensityModifier * beersLaw * phaseFunction * mix(0.85 + 1.35 * pow(min(1.0, dC * 8.5), 0.3 + 5.5 * cloudHeight), 1.0, clamp(lighRayDen * 0.4, 0.0, 1.0)) * thinCloudDim;
+}
+
+fn pcgHash(v: u32) -> u32 {
+    let state = v * 747796405u + 2891336453u;
+    let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+fn hashToUnit(h: u32) -> f32 {
+    return f32(h >> 8u) * (1.0 / 16777216.0);
+}
+
+// White-noise dither for the view march (x) and light rays (y), reseeded on every
+// march of a texel so the temporal accumulation averages it away. White rather
+// than a low-discrepancy pattern: the clamped accumulation only partly averages,
+// and a structured pattern's lines survive into the clouds where white noise
+// falls to the bilateral.
+fn marchDither(fragCoord: vec2f) -> vec2f {
+    let pixel = vec2u(fragCoord);
+    let seed = pcgHash(pixel.x + pcgHash(pixel.y + pcgHash(temporal.frameIndex >> 2u)));
+    return vec2f(hashToUnit(seed), hashToUnit(pcgHash(seed)));
+}
+
+struct CloudMarch {
+    color: vec3f,
+    transmittance: f32,
+    // Absorption-weighted distance sum, for the aerial perspective on the deck.
+    depthSum: f32,
+    weightSum: f32,
+};
+
+// Shared per-ray inputs to accumulateSample.
+struct MarchLighting {
+    mu: f32,
+    phaseFunction: f32,
+    sunDirection: vec3f,
+    ambientColor: vec3f,
+    sunTint: vec3f,
+};
+
+fn accumulateSample(
+    march: ptr<function, CloudMarch>,
+    lighting: ptr<function, MarchLighting>,
+    cloudSample: CloudDensityResult,
+    position: vec3f, t: f32, stepS: f32, lightDither: f32
+) {
+    let density = cloudSample.density;
+    let cloudHeight = cloudSample.cloudHeight;
+    let intensity = lightRay(position, (*lighting).phaseFunction, density, (*lighting).mu, (*lighting).sunDirection, cloudHeight, lightDither);
+    let skyAmbient = mix(CLOUD_BASE_AMBIENT, 1.1, cloudHeight);
+    let ambient = skyAmbient * (*lighting).ambientColor * 6.5 + vec3f(CLOUD_BASE_BOUNCE) * max(0.0, 1.0 - 2.0 * cloudHeight);
+    let radiance = (ambient + SUN_POWER * intensity * (*lighting).sunTint) * density;
+    let stepTransmittance = exp(-density * stepS);
+    let absorbed = (*march).transmittance * (1.0 - stepTransmittance);
+
+    (*march).color += (*march).transmittance * (radiance - radiance * stepTransmittance) / density;
+    (*march).depthSum += t * absorbed;
+    (*march).weightSum += absorbed;
+    (*march).transmittance *= stepTransmittance;
 }
 
 fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
@@ -237,6 +320,10 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     let hitInner = intersectSphereBoth(cameraPos, dir, earthCenter, ATM_START);
     let hitOuter = intersectSphereBoth(cameraPos, dir, earthCenter, ATM_END);
 
+    // From inside or above, a ray runs to where it leaves the deck's outer shell,
+    // passing under the deck and back up into it if it dips below the base. It is
+    // not stopped at the base: rays either side of the base's tangent would then
+    // end tens of kilometres apart and draw a seam along the horizon.
     var tStart: f32;
     var tEnd: f32;
     var isInsideClouds = false;
@@ -248,20 +335,11 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     } else if (camHeight <= ATM_END) {
         isInsideClouds = true;
         tStart = 0.0;
-        if (hitInner.hit && hitInner.tNear > 0.0) {
-            tEnd = hitInner.tNear;
-        } else {
-            tEnd = hitOuter.tFar;
-        }
-        tEnd = min(tEnd, 2000.0);
+        tEnd = hitOuter.tFar;
     } else {
         if (!hitOuter.hit || hitOuter.tNear < 0.0) { return vec4f(0.0); }
         tStart = hitOuter.tNear;
-        if (hitInner.hit && hitInner.tNear > 0.0) {
-            tEnd = hitInner.tNear;
-        } else {
-            tEnd = hitOuter.tFar;
-        }
+        tEnd = hitOuter.tFar;
     }
 
     if (tStart >= tEnd || tEnd <= 0.0) { return vec4f(0.0); }
@@ -272,7 +350,10 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
         if (tStart >= tEnd) { return vec4f(0.0); }
     }
 
-    let rayLength = tEnd - tStart;
+    // From inside or above, the uniform march covers NEAR_MARCH_DISTANCE past the
+    // entry point and the far loop below the remainder.
+    let nearEnd = select(tEnd, min(tEnd, tStart + NEAR_MARCH_DISTANCE), camHeight >= ATM_START);
+    let rayLength = nearEnd - tStart;
     var nbSample = i32(f32(NUM_CLOUD_SAMPLES) * min(1.0, rayLength / 2000.0));
     if (isInsideClouds) {
         nbSample = i32(f32(nbSample) * 0.3);
@@ -283,13 +364,8 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     let lod = calculateCloudLOD(currentFragCoord, dir, rayLength);
     nbSample = max(i32(mix(f32(nbSample), ${ CLOUD_LOD_SAMPLES }, lod)), ${ CLOUD_MIN_SAMPLES });
 
-    var color = vec3f(0.0);
     let stepS = rayLength / f32(nbSample);
-    var rayStartPosition = cameraPos + tStart * dir;
-    var transmittance = 1.0;
     let mu = dot(sun_direction, dir);
-    let phaseFunction = numericalMieFit(mu);
-    rayStartPosition += dir * stepS * hash1(dot(dir, vec3f(12.256, 2.646, 6.356)) + object.iTime * 0.00001);
 
     // pow() is undefined for a negative base in WGSL (it evaluates as
     // exp2(e2 * log2(e1))), and sunDotUp goes negative every night. Saturating first
@@ -297,43 +373,70 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     // the multiply by a zeroed sun term.
     let sunDotUp3 = pow(saturate(sunDotUp), 3.0);
 
+    var lighting: MarchLighting;
+    lighting.mu = mu;
+    lighting.phaseFunction = numericalMieFit(mu);
+    lighting.sunDirection = sun_direction;
+    lighting.sunTint = mix(vec3f(0.8, 0.5, 0.3), vec3f(1.0), sunDotUp3);
+    // The evening term peaks at the horizon and day takes over from ~6 to ~37
+    // degrees, so the warm ambient gets a window of its own.
+    lighting.ambientColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.25, -0.02, sunDotUp));
+    lighting.ambientColor = mix(lighting.ambientColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.1, 0.6, sunDotUp));
+
+    var march: CloudMarch;
+    march.transmittance = 1.0;
+
+    // Light-ray dither for the n-th lit sample: a golden-ratio sequence on the
+    // pixel's noise, so consecutive samples decorrelate.
+    var litCount = 0.0;
+
+    // No empty-space skipping: an empty sample already returns before the fbm and
+    // the light ray, and the deck's interior is full of eroded pockets that any
+    // stride would leap from one to the next, dropping the cloud in between.
+    var t = tStart + stepS * marchNoise;
     for (var i = 0; i < nbSample; i++) {
-        var cloudHeight: f32;
-        let result = clouds(rayStartPosition);
-        let density = result.density;
-        cloudHeight = result.cloudHeight;
-
-        if (density > 0.0) {
-            let intensity = lightRay(rayStartPosition, phaseFunction, density, mu, sun_direction, cloudHeight);
-            // The evening term now peaks at the horizon instead of ~11 degrees up, and
-            // day takes over from ~6 to ~37 degrees. Previously evening only arrived at
-            // the same elevation where day started displacing it, so the warm ambient
-            // never actually got a window of its own.
-            var cloudAmbientColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.25, -0.02, sunDotUp));
-            cloudAmbientColor = mix(cloudAmbientColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.1, 0.6, sunDotUp));
-            let skyAmbient = mix(CLOUD_BASE_AMBIENT, 1.1, cloudHeight);
-            let ambient = skyAmbient * cloudAmbientColor * 6.5 + vec3f(CLOUD_BASE_BOUNCE) * max(0.0, 1.0 - 2.0 * cloudHeight);
-            var radiance = ambient + (SUN_POWER * intensity * mix(vec3f(0.8, 0.5, 0.3), vec3f(1.0), clamp(sunDotUp3, 0.0, 1.0)));
-            radiance *= density;
-            color += transmittance * (radiance - radiance * exp(-density * stepS)) / density;
-            transmittance *= exp(-density * stepS);
-            if (transmittance <= CLOUD_TRANSMITTANCE_FLOOR) { break; }
+        let position = cameraPos + dir * t;
+        let cloudSample = clouds(position);
+        if (cloudSample.density > 0.0) {
+            accumulateSample(&march, &lighting, cloudSample, position, t, stepS, fract(lightNoise + litCount * 0.618034));
+            litCount += 1.0;
+            if (march.transmittance <= CLOUD_TRANSMITTANCE_FLOOR) { break; }
         }
-
-        rayStartPosition += dir * stepS;
+        t += stepS;
     }
 
-    // Cirrus: blend high-altitude ice layer using remaining transmittance.
+    // Geometric steps from nearEnd to the end of the ray: step length grows with
+    // distance, so the far deck costs a fixed sample count however long the ray.
+    if (tEnd > nearEnd && march.transmittance > CLOUD_TRANSMITTANCE_FLOOR) {
+        let growth = pow(tEnd / nearEnd, 1.0 / f32(NUM_FAR_SAMPLES));
+        var tFar = nearEnd * pow(growth, marchNoise);
+        for (var i = 0; i < NUM_FAR_SAMPLES; i++) {
+            let tNext = tFar * growth;
+            let position = cameraPos + dir * tFar;
+            let cloudSample = clouds(position);
+            if (cloudSample.density > 0.0) {
+                accumulateSample(&march, &lighting, cloudSample, position, tFar, tNext - tFar, fract(lightNoise + litCount * 0.618034));
+                litCount += 1.0;
+                if (march.transmittance <= CLOUD_TRANSMITTANCE_FLOOR) { break; }
+            }
+            tFar = tNext;
+        }
+    }
+
+    // Everything behind the cumulus: cirrus, sky and sun disc.
+    var transmittance = march.transmittance;
+    var backdrop = vec3f(0.0);
+
     if (transmittance > CLOUD_TRANSMITTANCE_FLOOR && object.cirrusOpacity > 0.0) {
         let cir = cirrusRaySample(cameraPos, dir, sun_direction);
         if (cir.a > 0.0) {
-            color += transmittance * cir.rgb * cir.a;
+            backdrop += transmittance * cir.rgb * cir.a;
             transmittance *= (1.0 - cir.a);
         }
     }
 
     let background = getAtmosphereColor(sun_direction, dir, mu, vec3f(0.0));
-    color += background * pow(transmittance, 2.0);
+    backdrop += background * pow(transmittance, 2.0);
 
     let sunExtinction = smoothstep(-0.12, 0.0, sunDotUp);
     let airmass = 1.0 / max(sunDotUp, 0.04);
@@ -344,58 +447,45 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     let alphaEdge = mix(0.9995, 0.9987, horizonFactor);
     let discBrightness = mix(1000.0, 9000.0, horizonFactor);
     let sunDisc = discBrightness * smoothstep(discEdge, 1.0, mu) * sunExtinction * atmosphericDimming;
-    color += vec3f(sunDisc) * pow(transmittance, 2.0);
+    backdrop += vec3f(sunDisc) * pow(transmittance, 2.0);
+
+    // Aerial perspective. The cumulus is fogged at its own absorption-weighted
+    // depth from every camera height, so the deck fades out at the same distance
+    // whether seen from below, inside or above. Each part's fog is weighted by the
+    // share of the pixel it covers, so the scatter colour sums to one pixel's worth.
+    //
+    // The backdrop is fogged at the cloud base from below, which lays the haze band
+    // along the horizon, and at the end of the ray from inside or above, so the
+    // horizon there fades to the same haze as the distant clouds in front of it.
+    let scatterColor = getFogScatterColor(dir, sun_direction);
+    let cloudDepth = select(0.0, march.depthSum / march.weightSum, march.weightSum > 0.0);
+    let cloudFog = fogTransmittance(cameraPos, dir, cloudDepth);
+    let backdropFog = fogTransmittance(cameraPos, dir, select(tEnd, tStart, camHeight < ATM_START));
+    let color = march.color * cloudFog + scatterColor * (1.0 - cloudFog) * (1.0 - march.transmittance)
+        + backdrop * backdropFog + scatterColor * (1.0 - backdropFog) * march.transmittance;
 
     let sunAlpha = smoothstep(alphaEdge, 1.0, mu) * sunExtinction;
 
     // Rescale against the march's cut-off so a fully-marched cloud reaches true
-    // opacity. Raw 1 - transmittance topped out at 0.95, leaving even solid overcast
-    // 5% transparent. That is invisible against sky, but stars run to hundreds of HDR
-    // and skyBlend caps the sky it composites at 60, so the leak was a fixed ~3 HDR —
-    // about three times a night cloud's own ambient radiance, which is why stars read
-    // as shining straight through the deck. Dividing keeps the ramp smooth rather
-    // than clamping at a hard edge.
+    // opacity. Raw 1 - transmittance tops out at 0.95, and against stars (hundreds
+    // of HDR, capped at 60 by skyBlend) that leak reads as stars shining through
+    // the deck. Dividing keeps the ramp smooth rather than clamping at a hard edge.
+    //
+    // Coverage is the cloud's own opacity: fog in front of a cloud changes its
+    // colour, above, and must not reduce how much background it hides.
     let cloudOpacity = saturate((1.0 - transmittance) / (1.0 - CLOUD_TRANSMITTANCE_FLOOR));
     let alpha = max(cloudOpacity, sunAlpha);
     return vec4f(color, alpha);
 }
 
-fn drawCloudsHorizonFog(dir: vec3f, org: vec3f, vSunDirection: vec3f) -> vec4f {
-    var color = vec4f(0.0);
-    color = skyRay(org, dir, vSunDirection);
-
-    let earthCenter = vec3f(0.0, -EARTH_RADIUS, 0.0);
-    let camHeight = length(org - earthCenter);
-    const ATM_START_DCS = EARTH_RADIUS + CLOUD_START;
-
-    if (camHeight >= ATM_START_DCS) {
-        return color;
-    }
-
-    let fogDistance = intersectSphere(org, dir, earthCenter, ATM_START_DCS);
-
-    // Coverage is the cloud's own opacity. Fog between the camera and the cloud layer
-    // changes the cloud's *colour*, which getFogColor below already does — it must not
-    // reduce how much of the background the cloud hides.
-    //
-    // This used to be min(fogTransmittance, color.a), which mixes a transmittance
-    // (1 = clear air) with an opacity, so the two run in opposite directions. Near the
-    // horizon a ray only reaches the 500m cloud shell after ~79km of atmosphere, so
-    // even at foginess = 0 transmittance is ~0.21 — and cloud alpha was being clamped
-    // to 0.21 with it. The dark cloud colour still looked dark over a dark night sky,
-    // which hid the problem, but ~79% of the starfield came through solid overcast.
-    let cloudAlpha = color.a;
-    return vec4f(getFogColor(dir, org, vSunDirection, color.rgb), cloudAlpha);
-}
-
-// Low-quality fallback for disoccluded pixels: same path as drawCloudsHorizonFog
-// but forces maximum LOD so NUM_CLOUD_SAMPLES collapses to ~16.
-fn drawCloudsHorizonFogLowQuality(dir: vec3f, org: vec3f, vSunDirection: vec3f) -> vec4f {
+// Low-quality fallback for disoccluded pixels: same path as skyRay but forces
+// maximum LOD so NUM_CLOUD_SAMPLES collapses to CLOUD_LOD_SAMPLES.
+fn skyRayLowQuality(dir: vec3f, org: vec3f, vSunDirection: vec3f) -> vec4f {
     let savedFragCoord = currentFragCoord;
     // Place fragCoord at the screen corner to guarantee LOD = 1.0
     let screenSize = vec2f(object.resolutionX * object.resolutionScale, object.resolutionY * object.resolutionScale);
     currentFragCoord = screenSize;
-    let result = drawCloudsHorizonFog(dir, org, vSunDirection);
+    let result = skyRay(org, dir, vSunDirection);
     currentFragCoord = savedFragCoord;
     return result;
 }
@@ -581,6 +671,9 @@ fn fs(
 ) -> TemporalOutput {
     sunDotUp = dot(vSunDirection, vec3f(0.0, 1.0, 0.0));
     currentFragCoord = fragCoord.xy;
+    let dither = marchDither(fragCoord.xy);
+    marchNoise = dither.x;
+    lightNoise = dither.y;
     output.valid = 1.0;
 
     // vRelPosition is camera-relative, so the camera is at its origin.
@@ -599,7 +692,7 @@ fn fs(
     let cloudResolution = vec2f(object.resolutionX * object.resolutionScale, object.resolutionY * object.resolutionScale);
     let currentUV = fragCoord.xy / cloudResolution;
 
-    // ── Depth / hemisphere gates (same as standard clouds.wgsl) ──
+    // ── Depth / hemisphere gates ──
 
     if (camHeight < (EARTH_RADIUS + CLOUD_START)) {
         // Skip the march only where the surrounding neighbourhood is terrain too.
@@ -681,7 +774,7 @@ fn fs(
 
     if (isThisPixelsTurn || temporal.historyValid == 0u) {
         // Fresh full-quality raymarch (always when history is invalid)
-        pixelColor = drawCloudsHorizonFog(marchDirection, org, vSunDirection);
+        pixelColor = skyRay(org, marchDirection, vSunDirection);
     } else {
         // Direction-based reprojection:
         // Project the current ray direction into the previous frame's screen
@@ -736,7 +829,7 @@ fn fs(
             // Off-screen, behind-camera, or reprojecting onto texels the previous
             // frame gated away (foliage that has since moved) — nothing
             // trustworthy to read, so march instead.
-            pixelColor = drawCloudsHorizonFogLowQuality(marchDirection, org, vSunDirection);
+            pixelColor = skyRayLowQuality(marchDirection, org, vSunDirection);
         }
     }
 
