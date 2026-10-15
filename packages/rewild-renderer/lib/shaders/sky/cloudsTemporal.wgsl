@@ -3,7 +3,7 @@
 // Build order for TemporalCloudRenderer:
 //   cloudsTemporal.wgsl + skyConstants.wgsl + fog.wgsl + skyCommon.wgsl + cloudDensity.wgsl
 //
-// skyCommon.wgsl provides: ObjectStruct, VaryingsStruct, OutputStruct, hash/noise/fbm, @vertex fn vs()
+// skyCommon.wgsl provides: ObjectStruct, VaryingsStruct, OutputStruct, hash/noise, @vertex fn vs()
 // skyConstants.wgsl provides: EARTH_RADIUS, CLOUD_START, CLOUD_HEIGHT, SUN_POWER, FOG_*, etc.
 // fog.wgsl provides: intersectSphere, intersectSphereBoth, getFogColor, getAtmosphereColor
 // cloudDensity.wgsl provides: CloudDensityResult, cloudDensity()
@@ -99,6 +99,12 @@ var depthTexture: texture_depth_2d;
 @group(0) @binding(5)
 var depthSampler: sampler_comparison;
 
+@group(0) @binding(6)
+var shapeVolume: texture_3d<f32>;
+
+@group(0) @binding(7)
+var detailVolume: texture_3d<f32>;
+
 // ──────────────────────────────────────────────
 // Group 1: temporal reprojection bindings
 // ──────────────────────────────────────────────
@@ -141,6 +147,8 @@ var<private> sunDotUp: f32;
 var<private> currentFragCoord: vec2<f32>;
 var<private> marchNoise: f32;
 var<private> lightNoise: f32;
+// Angle one cloud texel subtends; a sample t metres out stands for t * pixelCone.
+var<private> pixelCone: f32;
 
 // ──────────────────────────────────────────────
 // Dynamic LOD
@@ -183,12 +191,12 @@ fn numericalMieFit(costh: f32) -> f32 {
     return dot(expValues, expValWeight);
 }
 
-fn clouds(position: vec3f) -> CloudDensityResult {
-    return cloudDensity(position, object.cameraPosition.xz, object.cloudiness, object.cloudDrift, object.cloudFront);
+fn clouds(position: vec3f, footprint: f32) -> CloudDensityResult {
+    return cloudDensity(position, object.cameraPosition.xz, object.cloudiness, object.cloudDrift, object.cloudFront, footprint);
 }
 
-fn cloudsShape(position: vec3f) -> CloudDensityResult {
-    return cloudDensityShape(position, object.cameraPosition.xz, object.cloudiness, object.cloudDrift, object.cloudFront);
+fn cloudsShape(position: vec3f, footprint: f32) -> CloudDensityResult {
+    return cloudDensityShape(position, object.cameraPosition.xz, object.cloudiness, object.cloudDrift, object.cloudFront, footprint);
 }
 
 // The shading terms below were tuned against a density sum over 25 equal steps
@@ -201,7 +209,7 @@ const LIGHT_REFERENCE_STEP: f32 = LIGHT_RAY_LENGTH / 25.0;
 // Their steps are long enough that the fine octaves only add noise.
 const LIGHT_DETAIL_SAMPLES = 2;
 
-fn lightRay(rayStartPos: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_direction: vec3f, cloudHeight2: f32, dither: f32) -> f32 {
+fn lightRay(rayStartPos: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_direction: vec3f, cloudHeight2: f32, dither: f32, footprint: f32) -> f32 {
     // Quadratic spacing: sample j covers [L (j/N)^2, L ((j+1)/N)^2], so steps are
     // short where self-shadowing changes fastest and lengthen toward the far end.
     let invN = 1.0 / f32(NUM_LIGHT_SAMPLES);
@@ -213,9 +221,9 @@ fn lightRay(rayStartPos: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_direct
         let samplePos = rayStartPos + sun_direction * (LIGHT_RAY_LENGTH * u * u);
         var result: CloudDensityResult;
         if (j < LIGHT_DETAIL_SAMPLES) {
-            result = clouds(samplePos);
+            result = clouds(samplePos, footprint);
         } else {
-            result = cloudsShape(samplePos);
+            result = cloudsShape(samplePos, footprint);
         }
         cloudHeight = result.cloudHeight;
         opticalDepth += result.density * stepL;
@@ -297,7 +305,7 @@ fn accumulateSample(
 ) {
     let density = cloudSample.density;
     let cloudHeight = cloudSample.cloudHeight;
-    let intensity = lightRay(position, (*lighting).phaseFunction, density, (*lighting).mu, (*lighting).sunDirection, cloudHeight, lightDither);
+    let intensity = lightRay(position, (*lighting).phaseFunction, density, (*lighting).mu, (*lighting).sunDirection, cloudHeight, lightDither, t * pixelCone);
     let skyAmbient = mix(CLOUD_BASE_AMBIENT, 1.1, cloudHeight);
     let ambient = skyAmbient * (*lighting).ambientColor * 6.5 + vec3f(CLOUD_BASE_BOUNCE) * max(0.0, 1.0 - 2.0 * cloudHeight);
     let radiance = (ambient + SUN_POWER * intensity * (*lighting).sunTint) * density;
@@ -390,13 +398,13 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     // pixel's noise, so consecutive samples decorrelate.
     var litCount = 0.0;
 
-    // No empty-space skipping: an empty sample already returns before the fbm and
+    // No empty-space skipping: an empty sample already returns before the noise volumes and
     // the light ray, and the deck's interior is full of eroded pockets that any
     // stride would leap from one to the next, dropping the cloud in between.
     var t = tStart + stepS * marchNoise;
     for (var i = 0; i < nbSample; i++) {
         let position = cameraPos + dir * t;
-        let cloudSample = clouds(position);
+        let cloudSample = clouds(position, t * pixelCone);
         if (cloudSample.density > 0.0) {
             accumulateSample(&march, &lighting, cloudSample, position, t, stepS, fract(lightNoise + litCount * 0.618034));
             litCount += 1.0;
@@ -413,7 +421,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
         for (var i = 0; i < NUM_FAR_SAMPLES; i++) {
             let tNext = tFar * growth;
             let position = cameraPos + dir * tFar;
-            let cloudSample = clouds(position);
+            let cloudSample = clouds(position, tFar * pixelCone);
             if (cloudSample.density > 0.0) {
                 accumulateSample(&march, &lighting, cloudSample, position, tFar, tNext - tFar, fract(lightNoise + litCount * 0.618034));
                 litCount += 1.0;
@@ -764,6 +772,9 @@ fn fs(
     );
     let jitteredRel = object.invViewProjectionMatrix * vec4f(jitteredNDC, 1.0, 1.0);
     let marchDirection = normalize(jitteredRel.xyz / jitteredRel.w);
+
+    let neighbourRel = object.invViewProjectionMatrix * vec4f(jitteredNDC + vec2f(2.0 / cloudResolution.x, 0.0), 1.0, 1.0);
+    pixelCone = length(normalize(neighbourRel.xyz / neighbourRel.w) - marchDirection);
 
     // ── 4×4 checkerboard temporal group ──
 

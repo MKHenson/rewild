@@ -2,9 +2,9 @@ import { TimestampWritesFn } from '../../metrics/GpuPassTimer';
 import { Renderer } from '../../Renderer';
 import shader from '../../shaders/sky/cloudShadow.wgsl';
 import constantsFns from '../../shaders/sky/skyConstants.wgsl';
-import cloudNoiseFns from '../../shaders/sky/cloudNoise.wgsl';
 import cloudDensityFns from '../../shaders/sky/cloudDensity.wgsl';
 import { RenderQuality } from '../../utils/RenderQuality';
+import { CloudNoiseVolumes } from './CloudNoiseVolumes';
 import { composeShader } from '../../utils/shaderDefines';
 import { cloudShadowShaderDefines } from './SkyQuality';
 
@@ -45,7 +45,7 @@ export class CloudShadowRenderer {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
-  init(renderer: Renderer): void {
+  init(renderer: Renderer, noiseVolumes: CloudNoiseVolumes): void {
     const { device } = renderer;
     const { resolution } = this.config;
 
@@ -81,7 +81,7 @@ export class CloudShadowRenderer {
     const module = device.createShaderModule({
       label: 'cloud shadow shader',
       code: composeShader(
-        [shader, constantsFns, cloudNoiseFns, cloudDensityFns],
+        [shader, constantsFns, cloudDensityFns],
         cloudShadowShaderDefines(this.quality)
       ),
     });
@@ -118,17 +118,13 @@ export class CloudShadowRenderer {
         { binding: 0, resource: { buffer: this.uniformBuffer } },
         { binding: 1, resource: renderer.samplerManager.get('linear') },
         {
-          binding: 2,
-          resource: renderer.textureManager
-            .get('rgba-noise-256')
-            .gpuTexture.createView(),
-        },
-        {
           binding: 3,
           resource: renderer.textureManager
             .get('pebbles-512')
             .gpuTexture.createView(),
         },
+        { binding: 4, resource: noiseVolumes.shape.createView() },
+        { binding: 5, resource: noiseVolumes.detail.createView() },
       ],
     });
   }

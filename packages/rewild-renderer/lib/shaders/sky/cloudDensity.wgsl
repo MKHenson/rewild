@@ -1,6 +1,7 @@
 // Shared cloud density function.
-// Requires in scope: fbm(), pebblesTexture, noiseSampler,
-// EARTH_RADIUS, CLOUD_START, CLOUD_HEIGHT (from constants.wgsl).
+// Requires in scope: pebblesTexture, noiseSampler, shapeVolume, detailVolume
+// (texture_3d<f32>, from CloudNoiseVolumes), EARTH_RADIUS, CLOUD_START, CLOUD_HEIGHT
+// (from constants.wgsl).
 
 struct CloudDensityResult {
   density: f32,
@@ -29,26 +30,72 @@ fn frontCloudiness(position: vec3f, cloudiness: f32, front: vec4f) -> f32 {
   return saturate(cloudiness + front.w * x * inverseSqrt(1.0 + x * x));
 }
 
-// Mean of the fine-detail fbm (three octaves of [0, 1] noise weighted 0.5, 0.25,
-// 0.125). The shape-only density subtracts this in place of the fbm itself, so it
-// matches the full density on average.
-const FINE_DETAIL_FBM_MEAN: f32 = 0.4375;
+// The erosion thresholds below were tuned against three octaves of [0, 1] value
+// noise, so both volumes are remapped to that noise's mean and deviation. The
+// shape-only density subtracts the mean in place of the detail term, so it
+// matches the full density on average. Measured by scripts/cloud-noise-stats.mjs.
+const EROSION_NOISE_MEAN: f32 = 0.4376;
+const EROSION_NOISE_STD: f32 = 0.1058;
+const SHAPE_NOISE_MEAN: f32 = 0.8307;
+const SHAPE_NOISE_STD: f32 = 0.0504;
+const DETAIL_NOISE_MEAN: f32 = 0.4814;
+const DETAIL_NOISE_STD: f32 = 0.1141;
 
-fn cloudDensity(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f) -> CloudDensityResult {
-  return cloudDensityDetail(position, domainOffset, skyCloudiness, drift, front, true);
+// World extent of one tile of each volume. A shape tile holds 8 base cells and a
+// detail tile 4, putting their billows at 100 m and 20 m.
+const SHAPE_VOLUME_METRES: f32 = 800.0;
+const DETAIL_VOLUME_METRES: f32 = 80.0;
+
+// Fraction of the deck, from its base, over which the detail turns from wispy to
+// billowy.
+const DETAIL_WISP_HEIGHT: f32 = 0.2;
+
+// Mip whose texels match `footprint`, the width in metres one sample stands for.
+// Level 0 everywhere would alias distant cloud and miss the cache on every tap.
+fn volumeLod(volume: texture_3d<f32>, volumeMetres: f32, footprint: f32) -> f32 {
+  let texelMetres = volumeMetres / f32(textureDimensions(volume).x);
+  return max(0.0, log2(footprint / texelMetres));
 }
 
-// cloudDensity without the fine-detail octaves: one fbm fewer per sample. For
-// consumers that blur the result anyway — shadow maps, distant light-ray samples.
-fn cloudDensityShape(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f) -> CloudDensityResult {
-  return cloudDensityDetail(position, domainOffset, skyCloudiness, drift, front, false);
+// Perlin-Worley shape noise as an erosion term: low on the billows, so they
+// survive the subtraction.
+fn shapeErosion(p: vec3f, footprint: f32) -> f32 {
+  let lod = volumeLod(shapeVolume, SHAPE_VOLUME_METRES, footprint);
+  let texel = textureSampleLevel(shapeVolume, noiseSampler, p / SHAPE_VOLUME_METRES, lod);
+  let lowFreqFbm = texel.g * 0.625 + texel.b * 0.25 + texel.a * 0.125;
+  let base = saturate((texel.r - (lowFreqFbm - 1.0)) / (2.0 - lowFreqFbm));
+  return EROSION_NOISE_MEAN + (SHAPE_NOISE_MEAN - base) * (EROSION_NOISE_STD / SHAPE_NOISE_STD);
 }
 
-fn cloudDensityDetail(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f, fineDetail: bool) -> CloudDensityResult {
+// Worley detail as an erosion term. Near the base it eats the cells' centres and
+// leaves wisps; higher up it eats between them and leaves billows.
+fn detailErosion(p: vec3f, cloudHeight: f32, footprint: f32) -> f32 {
+  let lod = volumeLod(detailVolume, DETAIL_VOLUME_METRES, footprint);
+  let texel = textureSampleLevel(detailVolume, noiseSampler, p / DETAIL_VOLUME_METRES, lod);
+  let cells = texel.r * 0.625 + texel.g * 0.25 + texel.b * 0.125;
+  let billow = saturate(cloudHeight / DETAIL_WISP_HEIGHT);
+  let erosion = mix(cells, 1.0 - cells, billow);
+  let erosionMean = mix(DETAIL_NOISE_MEAN, 1.0 - DETAIL_NOISE_MEAN, billow);
+  return EROSION_NOISE_MEAN + (erosion - erosionMean) * (EROSION_NOISE_STD / DETAIL_NOISE_STD);
+}
+
+// `footprint` is the width in metres the sample stands for, which picks the
+// volumes' mip level.
+fn cloudDensity(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f, footprint: f32) -> CloudDensityResult {
+  return cloudDensityDetail(position, domainOffset, skyCloudiness, drift, front, footprint, true);
+}
+
+// cloudDensity without the fine-detail octaves: one noise lookup fewer per sample.
+// For consumers that blur the result anyway — shadow maps, distant light-ray samples.
+fn cloudDensityShape(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f, footprint: f32) -> CloudDensityResult {
+  return cloudDensityDetail(position, domainOffset, skyCloudiness, drift, front, footprint, false);
+}
+
+fn cloudDensityDetail(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f, footprint: f32, fineDetail: bool) -> CloudDensityResult {
   let cloudiness = frontCloudiness(position, skyCloudiness, front);
   // Single coherent wind offset — all layers move together as one mass
   let windOffset = vec3f(drift.x, 0.0, drift.y);
-  // Small turbulence offset for FBM detail layers (subtle internal cloud motion)
+  // Small turbulence offset for the noise volumes (subtle internal cloud motion)
   let turbulenceOffset = windOffset * (1.5 / 10.3);
   var p = position + vec3f(domainOffset.x, 0.0, domainOffset.y) + windOffset;
 
@@ -90,10 +137,10 @@ fn cloudDensityDetail(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, 
     return result;
   }
 
-  // Calculate the cloud density using fractal Brownian motion (fbm)
+  // Erode the shape with the Perlin-Worley volume
   // Turbulence offset gives subtle internal motion without breaking the cloud shape
-  let fbmErosion = mix(0.7, 0.25, smoothstep(0.7, 1.0, cloudiness));
-  var den = max(0.0, cloudShape - fbmErosion * fbm((p + turbulenceOffset) * 0.01));
+  let shapeErosionStrength = mix(0.7, 0.25, smoothstep(0.7, 1.0, cloudiness));
+  var den = max(0.0, cloudShape - shapeErosionStrength * shapeErosion(p + turbulenceOffset, footprint));
 
   // If the cloud density is zero, return early
   if (den <= 0.0) {
@@ -101,12 +148,12 @@ fn cloudDensityDetail(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, 
     return result;
   }
 
-  // Calculate the final cloud density using fbm (slightly more turbulence on fine detail)
+  // Erode the edges with the Worley detail volume (slightly more turbulence on fine detail)
+  var detailNoise = EROSION_NOISE_MEAN;
   if (fineDetail) {
-    den = max(0.0, den - 0.2 * fbm((p + turbulenceOffset * 2.0) * 0.05));
-  } else {
-    den = max(0.0, den - 0.2 * FINE_DETAIL_FBM_MEAN);
+    detailNoise = detailErosion(p + turbulenceOffset * 2.0, cloudHeight, footprint);
   }
+  den = max(0.0, den - 0.2 * detailNoise);
 
   // Calculate the final density value based on the cloud density and weather pattern
   result.density = largeWeather * 0.2 * min(1.0, 5.0 * den);

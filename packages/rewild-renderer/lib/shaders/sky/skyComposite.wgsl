@@ -173,7 +173,11 @@ fn farGroundPosition(dir: vec3f) -> vec3f {
   if (t <= 0.0) {
     t = FAR_GROUND_MAX_DISTANCE;
   }
-  return cam + dir * t;
+  // Pinned to sea level: ring pixels a hair below the horizon otherwise land at
+  // camera height or above, escape the cloud-occlusion test, and draw a line
+  // across the deck when the camera is inside it.
+  let p = cam + dir * t;
+  return vec3f(p.x, object.seaLevel, p.z);
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {

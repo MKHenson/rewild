@@ -13,6 +13,7 @@ import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
 import {
   bilateralSigmas,
   cloudResolutionScale,
+  cloudShapeVolumeSize,
   cloudShadowConfig,
   godRaySamples,
   godRayScale,
@@ -26,6 +27,7 @@ import { DirectionLight } from '../../core/lights/DirectionLight';
 import { GpuPassTimer } from '../../metrics/GpuPassTimer';
 import { StarfieldRenderer } from './StarfieldRenderer';
 import { CloudShadowRenderer } from './CloudShadowRenderer';
+import { CloudNoiseVolumes } from './CloudNoiseVolumes';
 import { SkyCubeCapture } from './SkyCubeCapture';
 import { SkyCubeDebugRenderer } from './SkyCubeDebugRenderer';
 import { SkyIblPrefilter } from './SkyIblPrefilter';
@@ -141,6 +143,9 @@ export class SkyRenderer {
 
   cirrusCoverage: number = 0.1;
   cirrusOpacity: number = 0.2;
+
+  /** Kept across rebuilds; regenerated only when the tier's volume size changes. */
+  private cloudNoiseVolumes: CloudNoiseVolumes;
 
   /** Quality revision this chain was last built against; -1 until first build. */
   private builtQualityRevision: number = -1;
@@ -319,9 +324,16 @@ export class SkyRenderer {
       });
     }
 
-    this.cloudsPass.init(renderer, this.uniformBuffer);
+    // Both passes rebind below, so the old volumes have no readers left once
+    // the work already submitted against them completes, which destroy() waits for.
+    const shapeVolumeSize = cloudShapeVolumeSize(cloudsQuality);
+    if (this.cloudNoiseVolumes?.shapeSize !== shapeVolumeSize) {
+      this.cloudNoiseVolumes?.dispose();
+      this.cloudNoiseVolumes = new CloudNoiseVolumes(device, shapeVolumeSize);
+    }
+    this.cloudsPass.init(renderer, this.uniformBuffer, this.cloudNoiseVolumes);
     this.starfieldRenderer.init(renderer);
-    this.cloudShadowRenderer.init(renderer);
+    this.cloudShadowRenderer.init(renderer, this.cloudNoiseVolumes);
     const moonTexture = renderer.textureManager.get('moon').gpuTexture;
     this.moonTextureSize = moonTexture.width;
     this.atmospherePass.init(
@@ -787,6 +799,7 @@ export class SkyRenderer {
     this.cubeCapture.dispose();
     this.starfieldRenderer.dispose();
     this.cloudShadowRenderer.dispose();
+    this.cloudNoiseVolumes?.dispose();
     this.gpuTimer?.dispose();
     this.bilateralPass.dispose();
     this.godRaysPass.dispose();

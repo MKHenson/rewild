@@ -24,7 +24,9 @@ Atmospheric rendering system for the Rewild engine supporting realistic sky/clou
 
 **Altitude Handling**: Three cases (below/inside/above clouds) share one draw distance. Each ray runs to where it leaves the deck or meets the earth. From inside or above, the first 2 km are marched in uniform steps (30% of the usual count when inside) and the rest in `cloudSamples / 2` geometrically growing ones. Distant cloud is faded by aerial perspective at its absorption-weighted depth, the same from every height.
 
-**Cloud March Sampling**: Light rays take quadratically spaced steps over 600 m; all but the first two samples use the shape-only density (`cloudDensityShape`, no fine-detail fbm), as does the cloud shadow map. The ray start is dithered with white noise reseeded on every march, so the temporal accumulation averages out the banding.
+**Cloud March Sampling**: Light rays take quadratically spaced steps over 600 m; all but the first two samples use the shape-only density (`cloudDensityShape`, no detail volume), as does the cloud shadow map. The ray start is dithered with white noise reseeded on every march, so the temporal accumulation averages out the banding.
+
+**Cloud Noise**: Cumulus erosion samples two tiling RGBA8 volumes generated on the GPU with full mip chains (`CloudNoiseVolumes`): a Perlin-Worley shape volume over 800 m (128³ on ultra/high, 64³ on medium/low, to fit integrated-GPU caches) and a 64³ Worley detail volume over 80 m. Each lookup reads the mip matching its footprint (distance × the angle one cloud texel subtends; texel size in the shadow map). Detail erodes cell centres near the base (wisps) and between cells higher up (billows). Both are remapped to the mean and deviation of three-octave value noise, which the erosion thresholds are tuned against; `scripts/cloud-noise-stats.mjs` measures them.
 
 **God Rays**: Quarter-res radial blur toward sun with cloud transmittance masking — disabled at night
 
