@@ -1,4 +1,6 @@
 import {
+  FALL_HURT_FROM,
+  FALL_HURT_SCALE,
   GroundSlide,
   IMPACT_HURT_FROM,
   IMPACT_HURT_SCALE,
@@ -9,6 +11,7 @@ import {
   SLIDE_MAX_SPEED,
   SLIDE_START_SLIPPERY,
   slideAccel,
+  fallDamage,
   impactDamage,
   slideDamage,
   slideFriction,
@@ -74,6 +77,17 @@ describe('impactDamage', () => {
   it('hurts by the speed above it', () => {
     expect(impactDamage(IMPACT_HURT_FROM + 2)).toBe(2 * IMPACT_HURT_SCALE);
     expect(impactDamage(SLIDE_MAX_SPEED)).toBeGreaterThan(30);
+  });
+});
+
+describe('fallDamage', () => {
+  it('does no harm from a jump on flat ground', () => {
+    expect(fallDamage(10.5)).toBe(0);
+    expect(fallDamage(FALL_HURT_FROM)).toBe(0);
+  });
+
+  it('hurts by the speed above FALL_HURT_FROM', () => {
+    expect(fallDamage(FALL_HURT_FROM + 2)).toBe(2 * FALL_HURT_SCALE);
   });
 });
 
@@ -274,6 +288,32 @@ describe('GroundSlide', () => {
     expect(slide.collide(1, 0, 1, 0, 0.1)).toBe(0);
     expect(slide.collide(1, 0, 1 - 1e-4, 0, 0.1)).toBe(0);
     expect(slide.velocityX).toBe(10);
+  });
+
+  it('does not count climbing a walkable slope as blocked', () => {
+    const slide = slopeAt(20);
+    slide.walkX = -3;
+    const a = 20 * DEG;
+    const gotX = -Math.cos(a) * Math.cos(a);
+    expect(slide.collide(-1, 0, gotX, 0, 0.1)).toBe(0);
+    expect(slide.walkX).toBe(-3);
+  });
+
+  it('climbs a mild slippery slope at walking speed', () => {
+    const slide = slopeAt(20);
+    const a = 20 * DEG;
+    for (let i = 0; i < 600; i++) {
+      slide.step(-0.1, 0, true, true, 1 / 30, 1 / 60, 0.5);
+      slide.collide(slide.moveX, 0, slide.moveX * Math.cos(a) ** 2, 0, 1 / 30);
+    }
+    expect(slide.walkX).toBeLessThan(-2.5);
+  });
+
+  it('still stops at an obstacle on a walkable slope', () => {
+    const slide = slopeAt(20);
+    slide.walkX = -3;
+    slide.collide(-1, 0, 0, 0, 0.1);
+    expect(slide.walkX).toBeCloseTo(0);
   });
 
   it('does not push a slide away from what blocks it', () => {

@@ -46,8 +46,10 @@ import {
 } from './utils/Headwind';
 import { rainShare } from 'rewild-renderer/lib/renderers/sky/RainWetness';
 import {
+  FALL_HURT_FROM,
   GroundSlide,
   MAX_SLOPE_CLIMB,
+  fallDamage,
   impactDamage,
   slideDamage,
 } from './utils/Sliding';
@@ -845,11 +847,8 @@ export class Player extends Node {
     const controllerGrounded = this.characterController.computedGrounded();
 
     const fallSpeed = -this.verticalVelocity;
-    const hurt = controllerGrounded && this.verticalVelocity < -15.0;
-    if (hurt) {
-      const damage = (Math.abs(this.verticalVelocity) - 15.0) * 10.0;
-      this.health -= damage;
-    }
+    const hurt = controllerGrounded && fallSpeed > FALL_HURT_FROM;
+    if (hurt) this.health -= fallDamage(fallSpeed);
 
     if (this.spawnResolved) {
       if (this._hunger > 0) this.hunger -= _HUNGER_DRAIN_PER_SEC * delta;
