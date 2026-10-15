@@ -18,7 +18,16 @@ import { Mesh } from '../../core/Mesh';
 //   maskOrigin      vec2f  offset 56
 //   scatter         vec3f  offset 64
 //   slopeVariance   f32    offset 76
-const PARAMS_FLOATS = 20;
+//   outerRadius     f32    offset 80
+//   fadeStart       f32    offset 84
+//   fogged          f32    offset 88
+//   paletteLayers   2 × vec4f offset 96
+const PARAMS_FLOATS = 32;
+const PALETTE_OFFSET = 24;
+const PALETTE_SIZE = 8;
+
+// Stands in for the atmosphere composite's uniforms when there is no sky.
+const ATMOSPHERE_FALLBACK_BYTES = 256;
 
 export interface HorizonParams {
   centreX: number;
@@ -42,6 +51,14 @@ export interface HorizonParams {
   scatter: readonly [number, number, number];
   /** Mean square slope of the waves, all too fine to resolve at this range. */
   slopeVariance: number;
+  /** Metres from the centre of the last finite ring. */
+  outerRadius: number;
+  /** Metres from the centre the land starts flattening to sea level. */
+  fadeStart: number;
+  /** Whether the ring applies the scene fog, which it does when the sky runs. */
+  fogged: boolean;
+  /** Albedo array layer of each palette channel. */
+  paletteLayers: readonly number[];
 }
 
 export function packHorizonParams(
@@ -69,6 +86,11 @@ export function packHorizonParams(
   out[17] = params.scatter[1];
   out[18] = params.scatter[2];
   out[19] = params.slopeVariance;
+  out[20] = params.outerRadius;
+  out[21] = params.fadeStart;
+  out[22] = params.fogged ? 1 : 0;
+  for (let c = 0; c < PALETTE_SIZE; c++)
+    out[PALETTE_OFFSET + c] = params.paletteLayers[c] ?? 0;
   return out;
 }
 
@@ -80,9 +102,14 @@ export class HorizonUniforms implements ISharedUniformBuffer {
   /** Written to the GPU every frame the ring draws. */
   params: HorizonParams | null = null;
 
-  private _near: GPUTexture | null = null;
-  private _wide: GPUTexture | null = null;
+  private _nearWeights: GPUTexture | null = null;
+  private _wideWeights: GPUTexture | null = null;
+  private _nearGround: GPUTexture | null = null;
+  private _wideGround: GPUTexture | null = null;
+  private _albedo: GPUTexture | null = null;
   private _chunkMask: GPUTexture | null = null;
+  private _atmosphere: GPUBuffer | null = null;
+  private _atmosphereFallback: GPUBuffer | null = null;
   private _buffer: GPUBuffer | null = null;
   private _data = new Float32Array(PARAMS_FLOATS);
 
@@ -90,16 +117,40 @@ export class HorizonUniforms implements ISharedUniformBuffer {
     this.group = group;
   }
 
-  setMaps(near: GPUTexture, wide: GPUTexture, chunkMask: GPUTexture) {
-    this._near = near;
-    this._wide = wide;
+  setMaps(
+    nearWeights: GPUTexture,
+    wideWeights: GPUTexture,
+    nearGround: GPUTexture,
+    wideGround: GPUTexture,
+    chunkMask: GPUTexture
+  ) {
+    this._nearWeights = nearWeights;
+    this._wideWeights = wideWeights;
+    this._nearGround = nearGround;
+    this._wideGround = wideGround;
     this._chunkMask = chunkMask;
+    this.requiresBuild = true;
+  }
+
+  /** The terrain albedo array, whose smallest mip is each material's average. */
+  setAlbedo(albedo: GPUTexture) {
+    if (albedo === this._albedo) return;
+    this._albedo = albedo;
+    this.requiresBuild = true;
+  }
+
+  /** The atmosphere composite's uniform buffer the ring fogs with, if any. */
+  setAtmosphere(buffer: GPUBuffer | null) {
+    if (buffer === this._atmosphere) return;
+    this._atmosphere = buffer;
     this.requiresBuild = true;
   }
 
   destroy(): void {
     this._buffer?.destroy();
     this._buffer = null;
+    this._atmosphereFallback?.destroy();
+    this._atmosphereFallback = null;
   }
 
   build(renderer: Renderer, pipelineLayout: GPUBindGroupLayout): void {
@@ -110,6 +161,12 @@ export class HorizonUniforms implements ISharedUniformBuffer {
       size: PARAMS_FLOATS * 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    if (!this._atmosphere && !this._atmosphereFallback)
+      this._atmosphereFallback = device.createBuffer({
+        label: 'horizon atmosphere fallback',
+        size: ATMOSPHERE_FALLBACK_BYTES,
+        usage: GPUBufferUsage.UNIFORM,
+      });
 
     this.bindGroup = device.createBindGroup({
       label: 'horizon ocean',
@@ -119,10 +176,26 @@ export class HorizonUniforms implements ISharedUniformBuffer {
           binding: 0,
           resource: renderer.samplerManager.get('linear-clamped'),
         },
-        { binding: 1, resource: this._near!.createView() },
+        {
+          binding: 1,
+          resource: this._nearWeights!.createView({ dimension: '2d-array' }),
+        },
         { binding: 2, resource: { buffer: this._buffer } },
-        { binding: 3, resource: this._wide!.createView() },
+        {
+          binding: 3,
+          resource: this._wideWeights!.createView({ dimension: '2d-array' }),
+        },
         { binding: 4, resource: this._chunkMask!.createView() },
+        { binding: 5, resource: this._nearGround!.createView() },
+        { binding: 6, resource: this._wideGround!.createView() },
+        {
+          binding: 7,
+          resource: { buffer: (this._atmosphere ?? this._atmosphereFallback)! },
+        },
+        {
+          binding: 8,
+          resource: this._albedo!.createView({ dimension: '2d-array' }),
+        },
       ],
     });
     this.requiresBuild = false;

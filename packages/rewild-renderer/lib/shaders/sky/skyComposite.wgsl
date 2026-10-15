@@ -91,7 +91,8 @@ var<private> sunDotUp: f32;
     let cameraAltitude = object.cameraPosition.y;
     let aboveCloudBlend = smoothstep(CLOUD_START, CLOUD_START + 100.0, cameraAltitude);
     var worldPos = worldFromScreenCoord( uv, rawDepth );
-    if (rawDepth >= FAR_GROUND_DEPTH_MIN) {
+    let farGround = rawDepth >= FAR_GROUND_DEPTH_MIN;
+    if (farGround) {
       worldPos = farGroundPosition(normalize(worldPos - object.cameraPosition));
     }
     let terrainBelowClouds = smoothstep(CLOUD_START + CLOUD_HEIGHT + 100.0, CLOUD_START, worldPos.y);
@@ -108,9 +109,10 @@ var<private> sunDotUp: f32;
 
     // Fog opacity from the exponential height-fog model (fog.wgsl), integrated
     // along the camera→pixel ray. The layer is anchored to world height, so fog
-    // pools over low terrain instead of tracking the camera's eye level.
+    // pools over low terrain instead of tracking the camera's eye level. The
+    // horizon ring has fogged itself.
     let distance = length(worldPos - object.cameraPosition);
-    let fogFactor = 1.0 - sceneFogTransmittance(object.cameraPosition, dir, distance);
+    let fogFactor = select(1.0 - sceneFogTransmittance(object.cameraPosition, dir, distance), 0.0, farGround);
 
     sunDotUp = dot(sunDirection, vec3f(0.0, 1.0, 0.0));
 

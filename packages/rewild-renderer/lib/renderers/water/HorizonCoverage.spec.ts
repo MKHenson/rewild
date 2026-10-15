@@ -3,15 +3,15 @@ import {
   ClimateConfig,
   DEFAULT_CLIMATE,
   FOREST,
+  MAX_SPLAT_LAYERS,
   MOUNTAIN,
   PLAIN,
+  getClimatePalette,
 } from '../terrain/Biomes';
-import {
-  createClimateField,
-  resolveBiomeWeights,
-  sampleContinent,
-} from '../terrain/ClimateField';
+import { createClimateField, sampleContinent } from '../terrain/ClimateField';
 import { TERRAIN_METERS_PER_SAMPLE } from '../terrain/MeshGenerator';
+import { createGroundSampler, sampleGround } from '../terrain/Noise';
+import { worldToLakeSpace } from '../terrain/Lakes';
 import { fromFloat16 } from '../../utils/float16';
 import {
   FarMapBuilder,
@@ -61,13 +61,19 @@ describe('continentAtWorld', () => {
 describe('FarMapBuilder', () => {
   const texels = 8;
   const span = 16000;
+  const step = span / texels;
+
+  const continentAt = (b: FarMapBuilder, t: number) => fromFloat16(b.ground[t * 2 + 1]);
+  const heightAt = (b: FarMapBuilder, t: number) => fromFloat16(b.ground[t * 2]);
+  // Palette channel c of texel t, 0..255; channels 4-7 sit in the second plane.
+  const weightAt = (b: FarMapBuilder, t: number, c: number) =>
+    b.weights[(c >> 2) * texels * texels * 4 + t * 4 + (c & 3)];
 
   it('stores the continent value at each texel centre, +x along rows and +z down columns', () => {
     const builder = new FarMapBuilder(SEED, DEFAULT_CLIMATE, 500, -700, span, texels);
     expect(builder.build()).toBe(true);
 
     const world = createWorldClimateField(SEED, DEFAULT_CLIMATE);
-    const step = span / texels;
     for (const [i, j] of [
       [0, 0],
       [5, 2],
@@ -75,54 +81,82 @@ describe('FarMapBuilder', () => {
     ]) {
       const x = 500 - span / 2 + (i + 0.5) * step;
       const z = -700 - span / 2 + (j + 0.5) * step;
-      const stored = fromFloat16(builder.data[(i + j * texels) * 4 + 3]);
-      expect(stored).toBeCloseTo(continentAtWorld(world, x, z), 3);
+      expect(continentAt(builder, i + j * texels)).toBeCloseTo(
+        continentAtWorld(world, x, z),
+        3
+      );
     }
   });
 
-  it('colours land by the far colours of the biomes there', () => {
-    const builder = new FarMapBuilder(SEED, DEFAULT_CLIMATE, 0, 0, span, texels);
+  it('stores the ground height at each texel centre', () => {
+    const builder = new FarMapBuilder(SEED, DEFAULT_CLIMATE, 300, 900, span, texels, 4);
     builder.build();
 
-    const world = createWorldClimateField(SEED, DEFAULT_CLIMATE);
-    const biomes = new Int32Array(4);
-    const weights = new Float64Array(4);
-    const step = span / texels;
+    const ground = createGroundSampler(SEED, DEFAULT_CLIMATE, 4);
+    const lake = new Float64Array(2);
     for (const [i, j] of [
-      [1, 1],
-      [6, 3],
+      [0, 0],
+      [3, 6],
+      [7, 1],
     ]) {
-      const x = -span / 2 + (i + 0.5) * step;
-      const z = -span / 2 + (j + 0.5) * step;
-      const count = resolveBiomeWeights(
-        world,
-        x / TERRAIN_METERS_PER_SAMPLE,
-        -z / TERRAIN_METERS_PER_SAMPLE,
-        biomes,
-        weights
+      const x = 300 - span / 2 + (i + 0.5) * step;
+      const z = 900 - span / 2 + (j + 0.5) * step;
+      worldToLakeSpace(x, z, lake);
+      const expected = sampleGround(ground, lake[0], lake[1]);
+      expect(Math.abs(heightAt(builder, i + j * texels) - expected)).toBeLessThan(
+        Math.max(0.05, Math.abs(expected) / 1024)
       );
-      let red = 0;
-      for (let k = 0; k < count; k++)
-        red += DEFAULT_CLIMATE.biomes[biomes[k]].farColor![0] * weights[k];
-      expect(fromFloat16(builder.data[(i + j * texels) * 4])).toBeCloseTo(red, 3);
     }
   });
 
-  it('uses a single biome\'s colour everywhere in a one-biome climate', () => {
+  it('weights every texel fully across the palette', () => {
+    const builder = new FarMapBuilder(SEED, DEFAULT_CLIMATE, 0, 0, span, texels);
+    builder.build();
+    for (let t = 0; t < texels * texels; t++) {
+      let sum = 0;
+      for (let c = 0; c < MAX_SPLAT_LAYERS; c++) sum += weightAt(builder, t, c);
+      expect(Math.abs(sum - 255)).toBeLessThanOrEqual(MAX_SPLAT_LAYERS);
+    }
+  });
+
+  it("surfaces a one-biome climate only in that biome's materials", () => {
     const forestOnly: ClimateConfig = {
       ...DEFAULT_CLIMATE,
+      continent: undefined,
+      coast: undefined,
       temperature: { ...DEFAULT_CLIMATE.temperature, cuts: [] },
       biomes: [FOREST, PLAIN, MOUNTAIN],
       cells: [[0]],
     };
+    const palette = getClimatePalette(forestOnly);
+    const forest = new Set(FOREST.layers.map((l) => palette.indexOf(l.material)));
     const builder = new FarMapBuilder(SEED, forestOnly, 0, 0, span, texels);
     builder.build();
     for (let t = 0; t < texels * texels; t++)
-      for (let ch = 0; ch < 3; ch++)
-        expect(fromFloat16(builder.data[t * 4 + ch])).toBeCloseTo(
-          FOREST.farColor![ch],
-          3
-        );
+      for (let c = 0; c < MAX_SPLAT_LAYERS; c++)
+        if (!forest.has(c)) expect(weightAt(builder, t, c)).toBe(0);
+  });
+
+  it('snows mountain ground above the snow line and not below it', () => {
+    const mountainOnly: ClimateConfig = {
+      ...DEFAULT_CLIMATE,
+      continent: undefined,
+      coast: undefined,
+      temperature: { ...DEFAULT_CLIMATE.temperature, cuts: [] },
+      biomes: [MOUNTAIN, PLAIN, FOREST],
+      cells: [[0]],
+    };
+    const snow = getClimatePalette(mountainOnly).indexOf('snow_field_aerial');
+    const builder = new FarMapBuilder(SEED, mountainOnly, 0, 0, 64000, 32);
+    builder.build();
+    let snowed = 0;
+    for (let t = 0; t < 32 * 32; t++) {
+      const h = fromFloat16(builder.ground[t * 2]);
+      const w = builder.weights[(snow >> 2) * 32 * 32 * 4 + t * 4 + (snow & 3)];
+      if (h < 150) expect(w).toBe(0);
+      if (h > 200 && w > 0) snowed++;
+    }
+    expect(snowed).toBeGreaterThan(0);
   });
 
   it('builds the same map a few rows at a time', () => {
@@ -131,7 +165,8 @@ describe('FarMapBuilder', () => {
     const sliced = new FarMapBuilder(SEED, DEFAULT_CLIMATE, 0, 0, span, texels);
     let frames = 0;
     while (!sliced.build(3)) frames++;
-    expect(frames).toBe(2);
-    expect(sliced.data).toEqual(whole.data);
+    expect(frames).toBe(5);
+    expect(sliced.ground).toEqual(whole.ground);
+    expect(sliced.weights).toEqual(whole.weights);
   });
 });

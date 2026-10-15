@@ -4,21 +4,36 @@ import { Mesh } from '../../core/Mesh';
 import { Geometry } from '../../geometry/Geometry';
 import { HorizonOceanPass } from '../../materials/HorizonOceanPass';
 import { WATER_ROUGHNESS } from '../../materials/uniforms/WaterUniforms';
-import { ClimateConfig } from '../terrain/Biomes';
+import { ClimateConfig, MAX_SPLAT_LAYERS } from '../terrain/Biomes';
+import {
+  TERRAIN_ALBEDO_ARRAY,
+  getClimateLayerParams,
+} from '../terrain/TerrainTextureArrays';
 import { OCEAN_WATER, getWaterTypeIndex } from '../terrain/Water';
 import { WATER_INTERACTION_LAYER } from './ChunkWater';
 import {
   FAR_MAP_TEXELS,
   FarMapBuilder,
   NEAR_FAR_MAP_SPAN,
+  NEAR_FAR_MAP_TEXELS,
   WIDE_FAR_MAP_SPAN,
 } from './HorizonCoverage';
 
-const RING_SEGMENTS = 256;
+// Spokes around the ring: fine enough that a far peak keeps its shape.
+const RING_SEGMENTS = 1024;
+// Finite rings out to OUTER_RADIUS. Geometric spacing puts them about 120 m
+// apart at the edge of the near far map, about two of its texels.
+const RING_BANDS = 192;
 
-// Far map rows built per frame while a level rebuilds in the background, at
-// about 0.1 ms a row.
-const ROWS_PER_FRAME = 4;
+/** Metres from the centre of the last finite ring; flat sea level beyond. */
+const OUTER_RADIUS = 24000;
+/** Metres from the centre the land starts flattening to sea level. Haze has
+ *  hidden most of it by here. */
+const FADE_START = 16000;
+
+// Time spent per frame per level on a background far map rebuild. Rows cost
+// about 1 ms per 256 texels, so this is at least one row.
+const REBUILD_BUDGET_MS = 1;
 
 const NO_SCATTER: readonly [number, number, number] = [0, 0, 0];
 
@@ -54,26 +69,54 @@ export function chunkMaskIndex(
   return j * CHUNK_MASK_SIZE + i;
 }
 
+/** Radial parameter of the ring vertices at infinity. */
+export const INFINITE_EDGE = 2;
+
 /**
- * A ring of `segments` quads. Each vertex is (direction x, direction z, edge):
- * edge 0 is the inner radius, edge 1 is infinity.
+ * A polar grid of `segments` spokes crossing `bands` finite rings, then one
+ * more ring at infinity. Each vertex is (direction x, direction z, radial
+ * parameter): 0 to 1 from the inner to the outer finite ring, INFINITE_EDGE on
+ * the last. Vertices run ring by ring, `segments + 1` to a ring so it closes.
+ *
+ * Triangles are ordered inner ring first. The ring writes one depth everywhere,
+ * so the first surface drawn on a pixel keeps it: drawing outward lets nearer
+ * ground hide farther ground.
  */
-export function buildHorizonRing(segments: number = RING_SEGMENTS): {
+export function buildHorizonRing(
+  segments: number = RING_SEGMENTS,
+  bands: number = RING_BANDS
+): {
   vertices: Float32Array;
   indices: Uint32Array;
 } {
-  const vertices = new Float32Array((segments + 1) * 2 * 3);
-  const indices = new Uint32Array(segments * 6);
-  for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2;
-    const x = Math.cos(angle);
-    const z = Math.sin(angle);
-    vertices.set([x, z, 0, x, z, 1], i * 6);
+  const spokes = segments + 1;
+  const rings = bands + 2;
+  const vertices = new Float32Array(spokes * rings * 3);
+  const indices = new Uint32Array(segments * (rings - 1) * 6);
+  for (let k = 0; k < rings; k++) {
+    const s = k <= bands ? k / bands : INFINITE_EDGE;
+    for (let i = 0; i < spokes; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const v = (k * spokes + i) * 3;
+      vertices[v] = Math.cos(angle);
+      vertices[v + 1] = Math.sin(angle);
+      vertices[v + 2] = s;
+    }
   }
-  for (let i = 0; i < segments; i++) {
-    const inner = i * 2;
-    const next = inner + 2;
-    indices.set([inner, next, inner + 1, inner + 1, next, next + 1], i * 6);
+  let t = 0;
+  for (let k = 0; k < rings - 1; k++) {
+    for (let i = 0; i < segments; i++) {
+      const inner = k * spokes + i;
+      const next = inner + 1;
+      const outer = inner + spokes;
+      const outerNext = outer + 1;
+      indices[t++] = inner;
+      indices[t++] = next;
+      indices[t++] = outer;
+      indices[t++] = outer;
+      indices[t++] = next;
+      indices[t++] = outerNext;
+    }
   }
   return { vertices, indices };
 }
@@ -83,65 +126,114 @@ class HorizonMesh extends Mesh {
   localBounds = new Box3();
 }
 
-// One level of the far map: a texture that follows the chunks' visibility
-// centre, rebuilt in the background once the centre has drifted far enough.
+// One level of the far map: textures that follow the chunks' visibility centre,
+// rebuilt in the background once the centre has drifted far enough or the sea
+// level has moved.
 class FarMapLevel {
-  readonly texture: GPUTexture;
+  readonly weights: GPUTexture;
+  readonly ground: GPUTexture;
   centreX = 0;
   centreZ = 0;
+  private seaLevel = 0;
   private pending: FarMapBuilder | null = null;
 
   constructor(
     renderer: Renderer,
     label: string,
     readonly span: number,
+    private readonly texels: number,
     private readonly rebuildDistance: number
   ) {
-    this.texture = renderer.device.createTexture({
-      label,
-      size: [FAR_MAP_TEXELS, FAR_MAP_TEXELS],
-      format: 'rgba16float',
+    this.weights = renderer.device.createTexture({
+      label: `${label}-weights`,
+      size: [texels, texels, MAX_SPLAT_LAYERS / 4],
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    this.ground = renderer.device.createTexture({
+      label: `${label}-ground`,
+      size: [texels, texels],
+      format: 'rg16float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
   }
 
   /** Builds the map around (x, z) now, dropping any rebuild in flight. */
-  rebuildNow(renderer: Renderer, seed: number, climate: ClimateConfig, x: number, z: number) {
-    this.pending = this.builder(seed, climate, x, z);
+  rebuildNow(
+    renderer: Renderer,
+    seed: number,
+    climate: ClimateConfig,
+    seaLevel: number,
+    x: number,
+    z: number
+  ) {
+    this.pending = this.builder(seed, climate, seaLevel, x, z);
     this.pending.build();
     this.commit(renderer);
   }
 
-  /** Advances the background rebuild, starting one if the centre drifted. */
-  follow(renderer: Renderer, seed: number, climate: ClimateConfig, x: number, z: number) {
-    if (
+  /**
+   * Advances the background rebuild, starting one if the map is stale. Returns
+   * whether any rebuild work ran.
+   */
+  follow(
+    renderer: Renderer,
+    seed: number,
+    climate: ClimateConfig,
+    seaLevel: number,
+    x: number,
+    z: number
+  ): boolean {
+    const drifted =
       !this.pending &&
-      Math.hypot(x - this.centreX, z - this.centreZ) > this.rebuildDistance
-    )
-      this.pending = this.builder(seed, climate, x, z);
+      Math.hypot(x - this.centreX, z - this.centreZ) > this.rebuildDistance;
+    if (drifted || seaLevel !== this.seaLevel)
+      this.pending = this.builder(seed, climate, seaLevel, x, z);
+    if (!this.pending) return false;
 
-    if (this.pending?.build(ROWS_PER_FRAME)) this.commit(renderer);
+    const start = performance.now();
+    while (!this.pending.build(1)) {
+      if (performance.now() - start >= REBUILD_BUDGET_MS) return true;
+    }
+    this.commit(renderer);
+    return true;
   }
 
-  private builder(seed: number, climate: ClimateConfig, x: number, z: number) {
+  private builder(
+    seed: number,
+    climate: ClimateConfig,
+    seaLevel: number,
+    x: number,
+    z: number
+  ) {
+    this.seaLevel = seaLevel;
     // Snapped to whole texels so the map does not swim as it follows.
-    const texel = this.span / FAR_MAP_TEXELS;
+    const texel = this.span / this.texels;
     return new FarMapBuilder(
       seed,
       climate,
       Math.round(x / texel) * texel,
       Math.round(z / texel) * texel,
-      this.span
+      this.span,
+      this.texels,
+      seaLevel
     );
   }
 
   private commit(renderer: Renderer) {
     const built = this.pending!;
+    const texels = this.texels;
     renderer.device.queue.writeTexture(
-      { texture: this.texture },
-      built.data as BufferSource,
-      { bytesPerRow: FAR_MAP_TEXELS * 8 },
-      { width: FAR_MAP_TEXELS, height: FAR_MAP_TEXELS }
+      { texture: this.weights },
+      built.weights as BufferSource,
+      { bytesPerRow: texels * 4, rowsPerImage: texels },
+      { width: texels, height: texels, depthOrArrayLayers: MAX_SPLAT_LAYERS / 4 }
+    );
+    renderer.device.queue.writeTexture(
+      { texture: this.ground },
+      built.ground as BufferSource,
+      { bytesPerRow: texels * 4 },
+      { width: texels, height: texels }
     );
     this.centreX = built.centreX;
     this.centreZ = built.centreZ;
@@ -149,7 +241,8 @@ class FarMapLevel {
   }
 
   dispose() {
-    this.texture.destroy();
+    this.weights.destroy();
+    this.ground.destroy();
   }
 }
 
@@ -173,7 +266,8 @@ export interface HorizonOceanState {
 }
 
 // Everything from the last terrain chunk to the horizon: open sea, and the
-// land beyond the chunks drawn flat in its biome's far colour.
+// land beyond the chunks at its generated height, surfaced in the average
+// colours of the materials the chunks' splat rules would put there.
 export class HorizonOcean {
   readonly mesh: HorizonMesh;
   private readonly pass: HorizonOceanPass;
@@ -185,6 +279,8 @@ export class HorizonOcean {
   );
   private maskUploaded = false;
   private worldKey = '';
+  private paletteClimate: ClimateConfig | null = null;
+  private readonly paletteLayers = new Array<number>(MAX_SPLAT_LAYERS).fill(0);
 
   constructor(renderer: Renderer) {
     const ring = buildHorizonRing();
@@ -200,12 +296,14 @@ export class HorizonOcean {
       renderer,
       'far-map-near',
       NEAR_FAR_MAP_SPAN,
+      NEAR_FAR_MAP_TEXELS,
       NEAR_FAR_MAP_SPAN / 8
     );
     this.wide = new FarMapLevel(
       renderer,
       'far-map-wide',
       WIDE_FAR_MAP_SPAN,
+      FAR_MAP_TEXELS,
       WIDE_FAR_MAP_SPAN / 8
     );
 
@@ -218,8 +316,10 @@ export class HorizonOcean {
 
     this.pass = new HorizonOceanPass();
     this.pass.horizonUniforms.setMaps(
-      this.near.texture,
-      this.wide.texture,
+      this.near.weights,
+      this.wide.weights,
+      this.near.ground,
+      this.wide.ground,
       this.chunkMask
     );
     this.mesh = new HorizonMesh(geometry, this.pass);
@@ -236,16 +336,36 @@ export class HorizonOcean {
   }
 
   update(renderer: Renderer, state: HorizonOceanState) {
-    const { climate, seed, centreX, centreZ } = state;
+    const { climate, seed, seaLevel, centreX, centreZ } = state;
 
+    const albedo = renderer.textureManager.textures.get(TERRAIN_ALBEDO_ARRAY);
+    if (!albedo) {
+      this.mesh.visible = false;
+      return;
+    }
+    this.pass.horizonUniforms.setAlbedo(albedo.gpuTexture);
+
+    const rebuildStart = performance.now();
+    let rebuilt = true;
     const key = `${seed}|${state.climatePreset}`;
     if (key !== this.worldKey) {
-      this.near.rebuildNow(renderer, seed, climate, centreX, centreZ);
-      this.wide.rebuildNow(renderer, seed, climate, centreX, centreZ);
+      this.near.rebuildNow(renderer, seed, climate, seaLevel, centreX, centreZ);
+      this.wide.rebuildNow(renderer, seed, climate, seaLevel, centreX, centreZ);
       this.worldKey = key;
     } else {
-      this.near.follow(renderer, seed, climate, centreX, centreZ);
-      this.wide.follow(renderer, seed, climate, centreX, centreZ);
+      const near = this.near.follow(renderer, seed, climate, seaLevel, centreX, centreZ);
+      const wide = this.wide.follow(renderer, seed, climate, seaLevel, centreX, centreZ);
+      rebuilt = near || wide;
+    }
+    // Only frames that rebuilt, so the panel's duty is how often it happens.
+    if (rebuilt)
+      renderer.metrics.record('cpu.farmap', performance.now() - rebuildStart);
+
+    if (climate !== this.paletteClimate) {
+      const layers = getClimateLayerParams(climate);
+      for (let c = 0; c < MAX_SPLAT_LAYERS; c++)
+        this.paletteLayers[c] = layers[c]?.layerIndex ?? 0;
+      this.paletteClimate = climate;
     }
 
     // Without a continent or an ocean type, the ring is all land.
@@ -254,6 +374,10 @@ export class HorizonOcean {
     const hasOcean = !!continent && oceanType >= 0;
 
     this.uploadMask(renderer, state.chunkMask);
+
+    const atmosphere =
+      renderer.sky?.skyRenderer?.finalPass?.uniformBuffer ?? null;
+    this.pass.horizonUniforms.setAtmosphere(atmosphere);
 
     this.pass.horizonUniforms.params = {
       centreX,
@@ -277,6 +401,10 @@ export class HorizonOcean {
       maskOriginZ: Math.round(centreZ / state.chunkSize),
       scatter: hasOcean ? climate.water![oceanType].scatter : NO_SCATTER,
       slopeVariance: oceanSlopeVariance(state.windSpeed) * state.slopeScale,
+      outerRadius: OUTER_RADIUS,
+      fadeStart: FADE_START,
+      fogged: !!atmosphere,
+      paletteLayers: this.paletteLayers,
     };
     this.mesh.visible = true;
   }

@@ -419,7 +419,9 @@ export class Renderer {
     if (this.disposed) return;
 
     this.sky.update(this, this.camera.camera);
+    this.metrics.begin('cpu.terrain');
     this.terrainRenderer.update(this, this.camera.camera);
+    this.metrics.end('cpu.terrain');
 
     this.render();
 
@@ -734,6 +736,16 @@ export class Renderer {
       group: 'cpu',
       order: 4,
     });
+    m.declare('cpu.terrain', {
+      label: 'terrain update',
+      group: 'cpu',
+      order: 5,
+    });
+    m.declare('cpu.farmap', {
+      label: 'far map rebuild (in terrain)',
+      group: 'cpu',
+      order: 6,
+    });
 
     const count = 'count' as const;
     m.declare('counts.drawgroups', {
@@ -754,11 +766,17 @@ export class Renderer {
       kind: count,
       order: 4,
     });
+    m.declare('counts.water', {
+      label: 'water meshes',
+      group: 'counts',
+      kind: count,
+      order: 5,
+    });
     m.declare('counts.opaque', {
       label: 'other meshes',
       group: 'counts',
       kind: count,
-      order: 5,
+      order: 6,
     });
     m.declare('counts.solids', {
       label: 'visible solids',
@@ -782,6 +800,7 @@ export class Renderer {
   private recordCategoryCounts(renderList: IRenderGroup[]): void {
     let terrain = 0;
     let scatter = 0;
+    let water = 0;
     let opaque = 0;
 
     for (const item of renderList) {
@@ -789,12 +808,14 @@ export class Renderer {
       const category = item.pass.profileCategory ?? 'opaque';
       if (category === 'terrain') terrain += meshes;
       else if (category === 'scatter') scatter += meshes;
+      else if (category === 'water') water += meshes;
       else opaque += meshes;
     }
 
     const m = this.metrics;
     m.record('counts.terrain', terrain);
     m.record('counts.scatter', scatter);
+    m.record('counts.water', water);
     m.record('counts.opaque', opaque);
   }
 
