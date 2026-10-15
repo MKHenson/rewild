@@ -2,12 +2,12 @@ import { smoothstep } from 'rewild-common';
 import type { AudioScope, PlayOptions } from 'rewild-audio';
 
 // Landing speeds are in Player.verticalVelocity's units, down: a jump on flat
-// ground lands at about 10.5, and a fall hurts from 15.
+// ground lands at about 10.5, and a fall hurts from 12.5.
 
 /** Speed below which touching down makes no landing, as off a small bump. */
 export const LAND_FROM = 3;
 /** Speed at which a landing is at full gain. */
-const LAND_FULL_AT = 15;
+const LAND_FULL_AT = 12.5;
 /** A landing's gain at `LAND_FROM`. */
 const LAND_SOFTEST = 0.3;
 

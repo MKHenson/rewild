@@ -56,6 +56,10 @@ export const SLIDE_HURT_RATE = 20;
 export const IMPACT_HURT_FROM = 6;
 /** Health each unit of slide speed into an obstacle above IMPACT_HURT_FROM takes. */
 export const IMPACT_HURT_SCALE = 5;
+/** Landing speed, in Player.verticalVelocity's units, from which a fall hurts. */
+export const FALL_HURT_FROM = 12.5;
+/** Health each unit of landing speed above FALL_HURT_FROM takes. */
+export const FALL_HURT_SCALE = 15;
 // Blocked speed below which a move counts as unblocked, in the slide's units.
 const BLOCKED_FROM = 0.05;
 
@@ -100,6 +104,14 @@ export function slideDamage(
 /** Health hitting an obstacle at slide speed `speed` takes, on any ground. */
 export function impactDamage(speed: number): number {
   return Math.max(0, speed - IMPACT_HURT_FROM) * IMPACT_HURT_SCALE;
+}
+
+/**
+ * Health landing at `speed` takes. A plain jump lands at about 10.5 and does
+ * no harm; a fall of about 19 m kills.
+ */
+export function fallDamage(speed: number): number {
+  return Math.max(0, speed - FALL_HURT_FROM) * FALL_HURT_SCALE;
 }
 
 /** Slide speed `speed` after `seconds` of friction at slide `ramp` 0..1. */
@@ -265,7 +277,8 @@ export class GroundSlide {
    * Takes out of the slide and the walk what an obstacle stopped. The move
    * asked for was (`wantX`, `wantZ`) and the controller allowed (`gotX`,
    * `gotZ`), over `dt`; the difference is the way the obstacle blocked, and
-   * the velocity into it is lost, as in a dead stop. Returns the slide speed
+   * the velocity into it is lost, as in a dead stop. Climbing walkable ground
+   * shortens the horizontal step without blocking it. Returns the slide speed
    * lost into it, the speed of the impact.
    */
   collide(
@@ -276,8 +289,15 @@ export class GroundSlide {
     dt: number
   ): number {
     if (dt <= 0) return 0;
-    const blockedX = wantX - gotX;
-    const blockedZ = wantZ - gotZ;
+    let expectX = wantX;
+    let expectZ = wantZ;
+    const into = wantX * this.normalX + wantZ * this.normalZ;
+    if (into < 0 && this.walkable) {
+      expectX -= this.normalX * into;
+      expectZ -= this.normalZ * into;
+    }
+    const blockedX = expectX - gotX;
+    const blockedZ = expectZ - gotZ;
     const blocked = Math.hypot(blockedX, blockedZ);
     if (blocked / dt < BLOCKED_FROM) return 0;
     const nx = blockedX / blocked;
