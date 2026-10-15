@@ -7,8 +7,14 @@ import { WATER_ROUGHNESS } from '../../materials/uniforms/WaterUniforms';
 import { ClimateConfig, MAX_SPLAT_LAYERS } from '../terrain/Biomes';
 import {
   TERRAIN_ALBEDO_ARRAY,
+  TERRAIN_ARM_ARRAY,
+  TERRAIN_NORMAL_ARRAY,
   getClimateLayerParams,
 } from '../terrain/TerrainTextureArrays';
+import {
+  getTerrainMaterial,
+  getTerrainMaterialLayer,
+} from '../terrain/TerrainMaterials';
 import { OCEAN_WATER, getWaterTypeIndex } from '../terrain/Water';
 import { WATER_INTERACTION_LAYER } from './ChunkWater';
 import {
@@ -30,6 +36,16 @@ const OUTER_RADIUS = 24000;
 /** Metres from the centre the land starts flattening to sea level. Haze has
  *  hidden most of it by here. */
 const FADE_START = 16000;
+
+// The material whose normal and occlusion are tiled over all the far ground,
+// at the size the chunks tile it as macro relief, for relief finer than the far
+// map's heights.
+const DETAIL_MATERIAL = 'marble_cliff_05';
+const DETAIL_TILE = 160;
+const DETAIL_STRENGTH = 1;
+const DETAIL_LAYER = getTerrainMaterialLayer(DETAIL_MATERIAL);
+const DETAIL_Y_SIGN =
+  getTerrainMaterial(DETAIL_MATERIAL).normalConvention === 'opengl' ? -1 : 1;
 
 // Time spent per frame per level on a background far map rebuild. Rows cost
 // about 1 ms per 256 texels, so this is at least one row.
@@ -338,12 +354,19 @@ export class HorizonOcean {
   update(renderer: Renderer, state: HorizonOceanState) {
     const { climate, seed, seaLevel, centreX, centreZ } = state;
 
-    const albedo = renderer.textureManager.textures.get(TERRAIN_ALBEDO_ARRAY);
-    if (!albedo) {
+    const textures = renderer.textureManager.textures;
+    const albedo = textures.get(TERRAIN_ALBEDO_ARRAY);
+    const normal = textures.get(TERRAIN_NORMAL_ARRAY);
+    const arm = textures.get(TERRAIN_ARM_ARRAY);
+    if (!albedo || !normal || !arm) {
       this.mesh.visible = false;
       return;
     }
-    this.pass.horizonUniforms.setAlbedo(albedo.gpuTexture);
+    this.pass.horizonUniforms.setMaterials(
+      albedo.gpuTexture,
+      normal.gpuTexture,
+      arm.gpuTexture
+    );
 
     const rebuildStart = performance.now();
     let rebuilt = true;
@@ -405,6 +428,10 @@ export class HorizonOcean {
       fadeStart: FADE_START,
       fogged: !!atmosphere,
       paletteLayers: this.paletteLayers,
+      detailLayer: DETAIL_LAYER,
+      detailYSign: DETAIL_Y_SIGN,
+      detailTile: DETAIL_TILE,
+      detailStrength: DETAIL_STRENGTH,
     };
     this.mesh.visible = true;
   }
