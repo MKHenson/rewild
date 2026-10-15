@@ -8,8 +8,8 @@
 // so their peaks are the billows. Every lattice wraps at its cell count, so both
 // volumes tile seamlessly under a repeat sampler.
 //
-// Mirrored in scripts/cloud-noise-stats.mjs, which measures the distributions that
-// cloudDensity.wgsl's remap constants are derived from — change both together.
+// cloudDensity.wgsl remaps these volumes using their measured mean and deviation
+// (SHAPE_NOISE_*, DETAIL_NOISE_*); changing the generation changes both.
 
 @group(0) @binding(0) var shapeVolume: texture_storage_3d<rgba8unorm, write>;
 @group(0) @binding(1) var detailVolume: texture_storage_3d<rgba8unorm, write>;
