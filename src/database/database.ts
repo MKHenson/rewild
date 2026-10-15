@@ -1,8 +1,9 @@
 import type { SyncableRecord } from 'models';
 import { authService } from '../api/auth/auth-service';
 import { deleteServerProject } from '../api/projects';
+import { projectImageAsset } from '../api/assets/asset-api';
 import { SyncEngine } from '../api/sync/sync-engine';
-import { AssetReader, LevelRef, LocalAssetStore } from './local-asset-store';
+import { AssetReader, AssetRef, LevelRef, LocalAssetStore } from './local-asset-store';
 import { LocalLevelTable } from './local-level-table';
 import { LocalProjectTable } from './local-project-table';
 
@@ -34,25 +35,28 @@ export class Database {
     return this.exclusive(async () => {
       // The asset pull needs the server to know the level clears first, so a
       // failed record sync skips it.
-      if (await this.sync.run()) await this.assets.sync(this.setImageUrl);
+      if (await this.sync.run()) await this.assets.sync();
     });
   }
 
-  /** Stores a project image on the device. The next sync uploads it. */
-  setProjectImage(projectId: string, file: File): Promise<void> {
-    return this.exclusive(() => this.assets.writeProjectImage(projectId, file));
+  /** Writes a file on this device. The next sync uploads it. */
+  writeAsset(asset: AssetRef & { contentType?: string }, data: ArrayBuffer | Blob): Promise<string> {
+    return this.exclusive(() => this.assets.write(asset, data));
   }
 
-  /** The image picked on this device and not yet uploaded, or null. */
-  getPendingProjectImage(projectId: string): Promise<File | null> {
-    return this.assets.readProjectImage(projectId);
-  }
+  /** The project's image: the copy on this device, else a download from `imageUrl`, else null. */
+  async getProjectImage(project: { id?: string; imageUrl?: string | null }): Promise<Blob | null> {
+    if (!project.id) return null;
+    const local = await this.assets.readBlob(projectImageAsset(project.id)).catch(() => null);
+    if (local || !project.imageUrl) return local;
 
-  // Keeps the record's dirty state: only the server sets imageUrl.
-  private setImageUrl = async (projectId: string, imageUrl: string) => {
-    const project = await this.projects.getOne(projectId);
-    if (project) await this.projects.putSynced({ ...project, imageUrl }, project.syncedAt);
-  };
+    try {
+      const res = await fetch(project.imageUrl);
+      return res.ok ? await res.blob() : null;
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Deletes a project, its levels and their files. A project saved on the
@@ -87,7 +91,7 @@ export const db = new Database();
 
 /** Reads a level's files from this device. */
 export function localAssetReader(level: LevelRef): AssetReader {
-  return (assetType, filename) => db.assets.read(level, assetType, filename);
+  return (assetType, filename) => db.assets.read({ ...level, assetType, filename });
 }
 
 // Sync is auth-gated and local-first: edits made while logged out sit dirty in

@@ -1,3 +1,4 @@
+import { projectImageAsset } from '../api/assets/asset-api';
 import { db } from './database';
 import { installOPFSMock } from './opfs-mock';
 import { clearDatabase } from './local-db';
@@ -60,11 +61,11 @@ describe('Database clears', () => {
       containers: [],
     });
     await db.levels.markSynced(id, Date.now(), null);
-    await db.assets.write({ projectId: 'p1', levelId: id }, 'chunk', '0_0.bin', new Uint8Array([1]).buffer);
+    await db.assets.write({ projectId: 'p1', levelId: id, assetType: 'chunk', filename: '0_0.bin' }, new Uint8Array([1]).buffer);
 
     await db.clearLevelChunks(id);
 
-    expect(await db.assets.read({ projectId: 'p1', levelId: id }, 'chunk', '0_0.bin')).toBeNull();
+    expect(await db.assets.read({ projectId: 'p1', levelId: id, assetType: 'chunk', filename: '0_0.bin' })).toBeNull();
     expect((await db.levels.getOne(id))!.chunksClearedAt).toBeGreaterThan(0);
     expect((await db.levels.getDirty()).map((l) => l.id)).toEqual([id]);
   });
@@ -88,7 +89,7 @@ describe('Database.deleteProject', () => {
         containers: [],
       })
     ).id;
-    await db.assets.write({ projectId, levelId }, 'chunk', '0_0.bin', new Uint8Array([1]).buffer);
+    await db.assets.write({ projectId, levelId, assetType: 'chunk', filename: '0_0.bin' }, new Uint8Array([1]).buffer);
   });
 
   afterEach(() => jest.restoreAllMocks());
@@ -96,7 +97,7 @@ describe('Database.deleteProject', () => {
   const isGone = async () =>
     !(await db.projects.getOne(projectId)) &&
     !(await db.levels.getOne(levelId)) &&
-    !(await db.assets.read({ projectId, levelId }, 'chunk', '0_0.bin'));
+    !(await db.assets.read({ projectId, levelId, assetType: 'chunk', filename: '0_0.bin' }));
 
   it('deletes a local only project on the device', async () => {
     await db.deleteProject(projectId);
@@ -123,7 +124,7 @@ describe('Database.deleteProject', () => {
 
     await expect(db.deleteProject(projectId)).rejects.toThrow('Nope');
     expect(await db.projects.getOne(projectId)).not.toBeNull();
-    expect(await db.assets.read({ projectId, levelId }, 'chunk', '0_0.bin')).not.toBeNull();
+    expect(await db.assets.read({ projectId, levelId, assetType: 'chunk', filename: '0_0.bin' })).not.toBeNull();
   });
 
   it('treats a project the server no longer has as deleted', async () => {
@@ -191,59 +192,113 @@ describe('Database project images', () => {
 
   const png = () => new File([new Uint8Array([1, 2, 3])], 'cover.png', { type: 'image/png' });
 
-  const uploadResponses = () =>
-    mockFetch(
-      mockResponse(200, { uploadUrl: 'https://bucket/put', storageKey: 'k.png', publicUrl: '' }),
-      mockResponse(200),
-      mockResponse(200, { imageUrl: 'https://cdn/k.png' }),
-      mockResponse(200, [])
-    );
+  const image = () => projectImageAsset(projectId);
+  const setImage = (file: File) => db.writeAsset({ ...image(), contentType: file.type }, file);
 
   it('keeps a picked image on the device with its type', async () => {
-    await db.setProjectImage(projectId, png());
+    await setImage(png());
 
-    const pending = await db.getPendingProjectImage(projectId);
-    expect(pending!.type).toBe('image/png');
-    expect(pending!.size).toBe(3);
+    const local = await db.getProjectImage({ id: projectId });
+    expect(local!.type).toBe('image/png');
+    expect(local!.size).toBe(3);
+    expect(await db.assets.isPending(image())).toBe(true);
   });
 
-  it('a new pick replaces the pending image', async () => {
-    await db.setProjectImage(projectId, png());
-    await db.setProjectImage(projectId, new File([new Uint8Array([9])], 'c.webp', { type: 'image/webp' }));
+  it('a new pick replaces the image', async () => {
+    await setImage(png());
+    await setImage(new File([new Uint8Array([9])], 'c.webp', { type: 'image/webp' }));
 
-    expect((await db.getPendingProjectImage(projectId))!.type).toBe('image/webp');
+    expect((await db.getProjectImage({ id: projectId }))!.type).toBe('image/webp');
   });
 
-  it('uploads the pending image, sets imageUrl and drops the local file', async () => {
+  it('syncs the image like any other asset and keeps the local file', async () => {
     await db.projects.markSynced(projectId, Date.now(), null);
-    await db.setProjectImage(projectId, png());
-    uploadResponses();
+    await setImage(png());
+    const serverImage = {
+      id: 'srv',
+      ...image(),
+      contentType: 'image/png',
+      publicUrl: 'https://cdn/image?v=5',
+      updatedAt: 5,
+    };
+    mockFetch(
+      mockResponse(200, { uploadUrl: 'https://bucket/put', storageKey: 'k', publicUrl: '' }),
+      mockResponse(200),
+      mockResponse(200, serverImage),
+      mockResponse(200, [serverImage])
+    );
 
     await db.syncAll();
 
-    const project = await db.projects.getOne(projectId);
-    expect(project!.imageUrl).toBe('https://cdn/k.png');
-    expect(await db.projects.getDirty()).toEqual([]);
-    expect(await db.getPendingProjectImage(projectId)).toBeNull();
+    const calls = (global.fetch as jest.Mock).mock.calls;
+    expect(JSON.parse(calls[0][1].body)).toEqual({
+      projectId,
+      levelId: null,
+      assetType: 'image',
+      filename: 'image',
+      contentType: 'image/png',
+      size: 3,
+    });
+    expect(calls[1][1].headers).toEqual({ 'Content-Type': 'image/png' });
+    expect(calls).toHaveLength(4);
+    expect(await db.assets.isPending(image())).toBe(false);
+    expect(await db.getProjectImage({ id: projectId })).not.toBeNull();
   });
 
   it('keeps the local file when the upload fails', async () => {
     await db.projects.markSynced(projectId, Date.now(), null);
-    await db.setProjectImage(projectId, png());
-    mockFetch(mockResponse(500, { error: 'Nope' }), mockResponse(200, []));
+    await setImage(png());
+    mockFetch(mockResponse(400, { error: 'Nope' }), mockResponse(200, []));
 
     await db.syncAll();
 
-    expect(await db.getPendingProjectImage(projectId)).not.toBeNull();
-    expect((await db.projects.getOne(projectId))!.imageUrl).toBeUndefined();
+    expect(await db.getProjectImage({ id: projectId })).not.toBeNull();
     expect((await db.assets.getDirty())[0].syncError).toBe('Nope');
   });
 
-  it('a project delete removes its pending image', async () => {
-    await db.setProjectImage(projectId, png());
+  describe('getProjectImage', () => {
+    const imageUrl = 'https://cdn/users/u/projects/p/image/image?v=5';
+    const blobResponse = () =>
+      ({
+        ok: true,
+        status: 200,
+        blob: () => Promise.resolve(new Blob([new Uint8Array([7])], { type: 'image/png' })),
+      }) as unknown as Response;
+
+    it('prefers the copy on this device over the URL', async () => {
+      await setImage(png());
+      global.fetch = jest.fn();
+
+      const local = await db.getProjectImage({ id: projectId, imageUrl });
+
+      expect(local!.size).toBe(3);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('downloads the image when the device has no copy, without storing it', async () => {
+      mockFetch(blobResponse(), blobResponse());
+
+      expect((await db.getProjectImage({ id: projectId, imageUrl }))!.size).toBe(1);
+      await db.getProjectImage({ id: projectId, imageUrl });
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(await db.assets.readBlob(image())).toBeNull();
+    });
+
+    it('resolves null when the download fails', async () => {
+      mockFetch(mockResponse(404));
+      expect(await db.getProjectImage({ id: projectId, imageUrl })).toBeNull();
+
+      global.fetch = jest.fn().mockRejectedValue(new Error('offline'));
+      expect(await db.getProjectImage({ id: projectId, imageUrl })).toBeNull();
+    });
+  });
+
+  it('a project delete removes its image', async () => {
+    await setImage(png());
 
     await db.deleteProject(projectId);
 
-    expect(await db.getPendingProjectImage(projectId)).toBeNull();
+    expect(await db.getProjectImage({ id: projectId })).toBeNull();
   });
 });

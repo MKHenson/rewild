@@ -14,7 +14,11 @@ import {
 import { ILevel, StoredRecord } from 'models';
 import { projectStore } from '../../../stores/ProjectStore';
 import { getLevels } from '../../../../api/levels';
-import { PROJECT_IMAGE_TYPES, projectImageProblem } from '../../../../api/assets/asset-api';
+import {
+  PROJECT_IMAGE_TYPES,
+  projectImageAsset,
+  projectImageProblem,
+} from '../../../../api/assets/asset-api';
 import { authService } from '../../../../api/auth/auth-service';
 import { db } from '../../../../database/database';
 import { ProjectSharingPanel } from './ProjectSharingPanel';
@@ -35,11 +39,11 @@ export class ProjectSettingsDialog extends Component<Props> {
     const [levels, setLevels] = this.useState<StoredRecord<ILevel>[]>([]);
     const [saving, setSaving] = this.useState(false);
     const [nameMissing, setNameMissing] = this.useState(false);
-    const [imageUrl, setImageUrl] = this.useState(project.imageUrl ?? null);
+    const [imageUrl, setImageUrl] = this.useState<string | null>(null);
     const [imagePending, setImagePending] = this.useState(false);
     const [imageError, setImageError] = this.useState<string | null>(null);
     const [tab, setTab] = this.useState(0);
-    // A blob URL for an image picked on this device and not yet uploaded.
+    // A blob URL for the image shown.
     let previewUrl: string | null = null;
     // Set by a Save that failed validation, so the Modal's close that follows is skipped.
     let keepOpen = false;
@@ -51,10 +55,10 @@ export class ProjectSettingsDialog extends Component<Props> {
       <input type="file" accept={PROJECT_IMAGE_TYPES.join(',')} hidden />
     ) as HTMLInputElement;
 
-    const showPending = (file: File) => {
+    const showImage = (image: Blob, pending: boolean) => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      previewUrl = URL.createObjectURL(file);
-      setImagePending(true, false);
+      previewUrl = URL.createObjectURL(image);
+      setImagePending(pending, false);
       setImageUrl(previewUrl);
     };
 
@@ -68,12 +72,12 @@ export class ProjectSettingsDialog extends Component<Props> {
 
       setImageError(null);
       try {
-        await db.setProjectImage(project.id, file);
+        await db.writeAsset({ ...projectImageAsset(project.id), contentType: file.type }, file);
       } catch (err) {
         setImageError(err instanceof Error ? err.message : String(err));
         return;
       }
-      showPending(file);
+      showImage(file, true);
       if (authService.getToken())
         db.syncAll().catch((err) => console.warn('Image sync failed:', err));
     };
@@ -86,8 +90,8 @@ export class ProjectSettingsDialog extends Component<Props> {
 
     this.onMount = async () => {
       setLevels(await getLevels(project.id));
-      const pending = await db.getPendingProjectImage(project.id);
-      if (pending) showPending(pending);
+      const image = await db.getProjectImage(project);
+      if (image) showImage(image, await db.assets.isPending(projectImageAsset(project.id)));
     };
 
     this.onCleanup = () => {

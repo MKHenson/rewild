@@ -1,5 +1,5 @@
 import type { IAsset } from 'models';
-import { confirmUpload, listServerAssets, requestUploadUrl, uploadProjectImage } from '../api/assets/asset-api';
+import { confirmUpload, listServerAssets, requestUploadUrl, ServerAsset } from '../api/assets/asset-api';
 import { authService } from '../api/auth/auth-service';
 import { LocalDataTable, StoredRecord } from './local-db';
 
@@ -9,6 +9,9 @@ export interface LevelRef {
   levelId: string;
 }
 
+/** Identifies one file of a project: on the project itself (`levelId` null) or on one of its levels. */
+export type AssetRef = Pick<IAsset, 'projectId' | 'levelId' | 'assetType' | 'filename'>;
+
 /** Reads one of a level's files, or resolves null when the level has no such file. */
 export type AssetReader = (assetType: string, filename: string) => Promise<ArrayBuffer | null>;
 
@@ -17,97 +20,72 @@ export function startLevelRef(project: { id?: string; levelId?: string } | null 
   return project?.id && project.levelId ? { projectId: project.id, levelId: project.levelId } : null;
 }
 
-/** Called after a project image upload with the URL the server gave it. */
-export type ProjectImageUploaded = (projectId: string, imageUrl: string) => Promise<void>;
-
-const IMAGE = 'image';
-const IMAGE_EXTENSIONS: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-};
+const BINARY = 'application/octet-stream';
 
 /**
  * Project files in OPFS, laid out like the bucket:
  * `projects/{projectId}/levels/{levelId}/{assetType}/{filename}` for level files and
- * `projects/{projectId}/{assetType}/{filename}` for project files such as the image.
- * Each file has a metadata record that tracks its sync state.
+ * `projects/{projectId}/{assetType}/{filename}` for project files.
+ * Each file has a metadata record that tracks its sync state. The copy on this device comes first:
+ * a sync pushes local changes, and a pull never replaces a file with unsynced changes.
  */
 export class LocalAssetStore extends LocalDataTable<IAsset> {
   constructor() {
     super('rewild', 'assets');
   }
 
-  async write(level: LevelRef, assetType: string, filename: string, data: ArrayBuffer): Promise<string> {
-    const asset = { projectId: level.projectId, levelId: level.levelId, assetType, filename };
-    return this.writeAsset(asset, data);
+  /** Writes a file on this device. It stays pending until a sync uploads it. Returns the asset id. */
+  async write(asset: AssetRef & { contentType?: string }, data: ArrayBuffer | Blob): Promise<string> {
+    const contentType = asset.contentType ?? (data instanceof Blob && data.type ? data.type : BINARY);
+    await this.writeFile(asset, data);
+
+    const existing = await this.findMetadata(asset);
+    if (existing) {
+      await this.patch(existing.id, { contentType });
+      return existing.id;
+    }
+    return (await this.add({ ...pickRef(asset), contentType })).id;
   }
 
-  async read(level: LevelRef, assetType: string, filename: string): Promise<ArrayBuffer | null> {
-    const asset = { projectId: level.projectId, levelId: level.levelId, assetType, filename };
-    return this.readAsset(asset);
+  async read(asset: AssetRef): Promise<ArrayBuffer | null> {
+    try {
+      const dir = await this.assetDir(asset, false);
+      const fileHandle = await dir.getFileHandle(asset.filename, { create: false });
+      return await (await fileHandle.getFile()).arrayBuffer();
+    } catch {
+      return null;
+    }
   }
 
-  /** Stores a project image, replacing any other. Only a pending image is kept: the upload removes it. */
-  async writeProjectImage(projectId: string, file: File): Promise<void> {
-    const extension = IMAGE_EXTENSIONS[file.type];
-    if (!extension) throw new Error(`Unsupported image type: ${file.type}`);
-
-    await this.removeProjectImage(projectId);
-    await this.writeAsset({ projectId, levelId: null, assetType: IMAGE, filename: `image.${extension}` }, file);
-  }
-
-  /** The project image waiting for upload, or null. */
-  async readProjectImage(projectId: string): Promise<File | null> {
-    const record = (await this.projectImages(projectId))[0];
-    if (!record) return null;
-    const data = await this.readAsset(record);
+  /** The file with its content type, or null. */
+  async readBlob(asset: AssetRef): Promise<Blob | null> {
+    const data = await this.read(asset);
     if (!data) return null;
-    const extension = record.filename.split('.').pop()!;
-    const type = Object.keys(IMAGE_EXTENSIONS).find((t) => IMAGE_EXTENSIONS[t] === extension)!;
-    return new File([data], record.filename, { type });
+    const record = await this.findMetadata(asset);
+    return new Blob([data], { type: record?.contentType ?? BINARY });
   }
 
-  async sync(onProjectImage?: ProjectImageUploaded): Promise<void> {
+  /** True when the file on this device has changes a sync has not uploaded yet. */
+  async isPending(asset: AssetRef): Promise<boolean> {
+    const record = await this.findMetadata(asset);
+    return !!record && isDirty(record);
+  }
+
+  /** Pushes pending files, then pulls every server file this device lacks or has an older version of. */
+  async sync(): Promise<void> {
     if (!authService.getToken()) return;
 
-    // Push: level files via the presigned URL flow, project images via the image endpoints
-    const dirty = await this.getDirty();
-    for (const asset of dirty) {
+    for (const asset of await this.getDirty()) {
       try {
-        if (asset.levelId === null) {
-          await this.pushProjectImage(asset, onProjectImage);
-          continue;
-        }
-
-        const binary = await this.readAsset(asset);
-        if (!binary) continue;
-
-        const { uploadUrl, storageKey } = await requestUploadUrl(asset.levelId, asset.assetType, asset.filename);
-        const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: binary });
-        if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
-
-        await confirmUpload(storageKey);
-        await this.markSynced(asset.id, Date.now(), null);
+        await this.push(asset);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Sync failed';
-        await this.markSynced(asset.id, asset.syncedAt, msg);
+        await this.markSynced(asset.id, asset.syncedAt, err instanceof Error ? err.message : 'Sync failed');
       }
     }
 
-    // Pull: fetch server level files not present in OPFS and cache them locally
-    const serverAssets = await listServerAssets();
-    for (const serverAsset of serverAssets) {
-      const level = { projectId: serverAsset.projectId, levelId: serverAsset.levelId };
-      const existing = await this.read(level, serverAsset.assetType, serverAsset.filename);
-      if (existing) continue;
-
+    for (const serverAsset of await listServerAssets()) {
       try {
-        const res = await fetch(serverAsset.publicUrl);
-        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-        const data = await res.arrayBuffer();
-        const id = await this.write(level, serverAsset.assetType, serverAsset.filename, data);
-        await this.markSynced(id, Date.now(), null);
+        await this.pull(serverAsset);
       } catch {}
     }
   }
@@ -148,63 +126,59 @@ export class LocalAssetStore extends LocalDataTable<IAsset> {
     await Promise.all(chunks.map((item) => this.hardRemove(item.id)));
   }
 
-  // The image lives on the server once uploaded, and other devices only know its URL,
-  // so the local copy goes too.
-  private async pushProjectImage(asset: StoredRecord<IAsset>, onProjectImage?: ProjectImageUploaded) {
-    const file = await this.readProjectImage(asset.projectId);
-    if (!file) return;
-    const imageUrl = await uploadProjectImage(asset.projectId, file);
-    await onProjectImage?.(asset.projectId, imageUrl);
-    await this.removeProjectImage(asset.projectId);
+  private async push(asset: StoredRecord<IAsset>) {
+    const data = await this.read(asset);
+    if (!data) return;
+    const contentType = asset.contentType ?? BINARY;
+
+    const { uploadUrl, storageKey } = await requestUploadUrl({
+      projectId: asset.projectId,
+      levelId: asset.levelId,
+      assetType: asset.assetType,
+      filename: asset.filename,
+      contentType,
+      size: data.byteLength,
+    });
+    const res = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: data });
+    if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+
+    const confirmed = await confirmUpload(storageKey);
+    // Synced as of the write that was uploaded: a write made during the upload stays pending.
+    const current = await this.getOne(asset.id);
+    if (current) await this.putSynced({ ...current, version: confirmed.updatedAt }, asset.updatedAt);
   }
 
-  private async removeProjectImage(projectId: string): Promise<void> {
-    for (const record of await this.projectImages(projectId)) {
-      try {
-        const dir = await this.assetDir(record, false);
-        await dir.removeEntry(record.filename);
-      } catch {}
-      await this.hardRemove(record.id);
-    }
+  private async pull(serverAsset: ServerAsset) {
+    const ref: AssetRef = pickRef({ ...serverAsset, levelId: serverAsset.levelId ?? null });
+    const local = await this.findMetadata(ref);
+    if (local && isDirty(local)) return;
+    if (local?.version === serverAsset.updatedAt && (await this.read(ref))) return;
+
+    const res = await fetch(serverAsset.publicUrl);
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+    await this.writeFile(ref, await res.arrayBuffer());
+
+    const id = local?.id ?? (await this.add(ref)).id;
+    const now = Date.now();
+    await this.putSynced(
+      { ...ref, id, contentType: serverAsset.contentType, version: serverAsset.updatedAt, updatedAt: now },
+      now
+    );
   }
 
-  private async projectImages(projectId: string) {
-    const result = await this.getMany({ where: [['projectId', '==', projectId]] });
-    return result.items.filter((i) => i.levelId === null && i.assetType === IMAGE);
+  private async writeFile(asset: AssetRef, data: ArrayBuffer | Blob) {
+    const dir = await this.assetDir(asset, true);
+    const fileHandle = await dir.getFileHandle(asset.filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(data);
+    await writable.close();
   }
 
   private async levelRecords(levelId: string) {
     return (await this.getMany({ where: [['levelId', '==', levelId]] })).items;
   }
 
-  private async writeAsset(asset: IAsset, data: ArrayBuffer | Blob): Promise<string> {
-    const dir = await this.assetDir(asset, true);
-    const fileHandle = await dir.getFileHandle(asset.filename, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(data);
-    await writable.close();
-
-    const existing = await this.findMetadata(asset);
-    if (existing) {
-      await this.patch(existing.id, {});
-      return existing.id;
-    }
-    const record = await this.add(asset);
-    return record.id;
-  }
-
-  private async readAsset(asset: IAsset): Promise<ArrayBuffer | null> {
-    try {
-      const dir = await this.assetDir(asset, false);
-      const fileHandle = await dir.getFileHandle(asset.filename, { create: false });
-      const file = await fileHandle.getFile();
-      return await file.arrayBuffer();
-    } catch {
-      return null;
-    }
-  }
-
-  private async findMetadata(asset: IAsset) {
+  private async findMetadata(asset: AssetRef) {
     const result = await this.getMany({ where: [['projectId', '==', asset.projectId]] });
     return (
       result.items.find(
@@ -223,11 +197,19 @@ export class LocalAssetStore extends LocalDataTable<IAsset> {
     return projectDir.getDirectoryHandle('levels', { create });
   }
 
-  private async assetDir(asset: IAsset, create: boolean): Promise<FileSystemDirectoryHandle> {
+  private async assetDir(asset: AssetRef, create: boolean): Promise<FileSystemDirectoryHandle> {
     const parent =
       asset.levelId === null
         ? await (await this.projectsDir(create)).getDirectoryHandle(asset.projectId, { create })
         : await (await this.levelsDir(asset.projectId, create)).getDirectoryHandle(asset.levelId, { create });
     return parent.getDirectoryHandle(asset.assetType, { create });
   }
+}
+
+function pickRef({ projectId, levelId, assetType, filename }: AssetRef): AssetRef {
+  return { projectId, levelId, assetType, filename };
+}
+
+function isDirty(record: StoredRecord<IAsset>): boolean {
+  return record.updatedAt > record.syncedAt;
 }

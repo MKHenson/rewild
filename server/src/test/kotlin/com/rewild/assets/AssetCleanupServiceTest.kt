@@ -107,10 +107,11 @@ class AssetCleanupServiceTest {
             chunksClearedAt = chunksClearedAt
         )
 
-        private fun insertAsset(id: String, levelId: String, filename: String) = transaction {
+        private fun insertAsset(id: String, levelId: String, filename: String, projectId: String = PROJECT_A) = transaction {
             AssetsTable.insertIgnore {
                 it[AssetsTable.id] = id
                 it[AssetsTable.userId] = USER_A
+                it[AssetsTable.projectId] = projectId
                 it[AssetsTable.levelId] = levelId
                 it[AssetsTable.assetType] = "chunk"
                 it[AssetsTable.filename] = filename
@@ -215,7 +216,7 @@ class AssetCleanupServiceTest {
         levelService.upsert(USER_A, makeLevel("cl-doomed-1", projectId = "cl-doomed-proj"))
         levelService.upsert(USER_A, makeLevel("cl-doomed-2", projectId = "cl-doomed-proj"))
         levelService.upsert(USER_A, makeLevel("cl-survivor"))
-        insertAsset("cl-doomed-1-asset", "cl-doomed-1", "0_0.bin")
+        insertAsset("cl-doomed-1-asset", "cl-doomed-1", "0_0.bin", projectId = "cl-doomed-proj")
         val doomed = "users/$USER_A/projects/cl-doomed-proj"
         bucket.objects += setOf(
             "$doomed/levels/cl-doomed-1/chunk/0_0.bin",

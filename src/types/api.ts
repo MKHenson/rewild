@@ -663,160 +663,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/projects/{id}/image/upload-url": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Request project image upload URL
-         * @description Owner only. Returns a presigned PUT URL for a PNG, JPEG or WebP image up to 2 MB. The upload must send the requested Content-Type
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Project ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["com.rewild.models.ProjectImageUploadRequest"];
-                };
-            };
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.models.UploadUrlResponse"];
-                    };
-                };
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
-                    };
-                };
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
-                    };
-                };
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
-                    };
-                };
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/projects/{id}/image/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Confirm project image upload
-         * @description Owner only. Checks the uploaded object, sets it as the project image and deletes the previous one
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Project ID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["com.rewild.models.ConfirmRequest"];
-                };
-            };
-            responses: {
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.models.ProjectImageResponse"];
-                    };
-                };
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
-                    };
-                };
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
-                    };
-                };
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
-                    };
-                };
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/levels": {
         parameters: {
             query?: never;
@@ -1040,7 +886,7 @@ export interface paths {
         };
         /**
          * List assets
-         * @description Returns all confirmed assets for the authenticated user
+         * @description Returns the confirmed files of the caller's live projects and levels
          */
         get: {
             parameters: {
@@ -1080,7 +926,7 @@ export interface paths {
         put?: never;
         /**
          * Request presigned upload URL
-         * @description Validates level ownership and returns a presigned PUT URL for direct upload to object storage
+         * @description Owner only. Checks the file against its asset type's rule (scope, filename, content type and size) and returns a presigned PUT URL. The upload must send the requested Content-Type
          */
         post: {
             parameters: {
@@ -1103,7 +949,23 @@ export interface paths {
                         "application/json": components["schemas"]["com.rewild.models.UploadUrlResponse"];
                     };
                 };
-                403: {
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1130,7 +992,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm asset upload
-         * @description Marks an asset as confirmed after successful direct upload. Purges stale unconfirmed records older than 1 hour.
+         * @description Checks the uploaded object against its asset type's rule and makes it the file's new version. Purges uploads never confirmed within 1 hour
          */
         post: {
             parameters: {
@@ -1145,12 +1007,21 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Confirmed */
-                204: {
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.models.Asset"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
                 };
                 404: {
                     headers: {
@@ -1827,11 +1698,13 @@ export interface components {
             /** String */
             assetType: string;
             /** String */
+            contentType: string;
+            /** String */
             filename: string;
             /** String */
             id: string;
             /** String */
-            levelId: string;
+            levelId?: null | string;
             /** String */
             projectId: string;
             /** String */
@@ -2093,35 +1966,6 @@ export interface components {
             levels: components["schemas"]["com.rewild.models.Level"][];
             project: components["schemas"]["com.rewild.models.Project"];
         };
-        /** ProjectImageUploadRequest */
-        "com.rewild.models.ProjectImageUploadRequest": {
-            /** String */
-            contentType: string;
-            /**
-             * Long
-             * Format: int64
-             */
-            size: number;
-        };
-        /** UploadUrlResponse */
-        "com.rewild.models.UploadUrlResponse": {
-            /** String */
-            publicUrl: string;
-            /** String */
-            storageKey: string;
-            /** String */
-            uploadUrl: string;
-        };
-        /** ConfirmRequest */
-        "com.rewild.models.ConfirmRequest": {
-            /** String */
-            storageKey: string;
-        };
-        /** ProjectImageResponse */
-        "com.rewild.models.ProjectImageResponse": {
-            /** String */
-            imageUrl: string;
-        };
         /** SyncRecord */
         "com.rewild.models.SyncRecord": {
             /** String */
@@ -2163,9 +2007,32 @@ export interface components {
             /** String */
             assetType: string;
             /** String */
+            contentType: string;
+            /** String */
             filename: string;
             /** String */
-            levelId: string;
+            levelId?: null | string;
+            /** String */
+            projectId: string;
+            /**
+             * Long
+             * Format: int64
+             */
+            size: number;
+        };
+        /** UploadUrlResponse */
+        "com.rewild.models.UploadUrlResponse": {
+            /** String */
+            publicUrl: string;
+            /** String */
+            storageKey: string;
+            /** String */
+            uploadUrl: string;
+        };
+        /** ConfirmRequest */
+        "com.rewild.models.ConfirmRequest": {
+            /** String */
+            storageKey: string;
         };
         /** AdminProject */
         "com.rewild.admin.AdminProject": {

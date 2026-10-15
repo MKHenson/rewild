@@ -1,5 +1,6 @@
 package com.rewild.play
 
+import com.rewild.assets.AssetResult
 import com.rewild.assets.AssetService
 import com.rewild.assets.S3Signer
 import com.rewild.auth.JwtService
@@ -13,6 +14,7 @@ import com.rewild.models.Level
 import com.rewild.models.PlayProject
 import com.rewild.models.Project
 import com.rewild.models.SceneGraph
+import com.rewild.models.UploadUrlRequest
 import com.rewild.projects.ProjectService
 import com.rewild.publicgame.PublicGameService
 import com.rewild.shares.ShareService
@@ -111,9 +113,14 @@ class PlayRoutesTest {
             projects.upsert(OWNER, makeProject(projectId, levelId).copy(levelId = null))
             levels.upsert(OWNER, makeLevel(levelId, projectId))
             projects.upsert(OWNER, makeProject(projectId, levelId))
-            val upload = assets.requestUploadUrl(OWNER, levelId, "chunk", "0_0.bin")!!
-            assets.confirmUpload(OWNER, upload.storageKey)
-            return upload.storageKey
+            val storageKey = requestChunkUpload(projectId, levelId, "0_0.bin")
+            assets.confirmUpload(OWNER, storageKey)
+            return storageKey
+        }
+
+        private fun requestChunkUpload(projectId: String, levelId: String, filename: String): String {
+            val req = UploadUrlRequest(projectId, levelId, "chunk", filename, "application/octet-stream", 1)
+            return (assets.requestUploadUrl(OWNER, req) as AssetResult.Success).value.storageKey
         }
     }
 
@@ -189,7 +196,7 @@ class PlayRoutesTest {
     fun `unconfirmed files and deleted levels are left out`() = testApplication {
         installTestApp()
         seed("play-partial")
-        assets.requestUploadUrl(OWNER, "play-partial-level", "chunk", "1_0.bin")
+        requestChunkUpload("play-partial", "play-partial-level", "1_0.bin")
         levels.upsert(OWNER, makeLevel("play-partial-gone", "play-partial"))
         levels.delete(OWNER, "play-partial-gone")
 
@@ -205,7 +212,7 @@ class PlayRoutesTest {
         val before = decode(play("play-reupload", OWNER)).assets.single().publicUrl
 
         Thread.sleep(2)
-        assets.requestUploadUrl(OWNER, "play-reupload-level", "chunk", "0_0.bin")
+        requestChunkUpload("play-reupload", "play-reupload-level", "0_0.bin")
         assets.confirmUpload(OWNER, key)
 
         val after = decode(play("play-reupload", OWNER)).assets.single().publicUrl

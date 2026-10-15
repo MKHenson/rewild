@@ -28,11 +28,12 @@ In this doc, "admin" always means a super admin: `UserRole.SUPER_ADMIN`, checked
 | Admin access       | Super admins can see and run all projects from an admin-only tab. This is a stopgap. Privacy improves later                                                       |
 | Sync               | Sync is only for the player's own projects                                                                                                                        |
 | Remote projects    | Public, shared and admin-run projects are not stored on the device. The game loads them from the server each time it starts them, and all three use the same path |
+| Assets             | Every project file is an asset, saved and synced the same way. The asset type sets only its location and the rules the server enforces                         |
 | Asset caching      | Every asset URL carries a version, so the browser cache never serves an old file                                                                                  |
 | Delete             | A project saved on the server is deleted through the API, by its logged in owner. A local only project is deleted on the device                                   |
 | Flagged project    | The project cannot be played or shared. Players see a general message that tells them to contact an admin                                                         |
 | List order         | Projects sort by `updatedAt`, newest first                                                                                                                        |
-| Project image      | The owner sets an image in Project Settings. It syncs to the bucket under the user and the project. A new image deletes the old one. Size limit: 2 MB           |
+| Project image      | The owner sets an image in Project Settings. It is a project asset and syncs like every other asset. A new image replaces the old one. Size limit: 2 MB        |
 | Bucket layout      | All project files live under `users/{userId}/projects/{projectId}/`, level files too. There are no live projects, so there is no data migration                   |
 
 ---
@@ -76,10 +77,10 @@ The project settings pane (`ProjectSettings.tsx`) was temporary. It moves into a
 
 ### Project image
 
-- The owner picks an image file, logged in or not. The client checks the type and size, stores it in the asset store and shows it at once.
-- The image syncs with the other assets, after the project records. The push sends it to the project image endpoints, sets `imageUrl` on the local project and removes the local file. A failed upload keeps the file dirty for the next sync.
-- Other devices get the image URL with the project record. They do not store the image file.
-- A project with no image shows a placeholder.
+- The image is the project asset `image/image`: asset type `image`, no level. The owner picks a file, logged in or not. The client checks the type and size, writes it to the asset store and shows it at once.
+- It syncs like every other asset: the push uploads it, the pull brings it to the owner's other devices, and the device copy stays.
+- `db.getProjectImage` serves every screen: the copy on the device first, else a download from the project's `imageUrl`. A remote project's image (public, shared, admin-run) is not stored.
+- A project with no image, or an image that fails to load, shows a placeholder.
 - Story Mode, My Games and the admin Projects tab show the image, or the placeholder.
 
 ### Sharing tab
@@ -120,7 +121,7 @@ A reusable component, so other screens can use it later.
 
 ### Play
 
-- `GET /api/play/{projectId}`: auth is optional. It returns the project, its levels, and the asset list for each level. This is the one way the game loads a project that is not on the device.
+- `GET /api/play/{projectId}`: auth is optional. It returns the project, its levels, and the project's assets. Each asset names its level, or none for a project file. This is the one way the game loads a project that is not on the device.
 - The caller can read the project if any of these is true:
   - it is the public project (logged out callers too)
   - the caller owns it
@@ -132,34 +133,31 @@ A reusable component, so other screens can use it later.
 
 ### Asset versions
 
-The editor overwrites a level file at the same bucket key when it saves it again. Without a version in the URL, the browser cache can serve the old file.
+An asset keeps its bucket key when it is uploaded again. Without a version in the URL, the browser cache can serve the old file.
 
-- New `updated_at` column on `assets`. The upload confirm sets it.
+- `updated_at` on `assets` is the version. The upload confirm sets it and returns the asset.
 - The play endpoint and the sync asset list add `?v={updatedAt}` to each `publicUrl`.
 - Only the files that changed get a new URL, so the player downloads only those again.
+- The client stores the version of each file it holds. The sync pull downloads a file it lacks or holds an older version of, and never one with local changes.
 
 ### Bucket layout
 
 ```
 users/{userId}/projects/{projectId}/
-  image/{uuid}.{ext}                          project image
-  levels/{levelId}/{assetType}/{filename}     level files (was levels/{levelId}/...)
+  {assetType}/{filename}                      project files, such as image/image
+  levels/{levelId}/{assetType}/{filename}     level files
 ```
 
-- `AssetService.requestUploadUrl` builds the new level key. It looks up the level's `projectId` and owner.
-- `AssetCleanupService.prefixFor` uses the new prefix. A project delete can remove the whole `users/{userId}/projects/{projectId}/` prefix.
-- The client's asset store uses the same layout in OPFS, under `projects/{projectId}/`. Level files and the project image are both assets. An image asset has no level.
-- `GET /api/assets` returns each asset's `projectId`, so the pull can place the file.
-- Existing dev data under `levels/` is removed. There are no live projects to migrate.
+- `StorageKeys.asset` builds every key. A project delete removes the whole `users/{userId}/projects/{projectId}/` prefix.
+- The client's asset store uses the same layout in OPFS, under `projects/{projectId}/`.
+- `GET /api/assets` returns each asset's `projectId` and `levelId`, so the pull can place the file.
 
 ### Project image
 
-- **Bucket key:** `users/{userId}/projects/{projectId}/image/{uuid}.{ext}`. A new uuid for each upload, so browsers and the CDN never show an old image.
-- **Storage:** a new `image_key` column on `projects`. The image is not an `assets` row, because `assets.level_id` cannot be null.
-- `POST /api/projects/{id}/image/upload-url`: owner only. It returns a presigned PUT URL. It accepts PNG, JPEG and WebP only, with a maximum size of 2 MB.
-- `POST /api/projects/{id}/image/confirm`: owner only. It checks that the object exists and is within the size limit. It sets `image_key`, then queues the old object for deletion.
-- The project read APIs, the play endpoint and `GET /api/public-game` return the image URL.
-- A project delete also deletes its image.
+- An `assets` row with no level: asset type `image`, filename `image`, key `users/{userId}/projects/{projectId}/image/image`. It uploads through `/api/assets/upload-url` and `/api/assets/confirm` like any asset.
+- The `image` rule in `AssetTypes`: project scope, PNG, JPEG or WebP, 2 MB at most, and the fixed filename, so a project has one image.
+- The project read APIs, the play endpoint and `GET /api/public-game` return the image asset's versioned URL as `imageUrl`.
+- A project delete deletes its image with its other files.
 
 ### Project lists
 

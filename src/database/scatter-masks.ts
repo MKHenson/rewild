@@ -48,9 +48,7 @@ export function writeScatterMask(
   mask: PaintMask
 ): Promise<string> {
   return db.assets.write(
-    level,
-    'chunk',
-    scatterMaskFilename(cx, cy),
+    { ...level, assetType: 'chunk', filename: scatterMaskFilename(cx, cy) },
     serializePaintMask(mask)
   );
 }

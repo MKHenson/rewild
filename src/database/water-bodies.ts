@@ -35,9 +35,7 @@ export function writeWaterBodies(
   bodies: Iterable<WaterBody>
 ): Promise<string> {
   return db.assets.write(
-    level,
-    'chunk',
-    WATER_BODIES_FILENAME,
+    { ...level, assetType: 'chunk', filename: WATER_BODIES_FILENAME },
     serializeWaterBodies(bodies)
   );
 }

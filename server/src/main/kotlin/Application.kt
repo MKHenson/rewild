@@ -16,7 +16,6 @@ import com.rewild.levels.levelRoutes
 import com.rewild.models.*
 import com.rewild.play.PlayService
 import com.rewild.play.playRoutes
-import com.rewild.projects.ProjectImageService
 import com.rewild.projects.ProjectService
 import com.rewild.projects.projectRoutes
 import com.rewild.publicgame.PublicGameService
@@ -98,21 +97,16 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
         accessKey = str("storage.s3AccessKey"),
         secretKey = str("storage.s3SecretKey")
     ) else null
+    val assetCleanupService = AssetCleanupService(s3 = s3, bucketName = str("storage.bucketName"))
     val assetService = AssetService(
         s3 = s3,
         bucketName = str("storage.bucketName"),
-        bucketBaseUrl = str("storage.bucketBaseUrl")
-    )
-    val assetCleanupService = AssetCleanupService(s3 = s3, bucketName = str("storage.bucketName"))
-
-    val projectService = ProjectService(assetCleanupService, str("storage.bucketBaseUrl"))
-    val projectImageService = ProjectImageService(
-        signer = s3,
-        inspector = s3,
-        bucketName = str("storage.bucketName"),
         bucketBaseUrl = str("storage.bucketBaseUrl"),
+        inspector = s3,
         cleanup = assetCleanupService
     )
+
+    val projectService = ProjectService(assetCleanupService, str("storage.bucketBaseUrl"))
     val levelService = LevelService(assetCleanupService)
     val syncService = SyncService(projectService, levelService, assetCleanupService)
     val adminService = AdminService(authService, str("storage.bucketBaseUrl"))
@@ -164,7 +158,7 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                     playRoutes(playService)
                 }
                 authenticate("auth-jwt") {
-                    projectRoutes(projectService, projectImageService)
+                    projectRoutes(projectService)
                     levelRoutes(levelService)
                     syncRoutes(syncService)
                     assetRoutes(assetService)
@@ -176,7 +170,7 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                 }
             } else {
                 playRoutes(playService)
-                projectRoutes(projectService, projectImageService)
+                projectRoutes(projectService)
                 levelRoutes(levelService)
                 syncRoutes(syncService)
                 assetRoutes(assetService)

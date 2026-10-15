@@ -5,6 +5,7 @@ const asset = (filename: string, publicUrl: string) => ({
   projectId: 'p1',
   levelId: 'l1',
   assetType: 'chunk',
+  contentType: 'application/octet-stream',
   filename,
   publicUrl,
   updatedAt: 1,

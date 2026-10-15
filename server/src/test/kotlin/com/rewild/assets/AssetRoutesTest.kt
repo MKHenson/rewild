@@ -1,28 +1,48 @@
 package com.rewild.assets
 
-import com.rewild.installTestAuth
-import com.rewild.makeTestJwtService
-import com.rewild.startTestDatabase
 import com.rewild.auth.JwtService
-import com.rewild.db.tables.AssetsTable
+import com.rewild.common.ErrorResponse
+import com.rewild.installTestAuth
 import com.rewild.levels.LevelService
+import com.rewild.makeTestJwtService
 import com.rewild.models.*
 import com.rewild.projects.ProjectService
-import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
+import com.rewild.startTestDatabase
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
+import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
-import org.jetbrains.exposed.sql.insertIgnore
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.AfterClass
 import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+
+// Stands in for the bucket: an upload is simulated by adding an object directly.
+private class FakeAssetBucket : S3Signer, S3Inspector, S3Deleter {
+    val objects = mutableMapOf<String, ObjectHead>()
+
+    override fun presignPut(bucket: String, key: String, ttlMinutes: Long, contentType: String?) =
+        "https://fake-s3/presigned/$key"
+
+    override fun head(bucket: String, key: String) = objects[key]
+
+    override fun deletePrefix(bucket: String, prefix: String): Int {
+        val matched = objects.keys.filter { it.startsWith(prefix) }
+        matched.forEach { objects.remove(it) }
+        return matched.size
+    }
+}
+
+private const val BINARY = "application/octet-stream"
+private const val MB = 1024L * 1024
 
 class AssetRoutesTest {
 
@@ -32,30 +52,19 @@ class AssetRoutesTest {
         private lateinit var service: AssetService
         private lateinit var projectService: ProjectService
         private lateinit var levelService: LevelService
+        private val bucket = FakeAssetBucket()
         private val json = Json { ignoreUnknownKeys = true }
-
-        const val USER_A = "asset-user-a"
-        const val USER_B = "asset-user-b"
-        const val PROJECT_A = "asset-proj-a"
-        const val LEVEL_A = "asset-level-a"
-
-        // Returns a fixed URL so tests never hit real AWS.
-        private val fakeS3 = object : S3Signer {
-            override fun presignPut(bucket: String, key: String, ttlMinutes: Long, contentType: String?) =
-                "https://fake-s3/presigned/$key"
-        }
+        private const val BASE_URL = "https://fake-s3/public"
 
         @BeforeClass
         @JvmStatic
         fun setup() {
             postgres = startTestDatabase()
             jwtService = makeTestJwtService()
-            projectService = ProjectService()
-            levelService = LevelService()
-            service = AssetService(s3 = fakeS3, bucketName = "test-bucket", bucketBaseUrl = "https://fake-s3/public")
-
-            projectService.upsert(USER_A, makeProject(PROJECT_A))
-            levelService.upsert(USER_A, makeLevel(LEVEL_A, PROJECT_A))
+            val cleanup = AssetCleanupService(s3 = bucket, bucketName = "test-bucket")
+            projectService = ProjectService(cleanup, BASE_URL)
+            levelService = LevelService(cleanup)
+            service = AssetService(bucket, "test-bucket", BASE_URL, inspector = bucket, cleanup = cleanup)
         }
 
         @AfterClass
@@ -64,30 +73,28 @@ class AssetRoutesTest {
             postgres.close()
         }
 
-        private fun makeAtmosphere() = Atmosphere(
-            elevation = JsonPrimitive(0.0),
-            cloudiness = JsonPrimitive(0.0),
-            foginess = JsonPrimitive(0.0),
-            windiness = JsonPrimitive(0.0),
-            precipitation = JsonPrimitive(0.0),
-            temperature = JsonPrimitive(20.0),
-            dayNightCycle = JsonPrimitive(true)
-        )
-
         private fun makeProject(id: String) = Project(
             id = id,
-            userId = "placeholder",
-            levelId = null,
             name = "Fixture Project",
             description = "",
             startEvent = "",
-            sceneGraph = SceneGraph(containers = emptyList(), atmosphere = makeAtmosphere()),
+            sceneGraph = SceneGraph(
+                containers = emptyList(),
+                atmosphere = Atmosphere(
+                    elevation = JsonPrimitive(0.0),
+                    cloudiness = JsonPrimitive(0.0),
+                    foginess = JsonPrimitive(0.0),
+                    windiness = JsonPrimitive(0.0),
+                    precipitation = JsonPrimitive(0.0),
+                    temperature = JsonPrimitive(20.0),
+                    dayNightCycle = JsonPrimitive(true)
+                )
+            ),
             updatedAt = 1000L
         )
 
         private fun makeLevel(id: String, projectId: String) = Level(
             id = id,
-            userId = "placeholder",
             projectId = projectId,
             name = "Fixture Level",
             hasTerrain = false,
@@ -96,213 +103,251 @@ class AssetRoutesTest {
             updatedAt = 1000L
         )
 
-        private fun insertConfirmedAsset(id: String, userId: String, levelId: String, storageKey: String) = transaction {
-            AssetsTable.insertIgnore {
-                it[AssetsTable.id] = id
-                it[AssetsTable.userId] = userId
-                it[AssetsTable.levelId] = levelId
-                it[AssetsTable.assetType] = "chunk"
-                it[AssetsTable.filename] = "terrain.bin"
-                it[AssetsTable.storageKey] = storageKey
-                it[AssetsTable.confirmed] = true
-                it[AssetsTable.createdAt] = System.currentTimeMillis()
-            }
+        /** A project with one level, both prefixed [prefix]. */
+        private fun seed(user: String, prefix: String): Pair<String, String> {
+            val project = "$prefix-proj"
+            val level = "$prefix-level"
+            projectService.upsert(user, makeProject(project))
+            levelService.upsert(user, makeLevel(level, project))
+            return project to level
         }
+
+        private fun chunk(projectId: String, levelId: String?, filename: String = "0_0.bin", size: Long = 10) =
+            UploadUrlRequest(projectId, levelId, "chunk", filename, BINARY, size)
+
+        private fun image(projectId: String, contentType: String = "image/png", size: Long = 1000) =
+            UploadUrlRequest(projectId, null, "image", "image", contentType, size)
     }
 
     private fun ApplicationTestBuilder.installTestApp() {
         installTestAuth(jwtService) { assetRoutes(service) }
     }
 
+    private fun HttpRequestBuilder.auth(userId: String) =
+        header(HttpHeaders.Authorization, "Bearer ${jwtService.generateToken(userId, "$userId@test.com", userId)}")
+
+    private suspend fun ApplicationTestBuilder.requestUpload(userId: String, req: UploadUrlRequest) =
+        client.post("/api/assets/upload-url") {
+            auth(userId)
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(req))
+        }
+
+    private suspend fun ApplicationTestBuilder.confirm(userId: String, storageKey: String) =
+        client.post("/api/assets/confirm") {
+            auth(userId)
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(ConfirmRequest(storageKey)))
+        }
+
+    private suspend fun ApplicationTestBuilder.list(userId: String) =
+        json.decodeFromString<List<Asset>>(client.get("/api/assets") { auth(userId) }.bodyAsText())
+
+    /** Requests a URL, puts an object at its key as the upload would, and confirms it. */
+    private suspend fun ApplicationTestBuilder.upload(
+        userId: String,
+        req: UploadUrlRequest,
+        stored: ObjectHead = ObjectHead(req.size, req.contentType)
+    ): Pair<String, HttpResponse> {
+        val key = json.decodeFromString<UploadUrlResponse>(requestUpload(userId, req).bodyAsText()).storageKey
+        bucket.objects[key] = stored
+        return key to confirm(userId, key)
+    }
+
+    private suspend fun error(response: HttpResponse) = json.decodeFromString<ErrorResponse>(response.bodyAsText()).error
+
     // --- Auth guard ---
 
     @Test
-    fun `request without token returns 401`() = testApplication {
+    fun `every route needs a token`() = testApplication {
         installTestApp()
-        val response = client.get("/api/assets")
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
-
-    @Test
-    fun `upload-url without token returns 401`() = testApplication {
-        installTestApp()
-        val response = client.post("/api/assets/upload-url") {
+        assertEquals(HttpStatusCode.Unauthorized, client.get("/api/assets").status)
+        assertEquals(HttpStatusCode.Unauthorized, client.post("/api/assets/upload-url") {
             contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(UploadUrlRequest(LEVEL_A, "chunk", "x.bin")))
-        }
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
-
-    @Test
-    fun `confirm without token returns 401`() = testApplication {
-        installTestApp()
-        val response = client.post("/api/assets/confirm") {
+            setBody(json.encodeToString(chunk("p", "l")))
+        }.status)
+        assertEquals(HttpStatusCode.Unauthorized, client.post("/api/assets/confirm") {
             contentType(ContentType.Application.Json)
             setBody(json.encodeToString(ConfirmRequest("some/key")))
-        }
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }.status)
     }
 
-    // --- GET /api/assets ---
+    // --- Upload URL ---
 
     @Test
-    fun `GET assets returns only confirmed assets for the authenticated user`() = testApplication {
+    fun `a level file goes under its level and a project file under the project`() = testApplication {
         installTestApp()
-        val userId = "list-assets-user"
-        val levelId = "list-assets-level"
-        projectService.upsert(userId, makeProject("list-assets-proj"))
-        levelService.upsert(userId, makeLevel(levelId, "list-assets-proj"))
-        insertConfirmedAsset("list-asset-1", userId, levelId, "levels/$levelId/chunk/a.bin")
-        insertConfirmedAsset("list-asset-2", USER_A, LEVEL_A, "levels/$LEVEL_A/chunk/b.bin")
+        val (project, level) = seed("keys-user", "keys")
 
-        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
-        val response = client.get("/api/assets") {
-            header(HttpHeaders.Authorization, "Bearer $token")
+        val levelKey = json.decodeFromString<UploadUrlResponse>(requestUpload("keys-user", chunk(project, level)).bodyAsText())
+        val imageKey = json.decodeFromString<UploadUrlResponse>(requestUpload("keys-user", image(project)).bodyAsText())
+
+        assertEquals("users/keys-user/projects/$project/levels/$level/chunk/0_0.bin", levelKey.storageKey)
+        assertEquals("users/keys-user/projects/$project/image/image", imageKey.storageKey)
+        assertTrue(levelKey.uploadUrl.startsWith("https://fake-s3/presigned/"))
+    }
+
+    @Test
+    fun `an upload that breaks its type's rule is rejected`() = testApplication {
+        installTestApp()
+        val (project, level) = seed("rules-user", "rules")
+
+        val cases = mapOf(
+            UploadUrlRequest(project, level, "sound", "a.ogg", "audio/ogg", 10) to "Unknown asset type",
+            chunk(project, null) to "belongs to a level",
+            image(project).copy(levelId = level) to "belongs to the project",
+            image(project).copy(filename = "cover") to "Invalid filename",
+            chunk(project, level, filename = "../escape") to "Invalid filename",
+            image(project, contentType = "image/gif") to "PNG, JPEG or WebP",
+            image(project, size = 2 * MB + 1) to "2 MB",
+            chunk(project, level).copy(contentType = "text/plain") to "binary",
+            chunk(project, level, size = 0) to "16 MB",
+        )
+        for ((req, message) in cases) {
+            val response = requestUpload("rules-user", req)
+            assertEquals(HttpStatusCode.BadRequest, response.status, "$req")
+            assertTrue(error(response).contains(message), "$req: ${error(response)}")
         }
+    }
+
+    @Test
+    fun `only the owner of a live project and level gets an upload URL`() = testApplication {
+        installTestApp()
+        val (project, level) = seed("owner-user", "owner")
+        val (otherProject, _) = seed("owner-user", "owner-other")
+        levelService.upsert("owner-user", makeLevel("owner-deleted-level", project).copy(deletedAt = 2000L))
+
+        assertEquals(HttpStatusCode.NotFound, requestUpload("owner-intruder", chunk(project, level)).status)
+        assertEquals(HttpStatusCode.NotFound, requestUpload("owner-intruder", image(project)).status)
+        assertEquals(HttpStatusCode.NotFound, requestUpload("owner-user", chunk(project, "no-such-level")).status)
+        assertEquals(HttpStatusCode.NotFound, requestUpload("owner-user", chunk(project, "owner-deleted-level")).status)
+        assertEquals(HttpStatusCode.NotFound, requestUpload("owner-user", chunk(otherProject, level)).status)
+        assertEquals(HttpStatusCode.NotFound, requestUpload("owner-user", image("no-such-proj")).status)
+    }
+
+    // --- Confirm ---
+
+    @Test
+    fun `confirm returns the asset with its version and lists it`() = testApplication {
+        installTestApp()
+        val (project, level) = seed("confirm-user", "confirm")
+
+        val (key, response) = upload("confirm-user", chunk(project, level))
+
         assertEquals(HttpStatusCode.OK, response.status)
-
-        val assets = json.decodeFromString<List<Asset>>(response.bodyAsText())
-        assertEquals(1, assets.size)
-        assertEquals("list-asset-1", assets[0].id)
-        assertEquals("list-assets-proj", assets[0].projectId)
+        val asset = json.decodeFromString<Asset>(response.bodyAsText())
+        assertEquals(level, asset.levelId)
+        assertEquals(BINARY, asset.contentType)
+        assertTrue(asset.updatedAt > 0)
+        assertEquals("$BASE_URL/$key?v=${asset.updatedAt}", asset.publicUrl)
+        assertEquals(listOf(asset), list("confirm-user"))
     }
 
     @Test
-    fun `GET assets returns empty list when user has no confirmed assets`() = testApplication {
+    fun `a project file is listed with no level`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken("no-assets-user", "no-assets@test.com", "no-assets-user")
-        val response = client.get("/api/assets") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
-        assertEquals(HttpStatusCode.OK, response.status)
-        val assets = json.decodeFromString<List<Asset>>(response.bodyAsText())
-        assertTrue(assets.isEmpty())
-    }
+        val (project, _) = seed("list-image-user", "list-image")
 
-    // --- POST /api/assets/upload-url ---
+        upload("list-image-user", image(project, contentType = "image/webp"))
 
-    @Test
-    fun `upload-url returns presigned URL for owned level`() = testApplication {
-        installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
-        val response = client.post("/api/assets/upload-url") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(UploadUrlRequest(LEVEL_A, "chunk", "terrain.bin")))
-        }
-        assertEquals(HttpStatusCode.OK, response.status)
-
-        val body = json.decodeFromString<UploadUrlResponse>(response.bodyAsText())
-        assertTrue(body.uploadUrl.startsWith("https://fake-s3/presigned/"))
-        assertEquals("users/$USER_A/projects/$PROJECT_A/levels/$LEVEL_A/chunk/terrain.bin", body.storageKey)
-        assertTrue(body.publicUrl.startsWith("https://fake-s3/public/"))
+        val asset = list("list-image-user").single()
+        assertEquals(project, asset.projectId)
+        assertNull(asset.levelId)
+        assertEquals("image/webp", asset.contentType)
     }
 
     @Test
-    fun `upload-url returns 403 when level does not belong to user`() = testApplication {
+    fun `confirm rejects and deletes an object that breaks the rule or does not match the request`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_B, "$USER_B@test.com", USER_B)
-        val response = client.post("/api/assets/upload-url") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(UploadUrlRequest(LEVEL_A, "chunk", "terrain.bin")))
-        }
-        assertEquals(HttpStatusCode.Forbidden, response.status)
+        val (project, _) = seed("reject-user", "reject")
+
+        val (bigKey, big) = upload("reject-user", image(project), stored = ObjectHead(2 * MB + 1, "image/png"))
+        assertEquals(HttpStatusCode.BadRequest, big.status)
+        assertFalse(bigKey in bucket.objects)
+
+        val (typeKey, type) = upload("reject-user", image(project), stored = ObjectHead(1000, "image/gif"))
+        assertEquals(HttpStatusCode.BadRequest, type.status)
+        assertFalse(typeKey in bucket.objects)
+
+        assertTrue(list("reject-user").isEmpty())
     }
 
     @Test
-    fun `upload-url returns 403 for a level that does not exist`() = testApplication {
+    fun `confirm rejects a file that was never uploaded`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
-        val response = client.post("/api/assets/upload-url") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(UploadUrlRequest("nonexistent-level", "chunk", "x.bin")))
-        }
-        assertEquals(HttpStatusCode.Forbidden, response.status)
+        val (project, _) = seed("missing-user", "missing")
+        val key = json.decodeFromString<UploadUrlResponse>(requestUpload("missing-user", image(project)).bodyAsText()).storageKey
+
+        assertEquals(HttpStatusCode.BadRequest, confirm("missing-user", key).status)
     }
 
     @Test
-    fun `upload-url returns 403 for a deleted level`() = testApplication {
+    fun `confirm returns 404 for an unknown key or another user's upload`() = testApplication {
         installTestApp()
-        levelService.upsert(USER_A, makeLevel("deleted-level", PROJECT_A).copy(deletedAt = 2000L))
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
-        val response = client.post("/api/assets/upload-url") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(UploadUrlRequest("deleted-level", "chunk", "x.bin")))
-        }
-        assertEquals(HttpStatusCode.Forbidden, response.status)
-    }
+        val (project, level) = seed("theirs-user", "theirs")
+        val key = json.decodeFromString<UploadUrlResponse>(requestUpload("theirs-user", chunk(project, level)).bodyAsText()).storageKey
+        bucket.objects[key] = ObjectHead(10, BINARY)
 
-    // --- POST /api/assets/confirm ---
-
-    @Test
-    fun `confirm marks asset as confirmed`() = testApplication {
-        installTestApp()
-        val levelId = "confirm-level"
-        val userId = "confirm-user"
-        projectService.upsert(userId, makeProject("confirm-proj"))
-        levelService.upsert(userId, makeLevel(levelId, "confirm-proj"))
-
-        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
-
-        // First request the upload URL so an unconfirmed record exists
-        client.post("/api/assets/upload-url") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(UploadUrlRequest(levelId, "chunk", "new.bin")))
-        }
-
-        // Confirm it
-        val storageKey = "users/$userId/projects/confirm-proj/levels/$levelId/chunk/new.bin"
-        val confirmResponse = client.post("/api/assets/confirm") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(ConfirmRequest(storageKey)))
-        }
-        assertEquals(HttpStatusCode.NoContent, confirmResponse.status)
-
-        // Should now appear in list
-        val listResponse = client.get("/api/assets") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-        }
-        val assets = json.decodeFromString<List<Asset>>(listResponse.bodyAsText())
-        assertTrue(assets.any { it.filename == "new.bin" })
+        assertEquals(HttpStatusCode.NotFound, confirm("theirs-user", "users/x/projects/y/chunk/ghost.bin").status)
+        assertEquals(HttpStatusCode.NotFound, confirm("theirs-intruder", key).status)
     }
 
     @Test
-    fun `confirm returns 404 for an unknown storage key`() = testApplication {
+    fun `a re-upload keeps the confirmed version listed until it is confirmed, then gets a new URL`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
-        val response = client.post("/api/assets/confirm") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(ConfirmRequest("levels/does-not-exist/chunk/ghost.bin")))
-        }
-        assertEquals(HttpStatusCode.NotFound, response.status)
+        val (project, _) = seed("reupload-user", "reupload")
+        val (key, first) = upload("reupload-user", image(project))
+        val before = json.decodeFromString<Asset>(first.bodyAsText())
+
+        requestUpload("reupload-user", image(project, contentType = "image/jpeg"))
+        assertEquals(before, list("reupload-user").single())
+
+        Thread.sleep(2)
+        bucket.objects[key] = ObjectHead(1000, "image/jpeg")
+        val after = json.decodeFromString<Asset>(confirm("reupload-user", key).bodyAsText())
+        assertNotEquals(before.publicUrl, after.publicUrl)
+        assertEquals("image/jpeg", after.contentType)
     }
 
     @Test
-    fun `confirm returns 404 when storage key belongs to another user`() = testApplication {
+    fun `files of a deleted level or project are not listed`() = testApplication {
         installTestApp()
-        val userAToken = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
+        val (project, level) = seed("gone-user", "gone")
+        upload("gone-user", chunk(project, level))
+        upload("gone-user", image(project))
+        levelService.delete("gone-user", level)
 
-        // USER_A requests an upload URL (creates unconfirmed record)
-        client.post("/api/assets/upload-url") {
-            header(HttpHeaders.Authorization, "Bearer $userAToken")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(UploadUrlRequest(LEVEL_A, "chunk", "other-user.bin")))
-        }
+        assertEquals(listOf("image"), list("gone-user").map { it.assetType })
 
-        // USER_B tries to confirm it
-        val userBToken = jwtService.generateToken(USER_B, "$USER_B@test.com", USER_B)
-        val storageKey = "levels/$LEVEL_A/chunk/other-user.bin"
-        val response = client.post("/api/assets/confirm") {
-            header(HttpHeaders.Authorization, "Bearer $userBToken")
-            contentType(ContentType.Application.Json)
-            setBody(json.encodeToString(ConfirmRequest(storageKey)))
-        }
-        assertEquals(HttpStatusCode.NotFound, response.status)
+        projectService.delete("gone-user", project)
+        assertTrue(list("gone-user").isEmpty())
+    }
+
+    // --- The project image on project reads ---
+
+    @Test
+    fun `project reads carry the image asset's URL`() = testApplication {
+        installTestApp()
+        val (project, _) = seed("read-user", "read")
+        assertNull(projectService.getById("read-user", project)!!.imageUrl)
+
+        val (_, response) = upload("read-user", image(project))
+        val asset = json.decodeFromString<Asset>(response.bodyAsText())
+
+        assertEquals(asset.publicUrl, projectService.getById("read-user", project)!!.imageUrl)
+        assertEquals(asset.publicUrl, projectService.list("read-user", com.rewild.projects.ProjectScope.MINE).single().imageUrl)
+    }
+
+    @Test
+    fun `deleting a project removes all of its files`() = testApplication {
+        installTestApp()
+        val (project, level) = seed("delete-user", "delete")
+        val (chunkKey, _) = upload("delete-user", chunk(project, level))
+        val (imageKey, _) = upload("delete-user", image(project))
+
+        projectService.delete("delete-user", project)
+
+        assertFalse(chunkKey in bucket.objects)
+        assertFalse(imageKey in bucket.objects)
     }
 }

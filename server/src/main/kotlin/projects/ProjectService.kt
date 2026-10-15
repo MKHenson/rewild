@@ -1,6 +1,7 @@
 package com.rewild.projects
 
 import com.rewild.assets.AssetCleanupService
+import com.rewild.assets.projectImageUrls
 import com.rewild.common.DeleteResult
 import com.rewild.db.tables.LevelsTable
 import com.rewild.db.tables.ProjectSharesTable
@@ -40,6 +41,7 @@ class ProjectService(
         query
             .orderBy(ProjectsTable.updatedAt to SortOrder.DESC, ProjectsTable.id to SortOrder.ASC)
             .map { it.toProject().copy(authorName = it[UsersTable.displayName]) }
+            .withImages()
     }
 
     fun getById(userId: String, id: String): Project? = transaction {
@@ -47,6 +49,7 @@ class ProjectService(
             .where { (ProjectsTable.id eq id) and (ProjectsTable.userId eq userId) }
             .firstOrNull()
             ?.toProject()
+            ?.let { listOf(it).withImages().single() }
     }
 
     /** A live project, whoever owns it. */
@@ -55,6 +58,7 @@ class ProjectService(
             .where { (ProjectsTable.id eq id) and ProjectsTable.deletedAt.isNull() }
             .firstOrNull()
             ?.toProject()
+            ?.let { listOf(it).withImages().single() }
     }
 
     // Returns null if the id is already owned by a different user.
@@ -102,12 +106,12 @@ class ProjectService(
         ProjectsTable.selectAll()
             .where { (ProjectsTable.userId eq userId) and (ProjectsTable.updatedAt greater since) }
             .map { it.toProject() }
+            .withImages()
     }
 
     // Tombstones the project and its levels, so the owner's other devices drop them on their
     // next sync, then removes every file under the project's prefix.
     fun delete(userId: String, id: String): DeleteResult {
-        var levelIds = emptyList<String>()
         val result = transaction {
             val existing = ProjectsTable.selectAll()
                 .where { ProjectsTable.id eq id }
@@ -119,7 +123,6 @@ class ProjectService(
 
             val now = System.currentTimeMillis()
             val liveLevels = (LevelsTable.projectId eq id) and LevelsTable.deletedAt.isNull()
-            levelIds = LevelsTable.selectAll().where { liveLevels }.map { it[LevelsTable.id] }
 
             LevelsTable.update({ liveLevels }) {
                 it[deletedAt] = now
@@ -130,15 +133,20 @@ class ProjectService(
                 it[deletedAt] = now
                 it[updatedAt] = now
                 it[syncedAt] = now
-                it[imageKey] = null
             }
             ProjectSharesTable.deleteWhere { projectId eq id }
             DeleteResult.Success
         }
 
         // Only once the tombstones are committed: a rolled-back delete must not lose files.
-        if (result == DeleteResult.Success) cleanup?.cleanupProject(userId, id, levelIds)
+        if (result == DeleteResult.Success) cleanup?.cleanupProject(userId, id)
         return result
+    }
+
+    // The image is an asset: its URL comes from the confirmed image file. Call inside a transaction.
+    private fun List<Project>.withImages(): List<Project> {
+        val urls = projectImageUrls(bucketBaseUrl, map { it.id })
+        return map { it.copy(imageUrl = urls[it.id]) }
     }
 
     private fun ResultRow.toProject() = Project(
@@ -153,7 +161,6 @@ class ProjectService(
         syncedAt = this[ProjectsTable.syncedAt],
         deletedAt = this[ProjectsTable.deletedAt],
         syncError = this[ProjectsTable.syncError],
-        imageUrl = this[ProjectsTable.imageKey]?.let { "$bucketBaseUrl/$it" },
         flaggedAt = this[ProjectsTable.flaggedAt]
     )
 }

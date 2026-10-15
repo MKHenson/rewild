@@ -36,7 +36,7 @@ describe('LaunchPage', () => {
   beforeEach(async () => {
     await clearDatabase('rewild');
     jest.spyOn(authService, 'getToken').mockReturnValue(null);
-    jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
+    jest.spyOn(db, 'getProjectImage').mockResolvedValue(null);
   });
 
   afterEach(() => {

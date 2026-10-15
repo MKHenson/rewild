@@ -36,7 +36,7 @@ describe('createChunkSnapshotProvider', () => {
 
   it('returns the stored heights for a saved chunk', async () => {
     const heights = fixtureHeights();
-    await db.assets.write(LEVEL, 'chunk', '32_16.bin', serializeChunkSnapshot(heights, SIZE, SIZE));
+    await db.assets.write({ ...LEVEL, assetType: 'chunk', filename: '32_16.bin' }, serializeChunkSnapshot(heights, SIZE, SIZE));
 
     const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
     const result = await provider(32, 16);
@@ -50,14 +50,14 @@ describe('createChunkSnapshotProvider', () => {
   });
 
   it('does not leak snapshots across levels', async () => {
-    await db.assets.write(ref('other-level'), 'chunk', '0_0.bin', serializeChunkSnapshot(fixtureHeights(), SIZE, SIZE));
+    await db.assets.write({ ...ref('other-level'), assetType: 'chunk', filename: '0_0.bin' }, serializeChunkSnapshot(fixtureHeights(), SIZE, SIZE));
 
     const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
     expect(await provider(0, 0)).toBeNull();
   });
 
   it('resolves null (and warns) for a corrupt blob', async () => {
-    await db.assets.write(LEVEL, 'chunk', '0_0.bin', new Uint8Array([1, 2, 3]).buffer);
+    await db.assets.write({ ...LEVEL, assetType: 'chunk', filename: '0_0.bin' }, new Uint8Array([1, 2, 3]).buffer);
 
     const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
     expect(await provider(0, 0)).toBeNull();
@@ -67,7 +67,7 @@ describe('createChunkSnapshotProvider', () => {
   it('resolves null for a snapshot with the reserved compressed flag set', async () => {
     const blob = serializeChunkSnapshot(fixtureHeights(), SIZE, SIZE);
     new DataView(blob).setUint32(12, CHUNK_SNAPSHOT_FLAG_COMPRESSED, true);
-    await db.assets.write(LEVEL, 'chunk', '0_0.bin', blob);
+    await db.assets.write({ ...LEVEL, assetType: 'chunk', filename: '0_0.bin' }, blob);
 
     const provider = createChunkSnapshotProvider(localAssetReader(LEVEL));
     expect(await provider(0, 0)).toBeNull();

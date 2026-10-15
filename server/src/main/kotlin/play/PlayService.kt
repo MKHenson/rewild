@@ -39,7 +39,7 @@ class PlayService(
             PlayProject(
                 project = project,
                 levels = projectLevels,
-                assets = assets.listConfirmedForLevels(projectLevels.map { it.id })
+                assets = assets.listConfirmedForProject(projectId)
             )
         )
     }

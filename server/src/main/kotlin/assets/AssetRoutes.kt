@@ -10,16 +10,24 @@ import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
+import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+
+private suspend inline fun <reified T : Any> ApplicationCall.respondAssetResult(result: AssetResult<T>) = when (result) {
+    is AssetResult.Success -> respond(result.value)
+    is AssetResult.Invalid -> respond(HttpStatusCode.BadRequest, ErrorResponse(result.message))
+    AssetResult.NotFound -> respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
+    AssetResult.Unavailable -> respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("File storage is not configured"))
+}
 
 fun Route.assetRoutes(service: AssetService) {
     route("/assets") {
         get({
             tags("Assets")
             summary = "List assets"
-            description = "Returns all confirmed assets for the authenticated user"
+            description = "Returns the confirmed files of the caller's live projects and levels"
             response {
                 code(HttpStatusCode.OK) { body<List<Asset>>() }
             }
@@ -30,33 +38,30 @@ fun Route.assetRoutes(service: AssetService) {
         post("/upload-url", {
             tags("Assets")
             summary = "Request presigned upload URL"
-            description = "Validates level ownership and returns a presigned PUT URL for direct upload to object storage"
+            description = "Owner only. Checks the file against its asset type's rule (scope, filename, content type and size) and returns a presigned PUT URL. The upload must send the requested Content-Type"
             request { body<UploadUrlRequest>() }
             response {
                 code(HttpStatusCode.OK) { body<UploadUrlResponse>() }
-                code(HttpStatusCode.Forbidden) { body<ErrorResponse>() }
+                code(HttpStatusCode.BadRequest) { body<ErrorResponse>() }
+                code(HttpStatusCode.NotFound) { body<ErrorResponse>() }
+                code(HttpStatusCode.ServiceUnavailable) { body<ErrorResponse>() }
             }
         }) {
-            val req = call.receive<UploadUrlRequest>()
-            val result = service.requestUploadUrl(call.userId(), req.levelId, req.assetType, req.filename)
-                ?: return@post call.respond(HttpStatusCode.Forbidden, ErrorResponse("Level not found or not owned by user"))
-            call.respond(result)
+            call.respondAssetResult(service.requestUploadUrl(call.userId(), call.receive<UploadUrlRequest>()))
         }
 
         post("/confirm", {
             tags("Assets")
             summary = "Confirm asset upload"
-            description = "Marks an asset as confirmed after successful direct upload. Purges stale unconfirmed records older than 1 hour."
+            description = "Checks the uploaded object against its asset type's rule and makes it the file's new version. Purges uploads never confirmed within 1 hour"
             request { body<ConfirmRequest>() }
             response {
-                code(HttpStatusCode.NoContent) { description = "Confirmed" }
+                code(HttpStatusCode.OK) { body<Asset>() }
+                code(HttpStatusCode.BadRequest) { body<ErrorResponse>() }
                 code(HttpStatusCode.NotFound) { body<ErrorResponse>() }
             }
         }) {
-            val req = call.receive<ConfirmRequest>()
-            val confirmed = service.confirmUpload(call.userId(), req.storageKey)
-            if (!confirmed) return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Asset not found"))
-            call.respond(HttpStatusCode.NoContent)
+            call.respondAssetResult(service.confirmUpload(call.userId(), call.receive<ConfirmRequest>().storageKey))
         }
     }
 }

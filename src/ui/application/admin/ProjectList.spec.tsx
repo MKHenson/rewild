@@ -59,7 +59,7 @@ describe('ProjectList', () => {
     items = [project('a'), project('b', 5)];
     total = 2;
     jest.spyOn(authService, 'getToken').mockReturnValue(null);
-    jest.spyOn(db, 'getPendingProjectImage').mockResolvedValue(null);
+    jest.spyOn(db, 'getProjectImage').mockResolvedValue(null);
     global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
       requests.push({ url, method: init?.method ?? 'GET' });
       if (url.includes('/flag')) return json(null, 204);

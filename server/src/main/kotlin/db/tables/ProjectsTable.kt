@@ -15,7 +15,6 @@ object ProjectsTable : Table("projects") {
     val syncedAt = long("synced_at")
     val syncError = text("sync_error").nullable()
     val deletedAt = long("deleted_at").nullable()
-    val imageKey = text("image_key").nullable()
     val flaggedAt = long("flagged_at").nullable()
     val flaggedBy = text("flagged_by").nullable()
 

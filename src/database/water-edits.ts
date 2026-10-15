@@ -41,9 +41,7 @@ export function writeWaterEdit(
   edit: WaterEdit
 ): Promise<string> {
   return db.assets.write(
-    level,
-    'chunk',
-    waterEditFilename(cx, cy),
+    { ...level, assetType: 'chunk', filename: waterEditFilename(cx, cy) },
     serializeWaterEdit(edit)
   );
 }
