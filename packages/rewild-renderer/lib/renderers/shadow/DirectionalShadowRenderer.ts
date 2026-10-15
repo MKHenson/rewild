@@ -59,6 +59,15 @@ const CASTER_EXTENSION_TOWARD_LIGHT = 500;
 
 const FAR_CASCADE = NUM_CASCADES - 1;
 
+// Metres between the positions the light view may pivot on. Moving to the next
+// re-aliases shadow edges once, so it is coarse, but small enough to keep the
+// pivot near the camera. See _computeCascadeLightVPs.
+const LIGHT_ANCHOR_GRID = 128;
+
+// Float index of windParams.x, the sway amplitude, in an instanced caster's
+// uniforms.
+const WIND_AMPLITUDE_INDEX = 44;
+
 // Frames between re-renders of the far cascade. Between them it keeps its depth
 // and the light matrix it was drawn with, so the shader still samples it
 // consistently.
@@ -848,9 +857,14 @@ export class DirectionalShadowRenderer {
       );
     }
 
+    // The far cascade's texels are wider than a branch sways, so a swaying
+    // caster only flickers whole texels on and off there; it casts at rest.
+    const amplitude = data[WIND_AMPLITUDE_INDEX];
     for (let c = 0; c < NUM_CASCADES; c++) {
       this._shadowMVP.multiplyMatrices(this.lightVPs[c], world);
       data.set(this._shadowMVP.elements, 0);
+      if (uniforms.wind)
+        data[WIND_AMPLITUDE_INDEX] = c === FAR_CASCADE ? 0 : amplitude;
       device.queue.writeBuffer(uniforms.buffers[c], 0, data.buffer);
     }
   }
@@ -890,12 +904,23 @@ export class DirectionalShadowRenderer {
       this._lightUp.set(0, 1, 0);
     }
 
-    // Rotation-only light view anchored at the world origin, shared by every
-    // cascade. It depends on the sun alone, so a point's light-space position is
-    // absolute and snapping it to texels locks the grid to the world. A view
+    // Light view shared by every cascade, pivoting on an anchor that only moves
+    // in LIGHT_ANCHOR_GRID steps. Between steps a point's light-space position
+    // is fixed, so snapping it to texels locks the grid to the world. A view
     // that followed the cascade centre would put that centre at (0, 0) every
     // frame and leave the snap nothing to bite on.
+    //
+    // The anchor is kept near the camera because a turning sun swings the grid
+    // about it: a point d metres away slides d × the turn through the texels.
+    // Pivoting on the world origin made that d the player's distance from it,
+    // enough at a few hundred metres to re-alias every shadow edge each frame.
+    const camPos = camWorld.elements;
     this._lightViewWorld.lookAt(this._lightDir, this._origin, this._lightUp);
+    this._lightViewWorld.setPosition(
+      Math.round(camPos[12] / LIGHT_ANCHOR_GRID) * LIGHT_ANCHOR_GRID,
+      Math.round(camPos[13] / LIGHT_ANCHOR_GRID) * LIGHT_ANCHOR_GRID,
+      Math.round(camPos[14] / LIGHT_ANCHOR_GRID) * LIGHT_ANCHOR_GRID
+    );
     this._lightView.copy(this._lightViewWorld).invert();
 
     // --- Practical-split cascade distances ---
