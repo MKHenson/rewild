@@ -182,7 +182,10 @@ export class WaterPass implements IMaterialPass {
         fragment: {
           entryPoint: 'fs_depth',
           module,
-          targets: [{ format: sceneColorFormat, writeMask: 0 }],
+          targets: renderer.sceneTargets({
+            format: sceneColorFormat,
+            writeMask: 0,
+          }),
         },
         multisample,
         primitive,
@@ -202,7 +205,7 @@ export class WaterPass implements IMaterialPass {
         fragment: {
           entryPoint: 'fs_absorb',
           module,
-          targets: [
+          targets: renderer.sceneTargets(
             {
               format: sceneColorFormat,
               // Alpha is the water's coverage: its edge fades to the scene.
@@ -218,8 +221,8 @@ export class WaterPass implements IMaterialPass {
                   operation: 'add',
                 },
               },
-            },
-          ],
+            }
+          ),
         },
         multisample,
         primitive,
@@ -234,15 +237,15 @@ export class WaterPass implements IMaterialPass {
       fragment: {
         entryPoint: 'fs_light',
         module,
-        targets: [
+        targets: renderer.sceneTargets(
           {
             format: sceneColorFormat,
             blend: {
               color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
               alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
             },
-          },
-        ],
+          }
+        ),
       },
       multisample,
       primitive,

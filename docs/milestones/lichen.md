@@ -163,6 +163,39 @@ the gradient and fog shaders take it as an input directly.
 How the capture and prefilter actually work, and how to read the debug viewer, is
 in [Sky Rendering](../sky-rendering.md).
 
+### Screen-space ambient occlusion
+
+The cubes know nothing about what stands between a surface and the sky, so SSAO
+darkens the ambient where the depth buffer says the sky is hidden: under rocks, at
+the foot of trees, inside canopies. It applies fully to indirect light, next to the
+material occlusion map, and only partly to direct light: `directStrength` (0.3)
+of it darkens the sun too, so contact points the shadow maps are too coarse for
+still read in full sun.
+
+The scene pass is forward-rendered, so the ambient is kept separable with a second
+render target. Every opaque shader returns `SceneFragment` (`scene-output.wgsl`):
+location 0 the shaded colour as before, location 1 the ambient already summed into
+it (IBL × occlusion map). Shaders with no sky ambient write zero there. After the
+opaque pass (`renderers/ao/AmbientOcclusion.ts`):
+
+1. **ssao** — half resolution. Normals are reconstructed from depth, and a
+   cosine-weighted hemisphere is tested against the depth buffer. The tap pattern
+   rotates over a 4×4 tile.
+2. **ssao blur** — a depth-aware 4×4 box, exactly one tile, so the pattern averages
+   out and nothing swims as the camera moves.
+3. **ssao resolve** — depth-aware upsample, then one blend computes
+   `colour × (1 − k·o) − indirect × o(1 − k)`, with `o` the occlusion and `k`
+   `directStrength`.
+
+Water and transparent meshes draw after the resolve in the water pass, so they
+are never occluded, and water refracts the occluded scene. AO fades out with view
+distance, where depth precision can no longer support it.
+
+The `ao` quality aspect is off on `low`, and adds samples and radius on each tier
+up (`AoQuality.ts`). The directional shadow floors — the least sun a shadowed
+fragment keeps — drop while AO is applied, since that sun is light AO cannot
+darken (`DirectionalShadowRenderer.aoShadowFloors`).
+
 ---
 
 ## Terrain

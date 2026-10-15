@@ -67,7 +67,13 @@
   directionalShadowFactor = mix(1.0, directionalShadowFactor, _sunElevationFade);
   // Clamp shadow darkness — prevents pitch-black shadows where ambient light would exist.
   // A canopy lets light through and between its leaves, so foliage keeps more.
-  directionalShadowFactor = mix(select(0.25, 0.475, HAS_FOLIAGE_SHADING), 1.0, directionalShadowFactor);
+  // Lower while SSAO darkens the ambient, which this unoccluded sun would wash out.
+  let _shadowFloor = select(
+    directionalShadowParams.groundShadowFloor,
+    directionalShadowParams.foliageShadowFloor,
+    HAS_FOLIAGE_SHADING
+  );
+  directionalShadowFactor = mix(_shadowFloor, 1.0, directionalShadowFactor);
   // Debug tint: colours each cascade region (red=0, green=1, blue=2) when debugMode is on.
   var cascadeDebugTint = vec3f(0.0);
   if (directionalShadowParams.debugMode != 0u) {

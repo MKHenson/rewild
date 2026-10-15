@@ -88,7 +88,7 @@ export class ScatterImpostorPass implements IMaterialPass {
       fragment: {
         entryPoint: 'fs',
         module,
-        targets: [{ format: sceneColorFormat }],
+        targets: renderer.sceneTargets({ format: sceneColorFormat }, true),
       },
       multisample: { count: renderer.sampleCount },
       primitive: { topology: 'triangle-list', cullMode: 'none' },

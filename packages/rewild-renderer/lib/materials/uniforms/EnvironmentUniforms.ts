@@ -53,7 +53,7 @@ export class EnvironmentUniforms implements ISharedUniformBuffer {
 
   // invViewMatrix (16) + worldSize, centerX, centerZ, shadowIntensity (4) = 20 floats
   private cloudData: Float32Array;
-  // 3 × lightMVPFromView (192 bytes) + cascadeSplits (16 bytes) + debugMode u32 + normalOffsetScale f32 + 2× pad = 224 bytes
+  // 3 × lightMVPFromView (192 bytes) + cascadeSplits (16 bytes) + debugMode u32 + normalOffsetScale f32 + ground/foliage shadow floors = 224 bytes
   private directionalData: ArrayBuffer;
   private directionalFloats: Float32Array;
   private directionalInts: Uint32Array;
@@ -126,7 +126,7 @@ export class EnvironmentUniforms implements ISharedUniformBuffer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // Directional shadow params: 3 × lightMVPFromView (192) + cascadeSplits (16) + debugMode + normalOffsetScale + 2×pad = 224 bytes
+    // Directional shadow params: 3 × lightMVPFromView (192) + cascadeSplits (16) + debugMode + normalOffsetScale + 2× shadow floor = 224 bytes
     this.directionalBuffer = device.createBuffer({
       label: 'directional shadow params',
       size: 224,
@@ -322,6 +322,11 @@ export class EnvironmentUniforms implements ISharedUniformBuffer {
       // debugMode is at byte offset 208 (float index 52 = u32 index 52).
       this.directionalInts[52] = dirShadowRenderer.debugMode ? 1 : 0;
       this.directionalFloats[53] = dirShadowRenderer.normalOffsetScale;
+      const floors = dirShadowRenderer.shadowFloors(
+        renderer.ambientOcclusion.applies(renderer)
+      );
+      this.directionalFloats[54] = floors.ground;
+      this.directionalFloats[55] = floors.foliage;
       device.queue.writeBuffer(this.directionalBuffer, 0, this.directionalData);
     }
 

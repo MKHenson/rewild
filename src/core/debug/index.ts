@@ -3,6 +3,7 @@ import { Renderer } from 'rewild-renderer';
 import { registerChunkSnapshotDevCommands } from './ChunkSnapshotDevCommands';
 import { registerRenderQualityCommands } from './RenderQualityCommands';
 import { registerShadowDebugCommands } from './ShadowDebugCommands';
+import { registerAoDebugCommands } from './AoDebugCommands';
 import { registerSceneDebugCommands } from './SceneDebugCommands';
 import { registerSkyDebugCommands } from './SkyDebugCommands';
 import { registerAtmosphereDebugCommands } from './AtmosphereDebugCommands';
@@ -27,6 +28,7 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerSkyDebugCommands(renderer);
   registerAtmosphereDebugCommands(renderer);
   registerShadowDebugCommands(renderer);
+  registerAoDebugCommands(renderer);
   registerPbrHarnessCommands(renderer);
   registerGltfImportCommands(renderer);
   registerScatterDebugCommands(renderer);

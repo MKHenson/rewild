@@ -70,7 +70,7 @@ export class HorizonOceanPass implements IMaterialPass {
       fragment: {
         entryPoint: 'fs',
         module,
-        targets: [{ format: sceneColorFormat }],
+        targets: renderer.sceneTargets({ format: sceneColorFormat }),
       },
       multisample: { count: renderer.sampleCount },
       // Seen from above or, for an underwater camera, from below.

@@ -7,6 +7,7 @@ struct DirectionalShadowParams {
   debugMode: u32,
   // Scales the per-cascade normal-offset bias with the atlas texel size.
   normalOffsetScale: f32,
-  _p1: u32,
-  _p2: u32,
+  // Least sun a shadowed fragment keeps, ground and foliage.
+  groundShadowFloor: f32,
+  foliageShadowFloor: f32,
 };

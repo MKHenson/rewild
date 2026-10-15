@@ -142,11 +142,12 @@ export class TerrainPass implements IMaterialPass {
       fragment: {
         entryPoint: 'fs',
         module,
-        targets: [
+        targets: renderer.sceneTargets(
           {
             format: sceneColorFormat,
           },
-        ],
+          true
+        ),
       },
       multisample: {
         count: renderer.sampleCount,

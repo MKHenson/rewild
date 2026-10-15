@@ -76,6 +76,13 @@ const ASPECTS: Record<QualityAspect, { label: string; description: string }> = {
       'How many ripples shade the surface of the sea and lakes, and how far ' +
       'out they carry. The waves themselves are the same on every setting.',
   },
+  ao: {
+    label: 'Ambient Occlusion',
+    description:
+      'Soft darkening where the sky is hidden: under rocks, at the foot of ' +
+      'trees and inside canopies. Off on Low; higher tiers reach further ' +
+      'and take more samples.',
+  },
 };
 
 const VOLUMES: Record<VolumeSetting, { label: string; description: string }> = {

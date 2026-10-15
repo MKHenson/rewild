@@ -4,6 +4,7 @@
 const HAS_FOLIAGE_SHADING: bool = false;
 
 #include "./shader-lib/total-lighting.wgsl"
+#include "./shader-lib/scene-output.wgsl"
 #include "./shader-lib/selection-tint.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
@@ -68,7 +69,7 @@ fn fs(
   @location(0) fragUV: vec2f,
   @location(1) normal: vec3f,
   @location(2) viewPosition: vec3f
-) -> @location(0) vec4f {
+) -> SceneFragment {
 
   let normalizedNormal = normalize(normal);
 
@@ -93,5 +94,5 @@ fn fs(
     color = vec4f(mix(color.rgb, cascadeDebugTint, 0.5), color.a);
   }
 
-  return applySelectionTint(color, 0.35f);
+  return sceneFragment(applySelectionTint(color, 0.35f));
 }

@@ -12,6 +12,7 @@
 //     lightDistanceAttenuation
 //   - water-light.wgsl, for waterLightAt
 //   - rain-wet.wgsl, for rainLeaf
+//   - scene-output.wgsl, for sceneIndirect
 
 // How far the sun wraps past the terminator on a leaf, as a fraction of the
 // lobe. A blade is thin enough to be lit from well behind its own horizon, and
@@ -137,5 +138,7 @@ fn shadeFoliage(
 
   // Transmitted light is tinted by the blade it came through, so it takes the
   // albedo like the rest.
-  return vec4f(albedo * rainLeaf() * (direct + ambient + transmitted), 1.0);
+  let tint = albedo * rainLeaf();
+  sceneIndirect = tint * ambient;
+  return vec4f(tint * (direct + ambient + transmitted), 1.0);
 }

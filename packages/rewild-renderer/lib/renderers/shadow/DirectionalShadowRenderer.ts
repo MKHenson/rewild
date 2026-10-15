@@ -127,6 +127,13 @@ interface MeshShadowUniforms {
   wind: boolean;
 }
 
+/** Least sun a shadowed fragment keeps, 0..1. */
+export interface ShadowFloors {
+  ground: number;
+  /** A canopy lets light through and between its leaves, so it keeps more. */
+  foliage: number;
+}
+
 export class DirectionalShadowRenderer {
   shadowDepthTexture: GPUTexture;
   debugRenderer: ShadowDebugRenderer;
@@ -157,6 +164,13 @@ export class DirectionalShadowRenderer {
    * texel or so, so they shrink as the cascade grows and its texels get finer.
    */
   normalOffsetScale: number = 1;
+  /** Shadow floors while SSAO is off. */
+  readonly baseShadowFloors: ShadowFloors = { ground: 0.25, foliage: 0.475 };
+  /**
+   * Shadow floors while SSAO is applied. Lower, because the floor is sun the
+   * AO cannot darken, and at the base values it washes contact shadows out.
+   */
+  readonly aoShadowFloors: ShadowFloors = { ground: 0.2, foliage: 0.6 };
 
   private pipeline: GPURenderPipeline;
   private builtQualityRevision: number = -1;
@@ -219,6 +233,11 @@ export class DirectionalShadowRenderer {
     this._impostorData = new Float32Array(IMPOSTOR_UNIFORM_BYTES / 4);
     this._chunkInverse = new Matrix4();
     this._viewerLocal = new Vector3();
+  }
+
+  /** The floors in force, read by EnvironmentUniforms.prepare(). */
+  shadowFloors(aoApplied: boolean): ShadowFloors {
+    return aoApplied ? this.aoShadowFloors : this.baseShadowFloors;
   }
 
   init(renderer: Renderer): void {

@@ -1,4 +1,5 @@
 #include "./shader-lib/selection-tint.wgsl"
+#include "./shader-lib/scene-output.wgsl"
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -35,8 +36,8 @@ fn vs(
 }
 
 @fragment
-fn fs() -> @location(0) vec4f {
+fn fs() -> SceneFragment {
   var color = wireframeUniforms.color;
 
-  return applySelectionTint(color, 1.0f);
+  return sceneFragment(applySelectionTint(color, 1.0f));
 }
