@@ -1483,7 +1483,7 @@ export class TerrainRenderer implements WaterQuerySource {
   // out.
   private updateFarOnly(camera: Camera) {
     const eye = camera.transform.position;
-    const height = eye.y - this.groundUnder(eye.x, eye.z);
+    const height = eye.y - this.generatedGroundHeight(eye.x, eye.z);
     const above = this.farOnlyAbove;
     const band = Math.max(1, above - this.farOnlyBelow);
     this.heightFade = Math.min(1, Math.max(0, (above - height) / band));
@@ -1508,9 +1508,9 @@ export class TerrainRenderer implements WaterQuerySource {
     this.terrainChunksVisibleLastUpdate.length = 0;
   }
 
-  // The generator's ground at world (x, z), or the sea over it. Ignores edits,
-  // which are far finer than the heights this is compared against.
-  private groundUnder(x: number, z: number): number {
+  /** The generator's ground at world (x, z), or the sea over it, with no chunk
+   *  needed. Ignores edits, so it is for coarse checks such as camera height. */
+  generatedGroundHeight(x: number, z: number): number {
     this.groundSampler ??= createGroundSampler(
       this._seed,
       resolveClimatePreset(this._climatePreset),

@@ -654,7 +654,13 @@ export class Player extends Node {
         this.enableAssetBodies();
       }
 
-      gravityEnabled = !!hit;
+      // Past the ray's reach there is nothing to land on yet, and high enough
+      // no chunk streams in beneath until the player has fallen to it. So fall,
+      // and within its reach leave the ray to hold the player until there is
+      // ground beneath.
+      const aboveGround =
+        pos.y - terrainRenderer!.generatedGroundHeight(pos.x, pos.z);
+      gravityEnabled = !!hit || aboveGround > maxToi;
     }
 
     // The water over the feet, with the waves the probe last reported.
