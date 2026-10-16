@@ -21,7 +21,7 @@ interface Props {}
 
 /**
  * The project's levels under a project root. The flag marks the start level and
- * the dot marks the level open in the editor.
+ * the dot marks the level open in the editor. Double click opens a level.
  */
 @register('x-levels-tree')
 export class LevelsTree extends Component<Props> {
@@ -37,12 +37,24 @@ export class LevelsTree extends Component<Props> {
 
     this.onMount = () => {
       const project = projectStore.project;
-      if (project && !levelsStore.levels.some((l) => l.projectId === project.id))
+      if (
+        project &&
+        !levelsStore.levels.some((l) => l.projectId === project.id)
+      )
         levelsStore.load(project.id);
     };
 
     const selectedLevel = () =>
       levelsStore.levels.find((l) => l.id === selectedId()) ?? null;
+
+    const onLoad = (level = selectedLevel()) => {
+      if (level) projectStore.loadLevel(level.id);
+    };
+
+    const onSetStart = () => {
+      const level = selectedLevel();
+      if (level) projectStore.setStartLevel(level.id);
+    };
 
     const onAdd = async () => {
       const project = projectStore.project;
@@ -89,6 +101,16 @@ export class LevelsTree extends Component<Props> {
         <StyledIcon icon="circle-plus" size="s" />
       </Button>
     ) as Button;
+    const loadButton = (
+      <Button variant="text" onClick={() => onLoad()}>
+        <StyledIcon icon="folder-open" size="s" />
+      </Button>
+    ) as Button;
+    const startButton = (
+      <Button variant="text" onClick={onSetStart}>
+        <StyledIcon icon="flag" size="s" />
+      </Button>
+    ) as Button;
     const deleteButton = (
       <Button variant="text" onClick={onDelete}>
         <StyledIcon icon="trash-2" size="s" />
@@ -102,13 +124,19 @@ export class LevelsTree extends Component<Props> {
         <div class="graph-actions">
           <ButtonGroup>
             {addButton}
+            {loadButton}
+            {startButton}
             {deleteButton}
           </ButtonGroup>
         </div>
       </div>
     ) as HTMLElement;
 
-    const html = <Card stretched css={CardCss}>{content}</Card>;
+    const html = (
+      <Card stretched css={CardCss}>
+        {content}
+      </Card>
+    );
 
     return () => {
       const project = projectStore.project;
@@ -117,8 +145,9 @@ export class LevelsTree extends Component<Props> {
 
       const levelNodes: LevelNode[] = levelsStore.levels.map((level) => ({
         name: level.name,
-        icon: level.id === startLevelId ? 'flag' : 'map',
+        icon: level.id === startLevelId ? 'flag' : 'box',
         canSelect: true,
+        iconSize: 'xs',
         canRename: true,
         resource: level,
       }));
@@ -146,28 +175,30 @@ export class LevelsTree extends Component<Props> {
           selectedNodes={selected}
           activeNode={active}
           onSelectionChanged={onSelectionChanged}
+          onNodeDblClick={(node: LevelNode) => onLoad(node.resource)}
         />
       ) as Tree;
       content.querySelector('.nodes')!.replaceChildren(tree);
 
-      content
-        .querySelector('.error')!
-        .replaceChildren(
-          ...(levelsStore.error
-            ? [
-                (
-                  <InfoBox title="Error" variant="error">
-                    {levelsStore.error}
-                  </InfoBox>
-                ) as HTMLElement,
-              ]
-            : [])
-        );
+      content.querySelector('.error')!.replaceChildren(
+        ...(levelsStore.error
+          ? [
+              (
+                <InfoBox title="Error" variant="error">
+                  {levelsStore.error}
+                </InfoBox>
+              ) as HTMLElement,
+            ]
+          : [])
+      );
 
       const level = selectedLevel();
-      const busy = levelsStore.loading || !project;
+      const busy = levelsStore.loading || projectStore.loading || !project;
       addButton.disabled = busy;
-      deleteButton.disabled = busy || !level || !levelsStore.canRemove(level.id);
+      loadButton.disabled = busy || !level || level.id === loadedLevelId;
+      startButton.disabled = busy || !level || level.id === startLevelId;
+      deleteButton.disabled =
+        busy || !level || !levelsStore.canRemove(level.id);
 
       return html;
     };

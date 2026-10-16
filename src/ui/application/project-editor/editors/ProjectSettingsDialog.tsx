@@ -111,7 +111,7 @@ export class ProjectSettingsDialog extends Component<Props> {
       current.name = trimmedName;
       current.description = description();
       current.levelId = levelId();
-      await projectStore.updateProject();
+      await projectStore.saveProject();
       this.props.onClose();
     };
 
