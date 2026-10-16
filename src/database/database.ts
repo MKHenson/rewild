@@ -1,6 +1,7 @@
 import type { SyncableRecord } from 'models';
 import { authService } from '../api/auth/auth-service';
 import { deleteServerProject } from '../api/projects';
+import { deleteServerLevel } from '../api/levels';
 import { projectImageAsset } from '../api/assets/asset-api';
 import { SyncEngine } from '../api/sync/sync-engine';
 import { AssetReader, AssetRef, LevelRef, LocalAssetStore } from './local-asset-store';
@@ -74,6 +75,19 @@ export class Database {
       for (const level of levels.items) await this.levels.hardRemove(level.id);
       await this.assets.removeByProject(id);
       await this.projects.hardRemove(id);
+    });
+  }
+
+  /**
+   * Deletes a level and its files. A level saved on the server is deleted there
+   * first, and a failure leaves the local copy in place.
+   */
+  deleteLevel(id: string): Promise<void> {
+    return this.exclusive(async () => {
+      const level = await this.levels.getOne(id);
+      if (!level) return;
+      if (isSavedOnServer(level)) await deleteServerLevel(id);
+      await this.levels.hardRemove(id);
     });
   }
 

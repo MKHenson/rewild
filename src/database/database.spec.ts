@@ -3,7 +3,7 @@ import { db } from './database';
 import { installOPFSMock } from './opfs-mock';
 import { clearDatabase } from './local-db';
 import { authService } from '../api/auth/auth-service';
-import { mockFetch, mockResponse } from '../test-utils';
+import { emptySceneGraph, mockFetch, mockResponse } from '../test-utils';
 
 const user = {
   displayName: 'Test',
@@ -58,7 +58,7 @@ describe('Database clears', () => {
       projectId: 'p1',
       hasTerrain: true,
       startEvent: '',
-      containers: [],
+      sceneGraph: emptySceneGraph(),
     });
     await db.levels.markSynced(id, Date.now(), null);
     await db.assets.write({ projectId: 'p1', levelId: id, assetType: 'chunk', filename: '0_0.bin' }, new Uint8Array([1]).buffer);
@@ -86,7 +86,7 @@ describe('Database.deleteProject', () => {
         projectId,
         hasTerrain: true,
         startEvent: '',
-        containers: [],
+        sceneGraph: emptySceneGraph(),
       })
     ).id;
     await db.assets.write({ projectId, levelId, assetType: 'chunk', filename: '0_0.bin' }, new Uint8Array([1]).buffer);
@@ -134,6 +134,60 @@ describe('Database.deleteProject', () => {
     await db.deleteProject(projectId);
 
     expect(await isGone()).toBe(true);
+  });
+});
+
+describe('Database.deleteLevel', () => {
+  const projectId = 'p1';
+  let levelId: string;
+  const chunk = () => ({ projectId, levelId, assetType: 'chunk', filename: '0_0.bin' });
+
+  beforeEach(async () => {
+    await clearDatabase('rewild');
+    installOPFSMock();
+    global.fetch = jest.fn().mockResolvedValue(mockResponse(204));
+    levelId = (
+      await db.levels.add({
+        name: 'Level',
+        projectId,
+        hasTerrain: true,
+        startEvent: '',
+        sceneGraph: emptySceneGraph(),
+      })
+    ).id;
+    await db.assets.write(chunk(), new Uint8Array([1]).buffer);
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('deletes a local only level and its files on the device', async () => {
+    await db.deleteLevel(levelId);
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(await db.levels.getOne(levelId)).toBeNull();
+    expect(await db.assets.read(chunk())).toBeNull();
+  });
+
+  it('deletes a saved level on the server first', async () => {
+    await db.levels.markSynced(levelId, Date.now(), null);
+
+    await db.deleteLevel(levelId);
+
+    const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(String(url)).toContain(`/api/levels/${levelId}`);
+    expect(init.method).toBe('DELETE');
+    expect(await db.levels.getOne(levelId)).toBeNull();
+  });
+
+  it('keeps the local copy when the server refuses the delete', async () => {
+    await db.levels.markSynced(levelId, Date.now(), null);
+    (global.fetch as jest.Mock).mockResolvedValue(
+      mockResponse(409, { error: 'The start level cannot be deleted' })
+    );
+
+    await expect(db.deleteLevel(levelId)).rejects.toThrow('The start level cannot be deleted');
+    expect(await db.levels.getOne(levelId)).not.toBeNull();
+    expect(await db.assets.read(chunk())).not.toBeNull();
   });
 });
 

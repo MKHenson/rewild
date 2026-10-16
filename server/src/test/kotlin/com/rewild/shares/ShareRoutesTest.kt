@@ -84,19 +84,6 @@ class ShareRoutesTest {
             id = id,
             name = "Project $id",
             description = "",
-            startEvent = "",
-            sceneGraph = SceneGraph(
-                containers = emptyList(),
-                atmosphere = Atmosphere(
-                    elevation = JsonPrimitive(0.0),
-                    cloudiness = JsonPrimitive(0.0),
-                    foginess = JsonPrimitive(0.0),
-                    windiness = JsonPrimitive(0.0),
-                    precipitation = JsonPrimitive(0.0),
-                    temperature = JsonPrimitive(20.0),
-                    dayNightCycle = JsonPrimitive(true)
-                )
-            ),
             updatedAt = updatedAt
         )
 

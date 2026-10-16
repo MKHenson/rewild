@@ -18,7 +18,8 @@ In this doc, "admin" always means a super admin: `UserRole.SUPER_ADMIN`, checked
 | Topic              | Decision                                                                                                                                                          |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unit of play       | The player picks a project, not a level. Each project names its start level                                                                                       |
-| Levels             | A project can have many levels. The UI allows one for now, but the model and API must not assume one                                                              |
+| Levels             | A project has many levels. The editor's Levels pane adds, renames and removes them at once, without dirtying the project. The start level cannot be removed |
+| Level content      | A level holds its scene graph (containers, atmosphere, terrain config) and start event. Save writes it to the level open in the editor. There is no Publish step |
 | Start level        | `project.levelId` is the start level. The owner picks it in Project Settings. `activeOnStartup` is removed                                                        |
 | Game URL           | The game always runs at `/game/{projectId}`, also for the public game. There is no `/game` route without an id                                                    |
 | Public game        | One promoted project. Admins set it at `/admin/public`. It uses the project's start level                                                                         |

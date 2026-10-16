@@ -1,4 +1,4 @@
-import { ILevel, IProject, StoredRecord } from 'models';
+import { IProject, StoredRecord } from 'models';
 import {
   addLevel,
   addProject as addProjectApi,
@@ -8,6 +8,7 @@ import {
 import { Dispatcher } from 'rewild-common';
 import { db } from '../../database/database';
 import { getPublicGame } from '../../api/public-game';
+import { ProjectStore } from './ProjectStore';
 
 export type ProjectsStoreEvents = { kind: 'changed' };
 
@@ -42,14 +43,9 @@ export class ProjectsStore {
     try {
       const resp = await addProjectApi(token);
 
-      const newLevel: ILevel = {
-        containers: [],
-        hasTerrain: true,
-        name: token.name || '',
-        startEvent: token.startEvent || '',
-        projectId: resp.id,
-      };
-      const levelResp = await addLevel(newLevel);
+      const levelResp = await addLevel(
+        ProjectStore.createLevel(resp.id, token.name || '')
+      );
       await patchProject(resp.id, { levelId: levelResp.id });
 
       await this.getProjects();

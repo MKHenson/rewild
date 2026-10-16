@@ -1,3 +1,5 @@
+import type { ISceneGraph } from 'models';
+
 /** Creates a mock fetch Response with the given status and optional JSON body. */
 export function mockResponse(status: number, body?: unknown): Response {
   return {
@@ -11,4 +13,20 @@ export function mockResponse(status: number, body?: unknown): Response {
 export function mockFetch(...responses: Response[]): void {
   let i = 0;
   global.fetch = jest.fn(() => Promise.resolve(responses[i++]));
+}
+
+/** A scene graph with no containers and a default sky. */
+export function emptySceneGraph(): ISceneGraph {
+  return {
+    containers: [],
+    atmosphere: {
+      elevation: 80,
+      cloudiness: 0.7,
+      foginess: 0.3,
+      windiness: 0.5,
+      precipitation: 0,
+      temperature: 0.5,
+      dayNightCycle: false,
+    },
+  };
 }

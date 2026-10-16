@@ -38,7 +38,7 @@ fun Route.levelRoutes(service: LevelService) {
                 }
             }) {
                 val id = call.parameters["id"]!!
-                val level = service.getById(call.userId(), id)
+                val level = service.getById(call.userId(), id)?.takeIf { it.deletedAt == null }
                     ?: return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
                 call.respond(level)
             }
@@ -66,19 +66,20 @@ fun Route.levelRoutes(service: LevelService) {
             delete({
                 tags("Levels")
                 summary = "Delete level"
-                description = "Deletes a level by ID"
+                description = "Tombstones a level by ID. A project's start level cannot be deleted."
                 request { pathParameter<String>("id") { description = "Level ID" } }
                 response {
                     code(HttpStatusCode.NoContent) { description = "Level deleted" }
                     code(HttpStatusCode.NotFound) { body<ErrorResponse>() }
                     code(HttpStatusCode.Forbidden) { body<ErrorResponse>() }
+                    code(HttpStatusCode.Conflict) { body<ErrorResponse>() }
                 }
             }) {
                 val id = call.parameters["id"]!!
                 when (service.delete(call.userId(), id)) {
                     DeleteResult.NotFound -> return@delete call.respond(HttpStatusCode.NotFound, ErrorResponse("Not found"))
                     DeleteResult.Forbidden -> return@delete call.respond(HttpStatusCode.Forbidden, ErrorResponse("Forbidden"))
-                    DeleteResult.Conflict -> return@delete call.respond(HttpStatusCode.Conflict, ErrorResponse("Conflict"))
+                    DeleteResult.Conflict -> return@delete call.respond(HttpStatusCode.Conflict, ErrorResponse("The start level cannot be deleted"))
                     DeleteResult.Success -> call.respond(HttpStatusCode.NoContent)
                 }
             }

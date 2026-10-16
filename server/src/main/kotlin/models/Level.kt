@@ -10,7 +10,7 @@ data class Level(
     val name: String,
     val hasTerrain: Boolean,
     val startEvent: String,
-    val containers: List<Container>,
+    val sceneGraph: SceneGraph,
     val updatedAt: Long,
     val syncedAt: Long = 0,
     val deletedAt: Long? = null,

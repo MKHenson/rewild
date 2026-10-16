@@ -783,7 +783,7 @@ export interface paths {
         post?: never;
         /**
          * Delete level
-         * @description Deletes a level by ID
+         * @description Tombstones a level by ID. A project's start level cannot be deleted.
          */
         delete: {
             parameters: {
@@ -813,6 +813,14 @@ export interface paths {
                     };
                 };
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1722,8 +1730,6 @@ export interface components {
              * Format: int64
              */
             chunksClearedAt?: null | number;
-            /** List<Container> */
-            containers: components["schemas"]["com.rewild.models.Container"][];
             /**
              * Long
              * Format: int64
@@ -1737,124 +1743,6 @@ export interface components {
             name: string;
             /** String */
             projectId: string;
-            /** String */
-            startEvent: string;
-            /** String */
-            syncError?: null | string;
-            /**
-             * Long
-             * Format: int64
-             */
-            syncedAt: number;
-            /**
-             * Long
-             * Format: int64
-             */
-            updatedAt: number;
-            /** String */
-            userId?: null | string;
-        };
-        /** Container */
-        "com.rewild.models.Container": {
-            /** String */
-            id: string;
-            /** String */
-            name: string;
-            /** List<JsonElement> */
-            properties?: null | components["schemas"]["kotlinx.serialization.json.JsonElement"][];
-            /** String */
-            templateId?: null | string;
-            /** String */
-            type: string;
-            /** Boolean */
-            activeOnStartup: boolean;
-            /** List<Actor> */
-            actors: components["schemas"]["com.rewild.models.Actor"][];
-            pod: components["schemas"]["com.rewild.models.ContainerPod"];
-        };
-        /** JsonElement */
-        "kotlinx.serialization.json.JsonElement": unknown[] | {
-            [key: string]: unknown;
-        } | components["schemas"]["kotlinx.serialization.json.JsonPrimitive"];
-        /** JsonPrimitive */
-        "kotlinx.serialization.json.JsonPrimitive": components["schemas"]["kotlinx.serialization.json.JsonLiteral"] | components["schemas"]["kotlinx.serialization.json.JsonNull"];
-        /** JsonLiteral */
-        "kotlinx.serialization.json.JsonLiteral": {
-            /** String */
-            content: string;
-            /** Boolean */
-            isString: boolean;
-        };
-        /** JsonNull */
-        "kotlinx.serialization.json.JsonNull": {
-            /** String */
-            content: string;
-            /** Boolean */
-            isString: boolean;
-        };
-        /** Actor */
-        "com.rewild.models.Actor": {
-            /** String */
-            id: string;
-            /** String */
-            name: string;
-            /** List<JsonElement> */
-            properties?: null | components["schemas"]["kotlinx.serialization.json.JsonElement"][];
-            /** String */
-            templateId?: null | string;
-            /** String */
-            type: string;
-        };
-        /** ContainerPod */
-        "com.rewild.models.ContainerPod": {
-            /** List<Asset3D> */
-            asset3D: components["schemas"]["com.rewild.models.Asset3D"][];
-        };
-        /** Asset3D */
-        "com.rewild.models.Asset3D": {
-            /**
-             * Float
-             * Format: float
-             */
-            alignToNormal: number;
-            /** Boolean */
-            conform: boolean;
-            /** String */
-            id: string;
-            /** List<Float> */
-            position: number[];
-            /** List<Float> */
-            rotation: number[];
-            /**
-             * Float
-             * Format: float
-             */
-            yOffset: number;
-        };
-        /** Project */
-        "com.rewild.models.Project": {
-            /** String */
-            authorName?: null | string;
-            /**
-             * Long
-             * Format: int64
-             */
-            deletedAt?: null | number;
-            /** String */
-            description: string;
-            /**
-             * Long
-             * Format: int64
-             */
-            flaggedAt?: null | number;
-            /** String */
-            id: string;
-            /** String */
-            imageUrl?: null | string;
-            /** String */
-            levelId?: null | string;
-            /** String */
-            name: string;
             sceneGraph: components["schemas"]["com.rewild.models.SceneGraph"];
             /** String */
             startEvent: string;
@@ -1893,6 +1781,26 @@ export interface components {
             weatherState: components["schemas"]["kotlinx.serialization.json.JsonElement9"];
             windDirection: components["schemas"]["kotlinx.serialization.json.JsonElement10"];
             windiness: components["schemas"]["kotlinx.serialization.json.JsonElement11"];
+        };
+        /** JsonElement */
+        "kotlinx.serialization.json.JsonElement": unknown[] | {
+            [key: string]: unknown;
+        } | components["schemas"]["kotlinx.serialization.json.JsonPrimitive"];
+        /** JsonPrimitive */
+        "kotlinx.serialization.json.JsonPrimitive": components["schemas"]["kotlinx.serialization.json.JsonLiteral"] | components["schemas"]["kotlinx.serialization.json.JsonNull"];
+        /** JsonLiteral */
+        "kotlinx.serialization.json.JsonLiteral": {
+            /** String */
+            content: string;
+            /** Boolean */
+            isString: boolean;
+        };
+        /** JsonNull */
+        "kotlinx.serialization.json.JsonNull": {
+            /** String */
+            content: string;
+            /** Boolean */
+            isString: boolean;
         };
         /** JsonElement */
         "kotlinx.serialization.json.JsonElement2": unknown[] | {
@@ -1934,10 +1842,67 @@ export interface components {
         "kotlinx.serialization.json.JsonElement11": unknown[] | {
             [key: string]: unknown;
         } | components["schemas"]["kotlinx.serialization.json.JsonPrimitive"];
+        /** Container */
+        "com.rewild.models.Container": {
+            /** String */
+            id: string;
+            /** String */
+            name: string;
+            /** List<JsonElement> */
+            properties?: null | components["schemas"]["kotlinx.serialization.json.JsonElement12"][];
+            /** String */
+            templateId?: null | string;
+            /** String */
+            type: string;
+            /** Boolean */
+            activeOnStartup: boolean;
+            /** List<Actor> */
+            actors: components["schemas"]["com.rewild.models.Actor"][];
+            pod: components["schemas"]["com.rewild.models.ContainerPod"];
+        };
         /** JsonElement */
         "kotlinx.serialization.json.JsonElement12": unknown[] | {
             [key: string]: unknown;
         } | components["schemas"]["kotlinx.serialization.json.JsonPrimitive"];
+        /** Actor */
+        "com.rewild.models.Actor": {
+            /** String */
+            id: string;
+            /** String */
+            name: string;
+            /** List<JsonElement> */
+            properties?: null | components["schemas"]["kotlinx.serialization.json.JsonElement12"][];
+            /** String */
+            templateId?: null | string;
+            /** String */
+            type: string;
+        };
+        /** ContainerPod */
+        "com.rewild.models.ContainerPod": {
+            /** List<Asset3D> */
+            asset3D: components["schemas"]["com.rewild.models.Asset3D"][];
+        };
+        /** Asset3D */
+        "com.rewild.models.Asset3D": {
+            /**
+             * Float
+             * Format: float
+             */
+            alignToNormal: number;
+            /** Boolean */
+            conform: boolean;
+            /** String */
+            id: string;
+            /** List<Float> */
+            position: number[];
+            /** List<Float> */
+            rotation: number[];
+            /**
+             * Float
+             * Format: float
+             */
+            yOffset: number;
+        };
         /** WorldGenConfig */
         "com.rewild.models.WorldGenConfig": {
             /** String */
@@ -1957,6 +1922,45 @@ export interface components {
              * Format: int32
              */
             version: number;
+        };
+        /** Project */
+        "com.rewild.models.Project": {
+            /** String */
+            authorName?: null | string;
+            /**
+             * Long
+             * Format: int64
+             */
+            deletedAt?: null | number;
+            /** String */
+            description: string;
+            /**
+             * Long
+             * Format: int64
+             */
+            flaggedAt?: null | number;
+            /** String */
+            id: string;
+            /** String */
+            imageUrl?: null | string;
+            /** String */
+            levelId?: null | string;
+            /** String */
+            name: string;
+            /** String */
+            syncError?: null | string;
+            /**
+             * Long
+             * Format: int64
+             */
+            syncedAt: number;
+            /**
+             * Long
+             * Format: int64
+             */
+            updatedAt: number;
+            /** String */
+            userId?: null | string;
         };
         /** PlayProject */
         "com.rewild.models.PlayProject": {

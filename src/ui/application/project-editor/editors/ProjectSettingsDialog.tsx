@@ -34,7 +34,6 @@ export class ProjectSettingsDialog extends Component<Props> {
 
     const [name, setName] = this.useState(project.name);
     const [description, setDescription] = this.useState(project.description);
-    const [startEvent, setStartEvent] = this.useState(project.startEvent);
     const [levelId, setLevelId] = this.useState(project.levelId);
     const [levels, setLevels] = this.useState<StoredRecord<ILevel>[]>([]);
     const [saving, setSaving] = this.useState(false);
@@ -111,7 +110,6 @@ export class ProjectSettingsDialog extends Component<Props> {
       const current = projectStore.project!;
       current.name = trimmedName;
       current.description = description();
-      current.startEvent = startEvent();
       current.levelId = levelId();
       await projectStore.updateProject();
       this.props.onClose();
@@ -219,14 +217,6 @@ export class ProjectSettingsDialog extends Component<Props> {
                   onChange={(v) => setLevelId(v, false)}
                 />,
                 'The level a game of this project starts in'
-              )}
-              {field(
-                'Start Event',
-                <Input
-                  fullWidth
-                  value={startEvent()}
-                  onChange={(v) => setStartEvent(v, false)}
-                />
               )}
             </Tab>
             <Tab label="Sharing">{sharingPanel}</Tab>

@@ -64,7 +64,6 @@ export class RibbonButtons extends Component<Props> {
 
     const home = iconButton('house', () => this.props.onHome());
     const save = iconButton('save', () => projectStore.updateProject());
-    const publish = iconButton('upload', () => projectStore.publish());
     const play = iconButton('play', async () => {
       if (projectStore.dirty) await projectStore.updateProject();
       navigate(`/game/${projectStore.project!.id}`);
@@ -88,7 +87,6 @@ export class RibbonButtons extends Component<Props> {
           {home}
           {settings}
           {save}
-          {publish}
           <span class="separator" />
           {play}
           <span class="separator" />
@@ -104,11 +102,10 @@ export class RibbonButtons extends Component<Props> {
 
     return () => {
       const { loading, dirty } = projectStore;
-      const noTerrain = loading || !projectStore.project?.sceneGraph?.terrain;
+      const noTerrain = loading || !projectStore.level?.sceneGraph?.terrain;
 
       home.disabled = loading;
       save.disabled = !dirty || loading;
-      publish.disabled = loading;
       play.disabled = loading || !projectStore.project;
       settings.disabled = loading || !projectStore.project;
       terrain.disabled = noTerrain;

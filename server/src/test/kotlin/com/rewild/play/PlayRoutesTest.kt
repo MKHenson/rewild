@@ -81,6 +81,14 @@ class PlayRoutesTest {
             levelId = levelId,
             name = "Play $id",
             description = "",
+            updatedAt = 1000L
+        )
+
+        private fun makeLevel(id: String, projectId: String) = Level(
+            id = id,
+            projectId = projectId,
+            name = "Level $id",
+            hasTerrain = true,
             startEvent = "",
             sceneGraph = SceneGraph(
                 containers = emptyList(),
@@ -94,16 +102,6 @@ class PlayRoutesTest {
                     dayNightCycle = JsonPrimitive(true)
                 )
             ),
-            updatedAt = 1000L
-        )
-
-        private fun makeLevel(id: String, projectId: String) = Level(
-            id = id,
-            projectId = projectId,
-            name = "Level $id",
-            hasTerrain = true,
-            startEvent = "",
-            containers = emptyList(),
             updatedAt = 1000L
         )
 

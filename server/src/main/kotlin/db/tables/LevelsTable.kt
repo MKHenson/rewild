@@ -10,7 +10,7 @@ object LevelsTable : Table("levels") {
     val name = text("name")
     val hasTerrain = bool("has_terrain")
     val startEvent = text("start_event")
-    val containers = jsonb("containers")
+    val sceneGraph = jsonb("scene_graph")
     val updatedAt = long("updated_at")
     val syncedAt = long("synced_at")
     val syncError = text("sync_error").nullable()

@@ -14,7 +14,7 @@ describe('SceneGraphStore', () => {
   beforeEach(() => {
     store = new SceneGraphStore();
 
-    // Two containers under a Containers root, mirroring buildTreeFromProject.
+    // Two containers under a Containers root, mirroring buildTreeFromSceneGraph.
     containersNode = {
       name: 'Containers',
       factoryKey: 'container',

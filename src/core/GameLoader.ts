@@ -24,7 +24,7 @@ export async function loadInitialLevels(
   await templateLoader.load();
 
   // A project without a start level falls back to a bare world: default sky,
-  // the project's terrain, no actors. The Player places itself on the surface.
+  // default terrain, no actors. The Player places itself on the surface.
   const { project, level, read } = await loadGameSource(projectId);
 
   const stateMachine = new StateMachine<StateMachineData>({
@@ -33,15 +33,15 @@ export async function loadInitialLevels(
     gameManager,
   });
 
-  if (project.sceneGraph.terrain) {
-    renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
+  const sceneGraph = level?.sceneGraph;
+  if (sceneGraph?.terrain) {
+    renderer.terrainRenderer.seed = sceneGraph.terrain.seed;
     renderer.terrainRenderer.climatePreset =
-      project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
-    renderer.terrainRenderer.seaLevel =
-      project.sceneGraph.terrain.seaLevel ?? 0;
+      sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
+    renderer.terrainRenderer.seaLevel = sceneGraph.terrain.seaLevel ?? 0;
   }
 
-  applyAtmosphere(renderer, project.sceneGraph.atmosphere);
+  if (sceneGraph?.atmosphere) applyAtmosphere(renderer, sceneGraph.atmosphere);
 
   registerDebugCommands(renderer, project);
 
@@ -57,7 +57,7 @@ export async function loadInitialLevels(
   stateMachine.addNode(player, true);
   stateMachine.addNode(levelRouter, true);
 
-  for (const container of level?.containers ?? []) {
+  for (const container of sceneGraph?.containers ?? []) {
     const containerRouter = new ContainerWithState(
       container,
       levelRouter.parentObject3D

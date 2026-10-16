@@ -47,7 +47,7 @@ function getBrushButtons(comp: BiomePaintToolbar): Element[] {
 
 describe('BiomePaintToolbar', () => {
   afterEach(() => {
-    projectStore.project = null as never;
+    projectStore.level = null;
   });
 
   it('renders one button per biome in the active climate', () => {
@@ -59,8 +59,8 @@ describe('BiomePaintToolbar', () => {
 
   it('labels a kebab-cased biome name in title case', () => {
     // 'desert-mountain' → 'Desert Mountain'. Read the arid preset through the
-    // project so the toolbar rebuilds its list against it.
-    projectStore.project = {
+    // level so the toolbar rebuilds its list against it.
+    projectStore.level = {
       sceneGraph: { terrain: { climatePreset: 'arid' } },
     } as never;
 
@@ -128,7 +128,7 @@ describe('BiomePaintToolbar', () => {
     const comp = createToolbar();
     biomePaintStore.setBiome(DEFAULT_BIOMES.length - 1);
 
-    projectStore.project = {
+    projectStore.level = {
       sceneGraph: {
         terrain: { climatePreset: 'nonexistent-preset-falls-back' },
       },

@@ -18,7 +18,7 @@ import { Quaternion, Subscriber, Vector2, Vector3 } from 'rewild-common';
 import { ITransformObserver } from 'rewild-renderer/types/interfaces';
 import {
   syncFromEditorResource,
-  SyncRendererFromProject,
+  SyncRendererFromLevel,
 } from './utils/RendererSync';
 import { Raycaster } from 'rewild-renderer/lib/core/Raycaster';
 import {
@@ -152,7 +152,7 @@ export class EditorViewport extends Component<Props> {
       if (event.kind === 'loading-initiated') beginLevelLoad();
 
       if (event.kind === 'loading-completed') {
-        SyncRendererFromProject(this.renderer, event.project);
+        SyncRendererFromLevel(this.renderer, event.project, event.level);
         // Reloading a scene should keep the last viewpoint rather than snap
         // back to the default camera. The orbit controller may not exist yet
         // on the very first load — onCanvasReady restores in that case.

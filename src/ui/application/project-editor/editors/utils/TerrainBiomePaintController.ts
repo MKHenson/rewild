@@ -13,7 +13,6 @@ import { writeBiomeMask } from 'src/database/biome-masks';
 import { projectStore } from 'src/ui/stores/ProjectStore';
 import { biomePaintStore } from 'src/ui/stores/BiomePaintStore';
 import { BrushCursor, pickTerrain } from './BrushCursor';
-import { startLevelRef } from 'src/database/local-asset-store';
 
 // Stamp pacing, mirroring the sculpt controller: amounts are time-scaled so
 // painting feels the same at any pointer-event rate, and dt is clamped so a
@@ -138,7 +137,7 @@ export class TerrainBiomePaintController {
     this.stroke = null;
     if (!stroke || stroke.touched.size === 0) return;
 
-    const level = startLevelRef(projectStore.project);
+    const level = projectStore.levelRef;
     if (!level) {
       console.warn(
         'No levelId on the current project — biome paint not saved.'

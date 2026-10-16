@@ -1,29 +1,33 @@
-import { IProject, Vector3 } from 'models';
+import { ILevel, IProject, StoredRecord, Vector3 } from 'models';
 import { DEFAULT_CLIMATE_PRESET, PointLight, Renderer } from 'rewild-renderer';
 import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
-import { startLevelRef } from 'src/database/local-asset-store';
 import { localAssetReader } from 'src/database/database';
 import { setTerrainProviders } from 'src/core/TerrainProviders';
 import { registerDebugCommands } from 'src/core/debug';
 import { applyAtmosphere } from 'src/core/AtmosphereSync';
 
-export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
-  if (project.sceneGraph?.terrain) {
-    renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
+export function SyncRendererFromLevel(
+  renderer: Renderer,
+  project: StoredRecord<IProject>,
+  level: StoredRecord<ILevel>
+) {
+  const { terrain, atmosphere, containers } = level.sceneGraph;
+  if (terrain) {
+    renderer.terrainRenderer.seed = terrain.seed;
     renderer.terrainRenderer.climatePreset =
-      project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
-    renderer.terrainRenderer.seaLevel =
-      project.sceneGraph.terrain.seaLevel ?? 0;
+      terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
+    renderer.terrainRenderer.seaLevel = terrain.seaLevel ?? 0;
   }
 
-  const atmosphere = project.sceneGraph?.atmosphere;
   if (atmosphere) applyAtmosphere(renderer, atmosphere);
 
-  const levelRef = startLevelRef(project);
-  setTerrainProviders(renderer, levelRef ? localAssetReader(levelRef) : null);
+  setTerrainProviders(
+    renderer,
+    localAssetReader({ projectId: project.id, levelId: level.id })
+  );
   registerDebugCommands(renderer, project);
 
-  project.sceneGraph.containers.forEach((container) => {
+  containers.forEach((container) => {
     container.actors.forEach((actor) => {
       if (actor.type === 'actor') {
         const sceneObject = renderer.scene.findObjectById(actor.id);

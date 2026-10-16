@@ -119,7 +119,7 @@ export class BiomePaintToolbar extends Component<Props> {
 
     return () => {
       const preset =
-        projectStore.project?.sceneGraph?.terrain?.climatePreset ??
+        projectStore.level?.sceneGraph?.terrain?.climatePreset ??
         DEFAULT_CLIMATE_PRESET;
       const biomes = resolveClimatePreset(preset).biomes;
 
