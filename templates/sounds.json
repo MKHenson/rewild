@@ -827,6 +827,25 @@
       "gain": [0.85, 1],
       "source": "Soundly: voice mix",
       "license": "soundly"
+    },
+    {
+      "name": "portal-hum",
+      "files": ["audio/portal/portal-hum.ogg"],
+      "loop": true,
+      "source": "Soundly: portal",
+      "license": "soundly"
+    },
+    {
+      "name": "portal-open",
+      "files": ["audio/portal/portal-open.ogg"],
+      "source": "Soundly: portal",
+      "license": "soundly"
+    },
+    {
+      "name": "portal-travel",
+      "files": ["audio/portal/portal-travel.ogg"],
+      "source": "Soundly: portal",
+      "license": "soundly"
     }
   ]
 }

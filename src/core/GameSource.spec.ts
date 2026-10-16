@@ -81,6 +81,29 @@ describe('loadGameSource', () => {
     expect(await db.projects.getOne('remote-p')).toBeFalsy();
   });
 
+  it('loads the given level of a remote project and reads any level', async () => {
+    const source = await loadGameSource('remote-p', 'other-l');
+
+    expect(source.level?.id).toBe('other-l');
+    expect(await source.read!('chunk', '1_0.bin')).not.toBeNull();
+    expect(await source.readLevel('remote-l')('chunk', '0_0.bin')).not.toBeNull();
+    expect(await source.readLevel('remote-l')('chunk', '1_0.bin')).toBeNull();
+  });
+
+  it('loads the given level of a local project and reads any level', async () => {
+    const project = await db.projects.add({ name: 'Mine', description: '' } as unknown as IProject);
+    const start = await db.levels.add({ name: 'Start', projectId: project.id, hasTerrain: true, startEvent: '', sceneGraph: emptySceneGraph() } as ILevel);
+    const past = await db.levels.add({ name: 'Past', projectId: project.id, hasTerrain: true, startEvent: '', sceneGraph: emptySceneGraph() } as ILevel);
+    await db.projects.patch(project.id, { levelId: start.id } as IProject);
+    await db.assets.write({ projectId: project.id, levelId: start.id, assetType: 'portal-view', filename: 'view' }, new Uint8Array([7]).buffer);
+
+    const source = await loadGameSource(project.id, past.id);
+
+    expect(source.level?.id).toBe(past.id);
+    expect(new Uint8Array((await source.readLevel(start.id)('portal-view', 'view'))!)).toEqual(new Uint8Array([7]));
+    expect(await source.read!('portal-view', 'view')).toBeNull();
+  });
+
   it('throws GameBlockedError with the server message for a flagged project', async () => {
     const error = await loadGameSource('blocked-p').catch((e) => e);
     expect(error).toBeInstanceOf(GameBlockedError);

@@ -154,6 +154,11 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
     label: 'Radius',
     valueType: 'float',
   },
+  targetLevel: {
+    label: 'Target Level',
+    valueType: 'string',
+    customEditor: 'level-select',
+  },
   'camera-transform': {
     label: 'Camera Transform',
     valueType: 'object',

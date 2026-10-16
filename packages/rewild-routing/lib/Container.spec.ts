@@ -56,6 +56,16 @@ describe('Container', () => {
     expect(container.isDisposed).toBe(true);
   });
 
+  it('disposes its assets', () => {
+    const container = new Container('Test', true, new Asset3D('Test', '1'));
+    const asset = new Asset3D('Asset', '2');
+    const dispose = jest.fn();
+    container.addAsset(Object.assign(asset, { dispose }));
+    container.dispose();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(container.assets.length).toBe(0);
+  });
+
   it('calls onUpdate for each behavior of each asset in a container', () => {
     const container = new Container('Test', true, new Asset3D('Test', '1'));
     const asset1 = new Asset3D('Asset1', '2');

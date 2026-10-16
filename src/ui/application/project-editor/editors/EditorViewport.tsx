@@ -27,6 +27,8 @@ import {
 } from 'src/ui/stores/SceneGraphStore';
 import { IAssetPlacement, ITreeNodeAction } from 'models';
 import { TemplateLoader } from 'src/core/TemplateLoader';
+import { PortalAsset } from 'src/core/routing/PortalAsset';
+import { localAssetReader } from 'src/database/database';
 import { bindScreenshotHotkey } from 'src/core/ScreenshotHotkey';
 import { Asset3D } from 'src/core/routing/Asset3D';
 import { GizmoDragController } from './utils/GizmoDragController';
@@ -107,6 +109,10 @@ export class EditorViewport extends Component<Props> {
   init() {
     this.renderer = new Renderer();
     this.templateLoader = new TemplateLoader();
+    this.templateLoader.levelReader = (levelId) =>
+      projectStore.project
+        ? localAssetReader({ projectId: projectStore.project.id, levelId })
+        : null;
 
     // The scene is only really "open" once terrain is on screen, which lands
     // well after the project record does — so the overlay is held until the
@@ -277,6 +283,12 @@ export class EditorViewport extends Component<Props> {
       if (this.orbitController) this.orbitController.enabled = true;
     };
 
+    // Takes a placed object out of the scene and frees what it holds.
+    const removeSceneObject = (transform: Transform) => {
+      this.renderer.scene.removeChild(transform);
+      (transform.userData.portal as PortalAsset | undefined)?.dispose();
+    };
+
     const setTransformSelected = (transform: Transform, value: boolean) => {
       transform.selected = value;
       transform.traverse((child) => {
@@ -357,12 +369,13 @@ export class EditorViewport extends Component<Props> {
             const toRemove = this.renderer.scene.children.find(
               (c) => c.id === childNode.resource!.id
             );
-            if (toRemove) this.renderer.scene.removeChild(toRemove);
+            if (toRemove) removeSceneObject(toRemove);
           }
         }
         this.render();
       } else if (event.kind === 'node-removed') {
-        if (event.node.resource?.type === 'actor') {
+        const type = event.node.resource?.type;
+        if (type === 'actor' || type === 'portal') {
           const container = event.node.parent!;
           projectStore.containerPods[container.resource!.id].asset3D =
             projectStore.containerPods[container.resource!.id].asset3D.filter(
@@ -373,7 +386,7 @@ export class EditorViewport extends Component<Props> {
             (c) => c.id === event.node.resource!.id
           );
 
-          if (toRemove) this.renderer.scene.removeChild(toRemove);
+          if (toRemove) removeSceneObject(toRemove);
         }
       } else if (event.kind === 'nodes-updated') {
         if (sceneGraphStore.selectedResource?.id) {
@@ -474,6 +487,7 @@ export class EditorViewport extends Component<Props> {
         if (levelLoading()) armTerrainTimeout();
 
         this.gizmo = new Gizmo();
+        this.gizmo.transform.userData.isHelper = true;
         this.dragController = new GizmoDragController(
           this.renderer,
           this.gizmo

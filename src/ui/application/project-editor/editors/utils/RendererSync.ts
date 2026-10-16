@@ -5,6 +5,7 @@ import { localAssetReader } from 'src/database/database';
 import { setTerrainProviders } from 'src/core/TerrainProviders';
 import { registerDebugCommands } from 'src/core/debug';
 import { applyAtmosphere } from 'src/core/AtmosphereSync';
+import { PortalAsset } from 'src/core/routing/PortalAsset';
 
 export function SyncRendererFromLevel(
   renderer: Renderer,
@@ -44,7 +45,11 @@ export function syncFromEditorResource(id: string, renderer: Renderer) {
   if (id === 'SKY' && editorResource) {
     applyAtmosphere(renderer, editorResource);
   } else if (sceneObject && editorResource) {
-    if (sceneObject.component instanceof PointLight) {
+    const portal = sceneObject.userData.portal;
+    if (portal instanceof PortalAsset) {
+      const resource = sceneGraphStore.findNodeById(id)?.resource;
+      if (resource) portal.applyProperties(resource);
+    } else if (sceneObject.component instanceof PointLight) {
       const color = editorResource.color as Vector3;
       sceneObject.component.color.setRGB(color[0], color[1], color[2]);
       sceneObject.component.intensity = editorResource.intensity as f32;

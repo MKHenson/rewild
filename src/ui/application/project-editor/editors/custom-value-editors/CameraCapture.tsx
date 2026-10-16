@@ -3,6 +3,13 @@ import { Button, Component, register } from 'rewild-ui';
 import { getActiveRenderer } from 'src/ui/utils/getActiveRenderer';
 import { OrbitController } from 'rewild-renderer';
 import { ViewportEventDetails } from '../EditorViewport';
+import { bakePortalView } from 'src/core/PortalViewBake';
+import {
+  PORTAL_VIEW_ASSET_TYPE,
+  PORTAL_VIEW_FILENAME,
+} from 'src/core/routing/PortalAsset';
+import { projectStore } from 'src/ui/stores/ProjectStore';
+import { db } from 'src/database/database';
 
 interface Props {
   readOnly?: boolean;
@@ -21,6 +28,37 @@ function getActiveOrbitController(): OrbitController | null {
 @register('x-camera-capture')
 export class CameraCapture extends Component<Props> {
   init() {
+    const [baking, setBaking] = this.useState(false);
+
+    // Portals that lead to this level show it from here.
+    const onBakeClick = async () => {
+      const renderer = getActiveRenderer();
+      const level = projectStore.levelRef;
+      const position = this.props.value?.position as Vector3 | undefined;
+      if (!renderer || !level || !position || baking()) return;
+
+      setBaking(true);
+      const orbit = getActiveOrbitController();
+      if (orbit) orbit.enabled = false;
+      try {
+        const view = await bakePortalView(renderer, position);
+        await db.assets.write(
+          {
+            ...level,
+            assetType: PORTAL_VIEW_ASSET_TYPE,
+            filename: PORTAL_VIEW_FILENAME,
+            contentType: view.type,
+          },
+          view
+        );
+      } catch (err) {
+        console.error('Portal view bake failed', err);
+      } finally {
+        if (orbit) orbit.enabled = true;
+        setBaking(false);
+      }
+    };
+
     const onCaptureClick = (e: MouseEvent) => {
       const renderer = getActiveRenderer();
       const target = getActiveOrbitController()?.target;
@@ -44,7 +82,7 @@ export class CameraCapture extends Component<Props> {
       target?.fromArray(this.props.value?.target as Vector3);
     };
 
-    const elm = (
+    return () => (
       <div>
         <Button disabled={this.props.readOnly} onClick={onCaptureClick}>
           Capture
@@ -55,12 +93,14 @@ export class CameraCapture extends Component<Props> {
           onClick={onRestoreClick}>
           Restore
         </Button>
+        <Button
+          variant="text"
+          disabled={this.props.readOnly || baking()}
+          onClick={onBakeClick}>
+          {baking() ? 'Baking…' : 'Bake Portal View'}
+        </Button>
       </div>
     );
-
-    return () => {
-      return elm;
-    };
   }
 
   getStyle() {

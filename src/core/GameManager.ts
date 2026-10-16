@@ -27,6 +27,9 @@ export class GameManager {
   RAPIER: typeof import('@dimforge/rapier3d-compat');
   physicsWorld: World;
   onUnlock: () => void;
+  /** Asked to replace this game with one in another level of the project. */
+  onTravel: ((levelId: string) => void) | null = null;
+  private travelling = false;
   private _onPointerlockChange: () => void;
   private unbindScreenshotHotkey: (() => void) | null = null;
   TerrainEventDelegate: (event: TerrainEvent) => void;
@@ -51,7 +54,7 @@ export class GameManager {
     this.player.requestLock();
   }
 
-  async init(pane3D: Pane3D, projectId: string) {
+  async init(pane3D: Pane3D, projectId: string, levelId?: string) {
     try {
       if (this.hasInitialized) return false;
       this.hasInitialized = true;
@@ -63,7 +66,8 @@ export class GameManager {
       const stateMachine = await loadInitialLevels(
         projectId,
         this.player,
-        this
+        this,
+        levelId
       );
 
       this.renderer.terrainRenderer.dispatcher.add(this.TerrainEventDelegate);
@@ -83,6 +87,13 @@ export class GameManager {
       this.loadError = err instanceof Error ? err : new Error(String(err));
       return false;
     }
+  }
+
+  /** Leaves this level for another. Deferred, as the caller is mid-frame. */
+  travelTo(levelId: string) {
+    if (this.travelling) return;
+    this.travelling = true;
+    setTimeout(() => this.onTravel?.(levelId));
   }
 
   private onTerrainEvent(event: TerrainEvent) {

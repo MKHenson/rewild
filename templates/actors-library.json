@@ -16,6 +16,16 @@
               }
             }
           ]
+        },
+        {
+          "name": "Portal",
+          "type": "portal",
+          "properties": [
+            { "type": "targetLevel", "value": "" },
+            { "type": "radius", "value": 3 },
+            { "type": "color", "value": [0.45, 0.7, 1.0] },
+            { "type": "intensity", "value": 1 }
+          ]
         }
       ]
     },

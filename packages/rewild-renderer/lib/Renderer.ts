@@ -34,6 +34,10 @@ import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowR
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
 import { FrameCompositor } from './post-processes/FrameCompositor';
 import { RefractionCapture } from './renderers/water/RefractionCapture';
+import { PortalLens } from './renderers/portal/PortalLens';
+import { PortalSparks } from './renderers/portal/PortalSparks';
+import type { PortalPass } from './materials/PortalPass';
+import { IFrameEffect } from './post-processes/IFrameEffect';
 import { AmbientOcclusion } from './renderers/ao/AmbientOcclusion';
 import { QualitySettings } from './utils/QualitySettings';
 import { sortFrontToBack } from './utils/frontToBack';
@@ -128,6 +132,21 @@ export class Renderer {
 
   /** The opaque scene copied for water to refract, when water is in view. */
   readonly refraction = new RefractionCapture();
+
+  /** Portals updated every frame, in view or not. */
+  private readonly portals: PortalPass[] = [];
+
+  /** Drawn over the composited frame each frame, in this order. */
+  readonly frameEffects: IFrameEffect[];
+
+  addPortal(portal: PortalPass): void {
+    if (!this.portals.includes(portal)) this.portals.push(portal);
+  }
+
+  removePortal(portal: PortalPass): void {
+    const index = this.portals.indexOf(portal);
+    if (index > -1) this.portals.splice(index, 1);
+  }
 
   /** SSAO on the sky ambient, between the opaque scene and water. */
   readonly ambientOcclusion = new AmbientOcclusion();
@@ -298,6 +317,11 @@ export class Renderer {
     this.directionalShadowRenderer = new DirectionalShadowRenderer();
     this.spotLightShadowRenderer = new SpotLightShadowRenderer();
     this.frameCompositor = new FrameCompositor();
+    // The lightning draws after the lens, so the lens does not smear it.
+    this.frameEffects = [
+      new PortalLens(this.portals),
+      new PortalSparks(this.portals),
+    ];
     this.renderGroups = [];
     this.overlayRenderGroups = [];
 
@@ -466,6 +490,7 @@ export class Renderer {
     if (this.disposed) return;
 
     this.sky.update(this, this.camera.camera);
+    for (let i = 0; i < this.portals.length; i++) this.portals[i].update(this);
     this.metrics.begin('cpu.terrain');
     this.terrainRenderer.update(this, this.camera.camera);
     this.metrics.end('cpu.terrain');
@@ -481,6 +506,7 @@ export class Renderer {
     this.spotLightShadowRenderer.dispose();
     this.sceneGpuTimer.dispose();
     this.refraction.dispose();
+    for (const effect of this.frameEffects) effect.dispose();
     this.ambientOcclusion.dispose();
     this.frameCompositor.dispose();
     this.disposed = true;
@@ -1215,6 +1241,14 @@ export class Renderer {
       );
 
       device.queue.submit([postProcessingEncoder.finish()]);
+
+      for (let i = 0; i < this.frameEffects.length; i++)
+        this.frameEffects[i].render(
+          this,
+          camera.camera,
+          this.sceneColorTexture!,
+          sceneColorView
+        );
 
       // Water on the lens blurs and bends the composited frame, so bloom and
       // the tonemap see it as the eye does.

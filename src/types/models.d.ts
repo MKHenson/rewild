@@ -39,6 +39,7 @@ declare module 'models' {
     | 'geometry'
     | 'intensity'
     | 'radius'
+    | 'targetLevel'
     | 'camera-transform';
   export type PropValueType =
     | 'string'
@@ -69,7 +70,7 @@ declare module 'models' {
     value: PropValue;
   };
 
-  export type CustomEditorType = 'camera-capture';
+  export type CustomEditorType = 'camera-capture' | 'level-select';
 
   export type IProperty = {
     label: string;
@@ -173,7 +174,7 @@ declare module 'models' {
     version?: number;
   }
 
-  export type ResourceType = 'container' | 'actor' | 'player-start';
+  export type ResourceType = 'container' | 'actor' | 'player-start' | 'portal';
   export interface IResource {
     id: string;
     name: string;

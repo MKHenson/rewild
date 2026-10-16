@@ -17,7 +17,8 @@ import { applyAtmosphere } from './AtmosphereSync';
 export async function loadInitialLevels(
   projectId: string,
   player: Player,
-  gameManager: GameManager
+  gameManager: GameManager,
+  levelId?: string
 ) {
   const templateLoader = new TemplateLoader();
   const renderer: Renderer = gameManager.renderer;
@@ -25,7 +26,11 @@ export async function loadInitialLevels(
 
   // A project without a start level falls back to a bare world: default sky,
   // default terrain, no actors. The Player places itself on the surface.
-  const { project, level, read } = await loadGameSource(projectId);
+  const { project, level, read, readLevel } = await loadGameSource(
+    projectId,
+    levelId
+  );
+  templateLoader.levelReader = readLevel;
 
   const stateMachine = new StateMachine<StateMachineData>({
     renderer,

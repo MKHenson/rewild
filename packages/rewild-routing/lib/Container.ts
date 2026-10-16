@@ -91,6 +91,12 @@ export class Container extends Node {
     super.unMount();
   }
 
+  dispose(): void {
+    for (const object of this.objects) object.dispose?.();
+    this.objects.length = 0;
+    super.dispose();
+  }
+
   onUpdate(delta: f32, total: u32): void {
     super.onUpdate(delta, total);
     const objects = this.objects;
