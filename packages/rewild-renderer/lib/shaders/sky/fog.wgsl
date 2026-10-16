@@ -113,6 +113,11 @@ const OVERCAST_START: f32 = 0.85;
 const OVERCAST_FULL: f32 = 0.95;
 const BROKEN_CLOUD_DIM: f32 = 0.8;   // fog brightness at OVERCAST_START
 
+// Height of the glowing limb over the horizon, as the view direction's y at
+// which it has faded to 1/e: just above the cloud top, then high up.
+const LIMB_WIDTH_LOW: f32 = 0.25;
+const LIMB_WIDTH_HIGH: f32 = 0.10;
+
 // The cloudiness the sky and fog are shaded by. Cloud cover shades the air under
 // the deck, so it applies in full below it and is gone once the camera has
 // climbed through: above, the sky is clear and the haze sunlit.
@@ -433,8 +438,15 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     // black space. Full sky at/below cloud top (~1100 m), fades to nothing at ~15 km.
     // This gives the "going into space" effect — blue sky → dark blue → black, with
     // stars becoming visible through the thinning atmosphere even during daytime.
+    //
+    // Along the horizon the view still crosses a long path of air, so the limb
+    // keeps the sky's colour while the rest thins: a glow over the horizon that
+    // narrows as the camera climbs. At or below the cloud top it changes nothing.
     let camAlt = object.cameraPosition.y;
-    let atmosphereDensity = 1.0 - smoothstep(1100.0, 12000.0, camAlt);
+    let thinning = smoothstep(1100.0, 12000.0, camAlt);
+    let limbWidth = mix(LIMB_WIDTH_LOW, LIMB_WIDTH_HIGH, thinning);
+    let limb = exp(-max(dir.y, 0.0) / limbWidth);
+    let atmosphereDensity = max(1.0 - thinning, limb);
 
     // Horizon haze: atmospheric scattering brightens the horizon.
     // Fades with altitude (thinner air) and scales with daylight (minimal at night).
