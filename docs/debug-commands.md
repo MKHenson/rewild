@@ -267,12 +267,19 @@ See [Materials & Shading (Lichen)](./milestones/lichen.md#screen-space-ambient-o
 
 ## Terrain
 
-Registered in `ChunkSnapshotDevCommands.ts`.
+Registered in `ChunkSnapshotDevCommands.ts` and `TerrainDebugCommands.ts`.
 
 ```js
 writeChunkSnapshotFixture(cx, cy); // Save an unmistakable plateau and re-mesh in place
 clearChunkSnapshots(); // Remove every saved edit for this level and reload
+setTerrainFarOnlyHeight(1500, 1200); // Camera heights over the ground where chunks have faded out, and where they are fully in
 ```
+
+Chunks fade into the horizon ring as the camera climbs between the two heights.
+A little above the first, no chunks stream or draw, and the ring covers all the
+ground, the ground under the camera included. On the way down chunks stream in
+from the first height and fade in with the descent. Chunks that appear for any
+other reason, such as finishing late, fade in over 0.6 s.
 
 Terrain has no timing command of its own. It is not a separate render pass —
 its LOD meshes draw through the main scene pass alongside all opaque geometry —

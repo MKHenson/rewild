@@ -29,6 +29,7 @@ import { ScatterInstances, ScatterPick, pickScatterInstance } from './Scatter';
 import { generateSplatMap, sampleSplatMap } from './Splat';
 import { TERRAIN_MATERIALS } from './TerrainMaterials';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
+import { GroundSampler, createGroundSampler, sampleGround } from './Noise';
 import { ScatterModels } from './ScatterModels';
 import {
   CHUNK_MASK_SIZE,
@@ -89,6 +90,9 @@ const CULL_BOX_HALF_HEIGHT: f32 = 1000;
 // side, so the chunks a turn brings in are usually meshed before they reach
 // the screen rather than showing sky while they stream in.
 const GENERATION_VIEW_MARGIN = (25 * Math.PI) / 180;
+
+// Metres above farOnlyAbove the camera climbs before the chunks are dropped.
+const FAR_ONLY_MARGIN = 100;
 
 /** Widens a perspective projection by `margin` radians each side, in place.
  *  An orthographic one is left as it is. */
@@ -204,6 +208,18 @@ export class TerrainRenderer implements WaterQuerySource {
   /** The lake edit rules and the level's water body records. */
   readonly waterRules = new WaterBodyRules(this);
   private _enabled: boolean = true;
+  /** Camera metres above the ground at which chunks have faded out to the
+   *  horizon ring. A little past it the terrain goes far-only: no chunks
+   *  stream or draw, and the ring draws all the ground. */
+  farOnlyAbove = 1500;
+  /** Camera metres above the ground under which chunks are fully faded in. */
+  farOnlyBelow = 1200;
+  private _farOnly = false;
+  // How far chunks have faded in by the camera's height, 0 to 1.
+  private heightFade = 1;
+  private fadeFrame = 0;
+  // The generator's ground, for the camera's height above it without chunks.
+  private groundSampler: GroundSampler | null = null;
   // The ocean past the last chunk. Created with the renderer.
   private horizonOcean: HorizonOcean | null = null;
   /** What every chunk's water shares besides the ocean, once a frame. */
@@ -344,6 +360,11 @@ export class TerrainRenderer implements WaterQuerySource {
       this.clearChunks();
       this.horizonOcean?.hide();
     }
+  }
+
+  /** Whether the camera is high enough that only the horizon ring draws. */
+  get farOnly() {
+    return this._farOnly;
   }
 
   get maxViewDst() {
@@ -624,8 +645,13 @@ export class TerrainRenderer implements WaterQuerySource {
       if (chunk.visibilityPass !== pass) chunk.visible = false;
     }
 
-    // Eviction pass — runs after visible chunk processing so we never
-    // evict something that was just visited above.
+    // Runs after visible chunk processing so we never evict something that
+    // was just visited above.
+    this.evictDistantChunks(renderer);
+  }
+
+  private evictDistantChunks(renderer: Renderer) {
+    const maxViewDst = this.maxViewDst;
     const evictDistance = this.evictDistance;
     const viewerPos = this.viewerPosition;
     const toFullEvict: string[] = [];
@@ -1116,7 +1142,9 @@ export class TerrainRenderer implements WaterQuerySource {
       this.underWater.clear(renderer.device);
       return;
     }
+    this.updateFarOnly(camera);
     this.updateVisibility(renderer, camera);
+    this.updateChunkFades(renderer);
     this.updateHorizonOcean(renderer);
     this.updateWaterWaves(renderer, camera);
   }
@@ -1394,6 +1422,17 @@ export class TerrainRenderer implements WaterQuerySource {
     this.seaSpray?.draw(renderer, encoder, target);
   }
 
+  private updateChunkFades(renderer: Renderer) {
+    const frame = ++this.fadeFrame;
+    const now = performance.now();
+    const chunks = this.terrainChunksVisibleLastUpdate;
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      if (chunk.drawn)
+        chunk.updateFade(frame, now, this.heightFade, renderer.device);
+    }
+  }
+
   // The ring follows the centre chunk visibility was last computed from, so it
   // starts exactly where the chunks stop.
   private updateHorizonOcean(renderer: Renderer) {
@@ -1418,7 +1457,7 @@ export class TerrainRenderer implements WaterQuerySource {
         originX,
         originZ
       );
-      if (index >= 0) mask[index] = 255;
+      if (index >= 0) mask[index] = Math.round(chunk.fade * 255);
     }
 
     this.horizonOcean.update(renderer, {
@@ -1434,6 +1473,52 @@ export class TerrainRenderer implements WaterQuerySource {
       windSpeed: this.ocean?.windSpeed ?? 0,
       slopeScale: this.waterHorizonSlope,
     });
+  }
+
+  // High up, the chunks under the camera are too far to show their detail and
+  // a fast camera streams them faster than they build, so the ring draws all
+  // the ground instead. Chunks fade in by height on the way down, so they
+  // arrive with the descent rather than at once. Far-only starts a margin above
+  // where they have faded out, so hovering there does not stream them in and
+  // out.
+  private updateFarOnly(camera: Camera) {
+    const eye = camera.transform.position;
+    const height = eye.y - this.groundUnder(eye.x, eye.z);
+    const above = this.farOnlyAbove;
+    const band = Math.max(1, above - this.farOnlyBelow);
+    this.heightFade = Math.min(1, Math.max(0, (above - height) / band));
+    if (!this._farOnly && height > above + FAR_ONLY_MARGIN) this.enterFarOnly();
+    else if (this._farOnly && height < above) {
+      this._farOnly = false;
+      this._needsVisibilityUpdate = true;
+    }
+  }
+
+  // Chunks keep their CPU heights and geometry, so coming back down re-shows
+  // the ones still in range without a worker rebuild.
+  private enterFarOnly() {
+    this._farOnly = true;
+    for (const chunk of this.terrainChunks.values()) {
+      chunk.visible = false;
+      let hadGPU = false;
+      for (const lod of chunk.lodMesh) hadGPU ||= lod.gpuState === 'ready';
+      chunk.unloadGPU();
+      if (hadGPU) this.dispatcher.dispatch({ type: 'chunk-unloaded', chunk });
+    }
+    this.terrainChunksVisibleLastUpdate.length = 0;
+  }
+
+  // The generator's ground at world (x, z), or the sea over it. Ignores edits,
+  // which are far finer than the heights this is compared against.
+  private groundUnder(x: number, z: number): number {
+    this.groundSampler ??= createGroundSampler(
+      this._seed,
+      resolveClimatePreset(this._climatePreset),
+      this._seaLevel
+    );
+    const mps = this.metersPerSample;
+    const h = sampleGround(this.groundSampler, x / mps - 0.5, -z / mps - 0.5);
+    return Math.max(h, this._seaLevel);
   }
 
   private updateVisibility(renderer: Renderer, camera: Camera) {
@@ -1466,6 +1551,17 @@ export class TerrainRenderer implements WaterQuerySource {
       this.viewPosOld.copy(this.viewerPosition);
       this.viewDirOld = new Vector3();
       this.viewDirOld.copy(_viewDir);
+    }
+
+    if (this._farOnly) {
+      if (
+        this.viewPosOld.distanceToSquared(this.viewerPosition) >
+        sqrViewerMoveThresholdForChunkUpdate
+      ) {
+        this.viewPosOld.copy(this.viewerPosition);
+        this.evictDistantChunks(renderer);
+      }
+      return;
     }
 
     if (!this._hasInitiallyUpdatedTerrain) {
@@ -1512,6 +1608,7 @@ export class TerrainRenderer implements WaterQuerySource {
     }
     this.terrainChunks.clear();
     this.terrainChunksVisibleLastUpdate.length = 0;
+    this.groundSampler = null;
     this._hasInitiallyUpdatedTerrain = false;
     this._needsVisibilityUpdate = false;
   }

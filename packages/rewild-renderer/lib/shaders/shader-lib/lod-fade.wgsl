@@ -23,12 +23,19 @@ fn lodFadeWeights(distance : f32, band : vec4f) -> vec2f {
   return vec2f(fadeIn, fadeOut);
 }
 
-// Whether this pixel is one of the tier's under its weights. Interleaved
-// gradient noise over the pixel grid: the outgoing tier keeps the pixels
-// below its weight, the incoming one keeps the rest.
-fn lodFadeKeeps(fragCoord : vec2f, fade : vec2f) -> bool {
-  let pattern = fract(
+// The screen-door threshold of a pixel, 0 to 1: interleaved gradient noise over
+// the pixel grid. Whatever fades in keeps the pixels below its weight, and what
+// it replaces keeps the rest. Terrain chunks fade in against the horizon ring
+// with it too.
+fn fadePattern(fragCoord : vec2f) -> f32 {
+  return fract(
     52.9829189 * fract(dot(floor(fragCoord), vec2f(0.06711056, 0.00583715)))
   );
+}
+
+// Whether this pixel is one of the tier's under its weights: the outgoing tier
+// keeps the pixels below its weight, the incoming one keeps the rest.
+fn lodFadeKeeps(fragCoord : vec2f, fade : vec2f) -> bool {
+  let pattern = fadePattern(fragCoord);
   return pattern < fade.y && pattern >= 1.0 - fade.x;
 }

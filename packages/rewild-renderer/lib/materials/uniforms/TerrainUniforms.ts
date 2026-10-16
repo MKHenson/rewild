@@ -12,12 +12,13 @@ import { MAX_WATER_TYPES, WaterType } from '../../renderers/terrain/Water';
 //   noiseScale       f32             offset 8   (4 bytes)
 //   heightBlendDepth f32             offset 12  (4 bytes)
 //   uvPerMetre       f32             offset 16  (4 bytes)
+//   fade             f32             offset 20  (4 bytes)
 //   layers           array<vec4f,32> offset 32  (512 bytes)
 //   water            vec4f           offset 544 (16 bytes)
 //   waterExtinction  array<vec4f,4>  offset 560 (64 bytes)
 //
 // `layers` starts at 32 because a uniform array of vec4f needs 16-byte
-// alignment, and the five scalars above spill into a second row. Four vec4f
+// alignment, and the six scalars above spill into a second row. Four vec4f
 // per splat channel, MAX_SPLAT_LAYERS channels:
 //   [slot*4    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
 //   [slot*4 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
@@ -122,6 +123,9 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   // would tile the vertical axis at the wrong rate, and no projection at all is
   // better than a confidently wrong one. LODMesh sets it from the real chunk.
   uvPerMetre: number = 0;
+
+  // How far the chunk has faded in over the horizon ring, 0 to 1.
+  private _fade: number = 1;
 
   layers: TerrainLayerParams[] = [];
 
@@ -239,6 +243,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     data[2] = this.noiseScale;
     data[3] = this.heightBlendDepth;
     data[4] = this.uvPerMetre;
+    data[5] = this._fade;
 
     // Channels the palette does not use keep weight 0 in the splat, so the
     // shader's epsilon skips them — but zero them anyway so a stale layer can
@@ -288,6 +293,21 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       this._paramsBuffer,
       0,
       data as ArrayBufferView<ArrayBuffer>
+    );
+  }
+
+  /** Sets the fade, written straight to the GPU once the params exist. */
+  setFade(device: GPUDevice, fade: number): void {
+    if (fade === this._fade) return;
+    this._fade = fade;
+    if (!this._paramsBuffer) return;
+    this._paramsData[5] = fade;
+    device.queue.writeBuffer(
+      this._paramsBuffer,
+      20,
+      this._paramsData as ArrayBufferView<ArrayBuffer>,
+      5,
+      1
     );
   }
 

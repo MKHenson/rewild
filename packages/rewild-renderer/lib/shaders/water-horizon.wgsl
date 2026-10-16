@@ -25,6 +25,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
 #include "./shader-lib/far-ground.wgsl"
+#include "./shader-lib/lod-fade.wgsl"
 #include "./sky/atmosphere-uniforms.wgsl"
 
 const WATER_F0: f32 = 0.02;
@@ -137,7 +138,11 @@ struct VertexOutput {
 var<private> sunDotUp: f32;
 
 // Rings are spaced geometrically, so each spans about the same height on screen.
+// Inside the inner radius (s below 0) they are spaced evenly to the centre.
 fn ringRadius(s: f32) -> f32 {
+  if (s < 0.0) {
+    return horizon.innerRadius * (1.0 + s);
+  }
   return horizon.innerRadius * pow(horizon.outerRadius / horizon.innerRadius, s);
 }
 
@@ -209,16 +214,16 @@ fn vs(input: VertexInput) -> VertexOutput {
   return out;
 }
 
-// True where a terrain chunk drew this frame. A chunk in range but not yet
-// meshed reads false, so the ring fills it instead of leaving sky.
-fn chunkDrawn(p: vec2f) -> bool {
+// How far the terrain chunk at p has faded in, 0 to 1. A chunk in range but not
+// yet meshed reads 0, so the ring fills it instead of leaving sky.
+fn chunkFade(p: vec2f) -> f32 {
   let size = vec2i(textureDimensions(chunkMask));
   // floor(x + 0.5) rounds as Math.round does on the CPU.
   let cell = vec2i(floor(p / horizon.chunkSize + 0.5) - horizon.maskOrigin) + size / 2;
   if (any(cell < vec2i(0)) || any(cell >= size)) {
-    return false;
+    return 0.0;
   }
-  return textureLoad(chunkMask, cell, 0).r > 0.5;
+  return textureLoad(chunkMask, cell, 0).r;
 }
 
 fn materialAverage(layer: f32) -> vec3f {
@@ -284,6 +289,10 @@ struct FragmentOutput {
 fn fs(input: VertexOutput) -> FragmentOutput {
   let ground = input.world.xyz / max(input.world.w, 1e-6);
   let p = ground.xz;
+  // The chunk keeps the pixels under its fade; the ring draws the rest.
+  if (fadePattern(input.Position.xy) < chunkFade(p)) {
+    discard;
+  }
   let groundAt = sampleGround(p);
   // The continent's coast is smooth and the ground is not, so ground standing
   // clear of the water is land whatever the continent says.
@@ -341,11 +350,6 @@ fn fs(input: VertexOutput) -> FragmentOutput {
   sunDotUp = toSun.y;
   let fog = (1.0 - sceneFogTransmittance(object.cameraPosition, viewDir, groundDistance)) * horizon.fogged;
   let color = mix(direct + indirect, getFogScatterColor(viewDir, toSun), fog);
-
-  // Last, so every sample above runs in uniform control flow.
-  if (chunkDrawn(p)) {
-    discard;
-  }
 
   var out: FragmentOutput;
   out.color = vec4f(color, 1.0);

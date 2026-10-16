@@ -11,7 +11,7 @@ describe('buildHorizonRing', () => {
   const segments = 16;
   const bands = 4;
   const spokes = segments + 1;
-  const ring = buildHorizonRing(segments, bands);
+  const ring = buildHorizonRing(segments, bands, 0);
 
   it('lays out the finite rings from 0 to 1, then one at infinity', () => {
     expect(ring.vertices.length).toBe(spokes * (bands + 2) * 3);
@@ -45,6 +45,20 @@ describe('buildHorizonRing', () => {
         );
       }
     }
+  });
+
+  it('runs the inner bands evenly from the centre to the first finite ring', () => {
+    const innerBands = 3;
+    const closed = buildHorizonRing(segments, bands, innerBands);
+    const rings = innerBands + bands + 2;
+    expect(closed.vertices.length).toBe(spokes * rings * 3);
+    expect(closed.indices.length).toBe(segments * (rings - 1) * 6);
+    const radial = (k: number) => closed.vertices[k * spokes * 3 + 2];
+    expect(radial(0)).toBe(-1);
+    expect(radial(1)).toBeCloseTo(-2 / 3, 6);
+    expect(radial(innerBands)).toBe(0);
+    expect(radial(innerBands + bands)).toBe(1);
+    expect(radial(rings - 1)).toBe(INFINITE_EDGE);
   });
 });
 

@@ -30,6 +30,9 @@ const RING_SEGMENTS = 1024;
 // Finite rings out to OUTER_RADIUS. Geometric spacing puts them about 120 m
 // apart at the edge of the near far map, about two of its texels.
 const RING_BANDS = 192;
+// Evenly spaced rings from the centre out to the first finite ring, about two
+// near far map texels apart, so chunks have ground behind them as they fade in.
+const INNER_BANDS = 12;
 
 /** Metres from the centre of the last finite ring; flat sea level beyond. */
 const OUTER_RADIUS = 24000;
@@ -89,10 +92,12 @@ export function chunkMaskIndex(
 export const INFINITE_EDGE = 2;
 
 /**
- * A polar grid of `segments` spokes crossing `bands` finite rings, then one
- * more ring at infinity. Each vertex is (direction x, direction z, radial
- * parameter): 0 to 1 from the inner to the outer finite ring, INFINITE_EDGE on
- * the last. Vertices run ring by ring, `segments + 1` to a ring so it closes.
+ * A polar grid of `segments` spokes crossing `innerBands` rings from the centre,
+ * then `bands` finite rings, then one more ring at infinity. Each vertex is
+ * (direction x, direction z, radial parameter): -1 at the centre up to 0 on the
+ * inner finite ring, 0 to 1 from the inner to the outer finite ring,
+ * INFINITE_EDGE on the last. Vertices run ring by ring, `segments + 1` to a
+ * ring so it closes.
  *
  * Triangles are ordered inner ring first. The ring writes one depth everywhere,
  * so the first surface drawn on a pixel keeps it: drawing outward lets nearer
@@ -100,17 +105,24 @@ export const INFINITE_EDGE = 2;
  */
 export function buildHorizonRing(
   segments: number = RING_SEGMENTS,
-  bands: number = RING_BANDS
+  bands: number = RING_BANDS,
+  innerBands: number = INNER_BANDS
 ): {
   vertices: Float32Array;
   indices: Uint32Array;
 } {
   const spokes = segments + 1;
-  const rings = bands + 2;
+  const rings = innerBands + bands + 2;
   const vertices = new Float32Array(spokes * rings * 3);
   const indices = new Uint32Array(segments * (rings - 1) * 6);
   for (let k = 0; k < rings; k++) {
-    const s = k <= bands ? k / bands : INFINITE_EDGE;
+    const finite = k - innerBands;
+    const s =
+      finite < 0
+        ? finite / innerBands
+        : finite <= bands
+          ? finite / bands
+          : INFINITE_EDGE;
     for (let i = 0; i < spokes; i++) {
       const angle = (i / segments) * Math.PI * 2;
       const v = (k * spokes + i) * 3;
@@ -272,8 +284,8 @@ export interface HorizonOceanState {
   centreZ: number;
   maxViewDst: number;
   chunkSize: number;
-  /** 255 where a chunk drew this frame (chunkMaskIndex), centred on the
-   *  centre's chunk. */
+  /** How far the chunk drawn there this frame has faded in, 0 to 255
+   *  (chunkMaskIndex), centred on the centre's chunk. */
   chunkMask: Uint8Array;
   /** The ocean's wind speed in m/s. */
   windSpeed: number;
