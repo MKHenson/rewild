@@ -296,6 +296,10 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     );
   }
 
+  get fade(): number {
+    return this._fade;
+  }
+
   /** Sets the fade, written straight to the GPU once the params exist. */
   setFade(device: GPUDevice, fade: number): void {
     if (fade === this._fade) return;

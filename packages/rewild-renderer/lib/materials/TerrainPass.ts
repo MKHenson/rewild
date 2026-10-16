@@ -61,6 +61,8 @@ export class TerrainPass implements IMaterialPass {
   /** Tier the current pipeline was built against. Compared each draw so a
    *  change to the setting rebuilds rather than being silently ignored. */
   private builtQuality: RenderQuality | null = null;
+  /** Whether the current pipeline was built with the chunk fade's discard. */
+  private builtFade = false;
 
   /**
    * Rebuild the pipeline, and every bind group built against its layout.
@@ -87,6 +89,7 @@ export class TerrainPass implements IMaterialPass {
     // with, and none of the other aspects touch it. See TerrainQuality.
     const quality = renderer.quality.aspect('terrain');
     this.builtQuality = quality;
+    this.builtFade = this.wantsFade();
 
     // Distances, unlike the loop bounds, are uniforms and need no rebuild.
     const fade = terrainDetailFade(quality);
@@ -94,7 +97,10 @@ export class TerrainPass implements IMaterialPass {
     this.terrainUniforms.detailFadeEnd = fade.end;
 
     const module = device.createShaderModule({
-      code: composeShader([shader], terrainShaderDefines(quality)),
+      code: composeShader([shader], {
+        ...terrainShaderDefines(quality),
+        HAS_TERRAIN_FADE: this.builtFade,
+      }),
     });
 
     this.pipeline = device.createRenderPipeline({
@@ -169,6 +175,21 @@ export class TerrainPass implements IMaterialPass {
         format: 'depth24plus',
       },
     });
+  }
+
+  /**
+   * Sets the chunk's fade. A shader that can discard costs the hardware its
+   * early depth test, so only a fading chunk's carries the discard: crossing
+   * into or out of a fade rebuilds the pipeline, before the frame's draw.
+   */
+  setFade(device: GPUDevice, fade: number): void {
+    this.terrainUniforms.setFade(device, fade);
+    if (!this.requiresRebuild && this.wantsFade() !== this.builtFade)
+      this.invalidatePipeline();
+  }
+
+  private wantsFade(): boolean {
+    return this.terrainUniforms.fade < 1;
   }
 
   isGeometryCompatible(geometry: Geometry): boolean {
