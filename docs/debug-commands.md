@@ -117,7 +117,7 @@ clears them all, since the app-wide tier is the coarse control. To set one
 without going through the UI:
 
 ```js
-renderer.quality.setAspect('clouds', 'low');
+setQualityAspect('clouds', 'low');
 ```
 
 Players reach the same settings from Options on the main menu and Settings in the
