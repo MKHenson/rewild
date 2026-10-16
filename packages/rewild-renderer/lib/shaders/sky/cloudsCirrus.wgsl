@@ -42,11 +42,11 @@
 // Dependencies: fog.wgsl (intersectSphereBoth, SphereIntersect),
 //               skyCommon.wgsl (noise3, hash1, ObjectStruct: cirrusCoverage/
 //                               cirrusOpacity/windiness/windDirection/iTime),
-//               skyConstants.wgsl (EARTH_RADIUS, PI).
+//               skyConstants.wgsl (EARTH _RADIUS, PI).
 // `sunDotUp` is read from the host shader's private var.
 
-const CIRRUS_ALT:   f32 = 6000.0;
-const CIRRUS_THICK: f32 = 50000.0;
+const CIRRUS_ALT:   f32 = 2000.0;
+const CIRRUS_THICK: f32 = 5000.0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tuning. These are the knobs worth touching; everything below them is
