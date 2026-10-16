@@ -65,6 +65,29 @@ export interface IScatterInstancePass extends IMaterialPass {
  * instance through the vertex stage only to collapse most of them, and a chunk
  * standing in the 45m band would cost its full model for all 480m of it.
  */
+/** Milliseconds a chunk's scatter takes to fade in once first drawn. */
+const SCATTER_APPEAR_MS = 600;
+
+/**
+ * A chunk's scatter fading in, shared by all its layers so a rebuild after an
+ * edit does not fade it in again. The clock starts on the first draw after a
+ * restart, and `limit` holds it to the chunk's own fade.
+ */
+export class ScatterAppear {
+  limit = 1;
+  private start = -1;
+
+  restart(): void {
+    this.start = -1;
+  }
+
+  /** How far it has faded in at `now`, 0 to 1. */
+  value(now: number): number {
+    if (this.start < 0) this.start = now;
+    return Math.min(this.limit, (now - this.start) / SCATTER_APPEAR_MS);
+  }
+}
+
 export class ScatterChunkLayer implements IScatterInstanceGroup {
   readonly [IS_VISUAL_COMPONENT] = true as const;
   readonly [IS_SCATTER_INSTANCE_GROUP] = true as const;
@@ -143,7 +166,8 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     layer: ScatterLayer,
     tier: number,
     lodBias: number,
-    reach: number
+    reach: number,
+    private readonly appear: ScatterAppear = new ScatterAppear()
   ) {
     this.transform = transform;
     this.transform.component = this;
@@ -352,6 +376,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     uniforms[52] = this.tier;
     uniforms[53] = renderer.terrainRenderer.scatterLodTint ? 1 : 0;
     uniforms[54] = 1 / renderer.camera.camera.exposure;
+    uniforms[55] = this.appear.value(performance.now());
 
     const wind = renderer.sky.skyRenderer.wind;
     uniforms.set(wind.vec, 56);

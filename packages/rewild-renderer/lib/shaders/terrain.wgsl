@@ -35,6 +35,7 @@ const HAS_TERRAIN_NO_TILE: bool = ${ HAS_TERRAIN_NO_TILE };
 #include "./shader-lib/shore-waves.wgsl"
 #include "./shader-lib/caustics.wgsl"
 #include "./shader-lib/rain-wet.wgsl"
+#include "./shader-lib/lod-fade.wgsl"
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -97,6 +98,8 @@ struct TerrainParams {
   // the same units the horizontal axes use, so a layer's uvScale tiles a cliff
   // at the rate it tiles the ground. 0 disables the side projection.
   uvPerMetre      : f32,
+  // How far the chunk has faded in over the horizon ring, 0 to 1.
+  fade            : f32,
   // Packed TerrainLayer, four vec4f per splat channel (SPLAT_SLOTS channels):
   //   [slot*4    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
   //   [slot*4 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
@@ -498,8 +501,14 @@ fn fs(
   @location(1) normal: vec3f,
   @location(2) viewPosition: vec3f,
   @location(3) objectNormal: vec3f,
-  @location(4) objectHeight: f32
+  @location(4) objectHeight: f32,
+  @builtin(position) fragCoord: vec4f
 ) -> SceneFragment {
+  // The horizon ring draws the pixels a fading chunk leaves.
+  if (fadePattern(fragCoord.xy) >= terrainParams.fade) {
+    discard;
+  }
+
   // --- Uniform control flow: everything needing implicit derivatives ---------
   //
   // Below, layers are skipped by weight, which is non-uniform control flow —

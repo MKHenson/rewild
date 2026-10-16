@@ -2,7 +2,11 @@ import { Box3, Vector3 } from 'rewild-common';
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { ScatterInstances } from './Scatter';
-import { ScatterChunkLayer, modelRadius } from './ScatterChunkLayer';
+import {
+  ScatterAppear,
+  ScatterChunkLayer,
+  modelRadius,
+} from './ScatterChunkLayer';
 import { ScatterModels } from './ScatterModels';
 import { getScatterLayer } from './ScatterLayers';
 
@@ -23,6 +27,7 @@ const IDENTITY = new Float32Array([
  */
 export class ChunkScatter {
   private layers: ScatterChunkLayer[] = [];
+  private readonly appear = new ScatterAppear();
   private root: Transform;
   // What the last visibility pass measured against, so the debug commands
   // report the distance the cull actually used rather than a fresh one.
@@ -60,7 +65,8 @@ export class ChunkScatter {
               layer,
               tier,
               lodBias,
-              modelRadius(primitive.geometry, primitive.nodeMatrix)
+              modelRadius(primitive.geometry, primitive.nodeMatrix),
+              this.appear
             )
           );
         }
@@ -80,7 +86,8 @@ export class ChunkScatter {
             layer,
             tiers.length,
             lodBias,
-            impostor.reach
+            impostor.reach,
+            this.appear
           )
         );
     }
@@ -159,6 +166,16 @@ export class ChunkScatter {
         selected: layer.selectedCount,
       };
     });
+  }
+
+  /** Fades the scatter in again from its next draw. */
+  restartAppear(): void {
+    this.appear.restart();
+  }
+
+  /** Holds the fade to `limit`, 0 to 1. */
+  limitAppear(limit: number): void {
+    this.appear.limit = limit;
   }
 
   clear(): void {

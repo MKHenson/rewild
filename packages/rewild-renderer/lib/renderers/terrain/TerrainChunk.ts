@@ -38,6 +38,9 @@ const temp: Vector3 = new Vector3();
 // Kept apart from `temp`, which the constructor and the LOD walk also use.
 const _groundPoint: Vector3 = new Vector3();
 
+/** Milliseconds a chunk takes to fade in over the horizon ring once drawn. */
+const CHUNK_FADE_MS = 600;
+
 export type TerrainChunkEvent = {
   type: 'mesh-loaded';
   mesh: LODMesh;
@@ -56,6 +59,11 @@ export class TerrainChunk implements IComponent {
   _visible: boolean = false;
   /** The TerrainRenderer visibility update that last found it in range. */
   visibilityPass = -1;
+  /** How far it has faded in over the horizon ring, 0 to 1, in 1/255 steps
+   *  so the ring's 8-bit chunk mask leaves exactly the pixels it drops. */
+  fade = 0;
+  private drawnSince = 0;
+  private lastDrawnFrame = -2;
   bounds: Box3;
   transform: Transform;
   detailLevels: LODInfo[];
@@ -930,6 +938,28 @@ export class TerrainChunk implements IComponent {
     } else {
       this._visible = false;
       this.transform.visible = false;
+    }
+  }
+
+  /**
+   * Advances the fade for a frame it is drawn on: in over time since it was
+   * first drawn, held to `limit`. Not drawn the frame before, it starts again
+   * from nothing, and so does its scatter.
+   */
+  updateFade(frame: number, now: number, limit: number, device: GPUDevice) {
+    if (this.lastDrawnFrame !== frame - 1) {
+      this.drawnSince = now;
+      this.scatter?.restartAppear();
+    }
+    this.lastDrawnFrame = frame;
+    this.scatter?.limitAppear(limit);
+
+    const t = Math.min(1, (now - this.drawnSince) / CHUNK_FADE_MS, limit);
+    this.fade = Math.round(t * 255) / 255;
+    // Every frame, as a LOD mesh built mid-fade starts at full.
+    for (const lod of this.lodMesh) {
+      const pass = lod.mesh?.material as TerrainPass | undefined;
+      pass?.terrainUniforms.setFade(device, this.fade);
     }
   }
 

@@ -56,7 +56,8 @@ struct Uniforms {
   // The tier's distance band: fades in over [x, y] and out over [z, w].
   band : vec4f,
   // x = the tier index, y = 1 to tint by tier for the LOD debug view, z = the
-  // reciprocal of the camera exposure, so the tint lands in scene units.
+  // reciprocal of the camera exposure, so the tint lands in scene units, w = how
+  // far the chunk's scatter has faded in since it first drew, 0 to 1.
   debug : vec4f,
   // The weather: xy = world-space direction the air moves, z = strength,
   // w = seconds. See scatter-wind.wgsl.
@@ -239,6 +240,7 @@ fn transformVertex(
   // spent on the displacement and the surface shades untinted.
   output.color = select(color, vec4f(1.0), HAS_WIND);
   output.fade = lodFadeWeights(viewDistance, uniforms.band);
+  output.fade.y *= uniforms.debug.w;
 
   // The instance scale is uniform and the model-view is rigid, so both drop out
   // of the normal under a normalize — no inverse-transpose is needed, which is
