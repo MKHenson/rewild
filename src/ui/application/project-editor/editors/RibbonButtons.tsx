@@ -63,9 +63,9 @@ export class RibbonButtons extends Component<Props> {
     };
 
     const home = iconButton('house', () => this.props.onHome());
-    const save = iconButton('save', () => projectStore.updateProject());
+    const save = iconButton('save', () => projectStore.saveLevel());
     const play = iconButton('play', async () => {
-      if (projectStore.dirty) await projectStore.updateProject();
+      if (projectStore.dirty) await projectStore.saveLevel();
       navigate(`/game/${projectStore.project!.id}`);
     });
     const settings = iconButton('settings', () => setOpenDialog('project'));

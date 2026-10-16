@@ -70,7 +70,10 @@ export type TerrainEvent =
       instances: ScatterInstances[];
     }
   | { type: 'chunk-unloaded'; chunk: TerrainChunk }
-  | { type: 'chunk-disposed'; chunk: TerrainChunk };
+  | { type: 'chunk-disposed'; chunk: TerrainChunk }
+  /** The camera is high enough that the horizon ring draws all the ground and
+   *  no chunk will load. Raised once per chunk set while it holds. */
+  | { type: 'far-only' };
 
 const viewerMoveThresholdForChunkUpdate = 25;
 const sqrViewerMoveThresholdForChunkUpdate =
@@ -216,6 +219,7 @@ export class TerrainRenderer implements WaterQuerySource {
   /** Camera metres above the ground under which chunks are fully faded in. */
   farOnlyBelow = 1200;
   private _farOnly = false;
+  private _farOnlyReported = false;
   // How far chunks have faded in by the camera's height, 0 to 1.
   private heightFade = 1;
   private fadeFrame = 0;
@@ -1491,6 +1495,7 @@ export class TerrainRenderer implements WaterQuerySource {
     if (!this._farOnly && height > above + FAR_ONLY_MARGIN) this.enterFarOnly();
     else if (this._farOnly && height < above) {
       this._farOnly = false;
+      this._farOnlyReported = false;
       this._needsVisibilityUpdate = true;
     }
   }
@@ -1555,6 +1560,10 @@ export class TerrainRenderer implements WaterQuerySource {
     }
 
     if (this._farOnly) {
+      if (!this._farOnlyReported) {
+        this._farOnlyReported = true;
+        this.dispatcher.dispatch({ type: 'far-only' });
+      }
       if (
         this.viewPosOld.distanceToSquared(this.viewerPosition) >
         sqrViewerMoveThresholdForChunkUpdate
@@ -1599,6 +1608,13 @@ export class TerrainRenderer implements WaterQuerySource {
     this.seed = seed;
   }
 
+  /** Drops every chunk and saved water record, so they rebuild from the
+   *  current providers. GPU systems and workers are kept. */
+  reload() {
+    this.clearChunks();
+    this.waterRules.clearRecords();
+  }
+
   private clearChunks() {
     const dispatcher = this.dispatcher;
     for (const chunk of this.terrainChunks.values()) {
@@ -1610,6 +1626,7 @@ export class TerrainRenderer implements WaterQuerySource {
     this.terrainChunks.clear();
     this.terrainChunksVisibleLastUpdate.length = 0;
     this.groundSampler = null;
+    this._farOnlyReported = false;
     this._hasInitiallyUpdatedTerrain = false;
     this._needsVisibilityUpdate = false;
   }

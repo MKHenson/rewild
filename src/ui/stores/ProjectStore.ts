@@ -30,6 +30,7 @@ export type ProjectStoreEvents =
 
 export class ProjectStore {
   loading = false;
+  /** The open level has unsaved changes. */
   dirty = false;
   error?: string;
   project: StoredRecord<IProject> | null = null;
@@ -93,45 +94,69 @@ export class ProjectStore {
   }
 
   async getProject(projectId: string) {
-    this.loading = true;
-    this.dispatcher.dispatch({ kind: 'loading-initiated' });
-    this.dispatcher.dispatch({ kind: 'changed' });
+    this.beginLoad();
 
     try {
       const project = await getProjectApi(projectId);
       if (!project) throw new Error('Project not found');
       this.project = project;
-      this.level = await getLevelApi(project.levelId);
-      this.level.sceneGraph ??= ProjectStore.createSceneGraph();
+      this.level = await this.fetchLevel(project.levelId);
     } catch (err: any) {
       this.error = err.toString();
     }
 
-    this.loading = false;
-    this.dirty = false;
-    this.dispatcher.dispatch({ kind: 'changed' });
-
-    const project = this.project;
-    const level = this.level;
-    if (this.error || !project || !level) return;
-
-    this.containerPods = {};
-    level.sceneGraph.containers.forEach((container) => {
-      this.containerPods[container.id] = container.pod || {
-        asset3D: [],
-      };
-    });
-
-    sceneGraphStore.buildTreeFromSceneGraph(level.sceneGraph);
-    this.dispatcher.dispatch({ kind: 'loading-completed', project, level });
+    this.endLoad();
   }
 
-  /** Saves the project's fields and the editor's scene graph to the open level. */
-  async updateProject() {
-    const project = this.project!;
-    const level = this.level!;
+  /** Opens another level in the editor. Unsaved changes are saved first. */
+  async loadLevel(levelId: string) {
+    if (!this.project || this.loading || this.level?.id === levelId) return;
+
+    if (this.dirty) {
+      await this.saveLevel();
+      if (this.dirty) return;
+    }
+
+    sceneGraphStore.setActiveContainer(null);
+    sceneGraphStore.setSelectedNode(null);
+    this.beginLoad();
+
+    try {
+      this.level = await this.fetchLevel(levelId);
+    } catch (err: any) {
+      this.error = err.toString();
+    }
+
+    this.endLoad();
+  }
+
+  /** Makes a level the project's start level. Written at once, so the level stays clean. */
+  async setStartLevel(levelId: string) {
+    const project = this.project;
+    if (!project || project.levelId === levelId) return;
+
+    try {
+      await patchProject(project.id, { levelId });
+      project.levelId = levelId;
+    } catch (err: any) {
+      this.error = err.toString();
+    }
+
+    this.dispatcher.dispatch({ kind: 'changed' });
+    db.syncAll(); // background — errors captured on records via syncError
+  }
+
+  /** Saves the project's own fields, such as its name and start level. */
+  async saveProject() {
     // imageUrl is set by the image sync; a copy held here can be stale.
-    const { id, imageUrl, ...token } = project;
+    const { id, imageUrl, ...token } = this.project!;
+
+    await this.write(() => patchProject(id, createExporterObj(token)));
+  }
+
+  /** Saves the editor's scene graph to the open level and clears `dirty`. */
+  async saveLevel() {
+    const level = this.level!;
     const containerNodes = sceneGraphStore.nodes.find(
       (n) => n.name === 'Containers'
     )!.children;
@@ -159,23 +184,72 @@ export class ProjectStore {
       },
       terrain: level.sceneGraph.terrain,
     };
+
+    const saved = await this.write(() =>
+      patchLevel(level.id, { sceneGraph: createExporterObj(sceneGraph) })
+    );
+    if (!saved) return;
+
     level.sceneGraph = sceneGraph;
-
-    this.loading = true;
+    this.dirty = false;
     this.dispatcher.dispatch({ kind: 'changed' });
+  }
 
-    try {
-      await patchProject(id!, createExporterObj(token));
-      await patchLevel(level.id, { sceneGraph: createExporterObj(sceneGraph) });
-    } catch (err: any) {
-      this.error = err.toString();
+  private async fetchLevel(levelId: string) {
+    const level = await getLevelApi(levelId);
+    level.sceneGraph ??= ProjectStore.createSceneGraph();
+    return level;
+  }
+
+  private beginLoad() {
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'loading-initiated' });
+    this.dispatcher.dispatch({ kind: 'changed' });
+  }
+
+  private endLoad() {
+    const project = this.project;
+    const level = this.level;
+    const loaded = !this.error && project && level;
+
+    if (loaded) {
+      this.containerPods = {};
+      level.sceneGraph.containers.forEach((container) => {
+        this.containerPods[container.id] = container.pod || {
+          asset3D: [],
+        };
+      });
+      // Building the tree reports its nodes as updated, which would mark the
+      // fresh level dirty, so dirty is cleared after it.
+      sceneGraphStore.buildTreeFromSceneGraph(level.sceneGraph);
     }
 
     this.loading = false;
     this.dirty = false;
     this.dispatcher.dispatch({ kind: 'changed' });
 
+    if (loaded)
+      this.dispatcher.dispatch({ kind: 'loading-completed', project, level });
+  }
+
+  // Resolves false when the write failed; `error` says why.
+  private async write(task: () => Promise<void>): Promise<boolean> {
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'changed' });
+
+    let ok = true;
+    try {
+      await task();
+    } catch (err: any) {
+      this.error = err.toString();
+      ok = false;
+    }
+
+    this.loading = false;
+    this.dispatcher.dispatch({ kind: 'changed' });
+
     db.syncAll(); // background — errors captured on records via syncError
+    return ok;
   }
 }
 

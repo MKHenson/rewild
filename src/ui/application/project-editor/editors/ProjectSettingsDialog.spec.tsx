@@ -35,7 +35,7 @@ function clickButton(comp: ProjectSettingsDialog, label: string) {
 }
 
 describe('ProjectSettingsDialog', () => {
-  let updateProject: jest.SpyInstance;
+  let saveProject: jest.SpyInstance;
 
   beforeEach(() => {
     projectStore.project = {
@@ -47,8 +47,8 @@ describe('ProjectSettingsDialog', () => {
       updatedAt: 1000,
       sceneGraph: {},
     } as never;
-    updateProject = jest
-      .spyOn(projectStore, 'updateProject')
+    saveProject = jest
+      .spyOn(projectStore, 'saveProject')
       .mockResolvedValue(undefined);
     jest
       .spyOn(db.levels, 'getMany')
@@ -94,13 +94,13 @@ describe('ProjectSettingsDialog', () => {
       description: 'New description',
       levelId: 'level-2',
     });
-    expect(updateProject).toHaveBeenCalledTimes(1);
+    expect(saveProject).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalled();
   });
 
   it('disables the buttons and stays open until the save ends', async () => {
     let finish: () => void = () => undefined;
-    updateProject.mockImplementation(
+    saveProject.mockImplementation(
       () => new Promise<void>((resolve) => (finish = resolve))
     );
     const { comp, onClose } = createDialog();
@@ -125,7 +125,7 @@ describe('ProjectSettingsDialog', () => {
     clickButton(comp, 'Save');
     await flush();
 
-    expect(updateProject).not.toHaveBeenCalled();
+    expect(saveProject).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
     expect(comp.shadow!.querySelector('.error')?.textContent).toBe(
       'Enter a name for the project'
@@ -162,7 +162,7 @@ describe('ProjectSettingsDialog', () => {
     clickButton(comp, 'Cancel');
 
     expect(projectStore.project!.name).toBe('Old name');
-    expect(updateProject).not.toHaveBeenCalled();
+    expect(saveProject).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
   describe('image', () => {

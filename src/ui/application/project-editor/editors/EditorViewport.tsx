@@ -49,7 +49,11 @@ import { TerrainScatterPaintController } from './utils/TerrainScatterPaintContro
 import { waterBrushStore } from 'src/ui/stores/WaterBrushStore';
 import { WaterBrushToolbar } from './WaterBrushToolbar';
 import { TerrainWaterBrushController } from './utils/TerrainWaterBrushController';
-import { loadCameraState, saveCameraState } from './utils/CameraPersistence';
+import {
+  DEFAULT_CAMERA_STATE,
+  loadCameraState,
+  saveCameraState,
+} from './utils/CameraPersistence';
 import {
   applyConformPolicy,
   resolvePlacement,
@@ -149,13 +153,29 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onProjectEvent: Subscriber<ProjectStoreEvents> = (event) => {
-      if (event.kind === 'loading-initiated') beginLevelLoad();
+      if (event.kind === 'loading-initiated') {
+        // The brushes write to the open level's files, so none stays armed
+        // across a level change.
+        sculptStore.setEnabled(false);
+        biomePaintStore.setEnabled(false);
+        scatterPaintStore.setEnabled(false);
+        waterBrushStore.setEnabled(false);
+        // A pending save would store the old level's camera under the new one.
+        if (this.cameraSaveHandle !== null) {
+          window.clearTimeout(this.cameraSaveHandle);
+          this.cameraSaveHandle = null;
+        }
+        beginLevelLoad();
+      }
 
       if (event.kind === 'loading-completed') {
         SyncRendererFromLevel(this.renderer, event.project, event.level);
-        // Reloading a scene should keep the last viewpoint rather than snap
-        // back to the default camera. The orbit controller may not exist yet
-        // on the very first load — onCanvasReady restores in that case.
+        // A running renderer already holds chunks of the previous level. One
+        // that is still starting builds them from the settings above.
+        if (this.rendererReady) this.renderer.terrainRenderer.reload();
+        // Each level keeps its own viewpoint; one never saved opens at the
+        // default camera. The orbit controller may not exist yet on the very
+        // first load — onCanvasReady restores in that case.
         this.restoreSavedCamera();
       }
     };
@@ -168,7 +188,9 @@ export class EditorViewport extends Component<Props> {
     // chunk beneath the camera becomes available to lift the camera clear.
     const onTerrainEvent: Subscriber<TerrainEvent> = (event) => {
       // First chunk on screen is the earliest point the scene is worth showing.
-      if (event.type === 'chunk-loaded') endLevelLoad();
+      // High up no chunk loads: the horizon ring is the whole scene.
+      if (event.type === 'chunk-loaded' || event.type === 'far-only')
+        endLevelLoad();
 
       if (event.type !== 'chunk-loaded' || !this.orbitController) return;
       const cam = this.renderer.camera.camera.transform.position;
@@ -1075,10 +1097,10 @@ export class EditorViewport extends Component<Props> {
     }
     this.cameraSaveHandle = window.setTimeout(() => {
       this.cameraSaveHandle = null;
-      const projectId = projectStore.project?.id;
-      if (!projectId || !this.orbitController) return;
+      const levelId = projectStore.level?.id;
+      if (!levelId || !this.orbitController) return;
       saveCameraState(
-        projectId,
+        levelId,
         this.renderer.camera.camera.transform.position,
         this.orbitController.target
       );
@@ -1086,11 +1108,10 @@ export class EditorViewport extends Component<Props> {
   };
 
   private restoreSavedCamera(): void {
-    const projectId = projectStore.project?.id;
-    if (!projectId || !this.orbitController) return;
+    const levelId = projectStore.level?.id;
+    if (!levelId || !this.orbitController) return;
 
-    const state = loadCameraState(projectId);
-    if (!state) return;
+    const state = loadCameraState(levelId) ?? DEFAULT_CAMERA_STATE;
 
     this.renderer.camera.camera.transform.position.set(
       state.position[0],
