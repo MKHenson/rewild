@@ -44,6 +44,7 @@ import { WaterProbe } from '../water/WaterProbe';
 import { UnderWater, clipNear } from '../water/UnderWater';
 import { UnderWaterFog } from '../water/UnderWaterFog';
 import { WaterLens, lensRain } from '../water/WaterLens';
+import { rainBelowDeck } from '../sky/CloudDeck';
 import { CAUSTIC_CASCADE, Caustics } from '../water/Caustics';
 import { LightShafts } from '../water/LightShafts';
 import { MarineSnow } from '../water/MarineSnow';
@@ -1288,7 +1289,7 @@ export class TerrainRenderer implements WaterQuerySource {
     this.waterLens.update(
       underWater,
       deltaSeconds,
-      lensRain(sky.precipitation, sky.temperature),
+      lensRain(sky.precipitation, sky.temperature) * rainBelowDeck(eye.y),
       sky.wind.gustDrift,
       eye.x,
       eye.z

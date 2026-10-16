@@ -140,25 +140,22 @@ describe('ThunderSound', () => {
   it('ducks the rain, the wind and the land as the thunder arrives', () => {
     strikes.push(700, 520, 0, 0);
     step();
-    expect(engine.busDuck('weather')).toBe(1);
+    expect(thunder.duck).toBe(1);
 
     clock = 700 / SPEED_OF_SOUND + 0.01;
     step();
-    const full = Math.pow(10, THUNDER_DUCK_DB / 20);
-    expect(engine.busDuck('weather')).toBeCloseTo(full, 6);
-    expect(engine.busDuck('ambience')).toBeCloseTo(full, 6);
-    expect(engine.busDuck('effects')).toBe(1);
+    expect(thunder.duck).toBeCloseTo(Math.pow(10, THUNDER_DUCK_DB / 20), 6);
 
     clock += 30;
     step();
-    expect(engine.busDuck('weather')).toBe(1);
+    expect(thunder.duck).toBe(1);
   });
 
   it('ducks less under far thunder', () => {
     strikes.push(1900, 520, 0, 0);
     clock = 1900 / SPEED_OF_SOUND + 0.01;
     step();
-    const duck = engine.busDuck('weather');
+    const duck = thunder.duck;
     expect(duck).toBeLessThan(1);
     expect(duck).toBeGreaterThan(Math.pow(10, THUNDER_DUCK_DB / 20));
   });

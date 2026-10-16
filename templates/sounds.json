@@ -82,6 +82,27 @@
       "license": "soundly"
     },
     {
+      "name": "aloft",
+      "files": ["audio/aloft/aloft.ogg"],
+      "loop": true,
+      "source": "Soundly: high altitude",
+      "license": "soundly"
+    },
+    {
+      "name": "fall-rush",
+      "files": ["audio/body/fall-rush.ogg"],
+      "loop": true,
+      "source": "Soundly: freefall wind",
+      "license": "soundly"
+    },
+    {
+      "name": "fall-flap",
+      "files": ["audio/body/fall-flap.ogg"],
+      "loop": true,
+      "source": "Soundly: clothes flapping",
+      "license": "soundly"
+    },
+    {
       "name": "thunder-close",
       "files": [
         "audio/thunder/thunder-close-01.ogg",

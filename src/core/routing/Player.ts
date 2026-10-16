@@ -5,6 +5,7 @@ import {
   WaterQuery,
   createWaterQuerySample,
 } from 'rewild-renderer';
+import type { WaterLens } from 'rewild-renderer/lib/renderers/water/WaterLens';
 import { Node } from 'rewild-routing';
 import { Asset3D } from './Asset3D';
 import { StateMachineData } from './Types';
@@ -54,6 +55,7 @@ import {
   slideDamage,
 } from './utils/Sliding';
 import { STAMINA_FULL, Stamina } from './utils/Stamina';
+import { fallStep, freefallShare } from './utils/Freefall';
 import { OXYGEN_FULL, Oxygen } from './utils/Oxygen';
 import { BodyTemperature } from './utils/BodyTemperature';
 import { audio, footstepsDef, voiceDef } from '../audio/audio';
@@ -90,6 +92,11 @@ const _EYE_ABOVE_FEET: f32 = _CAPSULE_HALF_EXTENT + _STANDING_EYE_HEIGHT;
 // clear of the surface, so the character controller settles the last fraction
 // instead of starting interpenetrated.
 const _SPAWN_GROUND_CLEARANCE: f32 = _CAPSULE_HALF_EXTENT + 0.6;
+// Metres the ground ray reaches below the player before they first land.
+const _GROUND_RAY_REACH: f32 = 2000;
+// Metres above the generated ground a falling player holds while no ground
+// collider is built beneath them yet.
+const _GROUND_HOLD_ABOVE: f32 = 20;
 // Lowest the capsule centre may sit when no ground height is known — keeps its
 // base on y=0 rather than below it.
 const _MIN_CAPSULE_Y: f32 = _CAPSULE_HALF_EXTENT;
@@ -159,6 +166,7 @@ export class Player extends Node {
   private _swimHold: f32 = NaN;
   private _waterProbe = -1;
   private _waterQuery: WaterQuery | null = null;
+  private _waterLens: WaterLens | null = null;
   // Metres a second the wind's gusts shove the player downwind.
   private _gustPush: f32 = 0;
   uiHealthBar: UIElementMeterPass;
@@ -342,6 +350,7 @@ export class Player extends Node {
     this.immersion = 0;
     this.cameraUnderWater = false;
     this._waterQuery = stateData.renderer.terrainRenderer.waterQuery;
+    this._waterLens = stateData.renderer.terrainRenderer.waterLens;
     this._sounds?.dispose();
     const scope = stateData.gameManager?.sound;
     this._sounds = scope
@@ -506,6 +515,8 @@ export class Player extends Node {
     this._waterQuery?.releaseProbe(this._waterProbe);
     this._waterProbe = -1;
     this._waterQuery = null;
+    this._calmFall();
+    this._waterLens = null;
 
     this._sounds?.dispose();
     this._sounds = null;
@@ -541,6 +552,11 @@ export class Player extends Node {
     this.capsuleBody.setTranslation(_resizeTranslation, true);
   }
 
+  /** Clears the falling blur from the lens. */
+  private _calmFall(): void {
+    if (this._waterLens) this._waterLens.freefall = 0;
+  }
+
   /** Drops any slide and ground contact, e.g. after a teleport. */
   stopMotion(): void {
     this._onGround = false;
@@ -549,6 +565,7 @@ export class Player extends Node {
 
   private _die(): void {
     this._dead = true;
+    this._calmFall();
     this._sounds?.die();
     this.stopMotion();
     this._movingForward = false;
@@ -632,7 +649,7 @@ export class Player extends Node {
       const origin = { x: pos.x, y: pos.y + 2, z: pos.z };
       const dir = { x: 0, y: -1, z: 0 };
       const ray = new R.Ray(origin, dir);
-      const maxToi = 100.0;
+      const maxToi = _GROUND_RAY_REACH;
       const solid = true;
 
       const TERRAIN_BIT = 1;
@@ -654,13 +671,13 @@ export class Player extends Node {
         this.enableAssetBodies();
       }
 
-      // Past the ray's reach there is nothing to land on yet, and high enough
-      // no chunk streams in beneath until the player has fallen to it. So fall,
-      // and within its reach leave the ray to hold the player until there is
-      // ground beneath.
+      // High up no chunk streams in beneath until the player has fallen to it,
+      // so fall until the ray finds ground, holding just above the generated
+      // ground if its collider is not built yet. The generated ground ignores
+      // edits and reads the sea's surface, so the ray reaches far past it.
       const aboveGround =
         pos.y - terrainRenderer!.generatedGroundHeight(pos.x, pos.z);
-      gravityEnabled = !!hit || aboveGround > maxToi;
+      gravityEnabled = !!hit || aboveGround > _GROUND_HOLD_ABOVE;
     }
 
     // The water over the feet, with the waves the probe last reported.
@@ -716,7 +733,7 @@ export class Player extends Node {
     } else if (this.swimming) {
       this.verticalVelocity = waterDrag(this.verticalVelocity, delta);
     } else if (!this._onGround) {
-      this.verticalVelocity += gravity * dt;
+      this.verticalVelocity = fallStep(this.verticalVelocity, gravity, dt);
     } else if (this.verticalVelocity <= 0.0) {
       this.verticalVelocity = 0.0;
     }
@@ -868,6 +885,9 @@ export class Player extends Node {
       controllerGrounded && this.verticalVelocity <= 0.0 && !this.swimming;
     if (this._onGround && this.verticalVelocity < 0)
       this.verticalVelocity = 0.0;
+    const freefall =
+      this._onGround || this.swimming ? 0 : freefallShare(fallSpeed);
+    if (this._waterLens) this._waterLens.freefall = freefall;
 
     const currentPos = this.capsuleBody.translation();
     const nextX = currentPos.x + correctedMovement.x;
@@ -936,6 +956,7 @@ export class Player extends Node {
       s.climbing = this._slide.climbing;
       s.fallSpeed = fallSpeed;
       s.hurt = hurt;
+      s.freefall = freefall;
       s.entryVelocity = entryVelocity;
       s.swimming = this.swimming;
       s.immersion = this.immersion;

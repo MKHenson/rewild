@@ -206,11 +206,19 @@ strike's position and time.
 - **Near and far.** A strike under 1 km cracks and rumbles. A far one only rumbles, quieter and
   deeper. It comes from the strike's direction.
 - **Chains.** A chained strike adds a short crack, not a second rumble.
-- **The duck.** Thunder lowers the rain, wind and land under it for a few seconds.
+- **The duck.** Thunder lowers the rain, wind and land under it for a few seconds. `ThunderSound.duck`
+  is the level; `WorldSound` applies it to the weather and ambience buses.
 - **Distant storms.** Before a storm front arrives, low rumbles play now and then from upwind.
 
+### Above the clouds
+
+`AloftSound` fades the world below away as the listener climbs through the cloud deck, from half
+way up it (800 m) to 100 m above its top (1200 m). `WorldSound` ducks the ambience, weather and
+effects buses by the climb, and a distant `aloft` loop rises in their place. The loop plays on the
+world bus, past those ducks. Closing a scene scope lifts every bus duck.
+
 **Files to look at:** `WindSound.ts`, `windMapping.ts`, `RainSound.ts`, `rainMapping.ts`,
-`ThunderSound.ts`, `thunderMapping.ts`, `StrikeQueue.ts`.
+`ThunderSound.ts`, `thunderMapping.ts`, `StrikeQueue.ts`, `AloftSound.ts`.
 
 ---
 
@@ -371,6 +379,11 @@ in 2D on the player bus. The editor has no player, so it has none of them.
 - **Swimming.** A stroke every second or so while moving. Under water the strokes are slower and
   muffled, with bubbles. Standing up out of the water plays an emerge, and the body drips for a
   few seconds after a swim.
+- **Falling.** A fast fall roars with air and flapping clothes (`FallSound`). Both rise with
+  `freefallShare`, from a fall speed of 20 to 45 in `Player.verticalVelocity`'s units, so a jump
+  or a short drop stays silent. Drag eases a fall to a terminal speed of 60 (`fallStep`), so a
+  long drop holds at full. The roar opens and the flapping quickens as the fall speeds up; both
+  cut on landing.
 - **Sliding.** The ground crumbles under the feet, louder and higher as the slide speeds up. Dirt
   and stones fall away downhill in 3D. Snow hisses instead. Pushing uphill on ground too steep
   scrabbles.
