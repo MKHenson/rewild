@@ -13,9 +13,12 @@ import { GameManager } from './GameManager';
 import { RigidBodyBehaviour } from './routing/behaviours/RigidBodyBehaviour';
 import { LightAsset } from './routing/LightAsset';
 import { createColliderDesc } from './physics/ColliderShapes';
+import { LevelReader, PortalAsset } from './routing/PortalAsset';
 
 export class TemplateLoader {
   templateLibrary: ITemplateItems;
+  /** Reads other levels' files, for what a portal shows. */
+  levelReader: LevelReader | null = null;
 
   async load() {
     this.templateLibrary = (await fetch(
@@ -38,6 +41,8 @@ export class TemplateLoader {
 
     if (resource?.type === 'player-start') {
       toReturn = new PlayerStart();
+    } else if (resource?.type === 'portal') {
+      toReturn = new PortalAsset(renderer, this.levelReader, gameManager);
     } else if (template?.type === 'light') {
       toReturn = new LightAsset(new PointLight());
       if (toReturn instanceof LightAsset) {
@@ -133,6 +138,7 @@ export class TemplateLoader {
     toReturn.id = resource.id;
     toReturn.data = resource;
     if (toReturn instanceof Asset3D) toReturn.transform.name = resource.name;
+    if (toReturn instanceof PortalAsset) toReturn.applyProperties();
 
     return toReturn;
   }

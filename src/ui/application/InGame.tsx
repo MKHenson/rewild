@@ -29,10 +29,14 @@ export class InGame extends Component<Props> {
       audio.duckWorld(false);
     };
 
+    const [levelId, setLevelId] = this.useState<string | undefined>(undefined);
+
     const createViewport = () =>
       (
         <ViewportStateMachine
           projectId={this.props.projectId}
+          levelId={levelId()}
+          onTravel={onTravel}
           onUnlock={onUnlock}
           onDeath={onDeath}
           onQuit={onQuit}
@@ -44,6 +48,13 @@ export class InGame extends Component<Props> {
       viewport = createViewport();
       setModalOpen(false);
       setActiveMenu('ingameMenu');
+    };
+
+    const onTravel = (target: string) => {
+      viewport.dispose();
+      setLevelId(target, false);
+      viewport = createViewport();
+      this.render();
     };
 
     const onSettings = () => setActiveMenu('settings');

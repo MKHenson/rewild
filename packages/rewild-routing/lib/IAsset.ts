@@ -12,4 +12,6 @@ export interface IAsset<T = any> {
   add(child: IAsset): IAsset;
   remove(child: IAsset): IAsset;
   mount(): void;
+  /** Releases what the asset holds outside the scene, such as GPU resources. */
+  dispose?(): void;
 }

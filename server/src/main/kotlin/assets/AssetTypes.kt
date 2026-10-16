@@ -22,6 +22,9 @@ object AssetTypes {
     /** The project image. One per project, so its filename is fixed. */
     const val IMAGE = "image"
 
+    /** A level seen from its PlayerStart, shown by portals that lead to it. One per level. */
+    const val PORTAL_VIEW = "portal-view"
+
     const val BINARY = "application/octet-stream"
 
     private val rules = mapOf(
@@ -38,6 +41,13 @@ object AssetTypes {
             maxBytes = 2 * MB,
             filename = Regex("^image$"),
             wrongTypeMessage = "The image must be a PNG, JPEG or WebP file",
+        ),
+        PORTAL_VIEW to AssetRule(
+            scope = AssetScope.LEVEL,
+            contentTypes = setOf("image/png", "image/webp"),
+            maxBytes = 8 * MB,
+            filename = Regex("^view$"),
+            wrongTypeMessage = "A portal view must be a PNG or WebP file",
         ),
     )
 

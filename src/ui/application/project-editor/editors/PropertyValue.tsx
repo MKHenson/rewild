@@ -16,6 +16,7 @@ import {
   underlineField,
 } from 'rewild-ui';
 import { CameraCapture } from './custom-value-editors/CameraCapture';
+import { LevelSelect } from './custom-value-editors/LevelSelect';
 
 interface Props<T> {
   type: PropValueType;
@@ -45,6 +46,16 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
             readOnly={this.props.readonly}
             value={value as PropValueObject}
             onChange={(value) => onChange?.(value as T)}
+          />
+        );
+      }
+
+      if (this.props.customEditor === 'level-select') {
+        return (
+          <LevelSelect
+            readOnly={this.props.readonly}
+            value={value as string}
+            onChange={(levelId) => onChange?.(levelId as T)}
           />
         );
       }

@@ -6,6 +6,9 @@ import { GameLoadError } from './GameLoadError';
 
 interface Props {
   projectId: string;
+  /** The level to play; the project's start level when unset. */
+  levelId?: string;
+  onTravel: (levelId: string) => void;
   onUnlock: () => void;
   onDeath: () => void;
   onQuit: () => void;
@@ -20,6 +23,7 @@ export class ViewportStateMachine extends Component<Props> {
     this.player = new Player('Player');
     this.gameManager = new GameManager(this.player, this.props.onUnlock);
     this.player.onDeath = () => this.props.onDeath();
+    this.gameManager.onTravel = (levelId) => this.props.onTravel(levelId);
 
     // Covers physics init, renderer setup and the initial level load.
     const [loading, setLoading] = this.useState(true);
@@ -34,7 +38,8 @@ export class ViewportStateMachine extends Component<Props> {
     const onCanvasReady = async (pane3D: Pane3D) => {
       const initialized = await this.gameManager.init(
         pane3D,
-        this.props.projectId
+        this.props.projectId,
+        this.props.levelId
       );
       this.gameManager.onUnlock = this.props.onUnlock;
       // init() swallows its own errors, so drop the overlay either way rather
