@@ -40,6 +40,7 @@ import { LightningController } from './LightningController';
 import { LightningBoltPass } from '../../post-processes/LightningBoltPass';
 import type { LightningStrike } from './LightningController';
 import { RainWetness, rainShare } from './RainWetness';
+import { rainBelowDeck } from './CloudDeck';
 import { LightningFlash } from './LightningFlash';
 import { Moon, MOON_COLOR } from './Moon';
 
@@ -707,7 +708,9 @@ export class SkyRenderer {
     const currentStrike = this.lightning.currentStrike;
     this.pendingBoltStrike = currentStrike.boltVisible ? currentStrike : null;
 
-    if (this.precipitation > 0) {
+    const precipitation =
+      this.precipitation * rainBelowDeck(camera.transform.position.y);
+    if (precipitation > 0) {
       const { x: wdx, y: wdy } = this.windDirection;
       const baseSpeed = rainWindSpeed(this.windiness);
       const t = renderer.totalDeltaTime / 1000;
@@ -730,7 +733,7 @@ export class SkyRenderer {
         windSpeed: baseSpeed,
         windSpeedEff: effSpeed,
         temperature: this.temperature,
-        precipitation: this.precipitation,
+        precipitation,
         sunUpDot: this.upDot,
         light: rainLight(this.cloudiness, this.lightningFlashIntensity),
         pixelAngle: this.pixelAngle,

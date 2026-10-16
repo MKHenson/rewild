@@ -2,6 +2,7 @@ import {
   AudioEngine,
   AudioScope,
   AudioSettings,
+  DUCKABLE_BUSES,
   SoundManifest,
 } from 'rewild-audio';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
@@ -29,11 +30,12 @@ export function openSceneScope(): AudioScope {
   return scene;
 }
 
-/** Fades out a scene scope's sounds and lifts the menu duck. */
+/** Fades out a scene scope's sounds and lifts the menu duck and the bus ducks. */
 export function closeSceneScope(scope: AudioScope): void {
   if (scene === scope) scene = null;
   scope.dispose();
   audio.duckWorld(false);
+  for (const bus of DUCKABLE_BUSES) audio.duckBus(bus, 1);
 }
 
 /** Fetches the audio templates: the sound manifest, whose files start downloading, the footsteps, the voice and the soundscapes. */

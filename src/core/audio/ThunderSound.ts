@@ -25,14 +25,12 @@ const RUMBLE_CUTOFF = 500;
 /** Thunders whose duck is tracked at once. A new one replaces the oldest. */
 const DUCK_SLOTS = 8;
 
-/** Seconds by e the ducked buses follow the duck. */
-const DUCK_FOLLOW = 0.05;
-
 /**
  * Thunder: drains the lightning's strike queue and plays each strike from its
  * direction, late by its distance at the speed of sound, quieter and deeper
- * the further it is. As each thunder arrives it ducks the rain, the wind and
- * the land, so it cuts through them. Before a storm, a rare low rumble with no
+ * the further it is. As each thunder arrives its `duck` falls, for WorldSound
+ * to duck the rain, the wind and the land, so it cuts through them. Before a
+ * storm, a rare low rumble with no
  * bolt comes from upwind, where the storm is.
  */
 export class ThunderSound {
@@ -122,8 +120,6 @@ export class ThunderSound {
       );
     if (duck > 0.999) duck = 1;
     this._duck = duck;
-    this._engine.duckBus('weather', duck, DUCK_FOLLOW);
-    this._engine.duckBus('ambience', duck, DUCK_FOLLOW);
   }
 
   private _updateRumble(

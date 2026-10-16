@@ -127,7 +127,7 @@ A GPU compute + render particle system managing **50,000 particles**. Not a scre
 
 **Render pass** (`rainRender.wgsl`): billboard quads with depth test. Particle appearance blends between rain (streaks, slight blue tint) and snow (round flakes, slow wobble) based on `temperature`. Brightness is tinted by sun elevation — darker at night.
 
-`SkyRenderer` calls `rainPass.simulate()` then `rainPass.render()` each frame, passing current wind, precipitation, and camera data via the `RainParticleParams` struct.
+`SkyRenderer` calls `rainPass.simulate()` then `rainPass.render()` each frame, passing current wind, precipitation, and camera data via the `RainParticleParams` struct. Rain forms in the cloud deck, so the precipitation it passes thins as the camera climbs through the deck and is gone above it (`rainBelowDeck` in `CloudDeck.ts`). The drops on the lens follow the same share.
 
 **Wet surfaces** (`RainWetness`): rain darkens porous surfaces and glosses level ones, building while it falls and drying after. `SkyRenderer.rainWetness` carries it to every lit material through `IblParams.rain`. See [Rain on surfaces](./milestones/pelagic.md#rain-on-surfaces).
 

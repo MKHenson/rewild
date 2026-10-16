@@ -12,6 +12,7 @@ import {
 } from 'rewild-renderer/lib/renderers/terrain/Water';
 import type { ShorePoint } from 'rewild-renderer/lib/renderers/water/ShoreField';
 import type { WaterQuerySample } from 'rewild-renderer/lib/renderers/water/WaterQuery';
+import { AloftSound } from './AloftSound';
 import { soundscapesDef, soundscapesLoaded } from './audio';
 import { OpenSeaSound, SeaWater } from './OpenSeaSound';
 import { RainSound } from './RainSound';
@@ -54,10 +55,14 @@ class TerrainWater implements SurfWater, SeaWater {
 
 const BIOME_PROBE_SECONDS = 0.2;
 
+/** Seconds by e the ducked buses follow the thunder and the climb. */
+const DUCK_FOLLOW = 0.05;
+
 /**
  * The sound of the world around the listener: the weather now, and the water
- * and the land as they arrive. The game and the editor each own one in their
- * scene scope and update it once a frame, before `audio.update()`.
+ * and the land as they arrive, fading to the aloft loop above the clouds. The
+ * game and the editor each own one in their scene scope and update it once a
+ * frame, before `audio.update()`.
  */
 export class WorldSound {
   private readonly _wind: WindSound;
@@ -65,6 +70,7 @@ export class WorldSound {
   private readonly _thunder: ThunderSound;
   private readonly _surf: SurfSound;
   private readonly _openSea: OpenSeaSound;
+  private readonly _aloft: AloftSound;
   private readonly _water = new TerrainWater();
   private readonly _biomes = new BiomeProbe();
   private readonly _engine: AudioEngine;
@@ -95,6 +101,7 @@ export class WorldSound {
     this._thunder = new ThunderSound(engine, scope);
     this._surf = new SurfSound(engine, scope);
     this._openSea = new OpenSeaSound(engine, scope);
+    this._aloft = new AloftSound(engine, scope);
   }
 
   get wind(): WindSound {
@@ -122,6 +129,8 @@ export class WorldSound {
       atmosphere.running && atmosphere.state === 'FrontApproaching',
       seconds
     );
+    this._aloft.update();
+    this._duck();
     if (renderer.terrainRenderer) {
       this._water.attach(renderer.terrainRenderer);
       this._surf.update(this._water, sky.wind.vec[2], seconds);
@@ -137,6 +146,16 @@ export class WorldSound {
     this._engine.setReverb(
       renderer.terrainRenderer ? this._soundscape?.reverb ?? 0 : 0
     );
+  }
+
+  /** Ducks the rain, the wind and the land under thunder, and fades every
+   *  world bus out as the listener climbs above the clouds. */
+  private _duck(): void {
+    const below = 1 - this._aloft.share;
+    const thunder = this._thunder.duck * below;
+    this._engine.duckBus('weather', thunder, DUCK_FOLLOW);
+    this._engine.duckBus('ambience', thunder, DUCK_FOLLOW);
+    this._engine.duckBus('effects', below, DUCK_FOLLOW);
   }
 
   /** Builds the soundscape again whenever `soundscapes.json` loads. */

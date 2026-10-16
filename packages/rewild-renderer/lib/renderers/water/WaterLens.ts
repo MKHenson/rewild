@@ -140,6 +140,9 @@ export function airBlurShare(since: number, recovery: number): number {
  */
 export class WaterLens {
   settings: LensBlurSettings = { ...DEFAULT_LENS_BLUR };
+  /** 0..1: how hard the air rushes past a falling camera. The eye waters as
+   *  if facing into a full gale, whichever way it looks. */
+  freefall = 0;
   readonly drops = new LensDrops();
   private wasSubmerged = false;
   // The eye's response to the gusts, 0..1 (followGust).
@@ -205,12 +208,16 @@ export class WaterLens {
     const world = camera.transform.matrixWorld.elements;
     // The camera looks down its −z axis; the wind's vec is xz the way the air
     // moves, z its strength (WindState).
-    const windy = windBlurShare(wind[2], this.settings.windStart);
+    const gale = windBlurShare(wind[2], this.settings.windStart);
+    const windy = Math.max(gale, this.freefall);
     const windBlur =
       this.settings.wind *
-      windy *
-      windFacing(-world[8], -world[10], wind[0], wind[1]) *
-      (GUST_CALM + (1 - GUST_CALM) * this.gust);
+      Math.max(
+        gale *
+          windFacing(-world[8], -world[10], wind[0], wind[1]) *
+          (GUST_CALM + (1 - GUST_CALM) * this.gust),
+        this.freefall
+      );
     // The full-screen draw blurs and draws the waterline; rain alone needs
     // only the drops.
     const lens =

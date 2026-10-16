@@ -2,6 +2,7 @@ import { smoothstep } from 'rewild-common';
 import type { AudioEngine, AudioScope } from 'rewild-audio';
 import { BodySound } from './BodySound';
 import { DripSound } from './DripSound';
+import { FallSound } from './FallSound';
 import { Footsteps, FootstepsDef } from './Footsteps';
 import { SLIDING_FROM, SlideInput, SlideSound } from './SlideSound';
 import { SwimSound } from './SwimSound';
@@ -16,6 +17,8 @@ export interface PlayerSoundState extends SlideInput, VoiceInput {
   fallSpeed: number;
   /** Whether touching down did fall damage. */
   hurt: boolean;
+  /** 0..1: how hard the air rushes past a falling player (freefallShare). */
+  freefall: number;
   /** Player.verticalVelocity at the start of the frame, before the water slows it. */
   entryVelocity: number;
   /** Metres of water over the feet. */
@@ -61,6 +64,7 @@ function createState(): PlayerSoundState {
     climbing: false,
     fallSpeed: 0,
     hurt: false,
+    freefall: 0,
     entryVelocity: 0,
     swimming: false,
     immersion: 0,
@@ -83,8 +87,8 @@ function createState(): PlayerSoundState {
 }
 
 /**
- * Every sound the player makes: footsteps, the jump and landings, sliding,
- * swimming, dripping, the under-water mix, the flashlight, and the breath and
+ * Every sound the player makes: footsteps, the jump and landings, falling,
+ * sliding, swimming, dripping, the under-water mix, the flashlight, and the breath and
  * voice. The player fills in
  * `state` each frame and calls `update`; events such as a jump are calls of
  * their own. Everything plays in the player's scope.
@@ -98,6 +102,7 @@ export class PlayerSounds {
   private readonly _swim: SwimSound;
   private readonly _drips: DripSound;
   private readonly _slide: SlideSound;
+  private readonly _fall: FallSound;
   private readonly _voice: VoiceSound | null;
   private _wasOnGround = false;
   private _sinceThud = Infinity;
@@ -116,6 +121,7 @@ export class PlayerSounds {
     this._swim = new SwimSound(scope);
     this._drips = new DripSound(scope);
     this._slide = new SlideSound(scope, this._footsteps);
+    this._fall = new FallSound(scope);
     this._voice = voice ? createVoice(voice, scope) : null;
     VoiceSound.current = this._voice;
   }
@@ -142,6 +148,7 @@ export class PlayerSounds {
     if (!this._wasOnGround && s.onGround && s.immersion <= 0) this._land();
     this._wasOnGround = s.onGround;
     this._slide.update(s, seconds);
+    this._fall.update(s.freefall);
 
     this._underWater.update(
       s.immersion,
@@ -167,14 +174,15 @@ export class PlayerSounds {
 
   /**
    * The player died: the death sound, after the thud if a fall or an impact
-   * killed them; the breathing, the heartbeat, the slide and the drips fade
-   * out; and the world goes distant and dull.
+   * killed them; the breathing, the heartbeat, the slide, the fall and the
+   * drips fade out; and the world goes distant and dull.
    */
   die(): void {
     const delay = this._sinceThud < THUD_KILLS ? DEATH_AFTER_THUD : 0;
     if (this._voice) this._voice.die(DEATH_FADE, delay);
     else this._body.death(delay);
     this._slide.dispose();
+    this._fall.dispose();
     this._drips.dispose();
     this._underWater.die();
   }
@@ -185,6 +193,7 @@ export class PlayerSounds {
     this._underWater.dispose();
     this._drips.dispose();
     this._slide.dispose();
+    this._fall.dispose();
     this._voice?.dispose();
   }
 

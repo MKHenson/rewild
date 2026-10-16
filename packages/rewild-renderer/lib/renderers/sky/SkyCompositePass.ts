@@ -8,6 +8,7 @@ import commonShaderFns from '../../shaders/sky/fog.wgsl';
 import { PostProcessManager } from '../../post-processes/PostProcessManager';
 import { Camera } from '../../core/Camera';
 import { degToRad, Matrix4, Vector3 } from 'rewild-common';
+import { CLOUD_START } from './CloudDeck';
 
 const finalUniformBufferSize =
   64 + // invViewProjectionMatrix
@@ -26,10 +27,6 @@ const finalUniformBufferSize =
 
 const alignedUniformBufferSize = Math.ceil(finalUniformBufferSize / 256) * 256;
 const BLEND_UNIFORM_SIZE = Math.ceil(16 / 256) * 256; // resolution vec2f + cloudsGated + pad
-
-/** Mirrors CLOUD_START in shaders/sky/skyConstants.wgsl. Below this altitude the
- *  cloud pass depth-gates, leaving vec4f(0) on terrain-occluded texels. */
-const CLOUD_START = 500.0;
 
 // Reused across frames — renderBlend runs every frame and must not allocate.
 const blendData = new Float32Array(BLEND_UNIFORM_SIZE / 4);

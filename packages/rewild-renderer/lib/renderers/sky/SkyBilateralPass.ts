@@ -3,6 +3,7 @@ import bilateralShader from '../../shaders/sky/skyBilateral.wgsl';
 import { RenderQuality } from '../../utils/RenderQuality';
 import { composeShader } from '../../utils/shaderDefines';
 import { bilateralShaderDefines } from './SkyQuality';
+import { CLOUD_START } from './CloudDeck';
 
 // Uniform layout (matches SkyBilateralUniforms in skyBilateral.wgsl):
 //   resolution        : vec2<f32>    offset  0, size  8
@@ -15,10 +16,6 @@ import { bilateralShaderDefines } from './SkyQuality';
 // Total: 96 bytes → aligned to 256
 const UNIFORM_BYTE_SIZE = 96;
 const ALIGNED_UNIFORM_SIZE = Math.ceil(UNIFORM_BYTE_SIZE / 256) * 256;
-
-/** Mirrors CLOUD_START in shaders/sky/skyConstants.wgsl. Below this altitude the
- *  cloud pass depth-gates, leaving vec4f(0) on terrain-occluded texels. */
-const CLOUD_START = 500.0;
 
 /**
  * Single-pass bilateral filter for cloud edge-preserving softening.
