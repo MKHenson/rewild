@@ -141,6 +141,11 @@ export class WaterPass implements IMaterialPass {
     for (const water of this.allWaterUniforms) water.grid = grid;
   }
 
+  /** The chunk's fade over the horizon ring, 0 to 1. */
+  setFade(device: GPUDevice, fade: number) {
+    for (const water of this.allWaterUniforms) water.setFade(device, fade);
+  }
+
   set wavesBuffer(buffer: GPUBuffer) {
     for (const water of this.allWaterUniforms) water.wavesBuffer = buffer;
   }

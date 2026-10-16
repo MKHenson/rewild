@@ -12,9 +12,11 @@ import { MAX_WATER_TYPES, WaterType } from '../../renderers/terrain/Water';
 //   scatter     array<vec4f, 4>   offset 16  (a: crest foam amount)
 //   extinction  array<vec4f, 4>   offset 80
 //   baseLevel   f32               offset 144
+//   fade        f32               offset 148
 const SCATTER_OFFSET = 4;
 const EXTINCTION_OFFSET = SCATTER_OFFSET + MAX_WATER_TYPES * 4;
 const BASE_LEVEL_OFFSET = EXTINCTION_OFFSET + MAX_WATER_TYPES * 4;
+const FADE_OFFSET = BASE_LEVEL_OFFSET + 1;
 const PARAMS_FLOATS = BASE_LEVEL_OFFSET + 4;
 
 /** Where a chunk's water sits: its centre in world xz, and the world height
@@ -70,6 +72,8 @@ export class WaterUniforms implements ISharedUniformBuffer {
   private _paramsBuffer: GPUBuffer | null = null;
   private _paramsData = new Float32Array(PARAMS_FLOATS);
   private _refraction: GPUTexture | null = null;
+  // How far the chunk has faded in over the horizon ring, 0 to 1.
+  private _fade = 1;
 
   /** `refracts`: bind the renderer's refraction capture. `shades`: bind the
    *  ocean's slopes and the foam texture. Each is for the
@@ -104,6 +108,22 @@ export class WaterUniforms implements ISharedUniformBuffer {
     this.requiresBuild = true;
   }
 
+  /** Sets the chunk's fade, written straight to the GPU once the params
+   *  exist. */
+  setFade(device: GPUDevice, fade: number) {
+    if (fade === this._fade) return;
+    this._fade = fade;
+    if (!this._paramsBuffer) return;
+    this._paramsData[FADE_OFFSET] = fade;
+    device.queue.writeBuffer(
+      this._paramsBuffer,
+      FADE_OFFSET * 4,
+      this._paramsData,
+      FADE_OFFSET,
+      1
+    );
+  }
+
   /** The shared Waves uniform (WaterWaveBuffer). */
   set wavesBuffer(buffer: GPUBuffer) {
     this._wavesBuffer = buffer;
@@ -126,6 +146,7 @@ export class WaterUniforms implements ISharedUniformBuffer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     packWaterParams(this._palette, surface.width, this._grid, this._paramsData);
+    this._paramsData[FADE_OFFSET] = this._fade;
     device.queue.writeBuffer(this._paramsBuffer, 0, this._paramsData);
 
     const entries: GPUBindGroupEntry[] = [
