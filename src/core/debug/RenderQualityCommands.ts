@@ -1,4 +1,10 @@
-import { Renderer, RENDER_QUALITIES, isRenderQuality } from 'rewild-renderer';
+import {
+  Renderer,
+  QUALITY_ASPECTS,
+  RENDER_QUALITIES,
+  isQualityAspect,
+  isRenderQuality,
+} from 'rewild-renderer';
 
 // Whole-frame image controls: the render quality tier, exposure and bloom. All
 // three cut across the sky/scene split, which is why they live here rather than
@@ -39,6 +45,22 @@ export function registerRenderQualityCommands(renderer: Renderer) {
     console.log(
       `Render quality → ${quality}; affected shaders rebuild on the next frame.`
     );
+  };
+
+  // One subsystem's tier, leaving the rest on the app-wide one. Persists like
+  // setRenderQuality and rebuilds that subsystem's shaders on the next frame.
+  (window as any).setQualityAspect = (aspect?: string, quality?: string) => {
+    if (!isQualityAspect(aspect) || !isRenderQuality(quality)) {
+      console.log(
+        `setQualityAspect(aspect, quality) — aspect: ${QUALITY_ASPECTS.join(
+          ' | '
+        )}; quality: ${RENDER_QUALITIES.join(' | ')}`
+      );
+      return;
+    }
+
+    renderer.quality.setAspect(aspect, quality);
+    console.log(`${aspect} quality → ${quality}; shaders rebuild next frame.`);
   };
 
   // Whole-frame exposure — the linear scale applied to HDR radiance just before

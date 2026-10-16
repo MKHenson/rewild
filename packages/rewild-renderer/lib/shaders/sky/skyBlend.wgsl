@@ -89,7 +89,17 @@ fn sampleCloudsValid(uv: vec2f) -> vec4f {
     // the cap is doing far less than it was designed to. Worth revisiting if thin cloud
     // in front of the sun starts reading as solid white again.
     let skyCapped = min(sky.rgb, vec3f(60.0));
-    let blended = skyCapped * (1.0 - clouds.a) + clouds.rgb * clouds.a;
+
+    // Over the scene, what lies behind the cloud is the scene, which
+    // skyComposite blends the cloud over by its opacity. Blending the sky in
+    // here too would count the background twice and, where the sky below the
+    // horizon is dark, darken part-covered pixels such as the far edge of the
+    // deck seen from above.
+    let dDims = vec2f(textureDimensions(depthTexture));
+    let depthCoord = clamp(vec2i(uv * dDims), vec2i(0), vec2i(dDims) - 1);
+    let overScene = textureLoad(depthTexture, depthCoord, 0) < 1.0;
+    let behind = select(skyCapped, clouds.rgb, overScene);
+    let blended = behind * (1.0 - clouds.a) + clouds.rgb * clouds.a;
 
     // Alpha carries CLOUD opacity, not the composited alpha. The sky pass used to
     // write alpha=0 on terrain-occluded pixels, which made the composited alpha
