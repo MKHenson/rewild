@@ -959,7 +959,7 @@ export class TerrainChunk implements IComponent {
     // Every frame, as a LOD mesh built mid-fade starts at full.
     for (const lod of this.lodMesh) {
       const pass = lod.mesh?.material as TerrainPass | undefined;
-      pass?.terrainUniforms.setFade(device, this.fade);
+      pass?.setFade(device, this.fade);
     }
   }
 

@@ -19,6 +19,9 @@ const HAS_TERRAIN_PARALLAX: bool = ${ HAS_TERRAIN_PARALLAX };
 // Take the second no-tile tap. Half of the per-layer texture reads live behind
 // this; turning it off lets the texture repeat show. See TerrainQuality.
 const HAS_TERRAIN_NO_TILE: bool = ${ HAS_TERRAIN_NO_TILE };
+// Whether this chunk is fading in over the horizon ring. Off compiles the
+// discard out, which keeps the early depth test for every chunk not fading.
+const HAS_TERRAIN_FADE: bool = ${ HAS_TERRAIN_FADE };
 
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
@@ -505,8 +508,10 @@ fn fs(
   @builtin(position) fragCoord: vec4f
 ) -> SceneFragment {
   // The horizon ring draws the pixels a fading chunk leaves.
-  if (fadePattern(fragCoord.xy) >= terrainParams.fade) {
-    discard;
+  if (HAS_TERRAIN_FADE) {
+    if (fadePattern(fragCoord.xy) >= terrainParams.fade) {
+      discard;
+    }
   }
 
   // --- Uniform control flow: everything needing implicit derivatives ---------
