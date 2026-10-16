@@ -107,12 +107,15 @@ skyRenderer.triggerLightning(worldPos?) // manually trigger a strike
 
 ## Overcast Sky Response
 
-Implemented in `atmosphere.wgsl`. When `cloudiness` exceeds ~0.5, an `overcastFactor` is derived and applied to:
+Implemented in `sky/fog.wgsl`, from `cloudiness`:
 
-- Sky zenith and horizon colors — shift toward pale gray-blue
-- Sun disk — softer edge, reduced intensity
+- Sky colour (`getAtmosphereColor`) — greys from 0.8 to 0.95, dims from 0.9 to 1. Gated by sun elevation so the night sky is unaffected.
+- Fog colour (`getFogScatterColor`) — dims gently with any cover, then darkens and turns storm grey from 0.85 to 0.95.
+- Stars (`skyGradient.wgsl`) — fade with the cover.
 
-The effect is gated by sun elevation so the night sky is unaffected.
+All of these read `shadingCloudiness()`, not `cloudiness` directly: cloud cover shades the air under the deck, so it applies in full below the deck and fades out as the camera climbs through it. Above the deck the sky is clear, the haze is sunlit and the stars are out, whatever the weather below.
+
+The IBL capture is drawn from the same gradient (the clouds themselves are not captured), so this is also what darkens the scene's ambient light under heavy cover.
 
 ---
 
