@@ -113,6 +113,14 @@ const OVERCAST_START: f32 = 0.85;
 const OVERCAST_FULL: f32 = 0.95;
 const BROKEN_CLOUD_DIM: f32 = 0.8;   // fog brightness at OVERCAST_START
 
+// The cloudiness the sky and fog are shaded by. Cloud cover shades the air under
+// the deck, so it applies in full below it and is gone once the camera has
+// climbed through: above, the sky is clear and the haze sunlit.
+fn shadingCloudiness() -> f32 {
+    let underDeck = 1.0 - smoothstep(CLOUD_START, CLOUD_START + CLOUD_HEIGHT, object.cameraPosition.y);
+    return object.cloudiness * underDeck;
+}
+
 // A broad haze over the ground fog, for scene pixels only: it thickens with
 // foginess and reaches far above the ground layer, so distant terrain fades
 // from any camera height. Thinner with altitude, never gone.
@@ -255,21 +263,22 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     let mu = dot(vSunDirection, dir) * sunVisibility;
 
     let foginess = object.foginess;
+    let cloudiness = shadingCloudiness();
 
     // Cloud occlusion: clouds block sunlight from reaching the lower atmosphere.
     // Broken cloud (below OVERCAST_START) only dims gently to BROKEN_CLOUD_DIM;
     // the heavy drop to 0.05 happens across OVERCAST_START → OVERCAST_FULL, and
     // total cover lights the fog the same as OVERCAST_FULL so it reads flat grey
     // rather than black.
-    let brokenCloudDim = mix(1.0, BROKEN_CLOUD_DIM, saturate(object.cloudiness / OVERCAST_START));
-    let overcastDim = mix(1.0, 0.05 / BROKEN_CLOUD_DIM, smoothstep(OVERCAST_START, OVERCAST_FULL, object.cloudiness));
+    let brokenCloudDim = mix(1.0, BROKEN_CLOUD_DIM, saturate(cloudiness / OVERCAST_START));
+    let overcastDim = mix(1.0, 0.05 / BROKEN_CLOUD_DIM, smoothstep(OVERCAST_START, OVERCAST_FULL, cloudiness));
     let cloudOcclusion = brokenCloudDim * overcastDim;
 
     // Combined sun strength: elevation + cloud cover
     let effectiveSunStrength = sunVisibility * cloudOcclusion;
 
     // Henyey-Greenstein forward scattering (g=0.76 base, reduced in stormy/foggy conditions)
-    let fogPhase = mix(0.4, 0.2, foginess * object.cloudiness) * HenyeyGreenstein(mu, mix( 0.76, 0.68, foginess * object.cloudiness ) );
+    let fogPhase = mix(0.4, 0.2, foginess * cloudiness) * HenyeyGreenstein(mu, mix( 0.76, 0.68, foginess * cloudiness ) );
 
     // Evening haze, split by azimuth. Uses the raw view-sun angle rather than the
     // sunVisibility-scaled `mu` above: the gold-to-violet split across the ring is
@@ -285,12 +294,12 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     var fogColor = mix(FOG_COLOR_NIGHT, eveningColor, smoothstep(-0.16, 0.0, sunDotUp));
     fogColor = mix(fogColor, FOG_COLOR_DAY, smoothstep(0.0, 0.3, sunDotUp));
 
-    let stormFactor = saturate( (object.cloudiness - OVERCAST_START) / (1.0 - OVERCAST_START) );
+    let stormFactor = saturate( (cloudiness - OVERCAST_START) / (1.0 - OVERCAST_START) );
     fogColor = mix( fogColor, FOG_COLOR_STORM, stormFactor );
 
     // W1.3: shift horizon fog toward neutral gray under overcast (daytime only)
     let overcastDayFactor_fog = smoothstep(-0.05, 0.15, sunDotUp);
-    let overcastFactor_fog    = smoothstep(OVERCAST_START, OVERCAST_FULL, object.cloudiness) * overcastDayFactor_fog;
+    let overcastFactor_fog    = smoothstep(OVERCAST_START, OVERCAST_FULL, cloudiness) * overcastDayFactor_fog;
     fogColor = mix(fogColor, vec3f(0.73, 0.73, 0.73), overcastFactor_fog);
 
     // Extreme overcast (0.9→1.0): desaturate toward luminance so the storm tint's
@@ -298,7 +307,7 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     // gated by sun elevation — a maxed-out sky is colourless at any hour — and it
     // preserves brightness (night stays dark, day stays bright) by pulling toward
     // the fog's own luminance rather than a fixed grey.
-    let neutralSwing = smoothstep(0.9, 1.0, object.cloudiness);
+    let neutralSwing = smoothstep(0.9, 1.0, cloudiness);
     let fogLuma = dot(fogColor, vec3f(0.2126, 0.7152, 0.0722));
     fogColor = mix(fogColor, vec3f(fogLuma), neutralSwing);
 
@@ -355,10 +364,12 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     //     cloud show clear sky, so the sky only greys once there are few left.
     //   darkFactor — dims the sky. Held back to the 0.9→1.0 bracket so only a
     //     near-total overcast actually goes dark.
-    // Both gated by day so the night sky is unaffected.
+    // Both gated by day so the night sky is unaffected, and both by
+    // shadingCloudiness so the sky above the deck is clear.
+    let cloudiness        = shadingCloudiness();
     let overcastDayFactor = smoothstep(-0.05, 0.15, sunDotUp);
-    let greyFactor        = smoothstep(OVERCAST_START - 0.05, OVERCAST_FULL, object.cloudiness) * overcastDayFactor;
-    let darkFactor        = smoothstep(0.9, 1.0, object.cloudiness) * overcastDayFactor;
+    let greyFactor        = smoothstep(OVERCAST_START - 0.05, OVERCAST_FULL, cloudiness) * overcastDayFactor;
+    let darkFactor        = smoothstep(0.9, 1.0, cloudiness) * overcastDayFactor;
     let overcastFactor    = greyFactor;
 
     // Sun proximity gradient: bright near the sun, dark away from it.

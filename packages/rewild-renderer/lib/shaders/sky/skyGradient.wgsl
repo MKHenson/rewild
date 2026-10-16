@@ -126,11 +126,12 @@ fn fs(
     // bloom pass masks that one out by coverage weight instead.
 
     if (camHeight >= ATM_START_FS) {
-        // Above the cloud layer. Fade out stars when looking down and when clouds are thick.
+        // Above the cloud layer. Fade out stars when looking down, and with the
+        // cloud cover until the camera has climbed through the deck.
         let moon = moonDisc(direction, vSunDirection);
         let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a);
         let downFade = smoothstep(-0.1, 0.1, viewVertical);
-        let cloudinessFade = 1.0 - object.cloudiness;
+        let cloudinessFade = 1.0 - shadingCloudiness();
         let adjustedNightSky = nightSky * downFade * cloudinessFade;
         let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, adjustedNightSky, moon.rgb );
         output.color = vec4f( atmosphereColor, 1.0 );
@@ -148,7 +149,7 @@ fn fs(
     // so the color exactly matches what's at the horizon edge (no palette mismatch).
     // Stars fade with cloud coverage.
     let horizonDir = normalize(vec3f(direction.x, max(0.001, direction.y), direction.z));
-    let horizonNightSky = sampleNightSky(horizonDir) * starVisibility * (1.0 - object.cloudiness);
+    let horizonNightSky = sampleNightSky(horizonDir) * starVisibility * (1.0 - shadingCloudiness());
     var horizonFog = drawSkyAndHorizonFog(horizonDir, org, vSunDirection, horizonNightSky, vec3f(0.0));
 
     // Azimuth is undefined looking straight down — every azimuth converges on
@@ -177,7 +178,7 @@ fn fs(
             sunPerp = perpAxis / perpLen;
         }
 
-        let nadirNightSky = sampleNightSky(sunPerp) * starVisibility * (1.0 - object.cloudiness);
+        let nadirNightSky = sampleNightSky(sunPerp) * starVisibility * (1.0 - shadingCloudiness());
         let nadirFog = drawSkyAndHorizonFog(sunPerp, org, vSunDirection, nadirNightSky, vec3f(0.0));
         horizonFog = mix(horizonFog, nadirFog, nadirFade);
     }
@@ -189,7 +190,7 @@ fn fs(
     // Horizon transition band: blend between below-horizon color and atmosphere above
     if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
         let moon = moonDisc(direction, vSunDirection);
-        let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a) * (1.0 - object.cloudiness);
+        let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a) * (1.0 - shadingCloudiness());
         let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky, moon.rgb );
         output.color = vec4f( mix( horizonFog, atmosphereColor, hemisphereMask), 1.0 );
         return output;
@@ -202,7 +203,7 @@ fn fs(
     // Above horizon: full atmosphere
     else {
         let moon = moonDisc(direction, vSunDirection);
-        let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a) * (1.0 - object.cloudiness);
+        let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a) * (1.0 - shadingCloudiness());
         let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky, moon.rgb );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
