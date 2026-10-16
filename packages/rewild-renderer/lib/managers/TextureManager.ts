@@ -228,6 +228,38 @@ export class TextureManager {
         glowSize
       )
     );
+
+    this.addTexture(
+      new DataTexture(
+        new TextureProperties('waypoint-marker', false),
+        this.createWaypointMarkerData(glowSize),
+        glowSize,
+        glowSize
+      )
+    );
+  }
+
+  // A white ring with a soft halo around a centre dot, for tinted waypoint sprites.
+  private createWaypointMarkerData(size: number) {
+    const half = size / 2;
+    const data = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (x - half + 0.5) / half;
+        const dy = (y - half + 0.5) / half;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const ring = Math.max(0, 1 - Math.abs(d - 0.7) / 0.08);
+        const dot = Math.max(0, 1 - d / 0.22);
+        const halo = 0.35 * Math.max(0, 1 - Math.abs(d - 0.7) / 0.3);
+        const alpha = Math.min(1, ring + dot + halo * halo);
+        const i = (y * size + x) * 4;
+        data[i] = 255;
+        data[i + 1] = 255;
+        data[i + 2] = 255;
+        data[i + 3] = Math.round(alpha * 255);
+      }
+    }
+    return data;
   }
 
   // Smooth, tileable, low-frequency value noise.

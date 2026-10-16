@@ -5,16 +5,19 @@ import {
   PointLight,
   PortalPass,
   Renderer,
+  Sprite3D,
+  SpritePass,
   Transform,
   createPortalViewCube,
 } from 'rewild-renderer';
 import { Asset3D } from './Asset3D';
 import type { AssetReader } from '../../database/local-asset-store';
 import { PortalSound } from '../audio/PortalSound';
-import { PortalOpening } from './PortalOpening';
+import { OPEN_RANGE, PortalOpening } from './PortalOpening';
 import { GameManager } from '../GameManager';
 import { PortalTrigger } from './behaviours/PortalTrigger';
 import { audio } from '../audio/audio';
+import { InteractionLayer } from '../InteractionLayer';
 
 /** The level file a portal shows: its destination seen from that level's PlayerStart. */
 export const PORTAL_VIEW_ASSET_TYPE = 'portal-view';
@@ -29,6 +32,13 @@ const LIGHT_RANGE = 40;
 const CLOSED_GLOW = 0.25;
 /** How many times more often the lightning bursts while opening or closing. */
 const POWERING_RATE = 6;
+/** The waypoint marker's size as a share of its distance, keeping it a steady size on screen. */
+const MARKER_SIZE = 0.035;
+/** Distances in portal radii over which the marker fades in as the player leaves. */
+const MARKER_FADE_START = OPEN_RANGE;
+const MARKER_FADE_END = OPEN_RANGE * 2;
+/** How high the marker sits above the portal's centre, in radii. */
+const MARKER_HEIGHT = 1.5;
 
 /**
  * A sphere that shows its target level and takes the player there. In a game
@@ -44,6 +54,9 @@ export class PortalAsset extends Asset3D {
   targetLevel = '';
   /** Its sounds in a game; null in the editor. */
   sound: PortalSound | null = null;
+  /** Guides the player to the portal from afar in a game; null in the editor. */
+  marker: Sprite3D | null = null;
+  private markerPass: SpritePass | null = null;
   /** Open in the editor; `mount` closes it for a game. */
   opening = new PortalOpening(true);
 
@@ -71,7 +84,26 @@ export class PortalAsset extends Asset3D {
     if (gameManager) {
       this.addBehavior(new PortalTrigger());
       this.sound = new PortalSound(gameManager.sound, audio);
+      this.marker = this.createMarker(renderer);
     }
+  }
+
+  private createMarker(renderer: Renderer): Sprite3D {
+    const pass = new SpritePass();
+    pass.alwaysOnTop = true;
+    pass.spriteUniforms.texture =
+      renderer.textureManager.get('waypoint-marker').gpuTexture;
+    this.markerPass = pass;
+    const marker = new Sprite3D(
+      renderer.geometryManager.get('sprite-quad'),
+      pass
+    );
+    marker.alwaysOnScreen = true;
+    marker.transform.visible = false;
+    marker.transform.name = `${this.transform.name}-marker`;
+    marker.transform.layers.set(InteractionLayer.Helper);
+    this.transform.addChild(marker.transform);
+    return marker;
   }
 
   mount(): void {
@@ -97,6 +129,27 @@ export class PortalAsset extends Asset3D {
     arcs.spawning = this.opening.openness > 0;
     arcs.rate = this.opening.isChanging ? POWERING_RATE : 1;
     this.applyOpening();
+    this.applyMarker(distance);
+  }
+
+  // Keeps the marker a steady size on screen and fades it out as the player nears.
+  private applyMarker(distance: number) {
+    const marker = this.marker;
+    if (!marker || !this.markerPass) return;
+    const fade = Math.min(
+      1,
+      Math.max(
+        0,
+        (distance / this.radius - MARKER_FADE_START) /
+          (MARKER_FADE_END - MARKER_FADE_START)
+      )
+    );
+    marker.transform.visible = fade > 0;
+    if (fade === 0) return;
+    const size = distance * MARKER_SIZE;
+    marker.transform.scale.set(size, size, size);
+    marker.transform.position.y = this.radius * MARKER_HEIGHT;
+    this.markerPass.spriteUniforms.diffuseAlpha = fade;
   }
 
   applyProperties(resource: IResource = this.data) {
@@ -110,6 +163,13 @@ export class PortalAsset extends Asset3D {
     if (tint) {
       this.pass.portal.tint.setRGB(tint[0], tint[1], tint[2]);
       this.light.color.setRGB(tint[0], tint[1], tint[2]);
+      const markerUniforms = this.markerPass?.spriteUniforms;
+      if (markerUniforms)
+        markerUniforms.diffuseColor = markerUniforms.diffuseColor.setRGB(
+          tint[0],
+          tint[1],
+          tint[2]
+        );
     }
     if (typeof properties.intensity === 'number')
       this.pass.portal.glow = properties.intensity;
@@ -141,6 +201,12 @@ export class PortalAsset extends Asset3D {
     this.renderer.removePortal(this.pass);
     this.sound?.dispose();
     this.sound = null;
+    this.markerPass?.dispose();
+    this.markerPass = null;
+    if (this.marker) {
+      this.transform.removeChild(this.marker.transform);
+      this.marker = null;
+    }
     delete this.transform.userData.portal;
   }
 

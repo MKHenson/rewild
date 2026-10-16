@@ -104,9 +104,10 @@ export class SpriteProjView implements IPerMeshUniformBuffer {
         clipW <= 0 || Math.abs(ndcX) > 1 || Math.abs(ndcY) > 1;
 
       if (isOffscreen) {
-        // Compute the perspective-correct scale from the original depth
-        // so the clamped icon approximates the sprite's apparent world size
-        const originalClipW = clipW > 0 ? clipW : Math.abs(viewZ) || 1;
+        // Distance, not depth: depth nears zero beside or behind the camera
+        // and would blow the clamped icon up to fill the screen
+        const originalClipW =
+          Math.sqrt(viewX * viewX + viewY * viewY + viewZ * viewZ) || 1;
 
         // Place clamped sprite at a fixed near depth
         const fixedZ = -2.0;

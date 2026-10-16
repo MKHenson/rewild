@@ -22,6 +22,7 @@ export class SpritePass implements IMaterialPass {
   spriteUniforms: SpriteUniforms;
   side: GPUFrontFace;
   private _blendMode: BlendMode = 'alpha';
+  private _alwaysOnTop = false;
 
   constructor() {
     this.side = 'ccw';
@@ -42,6 +43,17 @@ export class SpritePass implements IMaterialPass {
   set blendMode(mode: BlendMode) {
     if (this._blendMode === mode) return;
     this._blendMode = mode;
+    this.requiresRebuild = true;
+  }
+
+  /** Draws over anything in front of it rather than being hidden by it. */
+  get alwaysOnTop(): boolean {
+    return this._alwaysOnTop;
+  }
+
+  set alwaysOnTop(onTop: boolean) {
+    if (this._alwaysOnTop === onTop) return;
+    this._alwaysOnTop = onTop;
     this.requiresRebuild = true;
   }
 
@@ -120,7 +132,7 @@ export class SpritePass implements IMaterialPass {
       },
       depthStencil: {
         depthWriteEnabled: false,
-        depthCompare: 'less',
+        depthCompare: this._alwaysOnTop ? 'always' : 'less',
         format: 'depth24plus',
       },
     });
