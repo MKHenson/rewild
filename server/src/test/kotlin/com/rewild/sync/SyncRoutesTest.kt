@@ -55,6 +55,15 @@ class SyncRoutesTest {
             levelId = null,
             name = name,
             description = "A test project",
+            updatedAt = updatedAt
+        )
+
+        private fun makeLevel(id: String, updatedAt: Long = 1000L) = Level(
+            id = id,
+            userId = "placeholder",
+            projectId = "proj-1",
+            name = "Test Level",
+            hasTerrain = false,
             startEvent = "",
             sceneGraph = SceneGraph(
                 containers = emptyList(),
@@ -68,17 +77,6 @@ class SyncRoutesTest {
                     dayNightCycle = JsonPrimitive(true)
                 )
             ),
-            updatedAt = updatedAt
-        )
-
-        private fun makeLevel(id: String, updatedAt: Long = 1000L) = Level(
-            id = id,
-            userId = "placeholder",
-            projectId = "proj-1",
-            name = "Test Level",
-            hasTerrain = false,
-            startEvent = "",
-            containers = emptyList(),
             updatedAt = updatedAt
         )
 

@@ -4,6 +4,7 @@ declare module 'models' {
     | 'ribbon'
     | 'scene-graph'
     | 'actors'
+    | 'levels'
     | 'viewport';
   import type { IDragDropAction, ITreeNode, IconType } from 'rewild-ui';
   import type { PhysicsShape } from 'rewild-renderer';
@@ -120,32 +121,33 @@ declare module 'models' {
 
   export interface IProject {
     id?: string;
+    /** The level a game of this project starts in. */
     levelId: string;
     name: string;
     description: string;
-    startEvent: string;
     /** Set by the server when the owner uploads an image. */
     imageUrl?: string | null;
-    sceneGraph: {
-      containers: IContainer[];
-      atmosphere: {
-        elevation: PropValue;
-        cloudiness: PropValue;
-        foginess: PropValue;
-        windiness: PropValue;
-        windDirection?: PropValue;
-        precipitation: PropValue;
-        temperature: PropValue;
-        dayNightCycle: PropValue;
-        /** A weather state id to start in, or 'auto' for the nearest to the knobs. */
-        weatherState?: PropValue;
-        /** 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter. */
-        moonPhase?: PropValue;
-        /** Picks a moon phase at random when the world loads. */
-        randomMoonPhase?: PropValue;
-      };
-      terrain?: WorldGenConfig;
+  }
+
+  export interface ISceneGraph {
+    containers: IContainer[];
+    atmosphere: {
+      elevation: PropValue;
+      cloudiness: PropValue;
+      foginess: PropValue;
+      windiness: PropValue;
+      windDirection?: PropValue;
+      precipitation: PropValue;
+      temperature: PropValue;
+      dayNightCycle: PropValue;
+      /** A weather state id to start in, or 'auto' for the nearest to the knobs. */
+      weatherState?: PropValue;
+      /** 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter. */
+      moonPhase?: PropValue;
+      /** Picks a moon phase at random when the world loads. */
+      randomMoonPhase?: PropValue;
     };
+    terrain?: WorldGenConfig;
   }
 
   export interface ILevel {
@@ -154,7 +156,7 @@ declare module 'models' {
     projectId: string;
     hasTerrain: boolean;
     startEvent: string;
-    containers: IContainer[];
+    sceneGraph: ISceneGraph;
     /** When a device last removed all of the level's chunk files. */
     chunksClearedAt?: number | null;
   }

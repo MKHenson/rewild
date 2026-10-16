@@ -6,14 +6,15 @@ import { authStore } from '../../stores/AuthStore';
 import { authService } from '../../../api/auth/auth-service';
 import { db } from 'src/database/database';
 import { clearDatabase } from 'src/database/local-db';
+import { emptySceneGraph } from 'src/test-utils';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 async function addProject(name: string, updatedAt: number, levelNames: string[] = []) {
-  const project = await db.projects.add({ name, description: `About ${name}`, startEvent: '', sceneGraph: { containers: [] } } as unknown as IProject);
+  const project = await db.projects.add({ name, description: `About ${name}`, } as unknown as IProject);
   const levels = [];
   for (const levelName of levelNames)
-    levels.push(await db.levels.add({ name: levelName, projectId: project.id, hasTerrain: true, startEvent: '', containers: [] } as ILevel));
+    levels.push(await db.levels.add({ name: levelName, projectId: project.id, hasTerrain: true, startEvent: '', sceneGraph: emptySceneGraph() } as ILevel));
   await db.projects.putSynced({ ...project, levelId: levels[0]?.id, updatedAt }, 0);
   return project.id;
 }

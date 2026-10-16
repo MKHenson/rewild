@@ -27,8 +27,9 @@ function setProject(terrain?: {
   climatePreset?: string;
   seaLevel?: number;
 }) {
-  projectStore.project = {
-    levelId: 'level-1',
+  projectStore.project = { id: 'project-1', levelId: 'level-1' } as never;
+  projectStore.level = {
+    id: 'level-1',
     sceneGraph: {
       terrain: terrain ? { version: 1, ...terrain } : undefined,
     },
@@ -207,7 +208,7 @@ describe('TerrainSettingsDialog', () => {
       await applyAndConfirm(comp);
 
       expect(clearLevelChunks).toHaveBeenCalledWith('level-1');
-      expect(projectStore.project!.sceneGraph.terrain).toEqual({
+      expect(projectStore.level!.sceneGraph.terrain).toEqual({
         version: 1,
         seed: 99,
         climatePreset: ARID_CLIMATE_PRESET,
@@ -304,7 +305,7 @@ describe('TerrainSettingsDialog', () => {
       expect(terrainRenderer.climatePreset).toBe(DEFAULT_CLIMATE_PRESET);
       expect(terrainRenderer.seaLevel).toBe(3);
       expect(terrainRenderer.reset).toHaveBeenCalledWith(42, expect.anything());
-      expect(projectStore.project!.sceneGraph.terrain!.seed).toBe(42);
+      expect(projectStore.level!.sceneGraph.terrain!.seed).toBe(42);
       expect(onClose).toHaveBeenCalled();
     });
 

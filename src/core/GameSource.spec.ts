@@ -5,6 +5,7 @@ import { authService } from '../api/auth/auth-service';
 import { db } from '../database/database';
 import { installOPFSMock } from '../database/opfs-mock';
 import { clearDatabase } from '../database/local-db';
+import { emptySceneGraph } from '../test-utils';
 
 const json = (body: unknown, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -18,16 +19,14 @@ const remoteProject = {
   levelId: 'remote-l',
   name: 'Remote',
   description: '',
-  startEvent: '',
-  sceneGraph: { containers: [] },
   updatedAt: 1,
 };
 
 const playResponse = {
   project: remoteProject,
   levels: [
-    { id: 'remote-l', projectId: 'remote-p', name: 'Start', hasTerrain: true, startEvent: '', containers: [], updatedAt: 1 },
-    { id: 'other-l', projectId: 'remote-p', name: 'Other', hasTerrain: true, startEvent: '', containers: [], updatedAt: 1 },
+    { id: 'remote-l', projectId: 'remote-p', name: 'Start', hasTerrain: true, startEvent: '', sceneGraph: emptySceneGraph(), updatedAt: 1 },
+    { id: 'other-l', projectId: 'remote-p', name: 'Other', hasTerrain: true, startEvent: '', sceneGraph: emptySceneGraph(), updatedAt: 1 },
   ],
   assets: [
     { id: 'a1', projectId: 'remote-p', levelId: 'remote-l', assetType: 'chunk', filename: '0_0.bin', publicUrl: 'https://cdn/start/0_0.bin?v=1', updatedAt: 1 },
@@ -58,8 +57,8 @@ describe('loadGameSource', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it('loads a project on this device from the local DB, without a request', async () => {
-    const project = await db.projects.add({ name: 'Mine', description: '', startEvent: '', sceneGraph: { containers: [] } } as unknown as IProject);
-    const level = await db.levels.add({ name: 'Start', projectId: project.id, hasTerrain: true, startEvent: '', containers: [] } as ILevel);
+    const project = await db.projects.add({ name: 'Mine', description: '', } as unknown as IProject);
+    const level = await db.levels.add({ name: 'Start', projectId: project.id, hasTerrain: true, startEvent: '', sceneGraph: emptySceneGraph() } as ILevel);
     await db.projects.patch(project.id, { levelId: level.id } as IProject);
     await db.assets.write({ projectId: project.id, levelId: level.id, assetType: 'chunk', filename: '0_0.bin' }, new Uint8Array([4]).buffer);
 

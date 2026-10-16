@@ -196,8 +196,6 @@ class AdminRoutesTest {
             it[ProjectsTable.userId] = userId
             it[ProjectsTable.name] = name
             it[description] = "About $id"
-            it[startEvent] = ""
-            it[sceneGraph] = "{}"
             it[ProjectsTable.updatedAt] = updatedAt
             it[ProjectsTable.deletedAt] = deletedAt
         }

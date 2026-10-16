@@ -45,7 +45,6 @@ import { projectStore } from 'src/ui/stores/ProjectStore';
 import { waterBrushStore } from 'src/ui/stores/WaterBrushStore';
 import { BrushCursor, pickTerrain } from './BrushCursor';
 import { ChunkHeightLoader } from './ChunkHeights';
-import { startLevelRef } from 'src/database/local-asset-store';
 
 // Stamp pacing, mirroring the paint brushes.
 const MAX_STAMP_DT = 0.1; // seconds
@@ -258,7 +257,7 @@ export class TerrainWaterBrushController {
     const stroke = this.stroke;
     this.stroke = null;
     if (!stroke) return;
-    const level = startLevelRef(projectStore.project);
+    const level = projectStore.levelRef;
     const rules = this.renderer.terrainRenderer.waterRules;
 
     if (stroke.kind === 'level') {

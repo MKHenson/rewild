@@ -42,7 +42,7 @@ const WARNINGS: Record<
 @register('x-terrain-settings-dialog')
 export class TerrainSettingsDialog extends Component<Props> {
   init() {
-    const terrain = projectStore.project?.sceneGraph?.terrain;
+    const terrain = projectStore.level?.sceneGraph.terrain;
 
     const [seedInput, setSeedInput] = this.useState(
       String(terrain?.seed ?? '')
@@ -80,7 +80,7 @@ export class TerrainSettingsDialog extends Component<Props> {
     };
 
     const savedSettings = () => {
-      const current = projectStore.project?.sceneGraph.terrain;
+      const current = projectStore.level?.sceneGraph.terrain;
       return {
         seed: current?.seed ?? getActiveRenderer()?.terrainRenderer.seed ?? 0,
         climate: current?.climatePreset ?? DEFAULT_CLIMATE_PRESET,
@@ -92,10 +92,10 @@ export class TerrainSettingsDialog extends Component<Props> {
       const parsed = parseInt(seedInput(), 10);
       const seaLevel = parseFloat(seaLevelInput());
       const climate = climateInput();
-      const project = projectStore.project!;
-      await db.clearLevelChunks(project.levelId);
+      const level = projectStore.level!;
+      await db.clearLevelChunks(level.id);
 
-      project.sceneGraph.terrain = {
+      level.sceneGraph.terrain = {
         version: 1,
         seed: parsed,
         climatePreset: climate,
@@ -107,7 +107,7 @@ export class TerrainSettingsDialog extends Component<Props> {
     };
 
     const resetTerrain = async () => {
-      await db.clearLevelChunks(projectStore.project!.levelId);
+      await db.clearLevelChunks(projectStore.level!.id);
       const { seed, climate, seaLevel } = savedSettings();
       rebuild(seed, climate, seaLevel);
     };
@@ -136,7 +136,7 @@ export class TerrainSettingsDialog extends Component<Props> {
       const seaLevel = parseFloat(seaLevelInput());
       if (isNaN(seaLevel)) return;
 
-      const current = projectStore.project!.sceneGraph.terrain;
+      const current = projectStore.level!.sceneGraph.terrain;
       const climate = climateInput();
 
       // Nothing to regenerate — don't make the user confirm a no-op.

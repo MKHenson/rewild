@@ -1,6 +1,6 @@
 import {
   ITemplateTreeNode,
-  IProject,
+  ISceneGraph,
   PropertyType,
   PropValue,
   IResource,
@@ -72,7 +72,7 @@ export class SceneGraphStore {
     }
   }
 
-  buildTreeFromProject(project: IProject) {
+  buildTreeFromSceneGraph(sceneGraph: ISceneGraph) {
     this.nodes = [
       {
         name: 'Containers',
@@ -82,7 +82,7 @@ export class SceneGraphStore {
         id: 'CONTAINERS',
         template: containerFactory,
         children:
-          project.sceneGraph?.containers.map(
+          sceneGraph.containers.map(
             (container) =>
               ({
                 ...containerFactory(),
@@ -114,47 +114,47 @@ export class SceneGraphStore {
           properties: [
             {
               type: 'cloudiness',
-              value: project.sceneGraph?.atmosphere?.cloudiness || 0.7,
+              value: sceneGraph.atmosphere?.cloudiness || 0.7,
             },
             {
               type: 'foginess',
-              value: project.sceneGraph?.atmosphere?.foginess || 0.3,
+              value: sceneGraph.atmosphere?.foginess || 0.3,
             },
             {
               type: 'windiness',
-              value: project.sceneGraph?.atmosphere?.windiness || 0.5,
+              value: sceneGraph.atmosphere?.windiness || 0.5,
             },
             {
               type: 'windDirection',
-              value: project.sceneGraph?.atmosphere?.windDirection ?? 180,
+              value: sceneGraph.atmosphere?.windDirection ?? 180,
             },
             {
               type: 'temperature',
-              value: project.sceneGraph?.atmosphere?.temperature || 0.5,
+              value: sceneGraph.atmosphere?.temperature || 0.5,
             },
             {
               type: 'precipitation',
-              value: project.sceneGraph?.atmosphere?.precipitation || 0.0,
+              value: sceneGraph.atmosphere?.precipitation || 0.0,
             },
             {
               type: 'elevation',
-              value: project.sceneGraph?.atmosphere?.elevation || 80,
+              value: sceneGraph.atmosphere?.elevation || 80,
             },
             {
               type: 'dayNightCycle',
-              value: project.sceneGraph?.atmosphere?.dayNightCycle || false,
+              value: sceneGraph.atmosphere?.dayNightCycle || false,
             },
             {
               type: 'weatherState',
-              value: project.sceneGraph?.atmosphere?.weatherState ?? 'random',
+              value: sceneGraph.atmosphere?.weatherState ?? 'random',
             },
             {
               type: 'randomMoonPhase',
-              value: project.sceneGraph?.atmosphere?.randomMoonPhase ?? false,
+              value: sceneGraph.atmosphere?.randomMoonPhase ?? false,
             },
             {
               type: 'moonPhase',
-              value: project.sceneGraph?.atmosphere?.moonPhase ?? 0.5,
+              value: sceneGraph.atmosphere?.moonPhase ?? 0.5,
             },
           ],
         },

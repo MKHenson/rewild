@@ -1,10 +1,18 @@
 import { RibbonButtons } from './editors/RibbonButtons';
 import { EditorType } from 'models';
-import { Loading, Component, register, InfoBox, SplitPane } from 'rewild-ui';
+import {
+  Loading,
+  Component,
+  register,
+  InfoBox,
+  SplitPane,
+  PaneTabs,
+} from 'rewild-ui';
 import { SceneGraph } from './editors/SceneGraph';
 import { projectStore } from '../../stores/ProjectStore';
 import { Properties } from './editors/Properties';
 import { ActorsTree } from './editors/ActorsTree';
+import { LevelsTree } from './editors/LevelsTree';
 import { EditorViewport } from './editors/EditorViewport';
 
 interface Props {
@@ -31,6 +39,7 @@ export class PaneManager extends Component<Props> {
       viewport: <EditorViewport />,
       ribbon: <RibbonButtons onHome={this.props.onHome} />,
       actors: <ActorsTree />,
+      levels: <LevelsTree />,
     };
 
     this.viewport = editors.viewport as EditorViewport;
@@ -49,10 +58,11 @@ export class PaneManager extends Component<Props> {
                 mode="vertical"
                 initalRatio="250px"
                 pane1={
-                  <SplitPane
-                    mode="horizontal"
-                    pane1={editors.actors}
-                    pane1Title="Actors"
+                  <PaneTabs
+                    tabs={[
+                      { title: 'Actors', content: editors.actors },
+                      { title: 'Levels', content: editors.levels },
+                    ]}
                   />
                 }
                 pane2={editors.viewport}

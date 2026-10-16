@@ -13,7 +13,6 @@ import { writeWaterBodies } from 'src/database/water-bodies';
 import { writeWaterEdit } from 'src/database/water-edits';
 import { projectStore } from 'src/ui/stores/ProjectStore';
 import { sculptStore } from 'src/ui/stores/SculptStore';
-import { startLevelRef } from 'src/database/local-asset-store';
 
 // Stamp pacing. Amounts are time-scaled so sculpting feels the same at any
 // pointer-event rate; dt is clamped so a stall doesn't produce a giant stamp.
@@ -144,7 +143,7 @@ export class TerrainSculptController {
     this.stroke = null;
     if (!stroke || stroke.touched.size === 0) return;
 
-    const level = startLevelRef(projectStore.project);
+    const level = projectStore.levelRef;
     if (!level) {
       console.warn(
         'No levelId on the current project — sculpt edits not saved.'

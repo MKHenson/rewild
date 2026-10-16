@@ -9,16 +9,11 @@ import com.rewild.db.tables.ProjectsTable
 import com.rewild.db.tables.PublicGameTable
 import com.rewild.db.tables.UsersTable
 import com.rewild.models.Project
-import com.rewild.models.SceneGraph
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.transactions.transaction
-
-private val json = Json { ignoreUnknownKeys = true }
 
 enum class ProjectScope { MINE, SHARED }
 
@@ -78,8 +73,6 @@ class ProjectService(
                 it[levelId] = record.levelId
                 it[name] = record.name
                 it[description] = record.description
-                it[startEvent] = record.startEvent
-                it[sceneGraph] = json.encodeToString(record.sceneGraph)
                 it[updatedAt] = record.updatedAt
                 it[syncedAt] = record.syncedAt
                 it[deletedAt] = record.deletedAt
@@ -90,8 +83,6 @@ class ProjectService(
                 it[levelId] = record.levelId
                 it[name] = record.name
                 it[description] = record.description
-                it[startEvent] = record.startEvent
-                it[sceneGraph] = json.encodeToString(record.sceneGraph)
                 it[updatedAt] = record.updatedAt
                 it[syncedAt] = record.syncedAt
                 it[deletedAt] = record.deletedAt
@@ -155,8 +146,6 @@ class ProjectService(
         levelId = this[ProjectsTable.levelId],
         name = this[ProjectsTable.name],
         description = this[ProjectsTable.description],
-        startEvent = this[ProjectsTable.startEvent],
-        sceneGraph = json.decodeFromString<SceneGraph>(this[ProjectsTable.sceneGraph]),
         updatedAt = this[ProjectsTable.updatedAt],
         syncedAt = this[ProjectsTable.syncedAt],
         deletedAt = this[ProjectsTable.deletedAt],

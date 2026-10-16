@@ -77,6 +77,14 @@ class AssetRoutesTest {
             id = id,
             name = "Fixture Project",
             description = "",
+            updatedAt = 1000L
+        )
+
+        private fun makeLevel(id: String, projectId: String) = Level(
+            id = id,
+            projectId = projectId,
+            name = "Fixture Level",
+            hasTerrain = false,
             startEvent = "",
             sceneGraph = SceneGraph(
                 containers = emptyList(),
@@ -90,16 +98,6 @@ class AssetRoutesTest {
                     dayNightCycle = JsonPrimitive(true)
                 )
             ),
-            updatedAt = 1000L
-        )
-
-        private fun makeLevel(id: String, projectId: String) = Level(
-            id = id,
-            projectId = projectId,
-            name = "Fixture Level",
-            hasTerrain = false,
-            startEvent = "",
-            containers = emptyList(),
             updatedAt = 1000L
         )
 

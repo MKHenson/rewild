@@ -3,8 +3,9 @@ package com.rewild.levels
 import com.rewild.assets.AssetCleanupService
 import com.rewild.common.DeleteResult
 import com.rewild.db.tables.LevelsTable
-import com.rewild.models.Container
+import com.rewild.db.tables.ProjectsTable
 import com.rewild.models.Level
+import com.rewild.models.SceneGraph
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
@@ -54,7 +55,7 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
                 it[name] = record.name
                 it[hasTerrain] = record.hasTerrain
                 it[startEvent] = record.startEvent
-                it[containers] = json.encodeToString(record.containers)
+                it[sceneGraph] = json.encodeToString(record.sceneGraph)
                 it[updatedAt] = record.updatedAt
                 it[syncedAt] = record.syncedAt
                 it[deletedAt] = record.deletedAt
@@ -67,7 +68,7 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
                 it[name] = record.name
                 it[hasTerrain] = record.hasTerrain
                 it[startEvent] = record.startEvent
-                it[containers] = json.encodeToString(record.containers)
+                it[sceneGraph] = json.encodeToString(record.sceneGraph)
                 it[updatedAt] = record.updatedAt
                 it[syncedAt] = record.syncedAt
                 it[deletedAt] = record.deletedAt
@@ -87,22 +88,34 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
             .map { it.toLevel() }
     }
 
+    // Tombstones the level, so the owner's other devices drop it on their next sync.
+    // A project's start level cannot be deleted.
     fun delete(userId: String, id: String): DeleteResult {
         var projectId = ""
         val result = transaction {
             val existing = LevelsTable.selectAll()
                 .where { LevelsTable.id eq id }
                 .firstOrNull()
-                ?: return@transaction DeleteResult.NotFound
 
+            if (existing == null || existing[LevelsTable.deletedAt] != null) return@transaction DeleteResult.NotFound
             if (existing[LevelsTable.userId] != userId) return@transaction DeleteResult.Forbidden
 
             projectId = existing[LevelsTable.projectId]
-            LevelsTable.deleteWhere { LevelsTable.id eq id }
+            val isStartLevel = ProjectsTable.selectAll()
+                .where { (ProjectsTable.id eq projectId) and (ProjectsTable.levelId eq id) }
+                .any()
+            if (isStartLevel) return@transaction DeleteResult.Conflict
+
+            val now = System.currentTimeMillis()
+            LevelsTable.update({ LevelsTable.id eq id }) {
+                it[deletedAt] = now
+                it[updatedAt] = now
+                it[syncedAt] = now
+            }
             DeleteResult.Success
         }
 
-        // Only once the row is committed gone — a rolled-back delete must not lose blobs.
+        // Only once the tombstone is committed — a rolled-back delete must not lose blobs.
         if (result == DeleteResult.Success) cleanup?.cleanupLevel(userId, projectId, id)
         return result
     }
@@ -114,7 +127,7 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
         name = this[LevelsTable.name],
         hasTerrain = this[LevelsTable.hasTerrain],
         startEvent = this[LevelsTable.startEvent],
-        containers = json.decodeFromString<List<Container>>(this[LevelsTable.containers]),
+        sceneGraph = json.decodeFromString<SceneGraph>(this[LevelsTable.sceneGraph]),
         updatedAt = this[LevelsTable.updatedAt],
         syncedAt = this[LevelsTable.syncedAt],
         deletedAt = this[LevelsTable.deletedAt],

@@ -10,14 +10,15 @@ function buttonsOf(ribbon: RibbonButtons): HTMLElement[] {
 
 const SETTINGS = 1;
 const SAVE = 2;
-const PLAY = 4;
-const SCULPT = 6;
+const PLAY = 3;
+const SCULPT = 5;
 
 describe('RibbonButtons', () => {
   beforeEach(() => {
     projectStore.loading = false;
     projectStore.dirty = false;
-    projectStore.project = { sceneGraph: { terrain: {} } } as any;
+    projectStore.project = {} as any;
+    projectStore.level = { sceneGraph: { terrain: {} } } as any;
   });
 
   afterEach(() => {
@@ -56,7 +57,7 @@ describe('RibbonButtons', () => {
   });
 
   it('disables the terrain tools without terrain', () => {
-    projectStore.project = { sceneGraph: {} } as any;
+    projectStore.level = { sceneGraph: {} } as any;
     const ribbon = createRibbon();
 
     for (const button of buttonsOf(ribbon).slice(PLAY + 1))
@@ -67,11 +68,7 @@ describe('RibbonButtons', () => {
     jest
       .spyOn(db.levels, 'getMany')
       .mockResolvedValue({ items: [], cursor: 0 } as never);
-    projectStore.project = {
-      id: 'p1',
-      name: 'P',
-      sceneGraph: { terrain: {} },
-    } as any;
+    projectStore.project = { id: 'p1', name: 'P' } as any;
     const ribbon = createRibbon();
 
     buttonsOf(ribbon)[SETTINGS].click();
@@ -83,7 +80,7 @@ describe('RibbonButtons', () => {
   });
 
   it('plays the open project', async () => {
-    projectStore.project = { id: 'p1', sceneGraph: { terrain: {} } } as any;
+    projectStore.project = { id: 'p1' } as any;
     const ribbon = createRibbon();
 
     buttonsOf(ribbon)[PLAY].click();

@@ -18,6 +18,9 @@ import org.junit.AfterClass
 import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LevelRoutesTest {
 
@@ -67,8 +70,6 @@ class LevelRoutesTest {
             levelId = null,
             name = "Fixture Project",
             description = "",
-            startEvent = "",
-            sceneGraph = SceneGraph(containers = emptyList(), atmosphere = makeAtmosphere()),
             updatedAt = 1000L
         )
 
@@ -79,7 +80,7 @@ class LevelRoutesTest {
             name = name,
             hasTerrain = false,
             startEvent = "",
-            containers = emptyList(),
+            sceneGraph = SceneGraph(containers = emptyList(), atmosphere = makeAtmosphere()),
             updatedAt = 1000L
         )
     }
@@ -215,6 +216,42 @@ class LevelRoutesTest {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
         assertEquals(HttpStatusCode.NotFound, getResponse.status)
+    }
+
+    @Test
+    fun `DELETE level leaves a tombstone and a second delete returns 404`() = testApplication {
+        installTestApp()
+        service.upsert(USER_A, makeLevel("tombstone-level", PROJECT_A))
+
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
+        client.delete("/api/levels/tombstone-level") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+
+        val tombstone = service.getById(USER_A, "tombstone-level")
+        assertNotNull(tombstone?.deletedAt)
+        assertTrue(service.getLiveByProject(PROJECT_A).none { it.id == "tombstone-level" })
+
+        val again = client.delete("/api/levels/tombstone-level") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        assertEquals(HttpStatusCode.NotFound, again.status)
+    }
+
+    @Test
+    fun `DELETE the project's start level returns 409`() = testApplication {
+        installTestApp()
+        val projectId = "start-level-proj"
+        projectService.upsert(USER_A, makeProject(projectId))
+        service.upsert(USER_A, makeLevel("start-level", projectId))
+        projectService.upsert(USER_A, makeProject(projectId).copy(levelId = "start-level"))
+
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
+        val response = client.delete("/api/levels/start-level") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        assertEquals(HttpStatusCode.Conflict, response.status)
+        assertNull(service.getById(USER_A, "start-level")?.deletedAt)
     }
 
     @Test

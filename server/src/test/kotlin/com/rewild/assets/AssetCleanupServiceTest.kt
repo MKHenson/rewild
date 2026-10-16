@@ -72,19 +72,6 @@ class AssetCleanupServiceTest {
             levelId = null,
             name = "Fixture Project",
             description = "",
-            startEvent = "",
-            sceneGraph = SceneGraph(
-                containers = emptyList(),
-                atmosphere = Atmosphere(
-                    elevation = JsonPrimitive(0.0),
-                    cloudiness = JsonPrimitive(0.0),
-                    foginess = JsonPrimitive(0.0),
-                    windiness = JsonPrimitive(0.0),
-                    precipitation = JsonPrimitive(0.0),
-                    temperature = JsonPrimitive(20.0),
-                    dayNightCycle = JsonPrimitive(true)
-                )
-            ),
             updatedAt = 1000L
         )
 
@@ -101,7 +88,18 @@ class AssetCleanupServiceTest {
             name = "Fixture Level",
             hasTerrain = false,
             startEvent = "",
-            containers = emptyList(),
+            sceneGraph = SceneGraph(
+                containers = emptyList(),
+                atmosphere = Atmosphere(
+                    elevation = JsonPrimitive(0.0),
+                    cloudiness = JsonPrimitive(0.0),
+                    foginess = JsonPrimitive(0.0),
+                    windiness = JsonPrimitive(0.0),
+                    precipitation = JsonPrimitive(0.0),
+                    temperature = JsonPrimitive(20.0),
+                    dayNightCycle = JsonPrimitive(true)
+                )
+            ),
             updatedAt = updatedAt,
             deletedAt = deletedAt,
             chunksClearedAt = chunksClearedAt
@@ -144,7 +142,7 @@ class AssetCleanupServiceTest {
         levelService = LevelService(cleanup)
     }
 
-    // --- Hard delete (DELETE /api/levels/{id}) ---
+    // --- Level delete (DELETE /api/levels/{id}) ---
 
     @Test
     fun `deleting a level removes its objects and leaves other levels untouched`() {
@@ -194,7 +192,7 @@ class AssetCleanupServiceTest {
         val result = levelService.delete(USER_A, "cl-bucket-down")
 
         assertEquals(com.rewild.common.DeleteResult.Success, result)
-        assertNull(levelService.getById(USER_A, "cl-bucket-down"))
+        assertNotNull(levelService.getById(USER_A, "cl-bucket-down")?.deletedAt)
         assertEquals(listOf("$L/levels/cl-bucket-down/"), queuedPrefixes())
     }
 

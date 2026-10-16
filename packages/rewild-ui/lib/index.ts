@@ -21,6 +21,7 @@ export * from './common/Loading';
 export * from './common/Icon';
 export * from './common/Modal';
 export * from './common/Pane3D';
+export * from './common/PaneTabs';
 export * from './common/SplitPane';
 export * from './common/Popup';
 export * from './common/PropertyGroup';

@@ -2,8 +2,8 @@ import {
   ILevel,
   IProject,
   IContainer,
-  IActor,
   IContainerPod,
+  ISceneGraph,
   StoredRecord,
 } from 'models';
 import { createUUID } from 'rewild-ui';
@@ -17,9 +17,14 @@ import { sceneGraphStore } from './SceneGraphStore';
 import { createExporterObj } from '../utils/exportHelper';
 import { Dispatcher } from 'rewild-common';
 import { db } from 'src/database/database';
+import { LevelRef } from 'src/database/local-asset-store';
 
 export type ProjectStoreEvents =
-  | { kind: 'loading-completed'; project: IProject }
+  | {
+      kind: 'loading-completed';
+      project: StoredRecord<IProject>;
+      level: StoredRecord<ILevel>;
+    }
   | { kind: 'loading-initiated' }
   | { kind: 'changed' };
 
@@ -27,8 +32,9 @@ export class ProjectStore {
   loading = false;
   dirty = false;
   error?: string;
-  level: StoredRecord<ILevel> | null = null;
   project: StoredRecord<IProject> | null = null;
+  /** The level open in the editor. Save writes the scene graph to it. */
+  level: StoredRecord<ILevel> | null = null;
 
   readonly dispatcher = new Dispatcher<ProjectStoreEvents>();
   containerPods: { [id: string]: IContainerPod };
@@ -43,28 +49,47 @@ export class ProjectStore {
       name: 'New Project',
       description: '',
       levelId: '',
-      startEvent: '',
-      sceneGraph: {
-        atmosphere: {
-          cloudiness: 0.7,
-          foginess: 0.3,
-          windiness: 0.5,
-          windDirection: 180,
-          precipitation: 0.0,
-          temperature: 0.5,
-          elevation: 80,
-          dayNightCycle: false,
-          weatherState: 'random',
-          moonPhase: 0.5,
-          randomMoonPhase: false,
-        },
-        containers: [],
-        terrain: {
-          version: 1,
-          seed: Math.floor(Math.random() * 2147483647),
-        },
+    };
+  }
+
+  static createSceneGraph(): ISceneGraph {
+    return {
+      atmosphere: {
+        cloudiness: 0.7,
+        foginess: 0.3,
+        windiness: 0.5,
+        windDirection: 180,
+        precipitation: 0.0,
+        temperature: 0.5,
+        elevation: 80,
+        dayNightCycle: false,
+        weatherState: 'random',
+        moonPhase: 0.5,
+        randomMoonPhase: false,
+      },
+      containers: [],
+      terrain: {
+        version: 1,
+        seed: Math.floor(Math.random() * 2147483647),
       },
     };
+  }
+
+  static createLevel(projectId: string, name: string): ILevel {
+    return {
+      name,
+      projectId,
+      hasTerrain: true,
+      startEvent: '',
+      sceneGraph: ProjectStore.createSceneGraph(),
+    };
+  }
+
+  /** The files of the level open in the editor. */
+  get levelRef(): LevelRef | null {
+    return this.project && this.level
+      ? { projectId: this.project.id, levelId: this.level.id }
+      : null;
   }
 
   async getProject(projectId: string) {
@@ -73,10 +98,11 @@ export class ProjectStore {
     this.dispatcher.dispatch({ kind: 'changed' });
 
     try {
-      const resp = await getProjectApi(projectId);
-      this.project = resp;
-
-      await this.getLevel(resp!.levelId);
+      const project = await getProjectApi(projectId);
+      if (!project) throw new Error('Project not found');
+      this.project = project;
+      this.level = await getLevelApi(project.levelId);
+      this.level.sceneGraph ??= ProjectStore.createSceneGraph();
     } catch (err: any) {
       this.error = err.toString();
     }
@@ -85,31 +111,32 @@ export class ProjectStore {
     this.dirty = false;
     this.dispatcher.dispatch({ kind: 'changed' });
 
-    const project = this.project!;
+    const project = this.project;
+    const level = this.level;
+    if (this.error || !project || !level) return;
 
     this.containerPods = {};
-    project.sceneGraph?.containers?.forEach((container) => {
+    level.sceneGraph.containers.forEach((container) => {
       this.containerPods[container.id] = container.pod || {
         asset3D: [],
       };
     });
 
-    sceneGraphStore.buildTreeFromProject(project);
-    this.dispatcher.dispatch({
-      kind: 'loading-completed',
-      project: this.project!,
-    });
+    sceneGraphStore.buildTreeFromSceneGraph(level.sceneGraph);
+    this.dispatcher.dispatch({ kind: 'loading-completed', project, level });
   }
 
+  /** Saves the project's fields and the editor's scene graph to the open level. */
   async updateProject() {
     const project = this.project!;
+    const level = this.level!;
     // imageUrl is set by the image sync; a copy held here can be stale.
     const { id, imageUrl, ...token } = project;
     const containerNodes = sceneGraphStore.nodes.find(
       (n) => n.name === 'Containers'
     )!.children;
 
-    token.sceneGraph = {
+    const sceneGraph: ISceneGraph = {
       containers:
         containerNodes?.map(
           (containerNode) =>
@@ -130,14 +157,16 @@ export class ProjectStore {
       atmosphere: {
         ...sceneGraphStore.buildObjectFromProperties('SKY')!,
       },
-      terrain: project.sceneGraph.terrain,
+      terrain: level.sceneGraph.terrain,
     };
+    level.sceneGraph = sceneGraph;
 
     this.loading = true;
     this.dispatcher.dispatch({ kind: 'changed' });
 
     try {
       await patchProject(id!, createExporterObj(token));
+      await patchLevel(level.id, { sceneGraph: createExporterObj(sceneGraph) });
     } catch (err: any) {
       this.error = err.toString();
     }
@@ -147,54 +176,6 @@ export class ProjectStore {
     this.dispatcher.dispatch({ kind: 'changed' });
 
     db.syncAll(); // background — errors captured on records via syncError
-  }
-
-  async publish() {
-    await this.updateProject();
-    this.loading = true;
-    this.dispatcher.dispatch({ kind: 'changed' });
-
-    const project = this.project!;
-    const containers = sceneGraphStore.nodes.find(
-      (n) => n.name === 'Containers'
-    )!.children;
-
-    try {
-      await patchLevel(project.levelId!, {
-        containers:
-          containers?.map(
-            (c) =>
-              ({
-                ...c.resource,
-                pod: c.resource?.id
-                  ? this.containerPods[c.resource?.id]
-                  : { asset3D: [] },
-                activeOnStartup: sceneGraphStore.getNodePropertyValue(
-                  c,
-                  'active'
-                ),
-                actors:
-                  c.children?.map(
-                    (child) => ({ ...child.resource } as IActor)
-                  ) || [],
-              } as IContainer)
-          ) || [],
-        startEvent: project.startEvent,
-      });
-    } catch (err: any) {
-      this.error = err.toString();
-    }
-
-    await this.getLevel(project.levelId);
-
-    this.loading = false;
-    this.dirty = false;
-    this.dispatcher.dispatch({ kind: 'changed' });
-  }
-
-  async getLevel(levelId: string) {
-    const level = await getLevelApi(levelId);
-    this.level = level;
   }
 }
 

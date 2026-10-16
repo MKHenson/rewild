@@ -3,6 +3,7 @@ import { LocalAssetStore } from './local-asset-store';
 import { clearDatabase } from './local-db';
 import { LocalLevelTable } from './local-level-table';
 import { installOPFSMock } from './opfs-mock';
+import { emptySceneGraph } from '../test-utils';
 
 const FILES = [
   '0_0.bin',
@@ -16,7 +17,7 @@ const level = (overrides: Partial<ILevel> = {}): ILevel => ({
   projectId: 'p1',
   hasTerrain: true,
   startEvent: '',
-  containers: [],
+  sceneGraph: emptySceneGraph(),
   ...overrides,
 });
 
