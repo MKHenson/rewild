@@ -1,4 +1,6 @@
 import {
+  DEAD_EYE_ABOVE,
+  DEAD_RISE_SPEED,
   DIVE_SPEED,
   FLOAT_SNAP,
   RISE_SPEED,
@@ -7,6 +9,7 @@ import {
   SWIM_LEAVE_MARGIN,
   WADE_SLOWEST,
   WADE_START,
+  deadFloatStep,
   holdHeight,
   isSwimming,
   keepsSwimming,
@@ -131,5 +134,27 @@ describe('waterDrag', () => {
     expect(Math.abs(waterDrag(-12, 0.5))).toBeLessThan(12);
     expect(waterDrag(-12, 0)).toBe(-12);
     expect(waterDrag(-12, 10)).toBeCloseTo(0);
+  });
+});
+
+describe('deadFloatStep', () => {
+  it('rises slowly from the depths', () => {
+    expect(deadFloatStep(-10, 0, 0.1)).toBeCloseTo(DEAD_RISE_SPEED * 0.1, 9);
+  });
+
+  it('settles lower in the water than a swimmer', () => {
+    let eye = -1;
+    for (let i = 0; i < 600; i++) eye += deadFloatStep(eye, 0, 1 / 60);
+    expect(eye).toBeCloseTo(DEAD_EYE_ABOVE, 3);
+    expect(eye).toBeLessThan(SWIM_EYE_ABOVE);
+  });
+
+  it('lags a wave rather than holding to it', () => {
+    const swimmer = swimStep(0, 0.5, 1 / 60);
+    expect(deadFloatStep(DEAD_EYE_ABOVE, 0.5, 1 / 60)).toBeLessThan(swimmer);
+  });
+
+  it('sinks back down as a wave passes', () => {
+    expect(deadFloatStep(0.5, 0, 1 / 60)).toBeLessThan(0);
   });
 });

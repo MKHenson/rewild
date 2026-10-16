@@ -32,6 +32,7 @@ import {
 import {
   BED_CLEARANCE,
   SWIM_EYE_ABOVE,
+  deadFloatStep,
   SWIM_SPEED_SHARE,
   holdHeight,
   isSwimming,
@@ -58,6 +59,16 @@ import { STAMINA_FULL, Stamina } from './utils/Stamina';
 import { fallStep, freefallShare } from './utils/Freefall';
 import { OXYGEN_FULL, Oxygen } from './utils/Oxygen';
 import { BodyTemperature } from './utils/BodyTemperature';
+import {
+  COLLAPSE_ROLL,
+  LYING_EYE_ABOVE_FEET,
+  collapseRoll,
+  collapseShare,
+  collapseTime,
+  easeEye,
+  floatNod,
+  floatRock,
+} from './utils/Posture';
 import { audio, footstepsDef, voiceDef } from '../audio/audio';
 import { PlayerSounds } from '../audio/PlayerSounds';
 
@@ -88,6 +99,10 @@ const _SWIM_EYE_ABOVE_FEET: f32 = _SWIM_HALF_EXTENT + _SWIM_EYE_HEIGHT;
 const _STAND_BED_CLEARANCE: f32 = 0.02;
 // The standing eye's height above the feet; water depths are measured by it.
 const _EYE_ABOVE_FEET: f32 = _CAPSULE_HALF_EXTENT + _STANDING_EYE_HEIGHT;
+// The eye's height over the capsule centre once a body lies on the ground.
+const _LYING_EYE: f32 = LYING_EYE_ABOVE_FEET - _CAPSULE_HALF_EXTENT;
+// verticalVelocity times this is metres a second.
+const _VELOCITY_TO_SPEED: f32 = 2;
 // Where the capsule centre goes when spawning onto a known ground height: just
 // clear of the surface, so the character controller settles the last fraction
 // instead of starting interpenetrated.
@@ -187,6 +202,17 @@ export class Player extends Node {
   /** Called once when health reaches zero. */
   onDeath: (() => void) | null = null;
   private _dead: boolean = false;
+  // Seconds since the body began to collapse.
+  private _sinceDeath: f32 = 0;
+  // Seconds the head takes to reach the ground, and how fast it started down.
+  private _collapseTime: f32 = 0;
+  private _collapseSpeed: f32 = 0;
+  // The eye's height over the capsule centre as the body began to fall.
+  private _deathEye: f32 = 0;
+  // Radians the head rolls as the body falls, signed for the side it falls to.
+  private _deathRoll: f32 = 0;
+  // The camera's height over the capsule centre, easing to the posture's eye.
+  private _eye: f32 = _STANDING_EYE_HEIGHT;
 
   // Pointer-lock / mouse-look state
   private _yaw: f32 = 0;
@@ -332,6 +358,9 @@ export class Player extends Node {
     this._body.reset();
     this._showBars();
     this._dead = false;
+    this._sinceDeath = 0;
+    this._eye = _STANDING_EYE_HEIGHT;
+    this._crouching = false;
     this.cameraController.camera.transform.position.set(0, 0, -10);
     this.cameraController.camera.lookAt(0, 0, 0);
     this.syncLookFromCamera();
@@ -548,6 +577,8 @@ export class Player extends Node {
     );
     _resizeTranslation.x = p.x;
     _resizeTranslation.y = p.y + shift;
+    this._eye -= shift;
+    this._deathEye -= shift;
     _resizeTranslation.z = p.z;
     this.capsuleBody.setTranslation(_resizeTranslation, true);
   }
@@ -563,18 +594,25 @@ export class Player extends Node {
     this._slide.reset();
   }
 
-  private _die(): void {
+  /** Kills the player, the head already falling at `speed` metres a second. */
+  private _die(speed: f32): void {
     this._dead = true;
     this._calmFall();
     this._sounds?.die();
-    this.stopMotion();
+    this._sinceDeath = 0;
+    this._deathEye = this._eye;
+    this._collapseSpeed = speed;
+    this._collapseTime = collapseTime(this._eye - _LYING_EYE, speed);
+    this._deathRoll = (Math.random() < 0.5 ? -1 : 1) * COLLAPSE_ROLL;
     this._movingForward = false;
     this._movingBackward = false;
     this._movingLeft = false;
     this._movingRight = false;
     this._sprinting = false;
+    this._downHeld = false;
+    this._upHeld = false;
+    this.jumpRequested = false;
     this.onDeath?.();
-    if (document.pointerLockElement) document.exitPointerLock();
   }
 
   // The level's rigid bodies start disabled so props don't sink through
@@ -592,10 +630,22 @@ export class Player extends Node {
   }
 
   onUpdate(delta: f32, total: u32): void {
-    if (this._dead) return;
+    const alive = !this._dead;
 
-    // Apply mouse look to camera
-    _euler.set(this._pitch, this._yaw, 0, EulerRotationOrder.YXZ);
+    // Mouse look; a dying body levels its gaze and rolls onto its side.
+    let pitch = this._pitch;
+    let roll: f32 = 0;
+    if (!alive) {
+      this._sinceDeath += delta;
+      const share = collapseRoll(this._sinceDeath, this._collapseTime);
+      pitch *= 1 - share;
+      roll = this._deathRoll * share;
+      if (this.swimming) {
+        pitch += floatNod(this._sinceDeath) * share;
+        roll += floatRock(this._sinceDeath) * share;
+      }
+    }
+    _euler.set(pitch, this._yaw, roll, EulerRotationOrder.YXZ);
     this.cameraController.camera.transform.quaternion.setFromEuler(
       _euler,
       true
@@ -817,7 +867,10 @@ export class Player extends Node {
     moveZ = this._slide.moveZ;
 
     let moveY: f32 = gravityEnabled ? this.verticalVelocity * dt : 0.0;
-    if (this.swimming) {
+    if (this.swimming && !alive) {
+      this._swimHold = NaN;
+      moveY += deadFloatStep(body.y + eyeHeight, water.surface, delta);
+    } else if (this.swimming) {
       const eyeY = body.y + eyeHeight;
       this._swimHold = holdHeight(
         this._swimHold,
@@ -862,7 +915,7 @@ export class Player extends Node {
         dt
       )
     );
-    if (impact > 0) {
+    if (impact > 0 && alive) {
       this.health -= impact;
       this._sounds?.impact();
     }
@@ -870,10 +923,10 @@ export class Player extends Node {
     const controllerGrounded = this.characterController.computedGrounded();
 
     const fallSpeed = -this.verticalVelocity;
-    const hurt = controllerGrounded && fallSpeed > FALL_HURT_FROM;
+    const hurt = alive && controllerGrounded && fallSpeed > FALL_HURT_FROM;
     if (hurt) this.health -= fallDamage(fallSpeed);
 
-    if (this.spawnResolved) {
+    if (this.spawnResolved && alive) {
       if (this._hunger > 0) this.hunger -= _HUNGER_DRAIN_PER_SEC * delta;
       else this.health -= _STARVATION_DAMAGE_PER_SEC * delta;
       this._sinceHurt += delta;
@@ -911,7 +964,7 @@ export class Player extends Node {
         nextZ
       );
     this.grounded = this._onGround && this._slide.walkable;
-    if (this._onGround)
+    if (this._onGround && alive)
       this.health -= slideDamage(
         Math.hypot(this._slide.velocityX, this._slide.velocityZ),
         delta,
@@ -920,11 +973,24 @@ export class Player extends Node {
 
     const pos = this.capsuleBody.translation();
     const camX = pos.x;
-    const camY = pos.y + eyeHeight;
+    if (alive) this._eye = easeEye(this._eye, eyeHeight, delta);
+    else {
+      // A swimmer's body floats; one on land falls to lie on the ground.
+      const lying = this.swimming ? eyeHeight : _LYING_EYE;
+      this._eye =
+        this._deathEye +
+        (lying - this._deathEye) *
+          collapseShare(
+            this._sinceDeath,
+            this._collapseTime,
+            this._collapseSpeed
+          );
+    }
+    const camY = pos.y + this._eye;
     const camZ = pos.z;
     this.cameraController.camera.transform.position.set(camX, camY, camZ);
     this.cameraUnderWater = inWater && camY < water.surface;
-    if (this.spawnResolved)
+    if (this.spawnResolved && alive)
       this.health -= this._oxygen.update(this.cameraUnderWater, delta);
     const sky = stateData?.renderer?.sky?.skyRenderer;
     if (sky) {
@@ -943,7 +1009,7 @@ export class Player extends Node {
     this._showBars();
 
     const sounds = this._sounds;
-    if (sounds) {
+    if (sounds && alive) {
       const s = sounds.state;
       s.x = nextX;
       s.y = nextY - (this.swimming ? _SWIM_HALF_EXTENT : _CAPSULE_HALF_EXTENT);
@@ -993,17 +1059,19 @@ export class Player extends Node {
       );
     }
 
-    if (this._health <= 0) this._die();
+    if (alive && this._health <= 0)
+      this._die(hurt ? fallSpeed * _VELOCITY_TO_SPEED : 0);
   }
 
   private _handleMouseMove(e: MouseEvent) {
-    if (!this._isLocked) return;
+    if (!this._isLocked || this._dead) return;
     this._yaw -= e.movementX * _MOUSE_SENSITIVITY;
     this._pitch -= e.movementY * _MOUSE_SENSITIVITY;
     this._pitch = Math.max(-_PI_HALF, Math.min(_PI_HALF, this._pitch));
   }
 
   private _handleKeyDown(e: KeyboardEvent) {
+    if (this._dead) return;
     if (e.code === 'KeyW') this._movingForward = true;
     else if (e.code === 'KeyS') this._movingBackward = true;
     else if (e.code === 'KeyA') this._movingLeft = true;
