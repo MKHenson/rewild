@@ -30,6 +30,13 @@ export const RISE_SPEED = 2.1;
 export const FLOAT_SNAP = 0.4;
 /** Metres the eye keeps above the lowest it can reach over the bed. */
 export const BED_CLEARANCE = 0.1;
+/** Metres the eye of a dead body lies above the surface. */
+export const DEAD_EYE_ABOVE = 0.08;
+/** Metres a second a dead body rises to the surface. */
+export const DEAD_RISE_SPEED = 0.5;
+/** Per second: how fast a dead body follows the surface; slower than a
+ *  swimmer, so it lags the waves and rides them. */
+export const DEAD_FLOAT_RATE = 1.2;
 
 /** Metres of water over the feet at which a player whose eye stands
  *  `eyeAboveFeet` metres above them swims. */
@@ -72,6 +79,19 @@ export function swimStep(
   seconds: number
 ): number {
   return (target - eyeY) * (1 - Math.exp(-FLOAT_RATE * seconds));
+}
+
+/** Metres a dead body whose eye is at `eyeY` moves up over `seconds`,
+ *  rising slowly to float on the water's `surface`. */
+export function deadFloatStep(
+  eyeY: number,
+  surface: number,
+  seconds: number
+): number {
+  const step =
+    (surface + DEAD_EYE_ABOVE - eyeY) *
+    (1 - Math.exp(-DEAD_FLOAT_RATE * seconds));
+  return Math.min(step, DEAD_RISE_SPEED * seconds);
 }
 
 /**

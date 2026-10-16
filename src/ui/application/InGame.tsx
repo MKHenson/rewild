@@ -24,8 +24,8 @@ export class InGame extends Component<Props> {
     };
 
     const onDeath = () => {
+      setModalOpen(false);
       setActiveMenu('gameOverMenu');
-      setModalOpen(true);
       audio.duckWorld(false);
     };
 
@@ -72,15 +72,16 @@ export class InGame extends Component<Props> {
     };
 
     const onUnlock = () => {
+      if (activeMenu() === 'gameOverMenu') return;
       setModalOpen(true);
-      audio.duckWorld(activeMenu() !== 'gameOverMenu');
+      audio.duckWorld(true);
     };
 
     /** The one panel the overlay is showing, if any. */
     const renderMenu = () => {
       if (activeMenu() === 'gameOverMenu')
         return (
-          <GameOverMenu onRestartClick={onRestart} onQuitClick={onQuit} open />
+          <GameOverMenu onRestartClick={onRestart} onQuitClick={onQuit} />
         );
 
       if (activeMenu() === 'settings')
