@@ -29,6 +29,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/water-surface.wgsl"
 #include "./shader-lib/under-water.wgsl"
 #include "./shader-lib/water-fog.wgsl"
+#include "./shader-lib/lod-fade.wgsl"
 
 // Air to water at normal incidence.
 const WATER_F0: f32 = 0.02;
@@ -169,6 +170,8 @@ struct WaterParams {
   extinction : array<vec4f, 4>,
   // World height the level and terrain heights are relative to.
   baseLevel : f32,
+  // How far the chunk has faded in over the horizon ring, 0 to 1.
+  fade : f32,
 }
 
 
@@ -481,10 +484,15 @@ fn facesCamera(front: bool, viewPosition: vec3f) -> bool {
 }
 
 // Writes the nearest layer's depth, so the shading draws skip every layer the
-// waves fold behind it. Discards exactly where they do.
+// waves fold behind it. Discards exactly where they do, and where a fading
+// chunk leaves the pixel to the horizon ring, which the shading draws then
+// skip for want of the depth.
 @fragment
 fn fs_depth(input: VertexOutput, @builtin(front_facing) front: bool) {
   if (textureSample(surfaceMap, surfaceSampler, surfaceUV(input.uv)).b <= 0.0 || !facesCamera(front, input.viewPosition)) {
+    discard;
+  }
+  if (fadePattern(input.Position.xy) >= params.fade) {
     discard;
   }
 }

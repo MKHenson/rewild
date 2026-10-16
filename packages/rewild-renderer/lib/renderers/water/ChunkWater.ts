@@ -131,6 +131,12 @@ export class ChunkWater {
     transform.updateWorldMatrix(true, false);
   }
 
+  /** Fades the water in with its chunk, so where the chunk leaves pixels to
+   *  the horizon ring the ring's own sea shows. */
+  setFade(device: GPUDevice, fade: number) {
+    this.pass.setFade(device, fade);
+  }
+
   /** Draws the grid that suits terrain LOD `lod`. */
   setLod(renderer: Renderer, lod: number) {
     const quads = waterGridQuads(lod);

@@ -961,6 +961,7 @@ export class TerrainChunk implements IComponent {
       const pass = lod.mesh?.material as TerrainPass | undefined;
       pass?.setFade(device, this.fade);
     }
+    this.chunkWater?.setFade(device, this.fade);
   }
 
   /** Whether any of its LOD meshes is on screen this frame. */
