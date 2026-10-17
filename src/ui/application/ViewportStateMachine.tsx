@@ -1,8 +1,9 @@
 import { Component, Loading, Pane3D, register } from 'rewild-ui';
-import { Renderer } from 'rewild-renderer';
+import { Renderer, loadActivity } from 'rewild-renderer';
 import { Player } from 'src/core/routing/Player';
 import { GameManager } from 'src/core/GameManager';
 import { GameLoadError } from './GameLoadError';
+import { loadingLabel } from '../utils/loadingLabel';
 
 interface Props {
   projectId: string;
@@ -35,12 +36,18 @@ export class ViewportStateMachine extends Component<Props> {
         window.requestAnimationFrame(onFrame);
     };
 
+    const onLoadActivity = (url: string) => {
+      loadingOverlay.props = { overlay: true, label: loadingLabel(url) };
+    };
+
     const onCanvasReady = async (pane3D: Pane3D) => {
+      loadActivity.add(onLoadActivity);
       const initialized = await this.gameManager.init(
         pane3D,
         this.props.projectId,
         this.props.levelId
       );
+      loadActivity.remove(onLoadActivity);
       this.gameManager.onUnlock = this.props.onUnlock;
       // init() swallows its own errors, so drop the overlay either way rather
       // than leaving the player staring at a shell that will never clear.
@@ -71,6 +78,7 @@ export class ViewportStateMachine extends Component<Props> {
 
     this.onCleanup = () => {
       document.removeEventListener('request-renderer', onRequestRendererEvent);
+      loadActivity.remove(onLoadActivity);
     };
 
     const canvas = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;

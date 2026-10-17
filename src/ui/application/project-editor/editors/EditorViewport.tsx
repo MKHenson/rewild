@@ -8,7 +8,13 @@ import {
   Loading,
   InfoBox,
 } from 'rewild-ui';
-import { Mesh, Renderer, Sprite3D, Transform } from 'rewild-renderer';
+import {
+  Mesh,
+  Renderer,
+  Sprite3D,
+  Transform,
+  loadActivity,
+} from 'rewild-renderer';
 import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
 import { OrbitController } from 'rewild-renderer/lib/input/OrbitController';
 import { InteractionLayer } from 'src/core/InteractionLayer';
@@ -62,6 +68,7 @@ import {
   writeBackPlacement,
 } from 'src/core/placement/ConformedPlacement';
 import { ConformedPlacementSync } from 'src/core/placement/ConformedPlacementSync';
+import { loadingLabel } from 'src/ui/utils/loadingLabel';
 
 interface Props {}
 
@@ -120,7 +127,14 @@ export class EditorViewport extends Component<Props> {
     const [levelLoading, setLevelLoading] = this.useState(true);
     const [loadError, setLoadError] = this.useState<string | null>(null);
 
+    const setLoadingLabel = (label: string) => {
+      loadingOverlay.props = { overlay: true, label };
+    };
+
+    const onLoadActivity = (url: string) => setLoadingLabel(loadingLabel(url));
+
     const beginLevelLoad = () => {
+      setLoadingLabel(this.rendererReady ? 'Loading level' : 'Loading');
       setLoadError(null);
       setLevelLoading(true);
       if (this.loadingTimeout !== null) {
@@ -438,6 +452,7 @@ export class EditorViewport extends Component<Props> {
     this.onCleanup = () => {
       document.removeEventListener('request-renderer', onRequestRendererEvent);
       document.removeEventListener('keydown', onKeyDown);
+      loadActivity.remove(onLoadActivity);
       unbindScreenshotHotkey?.();
       if (this.loadingTimeout !== null) {
         window.clearTimeout(this.loadingTimeout);
@@ -451,6 +466,7 @@ export class EditorViewport extends Component<Props> {
         if (this.hasInitialized) return;
         this.hasInitialized = true;
 
+        loadActivity.add(onLoadActivity);
         await this.renderer.init(pane3D.canvas()!);
         this.orbitController = new OrbitController(
           this.renderer.camera,
@@ -484,6 +500,8 @@ export class EditorViewport extends Component<Props> {
         // terrain chunk become possible, so only now is a terrain timeout
         // meaningful.
         this.rendererReady = true;
+        loadActivity.remove(onLoadActivity);
+        setLoadingLabel('Generating terrain');
         if (levelLoading()) armTerrainTimeout();
 
         this.gizmo = new Gizmo();
@@ -533,6 +551,7 @@ export class EditorViewport extends Component<Props> {
         pane3D.onmousemove = onMouseMove;
         pane3D.onmouseup = onMouseUp;
       } catch (err: unknown) {
+        loadActivity.remove(onLoadActivity);
         failLevelLoad(err);
       }
     };
@@ -1005,9 +1024,7 @@ export class EditorViewport extends Component<Props> {
       <ScatterPaintToolbar />
     ) as ScatterPaintToolbar;
     const waterBrushToolbar = (<WaterBrushToolbar />) as WaterBrushToolbar;
-    const loadingOverlay = (
-      <Loading overlay label="Loading level" />
-    ) as Loading;
+    const loadingOverlay = (<Loading overlay label="Loading" />) as Loading;
     const errorBox = (
       <InfoBox variant="error" title="Could not open the level" />
     ) as InfoBox;

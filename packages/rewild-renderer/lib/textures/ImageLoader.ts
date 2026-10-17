@@ -1,3 +1,5 @@
+import { loadActivity } from '../core/LoadActivity';
+
 const BITMAP_OPTIONS: ImageBitmapOptions = { colorSpaceConversion: 'none' };
 
 // Images fetched at once, across every loader instance.
@@ -68,6 +70,7 @@ function backoff(attempt: number): Promise<void> {
 async function loadOne(src: string): Promise<ImageBitmap> {
   for (let attempt = 1; ; attempt++) {
     await acquire();
+    loadActivity.dispatch(src);
     try {
       return await decode(src);
     } catch (err) {

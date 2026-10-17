@@ -56,6 +56,27 @@ describe('Loading', () => {
     expect(loading.getAttribute('aria-label')).toBe('Loading');
   });
 
+  it('keeps the shell when the label changes', () => {
+    const loading = mount({ label: 'Loading grass.jpg' });
+    const shell = loading.shadow?.querySelector('svg.shell');
+
+    loading.props = { label: 'Loading rock.glb' };
+
+    expect(shell).not.toBeNull();
+    expect(loading.shadow?.querySelector('svg.shell')).toBe(shell);
+    expect(loading.shadow?.querySelector('.label')?.textContent).toBe(
+      'Loading rock.glb...'
+    );
+  });
+
+  it('removes the caption when the label is cleared', () => {
+    const loading = mount({ label: 'Loading' });
+
+    loading.props = {};
+
+    expect(loading.shadow?.querySelector('.label')).toBeNull();
+  });
+
   it('marks itself as an overlay only when asked', () => {
     expect(mount().hasAttribute('overlay')).toBe(false);
     expect(mount({ overlay: true }).hasAttribute('overlay')).toBe(true);

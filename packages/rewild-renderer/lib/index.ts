@@ -22,6 +22,7 @@ export * from './textures/PortalViewCube';
 export * from './input';
 export * from './core/GltfLoader';
 export * from './core/GltfTextures';
+export * from './core/LoadActivity';
 export * from './core/UIElement';
 export * from './core/UIPointerEvent';
 export * from './typeGuards';

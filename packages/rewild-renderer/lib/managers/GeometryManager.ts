@@ -14,6 +14,7 @@ import { SphereGeometryFactory } from '../geometry/SphereGeometryFactory';
 import { Renderer } from '../Renderer';
 import { validateScatterLayers } from '../renderers/terrain/ScatterLayers';
 import { IGeometryTemplates } from './types';
+import { loadActivity } from '../core/LoadActivity';
 
 export class GeometryManager {
   geometries: Map<string, Geometry>;
@@ -152,7 +153,9 @@ export class GeometryManager {
   /** Loads one glTF and its textures. Textures are pulled here rather than in
    *  the loader so the loader stays a pure parse. */
   private async loadModel(renderer: Renderer, url: string) {
-    const model = await loadGltfModel(process.env.SHARED_ASSETS_BASE_URL + url);
+    const fullUrl = process.env.SHARED_ASSETS_BASE_URL + url;
+    loadActivity.dispatch(fullUrl);
+    const model = await loadGltfModel(fullUrl);
     await renderer.textureManager.loadGltfTextures(renderer, model.textures);
     return model;
   }

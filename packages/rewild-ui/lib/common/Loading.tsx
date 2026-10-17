@@ -22,6 +22,10 @@ const NAUTILUS = createNautilusGeometry();
  */
 const delayFor = (t: number) => `animation-delay:${(-t * DURATION).toFixed(3)}s`;
 
+/**
+ * Nodes are kept across renders so the shell's animation doesn't restart when
+ * the label changes.
+ */
 @register('x-loading')
 export class Loading extends Component<Props> {
   constructor() {
@@ -29,6 +33,19 @@ export class Loading extends Component<Props> {
   }
 
   init() {
+    let shell: Element | null = null;
+    let shellSize = 0;
+    const text = document.createTextNode('');
+    const caption = (
+      <div class="label">
+        {text}
+        <span class="dot">.</span>
+        <span class="dot">.</span>
+        <span class="dot">.</span>
+      </div>
+    ) as HTMLDivElement;
+    const root = (<div class="loading" />) as HTMLDivElement;
+
     return () => {
       const size = this.props.size ?? 96;
       const label = this.props.label;
@@ -37,8 +54,10 @@ export class Loading extends Component<Props> {
       this.setAttribute('role', 'status');
       this.setAttribute('aria-label', label || 'Loading');
 
-      return (
-        <div class="loading">
+      if (!shell || shellSize !== size) {
+        shellSize = size;
+        shell?.remove();
+        shell = (
           <svg
             class="shell"
             width={size}
@@ -50,16 +69,17 @@ export class Loading extends Component<Props> {
               <path class="chamber" d={chamber.d} style={delayFor(chamber.t)} />
             ))}
           </svg>
-          {label ? (
-            <div class="label">
-              {label}
-              <span class="dot">.</span>
-              <span class="dot">.</span>
-              <span class="dot">.</span>
-            </div>
-          ) : undefined}
-        </div>
-      );
+        ) as Element;
+      }
+
+      if (root.firstChild !== shell) root.prepend(shell);
+
+      if (label) {
+        text.data = label;
+        if (!caption.parentNode) shell.after(caption);
+      } else caption.remove();
+
+      return root;
     };
   }
 
