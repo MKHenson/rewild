@@ -6,6 +6,7 @@ import {
   createWaterQuerySample,
 } from 'rewild-renderer';
 import type { WaterLens } from 'rewild-renderer/lib/renderers/water/WaterLens';
+import type { TerrainRenderer } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
 import { Node } from 'rewild-routing';
 import { Asset3D } from './Asset3D';
 import { StateMachineData } from './Types';
@@ -19,6 +20,7 @@ import {
   RigidBodyDesc,
   Vector3 as RapierVector3,
   Collider,
+  Ray,
 } from '@dimforge/rapier3d-compat';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
 import { UIElementMeterPass } from 'node_modules/rewild-renderer/lib/materials/UIElementMeterPass';
@@ -110,6 +112,8 @@ const _VELOCITY_TO_SPEED: f32 = 2;
 const _SPAWN_GROUND_CLEARANCE: f32 = _CAPSULE_HALF_EXTENT + 0.6;
 // Metres the ground ray reaches below the player before they first land.
 const _GROUND_RAY_REACH: f32 = 2000;
+// Collision groups of terrain colliders.
+const _TERRAIN_GROUPS = (1 << 16) | 1;
 // Metres above the generated ground a falling player holds while no ground
 // collider is built beneath them yet.
 const _GROUND_HOLD_ABOVE: f32 = 20;
@@ -158,6 +162,7 @@ export class Player extends Node {
   grounded: boolean = false;
   // Whether the capsule rests on any ground, however steep.
   private _onGround: boolean = false;
+  private _groundRay: Ray | null = null;
   private _slide = new GroundSlide();
   // How slippery the ground underfoot is, 0..1.
   private _slip: f32 = 0;
@@ -586,6 +591,42 @@ export class Player extends Node {
     this.capsuleBody.setTranslation(_resizeTranslation, true);
   }
 
+  /** Whether a terrain collider lies anywhere below the capsule. */
+  private _groundBelow(R: StateMachineData['gameManager']['RAPIER']): boolean {
+    const pos = this.capsuleBody.translation();
+    const ray = (this._groundRay ??= new R.Ray(
+      { x: 0, y: 0, z: 0 },
+      { x: 0, y: -1, z: 0 }
+    ));
+    ray.origin.x = pos.x;
+    ray.origin.y = pos.y + 2;
+    ray.origin.z = pos.z;
+    return (
+      this.rapierWorld.castRay(
+        ray,
+        _GROUND_RAY_REACH,
+        true,
+        R.QueryFilterFlags.EXCLUDE_DYNAMIC | R.QueryFilterFlags.EXCLUDE_SENSORS,
+        _TERRAIN_GROUPS,
+        undefined,
+        this.capsuleBody
+      ) !== null
+    );
+  }
+
+  /**
+   * Whether the player is high enough to fall before the ground's collider is
+   * needed. High up no chunk streams in beneath until the player has fallen to
+   * it; near the generated ground the player holds until its collider is
+   * built. The generated ground ignores edits and reads the sea's surface.
+   */
+  private _farAboveGround(terrain: TerrainRenderer): boolean {
+    const pos = this.capsuleBody.translation();
+    return (
+      pos.y - terrain.generatedGroundHeight(pos.x, pos.z) > _GROUND_HOLD_ABOVE
+    );
+  }
+
   /** Clears the falling blur from the lens. */
   private _calmFall(): void {
     if (this._waterLens) this._waterLens.freefall = 0;
@@ -681,6 +722,22 @@ export class Player extends Node {
       }
     }
 
+    // A body under the heightfield spawned inside the ground or fell through a
+    // collider that wasn't built yet; put it back on the surface.
+    if (this.spawnResolved && hasTerrain && this.capsuleBody) {
+      const p = this.capsuleBody.translation();
+      const groundY = terrainRenderer!.sampleHeight(p.x, p.z);
+      if (groundY !== null && p.y < groundY) {
+        _spawnTranslation.x = p.x;
+        _spawnTranslation.y = groundY + _SPAWN_GROUND_CLEARANCE;
+        _spawnTranslation.z = p.z;
+        this.capsuleBody.setTranslation(_spawnTranslation, true);
+        this.verticalVelocity = 0.0;
+        this.grounded = false;
+        this.stopMotion();
+      }
+    }
+
     // Gravity is held off until there is ground to land on, so an early frame
     // (or a terrain-less level) can't drop the player out of the world.
     let gravityEnabled = this.hasGround;
@@ -698,39 +755,16 @@ export class Player extends Node {
       this.rapierWorld &&
       this.capsuleBody
     ) {
-      const pos = this.capsuleBody.translation();
-      const origin = { x: pos.x, y: pos.y + 2, z: pos.z };
-      const dir = { x: 0, y: -1, z: 0 };
-      const ray = new R.Ray(origin, dir);
-      const maxToi = _GROUND_RAY_REACH;
-      const solid = true;
-
-      const TERRAIN_BIT = 1;
-      const TERRAIN_GROUPS = (TERRAIN_BIT << 16) | TERRAIN_BIT;
-
-      const hit = this.rapierWorld.castRay(
-        ray,
-        maxToi,
-        solid,
-        R.QueryFilterFlags.EXCLUDE_DYNAMIC | R.QueryFilterFlags.EXCLUDE_SENSORS,
-        TERRAIN_GROUPS,
-        undefined,
-        this.capsuleBody
-      );
-
+      const hit = this._groundBelow(R);
       if (hit) {
         this.terrainLoaded = true;
         this.hasGround = true;
         this.enableAssetBodies();
       }
-
-      // High up no chunk streams in beneath until the player has fallen to it,
-      // so fall until the ray finds ground, holding just above the generated
-      // ground if its collider is not built yet. The generated ground ignores
-      // edits and reads the sea's surface, so the ray reaches far past it.
-      const aboveGround =
-        pos.y - terrainRenderer!.generatedGroundHeight(pos.x, pos.z);
-      gravityEnabled = !!hit || aboveGround > _GROUND_HOLD_ABOVE;
+      gravityEnabled = hit || this._farAboveGround(terrainRenderer!);
+    } else if (this.hasGround && hasTerrain && R && !this.swimming) {
+      gravityEnabled =
+        this._groundBelow(R) || this._farAboveGround(terrainRenderer!);
     }
 
     // The water over the feet, with the waves the probe last reported.
@@ -855,6 +889,12 @@ export class Player extends Node {
       moveZ += wind[1] * this._gustPush * delta;
     } else {
       this._gustPush = 0;
+    }
+
+    // Held in place until the ground under the spawn is found.
+    if (!this.terrainLoaded) {
+      moveX = 0;
+      moveZ = 0;
     }
 
     this._slip =
