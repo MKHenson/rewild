@@ -148,7 +148,7 @@ private fun ApplicationCall.setRefreshCookie(token: String, secure: Boolean) {
         secure = secure,
         maxAge = REFRESH_TOKEN_MAX_AGE.toLong(),
         path = "/api/auth",
-        extensions = mapOf("SameSite" to "Strict")
+        extensions = sameSite(secure)
     )
 }
 
@@ -159,6 +159,11 @@ private fun ApplicationCall.clearRefreshCookie(secure: Boolean) {
         httpOnly = true,
         secure = secure,
         maxAge = 0L,
-        path = "/api/auth"
+        path = "/api/auth",
+        extensions = sameSite(secure)
     )
 }
+
+// The client and API are served from different sites, so a secure cookie must be SameSite=None
+// to reach the API. Browsers reject SameSite=None without Secure, so plain HTTP falls back to Lax.
+private fun sameSite(secure: Boolean) = mapOf("SameSite" to if (secure) "None" else "Lax")
