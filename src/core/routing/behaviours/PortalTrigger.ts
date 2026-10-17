@@ -30,7 +30,13 @@ export class PortalTrigger implements IBehaviour {
     if (!asset.targetLevel) return;
 
     const touch = asset.radius + TOUCH_MARGIN;
-    const distanceSq = eye.distanceToSquared(asset.transform.position);
+    const centre = asset.transform.position;
+    // Nearest point on the body, feet to eye, so a swimmer held off the bed still reaches it.
+    const bodyY = Math.min(Math.max(centre.y, data.player.feetY), eye.y);
+    const dx = eye.x - centre.x;
+    const dy = bodyY - centre.y;
+    const dz = eye.z - centre.z;
+    const distanceSq = dx * dx + dy * dy + dz * dz;
 
     if (!this.armed) {
       const armAt = touch + ARM_MARGIN;

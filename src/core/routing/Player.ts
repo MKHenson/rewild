@@ -76,7 +76,8 @@ const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
 const _PI_HALF = Math.PI / 2 - 0.01;
 const _MOUSE_SENSITIVITY = 0.002;
 const _MOVE_SPEED: f32 = 3.0;
-const _RUN_MULTIPLIER: f32 = 2.5;
+const _RUN_MULTIPLIER: f32 = 3.5;
+const _SWIM_RUN_MULTIPLIER: f32 = 2.5;
 const _CROUCH_SPEED_MULTIPLIER: f32 = 0.5;
 const _STANDING_EYE_HEIGHT: f32 = 1.8;
 const _CROUCH_EYE_HEIGHT: f32 = 0.9;
@@ -171,6 +172,8 @@ export class Player extends Node {
   spawnResolved: boolean = false;
   /** Whether the player is swimming rather than standing. */
   swimming: boolean = false;
+  /** World height of the bottom of the player's body. */
+  feetY: f32 = 0;
   /** Metres of water over the player's feet, waves included. */
   immersion: f32 = 0;
   /** Whether the camera's eye is below the water's surface. */
@@ -805,7 +808,11 @@ export class Player extends Node {
     this._stamina.update(sprinting && pushing, delta);
     const speed =
       _MOVE_SPEED *
-      (sprinting ? _RUN_MULTIPLIER : 1.0) *
+      (sprinting
+        ? this.swimming
+          ? _SWIM_RUN_MULTIPLIER
+          : _RUN_MULTIPLIER
+        : 1.0) *
       (this._crouching && !this.swimming ? _CROUCH_SPEED_MULTIPLIER : 1.0) *
       (this.swimming
         ? SWIM_SPEED_SHARE
@@ -989,6 +996,8 @@ export class Player extends Node {
     const camY = pos.y + this._eye;
     const camZ = pos.z;
     this.cameraController.camera.transform.position.set(camX, camY, camZ);
+    this.feetY =
+      pos.y - (this.swimming ? _SWIM_HALF_EXTENT : _CAPSULE_HALF_EXTENT);
     this.cameraUnderWater = inWater && camY < water.surface;
     if (this.spawnResolved && alive)
       this.health -= this._oxygen.update(this.cameraUnderWater, delta);
