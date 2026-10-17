@@ -104,6 +104,77 @@ scw container container deploy <container-id> region=fr-par
 
 > Scaleway does **not** redeploy automatically when a new image is pushed with the same tag. The `scw container container deploy` command is required to pick up the new image.
 
+### Asset bucket CORS
+
+The client uploads and downloads level and project files directly against the asset bucket (`BUCKET_NAME`), so the bucket must allow the client's origin. Without it every preflight returns 403 and sync never uploads files.
+
+`cors.json`:
+
+```json
+{
+  "CORSRules": [
+    {
+      "AllowedOrigins": ["https://rewild-client.s3-website.fr-par.scw.cloud"],
+      "AllowedMethods": ["GET", "HEAD", "PUT"],
+      "AllowedHeaders": ["*"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}
+```
+
+```bash
+aws s3api put-bucket-cors --bucket rewild-assets \
+  --cors-configuration file://cors.json \
+  --endpoint-url https://s3.fr-par.scw.cloud
+
+# Verify
+aws s3api get-bucket-cors --bucket rewild-assets \
+  --endpoint-url https://s3.fr-par.scw.cloud
+```
+
+Add any other client origin, such as a custom domain, to `AllowedOrigins`.
+
+### Asset bucket public read
+
+Uploads use presigned URLs, but downloads fetch the plain public URL, so objects in the asset bucket must be publicly readable. A Scaleway bucket policy denies everything it does not allow, so it also grants full access to the server's IAM application (the bearer of `S3_ACCESS_KEY`, with `ObjectStorageFullAccess` on the project) and to the owner's user.
+
+`bucket-policy.json`:
+
+```json
+{
+  "Version": "2023-04-17",
+  "Id": "rewild-assets-policy",
+  "Statement": [
+    {
+      "Sid": "ServerAndOwnerFullAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "SCW": [
+          "application_id:<REWILD_SERVER_APPLICATION_ID>",
+          "user_id:<YOUR_USER_ID>"
+        ]
+      },
+      "Action": "*",
+      "Resource": ["rewild-assets", "rewild-assets/*"]
+    },
+    {
+      "Sid": "PublicRead",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "rewild-assets/*"
+    }
+  ]
+}
+```
+
+```bash
+aws s3api put-bucket-policy --bucket rewild-assets \
+  --policy file://bucket-policy.json \
+  --endpoint-url https://s3.fr-par.scw.cloud
+```
+
 ---
 
 ## Infrastructure
@@ -112,6 +183,7 @@ scw container container deploy <container-id> region=fr-par
 |---|---|---|
 | Client static site | `rewild-client` bucket | Scaleway Object Storage |
 | Shared game assets | `rewild-shared-assets` bucket | Scaleway Object Storage |
+| User assets | `rewild-assets` bucket (public read, CORS for the client origin) | Scaleway Object Storage |
 | Container registry | `rewild` namespace | Scaleway Container Registry |
 | API server | `rewild-server-prod` | Scaleway Serverless Containers |
 | Database | `rewild-prod` | Scaleway Managed PostgreSQL |
