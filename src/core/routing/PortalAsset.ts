@@ -149,6 +149,7 @@ export class PortalAsset extends Asset3D {
     const size = distance * MARKER_SIZE;
     marker.transform.scale.set(size, size, size);
     marker.transform.position.y = this.radius * MARKER_HEIGHT;
+    this.renderer.sceneBVH?.markObjectMoved(marker.transform);
     this.markerPass.spriteUniforms.diffuseAlpha = fade;
   }
 
@@ -185,6 +186,7 @@ export class PortalAsset extends Asset3D {
     const size = this.radius * opening.scale;
     this.sphere.transform.scale.set(size, size, size);
     this.sphere.transform.position.y = this.radius * opening.bob;
+    this.renderer.sceneBVH?.markObjectMoved(this.sphere.transform);
     this.pass.lightGlowScale =
       CLOSED_GLOW + (1 - CLOSED_GLOW) * opening.openness;
     this.light.intensity = this.pass.lightLevel;
