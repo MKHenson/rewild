@@ -114,15 +114,15 @@ export class SceneGraphStore {
           properties: [
             {
               type: 'cloudiness',
-              value: sceneGraph.atmosphere?.cloudiness || 0.7,
+              value: sceneGraph.atmosphere?.cloudiness ?? 0.7,
             },
             {
               type: 'foginess',
-              value: sceneGraph.atmosphere?.foginess || 0.3,
+              value: sceneGraph.atmosphere?.foginess ?? 0.3,
             },
             {
               type: 'windiness',
-              value: sceneGraph.atmosphere?.windiness || 0.5,
+              value: sceneGraph.atmosphere?.windiness ?? 0.5,
             },
             {
               type: 'windDirection',
@@ -130,19 +130,19 @@ export class SceneGraphStore {
             },
             {
               type: 'temperature',
-              value: sceneGraph.atmosphere?.temperature || 0.5,
+              value: sceneGraph.atmosphere?.temperature ?? 0.5,
             },
             {
               type: 'precipitation',
-              value: sceneGraph.atmosphere?.precipitation || 0.0,
+              value: sceneGraph.atmosphere?.precipitation ?? 0.0,
             },
             {
               type: 'elevation',
-              value: sceneGraph.atmosphere?.elevation || 80,
+              value: sceneGraph.atmosphere?.elevation ?? 80,
             },
             {
               type: 'dayNightCycle',
-              value: sceneGraph.atmosphere?.dayNightCycle || false,
+              value: sceneGraph.atmosphere?.dayNightCycle ?? false,
             },
             {
               type: 'weatherState',
