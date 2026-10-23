@@ -1,4 +1,3 @@
-import { Matrix4, Quaternion, Vector3 } from 'rewild-common';
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from '../materials/IMaterialPass';
 import { Mesh } from './Mesh';
@@ -17,6 +16,16 @@ import {
   materialKeysById,
   toMaterialTemplates,
 } from './GltfMaterials';
+import {
+  GltfClip,
+  GltfSkeleton,
+  GltfSkin,
+  bindsSkin,
+  parseClips,
+  parseSkin,
+  readTransform,
+  toSkinAttributes,
+} from './GltfSkeleton';
 
 // glTF's TRIANGLES mode. Points, lines and strips load fine but none of the
 // engine's pipelines rasterize them, so they are skipped rather than uploaded
@@ -63,15 +72,14 @@ export interface GltfModel {
   /** Every image the file's materials bind, for the texture manager to load. */
   textures: GltfTextureRequest[];
   materials: GltfMaterialTemplate[];
+  /** The skeleton skinned primitives bind to, or null for a static model. */
+  skeleton: GltfSkeleton | null;
+  /** Animations that move the skeleton's joints. */
+  clips: GltfClip[];
 }
 
 /** Resolves a primitive to the pass that draws it. Called once per primitive. */
 export type MaterialResolver = (primitive: GltfPrimitive) => IMaterialPass;
-
-const _matrix = new Matrix4();
-const _position = new Vector3();
-const _quaternion = new Quaternion();
-const _scale = new Vector3();
 
 /**
  * glTF writes COLOR_0 as vec3 or vec4, in floats or normalized u8/u16 — six
@@ -135,9 +143,13 @@ function toFloatTangent(
   return out;
 }
 
-/** Returns null for anything the engine cannot draw, so the caller can skip it. */
+/**
+ * Returns null for anything the engine cannot draw, so the caller can skip it.
+ * `jointRemap` is set when the primitive's node binds the model's skin.
+ */
 function toGeometry(
-  primitive: GLTFMeshPrimitivePostprocessed
+  primitive: GLTFMeshPrimitivePostprocessed,
+  jointRemap?: Uint16Array
 ): Geometry | null {
   if ((primitive.mode ?? GLTF_MODE_TRIANGLES) !== GLTF_MODE_TRIANGLES)
     return null;
@@ -179,6 +191,14 @@ function toGeometry(
     geometry.tangents = toFloatTangent(tangents.value, tangents.components);
   else if (geometry.uvs && geometry.normals) geometry.computeTangents();
 
+  const joints = attributes.JOINTS_0;
+  const weights = attributes.WEIGHTS_0;
+  if (jointRemap && joints && weights) {
+    const skin = toSkinAttributes(joints.value, weights.value, jointRemap);
+    geometry.joints = skin.joints;
+    geometry.weights = skin.weights;
+  }
+
   // Compute bounds for culling/picking
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
@@ -196,37 +216,19 @@ export async function loadGltfModel(url: string): Promise<GltfModel> {
   return parseGltf(postProcessGLTF(gltf), url);
 }
 
-function readTransform(
-  node: GLTFNodePostprocessed
-): Pick<GltfNode, 'translation' | 'rotation' | 'scale'> {
-  if (node.matrix) {
-    _matrix.fromArray(new Float32Array(node.matrix));
-    _matrix.decompose(_position, _quaternion, _scale);
-
-    return {
-      translation: [_position.x, _position.y, _position.z],
-      rotation: [_quaternion.x, _quaternion.y, _quaternion.z, _quaternion.w],
-      scale: [_scale.x, _scale.y, _scale.z],
-    };
-  }
-
-  return {
-    translation: (node.translation as [number, number, number]) ?? [0, 0, 0],
-    rotation: (node.rotation as [number, number, number, number]) ?? [
-      0, 0, 0, 1,
-    ],
-    scale: (node.scale as [number, number, number]) ?? [1, 1, 1],
-  };
-}
-
 function parseNode(
   node: GLTFNodePostprocessed,
-  materialKeys: Map<string, string>
+  materialKeys: Map<string, string>,
+  skin: GltfSkin | null
 ): GltfNode {
   const primitives: GltfPrimitive[] = [];
+  const jointRemap =
+    node.skin && skin && bindsSkin(node.skin, skin)
+      ? skin.jointRemap
+      : undefined;
 
   for (const primitive of node.mesh?.primitives ?? []) {
-    const geometry = toGeometry(primitive);
+    const geometry = toGeometry(primitive, jointRemap);
     if (!geometry) continue;
 
     primitives.push({
@@ -244,7 +246,7 @@ function parseNode(
     ...readTransform(node),
     primitives,
     children: (node.children ?? []).map((child) =>
-      parseNode(child, materialKeys)
+      parseNode(child, materialKeys, skin)
     ),
   };
 }
@@ -280,11 +282,14 @@ export function parseGltf(
   );
   const materials = toMaterialTemplates(gltf, materialTextures);
   const materialKeys = materialKeysById(materials);
+  const skin = parseSkin(gltf);
 
   return {
-    roots: sceneRoots(gltf).map((node) => parseNode(node, materialKeys)),
+    roots: sceneRoots(gltf).map((node) => parseNode(node, materialKeys, skin)),
     textures,
     materials,
+    skeleton: skin?.skeleton ?? null,
+    clips: skin ? parseClips(gltf, skin) : [],
   };
 }
 
