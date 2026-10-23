@@ -39,6 +39,10 @@ export class Geometry {
    * with `vertexTangents` set on the pass.
    */
   tangents?: Float32Array;
+  /** Four skeleton joint indices per vertex. Set only on skinned geometry. */
+  joints?: Uint16Array;
+  /** Four weights per vertex, summing to 1, paired with `joints`. */
+  weights?: Float32Array;
   groups: GeometryGroup[];
 
   vertexBuffer: GPUBuffer;
