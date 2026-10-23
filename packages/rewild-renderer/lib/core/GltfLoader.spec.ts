@@ -440,6 +440,8 @@ describe('instantiateGltfModel', () => {
       roots: [...modelWith('left', 1).roots, ...modelWith('right', 1).roots],
       textures: [],
       materials: [],
+      skeleton: null,
+      clips: [],
     };
 
     const root = instantiateGltfModel(model, () => fakeMaterial());
