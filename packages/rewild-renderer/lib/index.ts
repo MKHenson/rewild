@@ -21,6 +21,7 @@ export * from './post-processes/IFrameEffect';
 export * from './textures/PortalViewCube';
 export * from './input';
 export * from './core/GltfLoader';
+export * from './core/GltfSkeleton';
 export * from './core/GltfTextures';
 export * from './core/LoadActivity';
 export * from './core/UIElement';
