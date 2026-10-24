@@ -126,6 +126,16 @@
       }
     },
     {
+      "name": "chicken",
+      "type": "asset",
+      "clips": { "look": "Idle2" },
+      "clipSpeeds": { "walk": 0.6, "run": 2.5 },
+      "idleActions": ["look"],
+      "resource": {
+        "geometryId": "chicken-01"
+      }
+    },
+    {
       "name": "point-light",
       "type": "light",
       "resource": {

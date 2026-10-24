@@ -113,9 +113,10 @@ Each layer has a weight from 0 to 1. A weight of 0 skips the layer and costs not
 A creature template adds to the asset template:
 
 - `behaviors`: for example `["wander", "flee"]`. The field exists today.
-- `clips`: maps a meaning to a clip name, only where the names differ. A missing entry falls back to the clip with the same name.
+- `clips`: maps a meaning to a clip name, only where the names differ. A missing entry falls back to the clip with the same name, matched without case if no exact one exists, so `idle` finds `Idle`.
 - `locomotion`: named sets of locomotion clips. `normal` is the default. A missing entry in another set falls back to `normal`.
-- `clipSpeeds`: the natural ground speed of each locomotion clip, in m/s.
+- `clipSpeeds`: the natural ground speed of each locomotion clip, in m/s, keyed by meaning. A set's clip falls back to the speed of the slot it fills, for example `limp` to `walk`, then to 1 m/s for walk and 3 m/s for run.
+- `idleActions`: the meanings idle variety picks from.
 - `bones`: the bone names for look-at and IK.
 - `driver`: the locomotion driver. Sinew has only `clips`.
 - `movement`: top speed and turn rate.
@@ -144,7 +145,8 @@ Each creature has an animation controller. It makes all animation decisions. Beh
 
 - Each clip has a natural speed: the speed its feet carry the body at normal rate. For example, a chicken's `walk` is 1.2 m/s and its `run` is 4 m/s.
 - At 2.6 m/s, the controller plays about half `walk` and half `run`. The clips share one cycle, so the feet stay in step.
-- The playback rate changes only a little, to remove the last foot slide.
+- Walk and run share one phase. Each frame it advances by the blended cycle rate, and each cycling clip's time is that phase times its length. Idle keeps its own time.
+- The playback rate changes only a little, to remove the last foot slide: at most 15% (`RATE_CORRECTION`). Inside the blend the rate is 1, since the blended natural speed equals the ground speed.
 - At zero speed, locomotion is all `idle`.
 
 **Locomotion sets.** A set is a version of locomotion. A behaviour or a health state picks it, and the controller crossfades to it.
@@ -160,7 +162,11 @@ The injured deer has no `run` of its own, so it uses the normal `run`. If an inj
 
 **Actions.** A behaviour plays an action clip by meaning: `animator.play('eat')`, `animator.stop('eat')`. The controller fades it in over locomotion and fades it out when it ends or stops. The behaviour decides the rest. Wander stops moving while the chicken eats. Flee stops the `eat` action before it runs.
 
-**Idle variety.** While a creature stands still, the controller plays a random idle action now and then, for example `look`, `scratch` or `shake`.
+**Idle variety.** While a creature stands still, the controller plays a random idle action now and then, for example `look`, `scratch` or `shake`, every 4 to 10 seconds. Moving fades it out.
+
+**Weights.** The controller sets every clip's weight each frame. Actions take their share first, and locomotion fills the rest, so the total stays 1. Two locomotion sets crossfading, each with two clips, plus an action and one fading out, fill the 6 clip slots.
+
+**Code.** `AnimationController` drives a `SkinnedInstance` through the `AnimationTarget` interface. `TemplateLoader` gives every skinned asset one as `asset.animator`. In game, the `Animator` behaviour measures ground speed from how far the asset moved and updates the controller each frame.
 
 **The seam.** Behaviours never play locomotion clips, so Shoal can swap the locomotion part for a swim controller with no change to behaviours.
 

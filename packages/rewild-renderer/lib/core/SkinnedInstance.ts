@@ -48,6 +48,20 @@ export class SkinnedInstance {
     return this.model.poses.slotOf(this.handle);
   }
 
+  /** Names of the model's clips. */
+  get clipNames(): string[] {
+    return this.model.player.clips.map((clip) => clip.name);
+  }
+
+  hasClip(clip: string): boolean {
+    return this.model.player.hasClip(clip);
+  }
+
+  /** The clip's length in seconds, or −1 if the model has no such clip. */
+  clipDuration(clip: string): number {
+    return this.model.player.duration(clip);
+  }
+
   /** Crossfades to `clip` over `fade` seconds. False if the model lacks it. */
   play(clip: string, fade = 0, loop = true): boolean {
     return this.model.player.play(this.handle, clip, fade, loop);

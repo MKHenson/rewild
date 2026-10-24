@@ -233,7 +233,26 @@ declare module 'models' {
     assets: ITemplateItem[];
   }
 
-  export interface ITemplateItemBase {
+  export type LocomotionMeaning = 'idle' | 'walk' | 'run';
+
+  /** The clips a locomotion set plays, by meaning. */
+  export type ILocomotionSet = { [meaning in LocomotionMeaning]?: string };
+
+  /** How a skinned asset's clips map to what its animation controller plays. */
+  export interface ICreatureAnimation {
+    /** Meaning to clip name, only where they differ. */
+    clips?: { [meaning: string]: string };
+    /** Named locomotion sets. `normal` is the default, and other sets fall
+     *  back to it for a meaning they leave out. */
+    locomotion?: { [set: string]: ILocomotionSet };
+    /** Ground speed in m/s that each locomotion meaning's clip carries the
+     *  body at, at normal rate. */
+    clipSpeeds?: { [meaning: string]: number };
+    /** Meanings played now and then while the creature stands still. */
+    idleActions?: string[];
+  }
+
+  export interface ITemplateItemBase extends ICreatureAnimation {
     name: string;
     behaviors?: string[];
   }
