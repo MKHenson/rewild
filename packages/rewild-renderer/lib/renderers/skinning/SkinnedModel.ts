@@ -4,6 +4,7 @@ import { GltfModel, GltfNode, GltfPrimitive } from '../../core/GltfLoader';
 import { Geometry } from '../../geometry/Geometry';
 import { SkinnedInstancedPass } from '../../materials/SkinnedInstancedPass';
 import { createStandardPass } from '../../managers/MaterialManager';
+import { ClipPlayer } from './ClipPlayer';
 import { PoseStore } from './PoseStore';
 
 const MATRIX_BYTES = 64;
@@ -16,12 +17,13 @@ export interface SkinnedPrimitive {
 }
 
 /**
- * What every SkinnedInstance of one glTF model shares: the poses, the joint
- * matrix buffer, and one pass per primitive. SkinnedModelManager creates and
+ * What every SkinnedInstance of one glTF model shares: the poses, the clip
+ * player, the joint matrix buffer, and one pass per primitive. SkinnedModelManager creates and
  * frees these.
  */
 export class SkinnedModel {
   readonly poses: PoseStore;
+  readonly player: ClipPlayer;
   readonly primitives: SkinnedPrimitive[] = [];
   /** Local bounds that hold the model however its joints bend: a cube of the
    *  bind pose's radius about the origin. */
@@ -41,6 +43,7 @@ export class SkinnedModel {
       throw new Error('Skinned model has no skinned primitives.');
 
     this.poses = new PoseStore(model.skeleton);
+    this.player = new ClipPlayer(this.poses, model.clips);
 
     const r = reach(skinned);
     this.localBounds.min.set(-r, -r, -r);

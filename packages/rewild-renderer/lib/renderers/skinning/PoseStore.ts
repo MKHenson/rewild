@@ -4,6 +4,14 @@ import { GltfSkeleton } from '../../core/GltfSkeleton';
 export const POSE_STRIDE = 10;
 const MATRIX = 16;
 
+/** Per-slot state kept beside a PoseStore that follows its slots. */
+export interface PoseSlotData {
+  grow(capacity: number): void;
+  /** Called after `from` has moved into `to`. */
+  moveSlot(from: number, to: number): void;
+  clearSlot(slot: number): void;
+}
+
 /**
  * The poses of every instance of one skinned model, in flat arrays a slot
  * apiece.
@@ -29,7 +37,10 @@ export class PoseStore {
   private handleBySlot = new Int32Array(0);
   private readonly slotByHandle = new Map<number, number>();
   private nextHandle = 1;
-  private readonly restPose: Float32Array;
+  /** Rest TRS of every joint, laid out as one slot of `pose`. */
+  readonly restPose: Float32Array;
+
+  private readonly slotData: PoseSlotData[] = [];
   private readonly world: Float32Array;
   private readonly local = new Float32Array(MATRIX);
 
@@ -49,6 +60,12 @@ export class PoseStore {
     this.grow(initialCapacity);
   }
 
+  /** Keeps `data` sized to the store and moved with its slots. */
+  attach(data: PoseSlotData): void {
+    data.grow(this.capacity);
+    this.slotData.push(data);
+  }
+
   /** Adds an instance in the rest pose. */
   add(): number {
     if (this.count === this.capacity) this.grow(this.capacity * 2);
@@ -58,6 +75,7 @@ export class PoseStore {
     this.handleBySlot[slot] = handle;
     this.slotByHandle.set(handle, slot);
     this.pose.set(this.restPose, slot * this.restPose.length);
+    for (const data of this.slotData) data.clearSlot(slot);
 
     this.posesDirty = true;
     return handle;
@@ -71,6 +89,7 @@ export class PoseStore {
     const last = this.count - 1;
     if (slot !== last) {
       this.moveSlot(last, slot);
+      for (const data of this.slotData) data.moveSlot(last, slot);
       const moved = this.handleBySlot[last];
       this.handleBySlot[slot] = moved;
       this.slotByHandle.set(moved, slot);
@@ -157,6 +176,7 @@ export class PoseStore {
     handles.set(this.handleBySlot);
     this.handleBySlot = handles;
     this.capacity = capacity;
+    for (const data of this.slotData) data.grow(capacity);
   }
 }
 
