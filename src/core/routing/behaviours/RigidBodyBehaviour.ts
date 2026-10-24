@@ -1,4 +1,4 @@
-import { IBehaviour, IAsset } from 'rewild-routing';
+import { BehaviourState, IBehaviour, IAsset } from 'rewild-routing';
 import { Asset3D } from '../Asset3D';
 import { RigidBody } from '@dimforge/rapier3d-compat/dynamics';
 import { Quaternion } from 'rewild-common';
@@ -53,6 +53,31 @@ export class RigidBodyBehaviour implements IBehaviour {
     );
   }
 
+  serialize(): BehaviourState {
+    const t = this.rb.translation();
+    const r = this.rb.rotation();
+    const v = this.rb.linvel();
+    const w = this.rb.angvel();
+    return {
+      translation: [t.x, t.y, t.z],
+      rotation: [r.x, r.y, r.z, r.w],
+      linearVelocity: [v.x, v.y, v.z],
+      angularVelocity: [w.x, w.y, w.z],
+    };
+  }
+
+  restore(state: BehaviourState): void {
+    const t = vector(state.translation, 3);
+    const r = vector(state.rotation, 4);
+    const v = vector(state.linearVelocity, 3);
+    const w = vector(state.angularVelocity, 3);
+    if (t) this.rb.setTranslation(new RapierVec3(t[0], t[1], t[2]), true);
+    if (r) this.rb.setRotation(new RapierQuat(r[0], r[1], r[2], r[3]), true);
+    if (this.isFixed) return;
+    if (v) this.rb.setLinvel(new RapierVec3(v[0], v[1], v[2]), true);
+    if (w) this.rb.setAngvel(new RapierVec3(w[0], w[1], w[2]), true);
+  }
+
   onMount(asset: IAsset): void {
     if (asset instanceof Asset3D) {
       this.rb.setRotation(
@@ -74,4 +99,15 @@ export class RigidBodyBehaviour implements IBehaviour {
       );
     }
   }
+}
+
+function vector(
+  value: BehaviourState[string],
+  length: number
+): number[] | null {
+  return Array.isArray(value) &&
+    value.length === length &&
+    value.every((n) => typeof n === 'number')
+    ? (value as number[])
+    : null;
 }
