@@ -49,12 +49,6 @@ export interface BVHConfig {
   /** Automatically call `sceneBVH.update()` each frame. */
   sceneBVHAutoUpdate: boolean;
 
-  /**
-   * Fraction of moved objects that triggers a full scene BVH rebuild
-   * instead of a cheaper refit. Range 0–1. Default: 0.1 (10%).
-   */
-  sceneBVHUpdateThreshold: f32;
-
   // ── Dynamic refit ──
 
   /**
@@ -73,6 +67,5 @@ export const DEFAULT_BVH_CONFIG: BVHConfig = {
   asyncBuildThreshold: 10000,
   enableSceneBVH: true,
   sceneBVHAutoUpdate: true,
-  sceneBVHUpdateThreshold: 0.1,
   autoRefitGeometryBVH: true,
 };

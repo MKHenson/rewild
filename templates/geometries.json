@@ -197,5 +197,9 @@
   "reed-01": {
     "type": "gltf",
     "url": "nature/plants/reed/reed-01.glb"
+  },
+  "chicken-01": {
+    "type": "gltf",
+    "url": "models/chicken-01.glb"
   }
 }

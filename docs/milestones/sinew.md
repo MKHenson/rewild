@@ -60,14 +60,14 @@ The loaded model keeps one skeleton and its clips. Many instances use them.
 
 ## Herds and instancing
 
-A herd is up to 20 animals, and up to 100 creatures are alive at once. At that scale every creature can build its full pose on the CPU, look-at and IK included. Each model is still one instanced draw, the same as scatter. The CPU writes each instance's joint matrices to a storage buffer, and the shader reads them by instance.
+A herd is up to 20 animals, and up to 100 creatures are alive at once. At that scale every creature can build its full pose on the CPU, look-at and IK included. A creature is a `SkinnedInstance`: a pose, and a `SkinnedMesh` per material on its transform, placed like any `Mesh`. Each creature is culled on its own, and every visible creature of one model is one instanced draw per material. The CPU writes every pose's joint matrices to a storage buffer, and the shader reads them by each drawn creature's slot.
 
 ### Pose buffers
 
 - Each model has one shared `Float32Array` for pose data. Each creature owns a fixed slot in it: a range of the array, found by its slot index. No creature has a separate array, and no bone is an object.
 - There are two buffers for each model. The working pose (position, rotation and scale for each bone) is the input. The joint matrices are the output. Only the output matches the GPU layout.
-- The output upload is one `writeBuffer` for each model each frame. The shader finds an instance's matrices at `instance_index × joint count`.
-- Live creatures fill slots 0 to N−1, because the instanced draw renders instances 0 to N−1. When a creature despawns, the last creature moves into its slot (swap-remove).
+- The output upload is one `writeBuffer` for each model each frame. Each draw also writes a short list of the visible creatures' world matrices and slots, and the shader finds a creature's joint matrices at `slot × joint count`.
+- Live creatures fill slots 0 to N−1. When a creature despawns, the last creature moves into its slot (swap-remove), so the buffer stays packed.
 - A moved creature's slot index changes. Other code refers to a creature by a stable handle that maps to its slot, and never keeps a slot index.
 - This layout lets a worker take the whole job with one buffer. It also lets WASM build every pose in one call over its own memory, with JS reading the result through views. Many small calls or copies for each creature would lose the gain.
 

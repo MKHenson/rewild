@@ -51,6 +51,8 @@ export class Geometry {
   uv1Buffer: GPUBuffer;
   colorBuffer: GPUBuffer;
   tangentBuffer: GPUBuffer;
+  jointBuffer: GPUBuffer;
+  weightBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
 
   boundingBox: Box3 | null;
@@ -100,6 +102,8 @@ export class Geometry {
     this.uvBuffer?.destroy();
     this.colorBuffer?.destroy();
     this.tangentBuffer?.destroy();
+    this.jointBuffer?.destroy();
+    this.weightBuffer?.destroy();
     this.indexBuffer?.destroy();
   }
 
@@ -432,6 +436,26 @@ export class Geometry {
       });
       new Float32Array(this.tangentBuffer.getMappedRange()).set(this.tangents);
       this.tangentBuffer.unmap();
+    }
+
+    if (this.joints && this.weights) {
+      this.jointBuffer = device.createBuffer({
+        label: 'joint buffer data',
+        size: this.joints.byteLength,
+        usage: GPUBufferUsage.VERTEX,
+        mappedAtCreation: true,
+      });
+      new Uint16Array(this.jointBuffer.getMappedRange()).set(this.joints);
+      this.jointBuffer.unmap();
+
+      this.weightBuffer = device.createBuffer({
+        label: 'weight buffer data',
+        size: this.weights.byteLength,
+        usage: GPUBufferUsage.VERTEX,
+        mappedAtCreation: true,
+      });
+      new Float32Array(this.weightBuffer.getMappedRange()).set(this.weights);
+      this.weightBuffer.unmap();
     }
 
     if (this.indices) {
