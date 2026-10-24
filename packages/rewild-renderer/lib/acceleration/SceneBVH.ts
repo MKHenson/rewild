@@ -24,7 +24,9 @@ const MAX_DEPTH = 24;
  *
  * **Manual control**: The developer explicitly calls `markDirty()` or
  * `rebuild()` after structural scene changes (add/remove objects).
- * Moving objects are tracked via `markObjectMoved()` for efficient refitting.
+ * Moving objects are tracked via `markObjectMoved()` and refitted, which keeps
+ * the tree's shape. A scene whose movers travel far from where the tree was
+ * built can call `markDirty()` to rebuild it.
  */
 export class SceneBVH {
   private root: SceneBVHNode | null = null;
@@ -43,9 +45,6 @@ export class SceneBVH {
   // --- Change tracking (manual control) ---
   private isDirty: boolean = true;
   private movedObjects: Set<Transform> = new Set();
-
-  /** Fraction of moved objects that triggers a full rebuild instead of refit. */
-  updateThreshold: number = 0.1;
 
   /** Last seen structureVersion from the scene root. */
   private lastStructureVersion: number = -1;
@@ -110,20 +109,12 @@ export class SceneBVH {
       return;
     }
 
-    const movedCount = this.movedObjects.size;
-    if (movedCount === 0) return;
+    if (this.movedObjects.size === 0) return;
 
-    const totalCount = this.objects.length;
-    if (totalCount === 0) return;
-
-    if (movedCount / totalCount > this.updateThreshold) {
-      // Too many objects moved — rebuild is faster
-      this.rebuild();
-    } else {
-      // Few objects moved — refit existing structure
-      this.refitMoved();
-      this.movedObjects.clear();
-    }
+    // A refit is O(n) with no allocation, so it beats a rebuild however many
+    // objects moved.
+    this.refitMoved();
+    this.movedObjects.clear();
   }
 
   // ───────────────────── Queries ─────────────────────

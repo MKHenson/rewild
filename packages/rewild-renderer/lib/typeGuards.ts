@@ -15,6 +15,18 @@ export function isScatterInstanceGroup(
   return !!(obj && obj[IS_SCATTER_INSTANCE_GROUP]);
 }
 
+export const IS_SKINNED_INSTANCED_PASS: unique symbol = Symbol(
+  'SkinnedInstancedPass'
+);
+
+/** A pass drawing SkinnedMeshes, which the shadow renderers batch per pass
+ *  rather than casting one mesh at a time. */
+export function isSkinnedInstancedPass(
+  obj: any
+): obj is import('./materials/SkinnedInstancedPass').SkinnedInstancedPass {
+  return !!(obj && obj[IS_SKINNED_INSTANCED_PASS]);
+}
+
 export const IS_SCATTER_IMPOSTOR_PASS: unique symbol = Symbol(
   'ScatterImpostorPass'
 );

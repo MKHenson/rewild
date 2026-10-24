@@ -5,7 +5,10 @@ import { IRenderGroup } from '../../../types/IRenderGroup';
 import { IVisualComponent } from '../../../types/interfaces';
 import { SpotLight } from '../../core/lights/SpotLight';
 import shader from '../../shaders/shadow-depth.wgsl';
-import { isScatterInstanceGroup } from '../../typeGuards';
+import {
+  isScatterInstanceGroup,
+  isSkinnedInstancedPass,
+} from '../../typeGuards';
 
 interface MeshShadowUniforms {
   buffer: GPUBuffer;
@@ -255,12 +258,14 @@ export class SpotLightShadowRenderer {
   private _ensureMeshUniforms(device: GPUDevice, mesh: IVisualComponent): void {
     if (this.meshUniforms.has(mesh)) return;
 
-    // Scatter is directional-only. This pipeline draws one copy per caster, so
-    // a chunk of instances would come out as a single stray shadow at the chunk
-    // origin; skipping here leaves it out of the write and draw loops too.
-    // Give it the instanced path from DirectionalShadowRenderer if a spot light
-    // ever needs to shadow foliage.
-    if (isScatterInstanceGroup(mesh)) return;
+    // Scatter and skinned meshes are directional-only. This pipeline draws one
+    // unskinned copy per caster, so a chunk of scatter would come out as a
+    // single stray shadow at its origin and a creature in its bind pose;
+    // skipping here leaves them out of the write and draw loops too. Give them
+    // DirectionalShadowRenderer's paths if a spot light ever needs to shadow
+    // them.
+    if (isScatterInstanceGroup(mesh) || isSkinnedInstancedPass(mesh.material))
+      return;
 
     const buffer = device.createBuffer({
       label: 'spot shadow mesh MVP',
