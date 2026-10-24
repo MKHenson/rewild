@@ -84,6 +84,47 @@ export function registerSkinnedDebugCommands(renderer: Renderer) {
     );
   };
 
+  (window as any).playSkinnedClip = (clip?: string, fade = 0.3) => {
+    const model = shown && renderer.skinnedModels.get(shown.modelId);
+    if (!shown || !model) {
+      console.log(
+        'No skinned instances are up. Run showSkinnedInstances first.'
+      );
+      return;
+    }
+
+    const names = model.player.clips.map((c) => c.name);
+    if (clip === undefined) {
+      console.log(
+        `playSkinnedClip(clip, fade = 0.3) — crossfades every shown instance ` +
+          `to a clip over fade seconds. An instance that starts the clip ` +
+          `starts at its own random time.\n` +
+          `stopSkinnedClips(fade = 0.3) fades them back to the bind pose.\n` +
+          `Clips: ${names.join(', ') || 'none'}`
+      );
+      return;
+    }
+
+    const found = model.player.clips.find((c) => c.name === clip);
+    if (!found) {
+      console.warn(
+        `playSkinnedClip: no clip '${clip}'. Clips: ${names.join(', ')}`
+      );
+      return;
+    }
+
+    for (const instance of shown.instances) {
+      const starting = instance.clipTime(clip) < 0;
+      instance.play(clip, fade);
+      if (starting) instance.setClipTime(clip, Math.random() * found.duration);
+    }
+  };
+
+  (window as any).stopSkinnedClips = (fade = 0.3) => {
+    if (!shown) return;
+    for (const instance of shown.instances) instance.stopAll(fade);
+  };
+
   (window as any).hideSkinnedInstances = () => {
     if (!shown) return;
     for (const instance of shown.instances) instance.dispose();
@@ -106,6 +147,11 @@ export function registerSkinnedDebugCommands(renderer: Renderer) {
     console.log(
       `skinnedInstancesInfo() — ${model.poses.count} poses, ` +
         `${model.poses.jointCount} joints, in scene: ${!!shown.root.parent}\n` +
+        `clips: ${
+          model.player.clips
+            .map((c) => `${c.name} (${c.duration.toFixed(2)}s)`)
+            .join(', ') || 'none'
+        }\n` +
         `camera (${m[12].toFixed(1)}, ${m[13].toFixed(1)}, ` +
         `${m[14].toFixed(1)}), first instance (${p[12].toFixed(1)}, ` +
         `${p[13].toFixed(1)}, ${p[14].toFixed(1)})`

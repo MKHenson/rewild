@@ -361,7 +361,10 @@ Registered in `SkinnedDebugCommands.ts`.
 
 ```js
 showSkinnedInstances('chicken', 20); // a grid of a skinned model's instances, 8m along the view
-skinnedInstancesInfo(); // pose count, camera against the first instance, and what each primitive drew
+playSkinnedClip('Idle'); // every shown instance crossfades to a clip, each starting at its own time
+playSkinnedClip('Walk', 0.5); // crossfade over 0.5s
+stopSkinnedClips(); // fade back to the bind pose
+skinnedInstancesInfo(); // pose count, clips, camera against the first instance, and what each primitive drew
 hideSkinnedInstances();
 ```
 
@@ -371,6 +374,9 @@ stands in its bind pose, and each primitive of the model is one draw for every v
 `skinnedInstancesInfo` reports each primitive's last draw: `drawnCount` instances, `drawnMsAgo`
 milliseconds ago, or `'never'` when the cull dropped them all. A creature that renders but casts
 no shadow means the shadow pass missed the skinned caster.
+
+`playSkinnedClip()` with no clip lists the model's clips. Clip names match the glTF exactly. A
+crossfade should show no pop, and the instances should stay out of step with each other.
 
 See [Sinew](./milestones/sinew.md).
 

@@ -961,6 +961,8 @@ export class Renderer {
 
     const pCamera = this.camera;
 
+    this.skinnedModels.update(deltaTime / 1000);
+
     // update scene graph
     this.scene.updateMatrixWorld();
     this.ui.updateMatrixWorld();
