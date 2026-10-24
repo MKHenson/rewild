@@ -24,7 +24,9 @@ const MAX_DEPTH = 24;
  *
  * **Manual control**: The developer explicitly calls `markDirty()` or
  * `rebuild()` after structural scene changes (add/remove objects).
- * Moving objects are tracked via `markObjectMoved()` for efficient refitting.
+ * Moving objects are tracked via `markObjectMoved()` and refitted, which keeps
+ * the tree's shape. A scene whose movers travel far from where the tree was
+ * built can call `markDirty()` to rebuild it.
  */
 export class SceneBVH {
   private root: SceneBVHNode | null = null;
@@ -33,15 +35,16 @@ export class SceneBVH {
   /** Flat list of objects currently in the BVH. */
   private objects: Transform[] = [];
 
-  /** World-space AABBs for each object (parallel to `objects`). */
+  /** World-space AABBs for each object (parallel to `objects`). Reused across
+   *  rebuilds. */
   private worldBoxes: Box3[] = [];
+
+  /** Each object's index in `objects`. */
+  private indexByObject = new Map<Transform, number>();
 
   // --- Change tracking (manual control) ---
   private isDirty: boolean = true;
   private movedObjects: Set<Transform> = new Set();
-
-  /** Fraction of moved objects that triggers a full rebuild instead of refit. */
-  updateThreshold: number = 0.1;
 
   /** Last seen structureVersion from the scene root. */
   private lastStructureVersion: number = -1;
@@ -65,8 +68,10 @@ export class SceneBVH {
    */
   rebuild(): void {
     this.objects.length = 0;
-    this.worldBoxes.length = 0;
     this.collectObjects(this.sceneRoot);
+    this.indexByObject.clear();
+    for (let i = 0, l = this.objects.length; i < l; i++)
+      this.indexByObject.set(this.objects[i], i);
     this.computeWorldBoxes();
 
     if (this.objects.length > 0) {
@@ -106,20 +111,12 @@ export class SceneBVH {
       return;
     }
 
-    const movedCount = this.movedObjects.size;
-    if (movedCount === 0) return;
+    if (this.movedObjects.size === 0) return;
 
-    const totalCount = this.objects.length;
-    if (totalCount === 0) return;
-
-    if (movedCount / totalCount > this.updateThreshold) {
-      // Too many objects moved — rebuild is faster
-      this.rebuild();
-    } else {
-      // Few objects moved — refit existing structure
-      this.refitMoved();
-      this.movedObjects.clear();
-    }
+    // A refit is O(n) with no allocation, so it beats a rebuild however many
+    // objects moved.
+    this.refitMoved();
+    this.movedObjects.clear();
   }
 
   // ───────────────────── Queries ─────────────────────
@@ -185,6 +182,7 @@ export class SceneBVH {
     this.root = null;
     this.objects.length = 0;
     this.worldBoxes.length = 0;
+    this.indexByObject.clear();
     this.movedObjects.clear();
   }
 
@@ -220,7 +218,7 @@ export class SceneBVH {
   /** Compute world-space AABBs for all collected objects. */
   private computeWorldBoxes(): void {
     const { objects, worldBoxes } = this;
-    worldBoxes.length = objects.length;
+    if (worldBoxes.length > objects.length) worldBoxes.length = objects.length;
 
     for (let i = 0, l = objects.length; i < l; i++) {
       const transform = objects[i];
@@ -233,10 +231,9 @@ export class SceneBVH {
       if (!local && geometry.boundingBox === null)
         geometry.computeBoundingBox();
 
-      const box = new Box3();
+      const box = worldBoxes[i] ?? (worldBoxes[i] = new Box3());
       box.copy(local ?? geometry.boundingBox!);
       box.applyMatrix4(transform.matrixWorld);
-      worldBoxes[i] = box;
     }
   }
 
@@ -364,7 +361,7 @@ export class SceneBVH {
   /** Refit world boxes for manually-marked moved objects only, then update BVH bounds bottom-up. */
   private refitMoved(): void {
     for (const transform of this.movedObjects) {
-      const idx = this.objects.indexOf(transform);
+      const idx = this.indexByObject.get(transform) ?? -1;
       if (idx === -1) continue;
 
       const component = transform.component as unknown as IVisualComponent;
@@ -392,7 +389,7 @@ export class SceneBVH {
 
       for (let i = 0, l = node.objects.length; i < l; i++) {
         const transform = node.objects[i];
-        const idx = this.objects.indexOf(transform);
+        const idx = this.indexByObject.get(transform) ?? -1;
         if (idx === -1) continue;
         const box = this.worldBoxes[idx];
         bb.expandByPoint(box.min);
@@ -435,7 +432,7 @@ export class SceneBVH {
         if (transform.renderLayer === RenderLayer.Overlay) continue;
 
         // Fine-grained test against object's own world AABB.
-        const idx = this.objects.indexOf(transform);
+        const idx = this.indexByObject.get(transform) ?? -1;
         if (idx !== -1 && frustum.intersectsBox(this.worldBoxes[idx])) {
           results.push(transform);
         }
@@ -470,7 +467,7 @@ export class SceneBVH {
         if (!transform.layers.test(raycaster.layers)) continue;
 
         // Test against object's world AABB before delegating to component.
-        const idx = this.objects.indexOf(transform);
+        const idx = this.indexByObject.get(transform) ?? -1;
         if (idx !== -1 && ray.intersectBox(this.worldBoxes[idx], _boxTarget)) {
           // Delegate to component raycast (which may use geometry BVH).
           transform.raycast(raycaster, intersects);
@@ -496,7 +493,7 @@ export class SceneBVH {
         const transform = node.objects[i];
         if (!transform.visible) continue;
 
-        const idx = this.objects.indexOf(transform);
+        const idx = this.indexByObject.get(transform) ?? -1;
         if (idx !== -1 && this.worldBoxes[idx].intersectsBox(box)) {
           results.push(transform);
         }

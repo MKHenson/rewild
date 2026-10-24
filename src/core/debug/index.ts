@@ -10,6 +10,7 @@ import { registerAtmosphereDebugCommands } from './AtmosphereDebugCommands';
 import { registerPbrHarnessCommands } from './PbrHarnessCommands';
 import { registerGltfImportCommands } from './GltfImportCommands';
 import { registerLakeDebugCommands } from './LakeDebugCommands';
+import { registerSkinnedDebugCommands } from './SkinnedDebugCommands';
 import { registerWaterDebugCommands } from './WaterDebugCommands';
 import { registerWaterEditDevCommands } from './WaterEditDevCommands';
 import { registerPlayerDebugCommands } from './PlayerDebugCommands';
@@ -32,6 +33,7 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerAoDebugCommands(renderer);
   registerPbrHarnessCommands(renderer);
   registerGltfImportCommands(renderer);
+  registerSkinnedDebugCommands(renderer);
   registerScatterDebugCommands(renderer);
   registerWindDebugCommands(renderer);
   registerLakeDebugCommands(renderer);

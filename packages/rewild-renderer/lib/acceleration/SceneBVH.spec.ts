@@ -84,6 +84,34 @@ describe('SceneBVH membership', () => {
     expect(scene.structureVersion).toBe(version);
   });
 
+  it('refits rather than rebuilds when most objects move', () => {
+    const scene = new Transform();
+    const movers = [0, 1, 2, 3].map((i) => visualTransform(`mover-${i}`));
+    for (const mover of movers) scene.addChild(mover);
+    scene.updateMatrixWorld();
+
+    const bvh = new SceneBVH(scene);
+    bvh.update();
+    const rebuild = jest.spyOn(bvh, 'rebuild');
+
+    // A box in front of x = 50 only, so a stale box would leave a mover out.
+    const projection = new Matrix4();
+    projection.makeOrthographic(40, 60, 1000, -1000, -1000, 1000);
+    const nearFifty = new Frustum().setFromProjectionMatrix(projection);
+
+    for (const mover of movers) {
+      mover.position.set(50, 0, 0);
+      bvh.markObjectMoved(mover);
+    }
+    scene.updateMatrixWorld();
+    bvh.update();
+
+    expect(rebuild).not.toHaveBeenCalled();
+    expect(bvh.frustumCull(nearFifty, [])).toEqual(
+      expect.arrayContaining(movers)
+    );
+  });
+
   it('keeps a transform whose component is merely marked invisible', () => {
     const scene = new Transform();
     const child = visualTransform('child');

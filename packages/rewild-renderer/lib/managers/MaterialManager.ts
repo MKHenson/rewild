@@ -13,15 +13,17 @@ import { UIElementMeterPass } from '../materials/UIElementMeterPass';
 import { StandardPass } from '../materials/StandardPass';
 import { StandardInstancedPass } from '../materials/StandardInstancedPass';
 import { ScatterInstancedPass } from '../materials/ScatterInstancedPass';
+import { SkinnedInstancedPass } from '../materials/SkinnedInstancedPass';
 import { ALPHA_MODES } from '../materials/uniforms/StandardMaterial';
 import { GltfMaterialTemplate } from '../core/GltfMaterials';
 
 /** Which standard pass a template is built into. The template is identical in
- *  all three; only the draw differs. */
+ *  all of them; only the draw differs. */
 export type StandardPassKind =
   | 'standard'
   | 'standard-instanced'
-  | 'standard-scatter';
+  | 'standard-scatter'
+  | 'standard-skinned';
 
 export class MaterialManager {
   materials: Map<string, IMaterialPass>;
@@ -226,10 +228,16 @@ export function createStandardPass(
   kind: StandardPassKind = t.type === 'standard-instanced'
     ? 'standard-instanced'
     : 'standard'
-): StandardPass | StandardInstancedPass | ScatterInstancedPass {
+):
+  | StandardPass
+  | StandardInstancedPass
+  | ScatterInstancedPass
+  | SkinnedInstancedPass {
   const pass =
     kind === 'standard-scatter'
       ? new ScatterInstancedPass()
+      : kind === 'standard-skinned'
+      ? new SkinnedInstancedPass()
       : kind === 'standard-instanced'
       ? new StandardInstancedPass()
       : new StandardPass();

@@ -355,6 +355,27 @@ See [Understory](./milestones/understory.md).
 
 ---
 
+## Creatures
+
+Registered in `SkinnedDebugCommands.ts`.
+
+```js
+showSkinnedInstances('chicken', 20); // a grid of a skinned model's instances, 8m along the view
+skinnedInstancesInfo(); // pose count, camera against the first instance, and what each primitive drew
+hideSkinnedInstances();
+```
+
+The model id is a geometry id from the templates, and the model must have a skin. The grid stands
+on the terrain when it is within 5m below the view point, and floats there otherwise. Each instance
+stands in its bind pose, and each primitive of the model is one draw for every visible instance.
+`skinnedInstancesInfo` reports each primitive's last draw: `drawnCount` instances, `drawnMsAgo`
+milliseconds ago, or `'never'` when the cull dropped them all. A creature that renders but casts
+no shadow means the shadow pass missed the skinned caster.
+
+See [Sinew](./milestones/sinew.md).
+
+---
+
 ## Player
 
 Registered in `PlayerDebugCommands.ts`. They work in a game only.

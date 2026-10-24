@@ -15,13 +15,16 @@ import {
 import shader from '../../shaders/shadow-depth.wgsl';
 import instancedShader from '../../shaders/shadow-depth-instanced.wgsl';
 import impostorShader from '../../shaders/shadow-depth-impostor.wgsl';
+import skinnedShader from '../../shaders/shadow-depth-skinned.wgsl';
 import { ScatterImpostorPass } from '../../materials/ScatterImpostorPass';
 import { ScatterInstancedPass } from '../../materials/ScatterInstancedPass';
 import { writeScatterWindParams } from '../terrain/ScatterLayers';
 import { ShadowDebugRenderer } from './ShadowDebugRenderer';
+import { SkinnedShadowCasters } from './SkinnedShadowCasters';
 import {
   isScatterImpostorPass,
   isScatterInstanceGroup,
+  isSkinnedInstancedPass,
 } from '../../typeGuards';
 import { shadowConfig } from './ShadowQuality';
 
@@ -180,6 +183,10 @@ export class DirectionalShadowRenderer {
   private instancedPipeline: GPURenderPipeline;
   private instancedWindPipeline: GPURenderPipeline;
   private impostorPipeline: GPURenderPipeline;
+  private skinnedPipeline: GPURenderPipeline;
+  private readonly skinnedCasters = new SkinnedShadowCasters();
+  private readonly _cascadeMaskOf = (mesh: IVisualComponent): number =>
+    this._cascadeMask(mesh);
   private meshUniforms: Map<IVisualComponent, MeshShadowUniforms>;
   // Scratch set reused by the per-frame stale-entry sweep (no per-frame allocation).
   private _liveMeshes = new Set<IVisualComponent>();
@@ -371,6 +378,44 @@ export class DirectionalShadowRenderer {
       },
     });
 
+    const skinnedModule = device.createShaderModule({
+      label: 'skinned shadow depth shader',
+      code: skinnedShader,
+    });
+
+    this.skinnedPipeline = device.createRenderPipeline({
+      label: 'directional shadow skinned pipeline',
+      layout: 'auto',
+      vertex: {
+        entryPoint: 'vs',
+        module: skinnedModule,
+        buffers: [
+          {
+            arrayStride: 4 * 3,
+            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
+          },
+          {
+            arrayStride: 2 * 4,
+            attributes: [{ shaderLocation: 1, offset: 0, format: 'uint16x4' }],
+          },
+          {
+            arrayStride: 4 * 4,
+            attributes: [{ shaderLocation: 2, offset: 0, format: 'float32x4' }],
+          },
+        ],
+      },
+      primitive: {
+        topology: 'triangle-list',
+        cullMode: 'none',
+      },
+      depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+        format: 'depth32float',
+        depthBiasSlopeScale: 2.0,
+      },
+    });
+
     const clearModule = device.createShaderModule({
       label: 'shadow quadrant clear shader',
       code: QUADRANT_CLEAR_SHADER,
@@ -481,8 +526,10 @@ export class DirectionalShadowRenderer {
       this._cascadeMasks.clear();
 
       // Ensure per-mesh uniform buffers exist (geometry must already be built).
+      // Skinned casters are batched per pass by skinnedCasters instead.
       for (const item of renderList) {
-        if (item.geometry.requiresBuild) continue;
+        if (item.geometry.requiresBuild || isSkinnedInstancedPass(item.pass))
+          continue;
         for (const mesh of item.meshes) {
           this._ensureMeshUniforms(renderer, mesh);
         }
@@ -525,6 +572,15 @@ export class DirectionalShadowRenderer {
           }
         }
       }
+
+      this.skinnedCasters.prepare(
+        renderer,
+        renderList,
+        this.lightVPs,
+        drawMask,
+        this._cascadeMaskOf,
+        this.skinnedPipeline.getBindGroupLayout(0)
+      );
     }
 
     const depthView = this.shadowDepthTexture.createView();
@@ -590,20 +646,28 @@ export class DirectionalShadowRenderer {
           pass.setIndexBuffer(geo.indexBuffer, 'uint32');
           const numIndices = geo.indices!.length;
 
+          if (isSkinnedInstancedPass(item.pass)) {
+            const count = this.skinnedCasters.count(item.pass, c);
+            const bindGroup = this.skinnedCasters.bindGroup(item.pass, c);
+            if (count === 0 || !bindGroup) continue;
+            if (currentPipeline !== this.skinnedPipeline) {
+              pass.setPipeline(this.skinnedPipeline);
+              currentPipeline = this.skinnedPipeline;
+            }
+            pass.setVertexBuffer(1, geo.jointBuffer);
+            pass.setVertexBuffer(2, geo.weightBuffer);
+            pass.setBindGroup(0, bindGroup);
+            pass.drawIndexed(numIndices, count);
+            continue;
+          }
+
           for (const mesh of item.meshes) {
             const uniforms = this.meshUniforms.get(mesh);
             if (!uniforms) continue;
             if (((this._cascadeMasks.get(mesh) ?? 0) & (1 << c)) === 0)
               continue;
 
-            const wanted =
-              uniforms.kind === 'impostor'
-                ? this.impostorPipeline
-                : uniforms.kind === 'instanced'
-                ? uniforms.wind
-                  ? this.instancedWindPipeline
-                  : this.instancedPipeline
-                : this.pipeline;
+            const wanted = this._pipelineFor(uniforms);
             if (wanted !== currentPipeline) {
               pass.setPipeline(wanted);
               currentPipeline = wanted;
@@ -682,6 +746,7 @@ export class DirectionalShadowRenderer {
       for (const buf of buffers) buf.destroy();
     }
     this.meshUniforms.clear();
+    this.skinnedCasters.dispose();
   }
 
   // The shadow render list is collected from the full scene (not camera-
@@ -699,6 +764,19 @@ export class DirectionalShadowRenderer {
       this.meshUniforms.delete(mesh);
     }
     live.clear();
+  }
+
+  private _pipelineFor(uniforms: MeshShadowUniforms): GPURenderPipeline {
+    switch (uniforms.kind) {
+      case 'impostor':
+        return this.impostorPipeline;
+      case 'instanced':
+        return uniforms.wind
+          ? this.instancedWindPipeline
+          : this.instancedPipeline;
+      default:
+        return this.pipeline;
+    }
   }
 
   private _ensureMeshUniforms(

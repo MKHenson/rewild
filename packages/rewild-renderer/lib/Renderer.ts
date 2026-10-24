@@ -21,6 +21,7 @@ import { TextureManager } from './managers/TextureManager';
 import { SamplerManager } from './managers/SamplerManager';
 import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
+import { SkinnedModelManager } from './managers/SkinnedModelManager';
 import { IMaterialsTemplate } from './managers/types';
 import { GuiManager } from './managers/GuiManager';
 import { UIElement } from './core/UIElement';
@@ -116,6 +117,7 @@ export class Renderer {
   fontManager: FontManager;
   guiManager: GuiManager;
   materialManager: MaterialManager;
+  skinnedModels: SkinnedModelManager;
   mipmapGenerator: MipMapGenerator;
 
   // Every performance number the engine publishes, and the only thing the perf
@@ -408,6 +410,7 @@ export class Renderer {
     this.fontManager = new FontManager();
     this.geometryManager = new GeometryManager();
     this.materialManager = new MaterialManager();
+    this.skinnedModels = new SkinnedModelManager();
     this.mipmapGenerator = new MipMapGenerator();
     this.guiManager = new GuiManager();
 
@@ -526,6 +529,7 @@ export class Renderer {
     this.textureManager.dispose();
     this.samplerManager.dispose();
     this.fontManager.dispose();
+    this.skinnedModels.dispose();
     this.geometryManager.dispose();
     this.materialManager.dispose();
     this.geometryManager.dispose();
@@ -960,12 +964,7 @@ export class Renderer {
       pCamera.camera.transform.updateMatrixWorld();
 
     // Auto-update scene BVH if enabled
-    if (this.sceneBVHAutoUpdate && this.sceneBVH) {
-      if (this.bvhConfig.sceneBVHUpdateThreshold !== undefined) {
-        this.sceneBVH.updateThreshold = this.bvhConfig.sceneBVHUpdateThreshold;
-      }
-      this.sceneBVH.update();
-    }
+    if (this.sceneBVHAutoUpdate && this.sceneBVH) this.sceneBVH.update();
 
     // Auto-refit per-geometry BVHs when vertices have been modified.
     if (this.bvhConfig.autoRefitGeometryBVH) {
