@@ -1,4 +1,4 @@
-import { IAsset, IBehaviour } from 'rewild-routing';
+import { BehaviourState, IAsset, IBehaviour } from 'rewild-routing';
 import { PortalAsset } from '../PortalAsset';
 import { StateMachineData } from '../Types';
 
@@ -18,6 +18,14 @@ export class PortalTrigger implements IBehaviour {
 
   onMount(): void {
     this.armed = false;
+  }
+
+  serialize(): BehaviourState {
+    return { armed: this.armed };
+  }
+
+  restore(state: BehaviourState): void {
+    if (typeof state.armed === 'boolean') this.armed = state.armed;
   }
 
   onUpdate(delta: f32, _total: u32, asset: IAsset): void {

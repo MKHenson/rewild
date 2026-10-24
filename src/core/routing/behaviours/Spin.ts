@@ -1,4 +1,4 @@
-import { IBehaviour, IAsset } from 'rewild-routing';
+import { BehaviourState, IBehaviour, IAsset } from 'rewild-routing';
 import { Asset3D } from '../Asset3D';
 
 export class Spin implements IBehaviour {
@@ -12,4 +12,10 @@ export class Spin implements IBehaviour {
       asset.transform.rotateY(delta * 0.5); // Rotate at 0.5 radians per second
     }
   }
+
+  serialize(): BehaviourState {
+    return {};
+  }
+
+  restore(): void {}
 }

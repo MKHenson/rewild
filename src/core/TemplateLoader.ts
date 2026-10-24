@@ -123,14 +123,9 @@ export class TemplateLoader {
         }
       }
 
-      if (template.behaviors) {
-        for (const behaviorName of template.behaviors) {
-          const behavior = behaviourManager.findByName(behaviorName);
-          if (!behavior)
-            throw new Error(`Could not find behavior ${behaviorName}`);
+      if (template.behaviors)
+        for (const behavior of behaviourManager.createAll(template.behaviors))
           (toReturn as Asset3D).addBehavior(behavior);
-        }
-      }
     } else
       throw new Error(`Could not find template for actor ${resource.name}`);
 

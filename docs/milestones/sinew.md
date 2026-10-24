@@ -123,12 +123,10 @@ A creature template adds to the asset template:
 
 ### Behaviours
 
-Today `BehaviourManager` holds one `Spin` that all spinning assets share. That was a first version. In Sinew:
-
-- `BehaviourManager` becomes a registry that maps a behaviour name to a factory.
-- `TemplateLoader` creates new behaviour instances for each asset on load.
+- `BehaviourManager` is a registry that maps a behaviour name to a factory. `register(name, factory)` adds one. `spin` is registered by default.
+- `TemplateLoader` creates new behaviour instances for each asset on load, through `createAll(template.behaviors)`. An unknown name throws.
 - Each instance owns its state. Wander keeps its target and its timer. Chase keeps its target.
-- `IBehaviour` gets `serialize()` and `restore()`. They write and read the state as plain data, so a later save layer can store it.
+- `IBehaviour` has `serialize()` and `restore()`. They write and read the state as plain data (`BehaviourState`, JSON values only), so a later save layer can store it. `restore()` keeps the current value of any field the state leaves out.
 - At runtime a behaviour can hold direct references, for example Chase holds its target. `serialize()` writes the target's stable id, not the object.
 
 ### Movement
