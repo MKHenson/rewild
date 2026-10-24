@@ -1,5 +1,8 @@
 import { Quaternion, Vector3 } from 'rewild-common';
+import { ICreatureAnimation } from 'models';
 import { Renderer, SkinnedInstance, Transform } from 'rewild-renderer';
+import { AnimationController } from '../animation/AnimationController';
+import { SPEED_SMOOTHING } from '../routing/behaviours/Animator';
 
 const SPACING = 2;
 const DISTANCE = 8;
@@ -14,6 +17,17 @@ export function registerSkinnedDebugCommands(renderer: Renderer) {
     root: Transform;
     instances: SkinnedInstance[];
   } | null = null;
+  let animated: {
+    controllers: AnimationController[];
+    frame: number;
+    /** Eased toward with the in-game smoothing, as a moving creature's is. */
+    targetSpeed: number;
+  } | null = null;
+
+  const stopAnimating = () => {
+    if (animated) cancelAnimationFrame(animated.frame);
+    animated = null;
+  };
 
   (window as any).showSkinnedInstances = (modelId?: string, count = 20) => {
     if (modelId === undefined) {
@@ -113,6 +127,7 @@ export function registerSkinnedDebugCommands(renderer: Renderer) {
       return;
     }
 
+    stopAnimating();
     for (const instance of shown.instances) {
       const starting = instance.clipTime(clip) < 0;
       instance.play(clip, fade);
@@ -121,11 +136,84 @@ export function registerSkinnedDebugCommands(renderer: Renderer) {
   };
 
   (window as any).stopSkinnedClips = (fade = 0.3) => {
+    stopAnimating();
     if (!shown) return;
     for (const instance of shown.instances) instance.stopAll(fade);
   };
 
+  (window as any).animateSkinned = (
+    speed?: number,
+    config: ICreatureAnimation = {}
+  ) => {
+    if (speed === undefined) {
+      console.log(
+        `animateSkinned(speed, config = {}) — gives every shown instance an ` +
+          `animation controller at a ground speed in m/s. config takes a ` +
+          `template's clips, locomotion, clipSpeeds and idleActions. Call ` +
+          `again to change the speed. It eases in as a moving creature's does.
+` +
+          `skinnedLocomotion(set) crossfades to a locomotion set.
+` +
+          `skinnedAction(meaning, loop = false) plays an action over ` +
+          `locomotion; skinnedAction(meaning, false, true) stops it.`
+      );
+      return;
+    }
+    if (!shown) {
+      console.log(
+        'No skinned instances are up. Run showSkinnedInstances first.'
+      );
+      return;
+    }
+
+    if (!animated) {
+      for (const instance of shown.instances) instance.stopAll();
+      const controllers = shown.instances.map((instance) => {
+        const controller = new AnimationController(instance, config);
+        controller.start();
+        return controller;
+      });
+      let last = performance.now();
+      const tick = () => {
+        const now = performance.now();
+        const dt = (now - last) / 1000;
+        last = now;
+        const t = 1 - Math.exp(-dt / SPEED_SMOOTHING);
+        for (const controller of animated!.controllers) {
+          controller.speed += (animated!.targetSpeed - controller.speed) * t;
+          controller.update(dt);
+        }
+        animated!.frame = requestAnimationFrame(tick);
+      };
+      animated = {
+        controllers,
+        frame: requestAnimationFrame(tick),
+        targetSpeed: speed,
+      };
+    }
+
+    animated.targetSpeed = speed;
+  };
+
+  (window as any).skinnedLocomotion = (set: string, fade = 0.25) => {
+    for (const controller of animated?.controllers ?? [])
+      controller.setLocomotion(set, fade);
+  };
+
+  (window as any).skinnedAction = (
+    meaning: string,
+    loop = false,
+    stop = false
+  ) => {
+    for (const controller of animated?.controllers ?? []) {
+      if (stop) controller.stop(meaning);
+      else if (!controller.play(meaning, loop))
+        return console.warn(`skinnedAction: no clip for '${meaning}'.`);
+    }
+  };
+
   (window as any).hideSkinnedInstances = () => {
+    stopAnimating();
     if (!shown) return;
     for (const instance of shown.instances) instance.dispose();
     shown.root.removeFromParent();

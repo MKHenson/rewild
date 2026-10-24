@@ -364,6 +364,10 @@ showSkinnedInstances('chicken', 20); // a grid of a skinned model's instances, 8
 playSkinnedClip('Idle'); // every shown instance crossfades to a clip, each starting at its own time
 playSkinnedClip('Walk', 0.5); // crossfade over 0.5s
 stopSkinnedClips(); // fade back to the bind pose
+animateSkinned(0, { clipSpeeds: { walk: 0.6, run: 2.5 } }); // an animation controller on each instance, at a ground speed
+animateSkinned(1.5); // change the speed: idle, walk and run blend with no pop
+skinnedLocomotion('injured'); // crossfade to a locomotion set
+skinnedAction('Idle2'); // an action over locomotion; skinnedAction('Idle2', false, true) stops it
 skinnedInstancesInfo(); // pose count, clips, camera against the first instance, and what each primitive drew
 hideSkinnedInstances();
 ```
@@ -377,6 +381,9 @@ no shadow means the shadow pass missed the skinned caster.
 
 `playSkinnedClip()` with no clip lists the model's clips. Clip names match the glTF exactly. A
 crossfade should show no pop, and the instances should stay out of step with each other.
+
+`animateSkinned` takes a template's animation fields as its config. Between the walk and run
+speeds the feet should keep in step with no slide.
 
 See [Sinew](./milestones/sinew.md).
 

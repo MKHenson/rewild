@@ -4,6 +4,8 @@ import {
   Mesh,
   PointLight,
   Renderer,
+  SkinnedInstance,
+  Transform,
   instantiateGltfModel,
 } from 'rewild-renderer';
 import { Asset3D } from './routing/Asset3D';
@@ -11,6 +13,8 @@ import { behaviourManager } from './routing/BehaviourManager';
 import { PlayerStart } from './routing/PlayerStart';
 import { GameManager } from './GameManager';
 import { RigidBodyBehaviour } from './routing/behaviours/RigidBodyBehaviour';
+import { Animator } from './routing/behaviours/Animator';
+import { AnimationController } from './animation/AnimationController';
 import { LightAsset } from './routing/LightAsset';
 import { createColliderDesc } from './physics/ColliderShapes';
 import { LevelReader, PortalAsset } from './routing/PortalAsset';
@@ -69,18 +73,42 @@ export class TemplateLoader {
         ? renderer.materialManager.get(materialId)
         : null;
 
-      // An imported model brings its own hierarchy; a built-in geometry is a
-      // single mesh.
-      const transform = isModel
-        ? instantiateGltfModel(
-            renderer.geometryManager.getModel(geometryId),
-            (primitive) =>
-              override ?? renderer.materialManager.get(primitive.materialKey)
-          )
-        : new Mesh(renderer.geometryManager.get(geometryId), override!)
-            .transform;
+      const model = isModel
+        ? renderer.geometryManager.getModel(geometryId)
+        : null;
+
+      // A skinned model draws through its own instanced passes with its glTF
+      // materials. Another imported model brings its own hierarchy; a
+      // built-in geometry is a single mesh.
+      let skinned: SkinnedInstance | null = null;
+      let transform: Transform;
+      if (model?.skeleton) {
+        skinned = new SkinnedInstance(renderer, geometryId);
+        transform = skinned.transform;
+      } else if (model) {
+        transform = instantiateGltfModel(
+          model,
+          (primitive) =>
+            override ?? renderer.materialManager.get(primitive.materialKey)
+        );
+      } else {
+        transform = new Mesh(
+          renderer.geometryManager.get(geometryId),
+          override!
+        ).transform;
+      }
 
       toReturn = new Asset3D(transform);
+
+      if (skinned) {
+        const asset = toReturn as Asset3D;
+        asset.skinned = skinned;
+        asset.animator = new AnimationController(skinned, template);
+        asset.animator.start();
+        transform.userData.skinned = skinned;
+        // Behaviours do not run in the editor, so there it plays idle in place.
+        if (gameManager) asset.addBehavior(new Animator(asset.animator));
+      }
 
       if (gameManager && template.resource.physics) {
         const R = gameManager.RAPIER;

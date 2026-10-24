@@ -11,6 +11,7 @@ import {
 import {
   Mesh,
   Renderer,
+  SkinnedInstance,
   Sprite3D,
   Transform,
   loadActivity,
@@ -301,6 +302,7 @@ export class EditorViewport extends Component<Props> {
     const removeSceneObject = (transform: Transform) => {
       this.renderer.scene.removeChild(transform);
       (transform.userData.portal as PortalAsset | undefined)?.dispose();
+      (transform.userData.skinned as SkinnedInstance | undefined)?.dispose();
     };
 
     const setTransformSelected = (transform: Transform, value: boolean) => {

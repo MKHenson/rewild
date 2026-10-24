@@ -42,6 +42,12 @@ export class ClipPlayer implements PoseSlotData {
     return this.clipByName.has(name);
   }
 
+  /** The clip's length in seconds, or −1 if the model has no such clip. */
+  duration(name: string): number {
+    const index = this.clipByName.get(name);
+    return index === undefined ? -1 : this.clips[index].duration;
+  }
+
   /**
    * Crossfades to `clip` over `fade` seconds: it rises to full weight and
    * every other layer falls to 0. A clip already playing keeps its time.
