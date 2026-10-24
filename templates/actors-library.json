@@ -88,6 +88,16 @@
       ]
     },
     {
+      "name": "Creatures",
+      "icon": "pets",
+      "actors": [
+        {
+          "name": "Chicken",
+          "templateId": "chicken"
+        }
+      ]
+    },
+    {
       "name": "Lights",
       "icon": "lightbulb",
       "actors": [
