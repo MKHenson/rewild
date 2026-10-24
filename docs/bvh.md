@@ -42,7 +42,6 @@ Full `BVHConfig` interface (in `lib/acceleration/BVHConfig.ts`):
 | `asyncBuildThreshold`         | `10000` | Min triangle count to build in Web Worker              |
 | `enableSceneBVH`              | `true`  | Create a SceneBVH on the Renderer                      |
 | `sceneBVHAutoUpdate`          | `true`  | Auto-call `sceneBVH.update()` each frame               |
-| `sceneBVHUpdateThreshold`     | `0.1`   | Fraction of moved objects that triggers full rebuild   |
 | `autoRefitGeometryBVH`        | `true`  | Auto-refit dirty geometry BVHs in render loop          |
 
 ## Manual Geometry BVH
@@ -103,10 +102,11 @@ renderer.sceneBVH.rebuild();
 // Mark dirty without waiting for version check
 renderer.sceneBVH.markDirty();
 
-// Track a moved object for refit optimisation
+// Track a moved object; update() refits its box and the tree's bounds
 renderer.sceneBVH.markObjectMoved(transform);
-// update() will refit (few moves) or rebuild (many moves) based on updateThreshold
 ```
+
+A refit is O(n) with no allocation, so `update()` refits however many objects moved. It keeps the tree's shape, so a scene whose movers travel far from where the tree was built can call `markDirty()` to rebuild it.
 
 ### Spatial Queries
 
