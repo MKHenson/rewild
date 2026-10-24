@@ -84,7 +84,7 @@ A spawn rule can spawn a group: some animals round one shared home. The home dri
 ## Pose pipeline
 
 1. **Sample.** Sample the active clips at their times.
-2. **Blend.** Mix the active clips by their weights: the speed blend, actions and crossfades. A creature has up to 6 active clips, so its slot size is fixed. Six covers a speed blend crossfading between two locomotion sets while an action fades out.
+2. **Blend.** Mix the active clips by their weights: the speed blend, actions and crossfades. A creature has up to 6 active clips, so its slot size is fixed. Six covers a speed blend crossfading between two locomotion sets while an action fades out. Each model's `ClipPlayer` keeps every creature's clips (clip, time, rate, weight and fade) in flat arrays beside its pose slot, and they move with it on swap-remove. If the weights sum to less than 1, the rest pose fills the remainder, so a clip that fades out alone settles into the rest pose. Weights over 1 are normalised. Rotations blend as a weighted sum on one hemisphere, then normalise.
 3. **Procedural layers.** Look-at. The next milestone adds chains and spring bones here.
 4. **IK.** Foot placement.
 5. **Joint matrices.** Multiply by the inverse bind matrices and write the result to the storage buffer.

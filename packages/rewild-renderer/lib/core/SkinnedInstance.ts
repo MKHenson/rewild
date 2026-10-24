@@ -48,6 +48,41 @@ export class SkinnedInstance {
     return this.model.poses.slotOf(this.handle);
   }
 
+  /** Crossfades to `clip` over `fade` seconds. False if the model lacks it. */
+  play(clip: string, fade = 0, loop = true): boolean {
+    return this.model.player.play(this.handle, clip, fade, loop);
+  }
+
+  /** Fades one clip to `weight` over `fade` seconds, leaving the others. */
+  fadeTo(clip: string, weight: number, fade = 0, loop = true): boolean {
+    return this.model.player.fadeTo(this.handle, clip, weight, fade, loop);
+  }
+
+  stop(clip: string, fade = 0): void {
+    this.model.player.stop(this.handle, clip, fade);
+  }
+
+  stopAll(fade = 0): void {
+    this.model.player.stopAll(this.handle, fade);
+  }
+
+  setClipRate(clip: string, rate: number): void {
+    this.model.player.setRate(this.handle, clip, rate);
+  }
+
+  setClipTime(clip: string, seconds: number): void {
+    this.model.player.setTime(this.handle, clip, seconds);
+  }
+
+  /** Seconds into the clip, or −1 when it is not playing. */
+  clipTime(clip: string): number {
+    return this.model.player.timeOf(this.handle, clip);
+  }
+
+  clipWeight(clip: string): number {
+    return this.model.player.weightOf(this.handle, clip);
+  }
+
   get visible(): boolean {
     return this.meshes[0].visible;
   }
