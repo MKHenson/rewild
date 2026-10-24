@@ -74,8 +74,17 @@ describe('Container', () => {
     container.addAsset(asset2);
 
     const onUpdateMock = jest.fn();
-    asset1.behaviours.push({ name: 'b1', onUpdate: onUpdateMock });
-    asset2.behaviours.push({ name: 'b2', onUpdate: onUpdateMock });
+    const stateless = { serialize: () => ({}), restore: () => {} };
+    asset1.behaviours.push({
+      name: 'b1',
+      onUpdate: onUpdateMock,
+      ...stateless,
+    });
+    asset2.behaviours.push({
+      name: 'b2',
+      onUpdate: onUpdateMock,
+      ...stateless,
+    });
 
     container.onUpdate(16, 1000);
     expect(onUpdateMock).toHaveBeenCalledTimes(2);

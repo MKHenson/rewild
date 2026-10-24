@@ -1,28 +1,40 @@
-import { IBehaviour } from 'node_modules/rewild-routing';
+import { IBehaviour } from 'rewild-routing';
 import { Spin } from './behaviours/Spin';
 
+export type BehaviourFactory = () => IBehaviour;
+
+/** Maps a template's behaviour names to factories, so each asset gets its own. */
 export class BehaviourManager {
-  private behaviours: IBehaviour[];
+  private readonly factories = new Map<string, BehaviourFactory>();
 
   constructor() {
-    this.behaviours = [new Spin()];
+    this.register('spin', () => new Spin());
   }
 
-  add(behaviour: IBehaviour): void {
-    if (!this.behaviours.includes(behaviour)) {
-      this.behaviours.push(behaviour);
-    }
+  register(name: string, factory: BehaviourFactory): void {
+    this.factories.set(name, factory);
   }
 
-  remove(behaviour: IBehaviour): void {
-    const index = this.behaviours.indexOf(behaviour);
-    if (index > -1) {
-      this.behaviours.splice(index, 1);
-    }
+  unregister(name: string): void {
+    this.factories.delete(name);
   }
 
-  findByName(name: string): IBehaviour | null {
-    return this.behaviours.find((b) => b.name === name) || null;
+  has(name: string): boolean {
+    return this.factories.has(name);
+  }
+
+  /** A new instance of the named behaviour, or null if none is registered. */
+  create(name: string): IBehaviour | null {
+    return this.factories.get(name)?.() ?? null;
+  }
+
+  /** New instances of every named behaviour. Throws on an unknown name. */
+  createAll(names: string[]): IBehaviour[] {
+    return names.map((name) => {
+      const behaviour = this.create(name);
+      if (!behaviour) throw new Error(`Could not find behavior ${name}`);
+      return behaviour;
+    });
   }
 }
 
