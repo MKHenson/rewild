@@ -12,6 +12,7 @@ import {
   paintMaskSize,
 } from './PaintMask';
 import { LODMesh } from './LODMesh';
+import { apronRingLength, assembleApron } from './ApronRing';
 import { DataTexture } from '../../textures/DataTexture';
 import { ChunkScatter } from './ChunkScatter';
 import { ScatterInstances } from './Scatter';
@@ -91,6 +92,11 @@ export class TerrainChunk implements IComponent {
   // showed as dark seams along sculpted chunk borders). Generated and
   // cached-generated chunks stay false and keep the seamless two-sided apron.
   heightsAreEdited = false;
+  // The generator's apron ring from the chunk's first generated build (see
+  // ApronRing). With `heights` it rebuilds the exact field the generator would,
+  // so later LOD builds skip generation. Only valid while the heights are
+  // unedited: cachedApron ignores it after an edit.
+  private generatedRing: Float32Array | null = null;
   disposed = false;
   // Built from the first worker response that carried instances. Scatter is
   // chunk state like the splat map — the same instances serve every LOD.
@@ -287,6 +293,29 @@ export class TerrainChunk implements IComponent {
     if (this.heights) return;
     this.validateHeights(heights);
     this.heights = heights;
+  }
+
+  // Keeps the generator's apron ring from a build that generated the heights.
+  // First writer wins, on the same terms as populateHeights.
+  populateRing(ring: Float32Array) {
+    if (this.generatedRing) return;
+    if (ring.length !== apronRingLength(this.chunkSize))
+      throw new Error(
+        `Chunk ${this.id} ring must have ${apronRingLength(
+          this.chunkSize
+        )} samples, got ${ring.length}.`
+      );
+    this.generatedRing = ring;
+  }
+
+  // The aproned field the generator would produce for this chunk, rebuilt from
+  // its heights and cached ring, or null when the build must generate. Null for
+  // an edited chunk: its ring is the noise baseline, which no longer matches
+  // the surface (see heightsAreEdited).
+  cachedApron(): Float32Array | null {
+    if (this.heightsAreEdited || !this.heights || !this.generatedRing)
+      return null;
+    return assembleApron(this.heights, this.generatedRing, this.chunkSize);
   }
 
   // Replaces the chunk's in-memory heightfield (an edit) and marks meshes
@@ -632,6 +661,23 @@ export class TerrainChunk implements IComponent {
     return this.waterEditBuilt !== this.waterEditVersion;
   }
 
+  // The resident water map was built from the heights at `version` and the
+  // water edit at `editVersion`, so a build can leave the water out. Both
+  // versions only rise, so a sum at least as high means both match.
+  waterIsCurrent(version: number, editVersion: number): boolean {
+    return (
+      this.waterVersion >= version + editVersion &&
+      this.waterEditBuilt === editVersion
+    );
+  }
+
+  // The resident splat map was built from the heights at `version`, so a build
+  // can leave the splat out. Paint patches the resident splat in place (see
+  // TerrainRenderer.refreshChunkSplat), so it never makes the splat stale here.
+  hasSplatFor(version: number): boolean {
+    return this.splatData !== null && this.splatVersion >= version;
+  }
+
   // Adopts a worker-built splat map for the heights at `version`. Creates the
   // GPU texture on first call, then re-uploads in place for later edits: the
   // GPUTexture object stays stable across a sculpt stroke, so LOD bind groups
@@ -839,6 +885,7 @@ export class TerrainChunk implements IComponent {
     this.splatTextureExt = null;
     this.splatData = null;
     this.splatVersion = -1;
+    this.generatedRing = null;
     this.chunkWater?.dispose();
     this.chunkWater = null;
     this.waterTextures?.dispose();
@@ -968,7 +1015,8 @@ export class TerrainChunk implements IComponent {
   get drawn(): boolean {
     if (!this._visible) return false;
     const lods = this.lodMesh;
-    for (let i = 0; i < lods.length; i++) if (lods[i].mesh?.visible) return true;
+    for (let i = 0; i < lods.length; i++)
+      if (lods[i].mesh?.visible) return true;
     return false;
   }
 

@@ -12,6 +12,7 @@ import { ScatterInstances, scatterChunk } from '../Scatter';
 import { WaterMap, buildWaterMap } from '../WaterMap';
 import { WaterEdit } from '../WaterEdit';
 import { Vector2 } from 'rewild-common';
+import { extractApronRing } from '../ApronRing';
 
 export interface BuildChunkMeshRequest {
   chunkSize: number;
@@ -23,10 +24,13 @@ export interface BuildChunkMeshRequest {
   // LOD-0 heights from a saved chunk snapshot. Present ⇒ these drive the mesh
   // geometry/splat instead of the generator; absent ⇒ generate from the recipe.
   heights?: Float32Array;
-  // Pre-assembled (chunkSize+2)² apron for an edited chunk: its own heights in
-  // the centre and the real neighbour ring around them (TerrainRenderer.
-  // buildApron). When present it drives geometry, splat and seamless two-sided
-  // edge normals, and `heights` is omitted (the apron carries them).
+  // Pre-assembled (chunkSize+2)² apron: the chunk's heights in the centre and a
+  // ring around them. For an edited chunk the ring is the real neighbour heights
+  // (TerrainRenderer.buildApron). For an unedited chunk it is the generator's
+  // own ring, cached from its first build (TerrainChunk.cachedApron), which
+  // makes this path identical to generation. When present it drives geometry,
+  // splat and seamless two-sided edge normals, and `heights` is omitted (the
+  // apron carries them).
   apron?: Float32Array;
   // The heights diverge from the deterministic generator (an edit / snapshot).
   // With no `apron` to shade against, such a chunk cannot use the noise apron
@@ -47,6 +51,10 @@ export interface BuildChunkMeshRequest {
   // The chunk's authored water, blended over the generated water map and read
   // by placement's water conditions.
   waterEdit?: WaterEdit;
+  // The chunk already holds a splat map / water map for these heights and
+  // edits, so this build leaves them out. Both are chunk-wide, not per LOD.
+  skipSplat?: boolean;
+  skipWater?: boolean;
 }
 
 // One-sample apron ring so edge-vertex normals get a two-sided gradient that
@@ -88,8 +96,8 @@ function overlayInner(
 
 export interface BuildChunkMeshResult {
   // RGBA8 splat map: channel i is the weight of the climate palette's i-th
-  // material. Chunk-wide and identical for every LOD.
-  splat: Uint8Array;
+  // material. Chunk-wide and identical for every LOD. Absent with skipSplat.
+  splat?: Uint8Array;
   vertices: Float32Array;
   uvs: Float32Array;
   normals: Float32Array;
@@ -100,18 +108,46 @@ export interface BuildChunkMeshResult {
   heights: Float32Array;
   // Per-layer instance lists; empty unless the request asked for scatter.
   scatter: ScatterInstances[];
-  // Chunk-wide like the splat. Null when no water shows in the chunk.
-  water: WaterMap | null;
+  // Chunk-wide like the splat. Null when no water shows in the chunk. Absent
+  // with skipWater, which is not the same as null: null means dry.
+  water?: WaterMap | null;
+  // The generator's apron ring (see ApronRing), present only when this build
+  // generated the heights. The chunk caches it for its later LOD builds.
+  ring?: Float32Array;
 }
+
+// The stages of one build, in the order they run.
+export type ChunkMeshStage =
+  | 'heights'
+  | 'splat'
+  | 'mesh'
+  | 'scatter'
+  | 'water'
+  | 'total';
+
+// Milliseconds each stage took. A stage that did not run has no entry.
+export type ChunkMeshTimings = Partial<Record<ChunkMeshStage, number>>;
 
 // Shared by the terrain worker and tests. Everything downstream of the height
 // array (colour bands, per-LOD downsampling, normals) is identical whether the
 // heights were generated or loaded from a snapshot — the height source is the
 // only branch.
+//
+// Pass `timings` to receive the cost of each stage, for benchmarks.
 export function buildChunkMesh(
-  request: BuildChunkMeshRequest
+  request: BuildChunkMeshRequest,
+  timings?: ChunkMeshTimings
 ): BuildChunkMeshResult {
   const { chunkSize, lod, position, seed, climatePreset, seaLevel } = request;
+
+  const started = timings ? performance.now() : 0;
+  let lapStarted = started;
+  const lap = (stage: ChunkMeshStage) => {
+    if (!timings) return;
+    const now = performance.now();
+    timings[stage] = now - lapStarted;
+    lapStarted = now;
+  };
 
   // Heights in absolute world meters. Which biome shapes each sample comes from
   // the temperature × moisture climate model of the world's climate preset —
@@ -137,6 +173,7 @@ export function buildChunkMesh(
   let heights: Float32Array;
   let meshHeights: Float32Array;
   let meshApron: number;
+  let ring: Float32Array | undefined;
   if (request.apron) {
     // Edited, seamless: the main thread supplied the neighbour apron. Its inner
     // region is the chunk's heights (geometry/splat/return); its ring gives edge
@@ -170,21 +207,27 @@ export function buildChunkMesh(
     }
     meshHeights = apronHeights;
     meshApron = APRON;
+    ring = extractApronRing(apronHeights, chunkSize);
   }
+  lap('heights');
 
   // Per-biome material weights, derived from the same climate model that shaped
   // the heights plus each biome's slope/height layer rules, with any painted
   // biome mask displacing the climate's choice. Derived rather than stored, so
   // it is correct for generated and sculpted chunks alike.
-  const splat = generateSplatMap(
-    chunkSize,
-    chunkSize,
-    seed,
-    worldOffset,
-    climate,
-    heights,
-    { biomeMask: request.biomeMask ?? null, seaLevel }
-  );
+  let splat: Uint8Array | undefined;
+  if (!request.skipSplat) {
+    splat = generateSplatMap(
+      chunkSize,
+      chunkSize,
+      seed,
+      worldOffset,
+      climate,
+      heights,
+      { biomeMask: request.biomeMask ?? null, seaLevel }
+    );
+    lap('splat');
+  }
 
   // Heights are already in meters (no vertical scaling); the mesh is stretched
   // horizontally by TERRAIN_METERS_PER_SAMPLE. The noise offset (position) is
@@ -213,6 +256,7 @@ export function buildChunkMesh(
     uvs[i * 2] = meshData.interleaved[base + 3];
     uvs[i * 2 + 1] = meshData.interleaved[base + 4];
   }
+  lap('mesh');
 
   // Derived from the same heights and climate the splat was, so an instance
   // stands on the material its own rules selected for.
@@ -225,17 +269,23 @@ export function buildChunkMesh(
         waterEdit: request.waterEdit ?? null,
       })
     : [];
+  if (request.scatter) lap('scatter');
 
   // Built from the same heights, so a sculpted chunk's shore follows the edit.
-  const water = buildWaterMap(
-    chunkSize,
-    seed,
-    worldOffset,
-    climate,
-    seaLevel,
-    heights,
-    request.waterEdit ?? null
-  );
+  let water: WaterMap | null | undefined;
+  if (!request.skipWater) {
+    water = buildWaterMap(
+      chunkSize,
+      seed,
+      worldOffset,
+      climate,
+      seaLevel,
+      heights,
+      request.waterEdit ?? null
+    );
+    lap('water');
+  }
+  if (timings) timings.total = performance.now() - started;
 
   return {
     splat,
@@ -246,5 +296,6 @@ export function buildChunkMesh(
     heights,
     scatter,
     water,
+    ring,
   };
 }

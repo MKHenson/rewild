@@ -20,17 +20,18 @@ npm run server         # live-server on :9001
 npm run test           # Jest (root + all workspaces)
 npm run unit-tests     # Jest (root only)
 npm run ts-check       # TypeScript type-check only
+npm run bench          # Benchmark the worker code (see packages/rewild-renderer/bench/run.mjs)
 npm run clean          # rimraf public/
 ```
 
 ### Build Details
 
-- **Entry points:** `src/index.tsx` (main), `rewild-renderer/.../TerrainWorker.ts` (web worker)
+- **Entry points:** `src/index.tsx` (main), `rewild-renderer/.../TerrainWorker.ts` and `rewild-renderer/.../BVHWorker.ts` (web workers)
 - **Loaders:** `.wgsl` → text, `.wasm` → file
 - **Custom plugin:** `wgslInlineIncludePlugin` processes `#include` directives in WGSL shader files
 - **Assets copied:** `style.css`, `index.html`, `templates/**`, `static/**` → `public/`
 - **Environment:** `MEDIA_URL` = `https://storage.googleapis.com/rewild-6809/`
-- **Output:** `public/` directory (Firebase Hosting root)
+- **Output:** `public/` directory, synced to a Scaleway Object Storage bucket
 
 ## Testing
 
@@ -48,12 +49,12 @@ npm run clean          # rimraf public/
 | UI Framework | **Custom web components with custom JSX** (NOT React)                |
 | 3D Rendering | WebGPU with WGSL shaders (custom engine in `rewild-renderer`)        |
 | Physics      | Rapier 3D (`@dimforge/rapier3d-compat`)                              |
-| Backend      | Firebase (Auth, Firestore, Functions, Hosting, Storage)              |
+| Backend      | Ktor (Kotlin) in `server/`, on a Scaleway Serverless Container       |
 | Build        | esbuild with custom plugins                                          |
 | Test         | Jest with jsdom + esbuild transform                                  |
 | Monorepo     | npm workspaces                                                       |
 | Node         | 22+ (enforced via `.nvmrc`, `.npmrc engine-strict`, `engines` field) |
-| CI/CD        | GitHub Actions → Firebase Hosting on merge to `main`                 |
+| CI/CD        | GitHub Actions → Scaleway (Object Storage + Container) on `main`     |
 
 ## Multi-Root Workspace Context
 
