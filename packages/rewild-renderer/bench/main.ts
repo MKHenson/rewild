@@ -11,6 +11,7 @@ import {
   ChunkMeshTimings,
 } from '../lib/renderers/terrain/worker/buildChunkMesh';
 import { DEFAULT_CLIMATE_PRESET } from '../lib/renderers/terrain/Biomes';
+import { assembleApron } from '../lib/renderers/terrain/ApronRing';
 import { BVHBuilder } from '../lib/acceleration/BVHBuilder';
 import { BVHOptions } from '../lib/acceleration/BVHNode';
 import { DEFAULT_BVH_CONFIG } from '../lib/acceleration/BVHConfig';
@@ -98,6 +99,23 @@ function main() {
 
   for (const lod of LODS) {
     bench(`terrain lod ${lod}`, (i) => timeChunk(chunkRequest(lod, i)));
+  }
+
+  // A later LOD build of a chunk that has been built once: it sends the cached
+  // heights and ring, and the chunk already holds the splat and water maps.
+  const firstBuilds = POSITIONS.map((_, i) =>
+    buildChunkMesh(chunkRequest(0, i))
+  );
+  for (const lod of LODS) {
+    bench(`terrain lod ${lod} reuse`, (i) => {
+      const first = firstBuilds[i % firstBuilds.length];
+      return timeChunk({
+        ...chunkRequest(lod, i),
+        apron: assembleApron(first.heights, first.ring!, CHUNK_SIZE),
+        skipSplat: true,
+        skipWater: true,
+      });
+    });
   }
 
   // Scatter runs once for each chunk, on whichever LOD builds first. Its cost

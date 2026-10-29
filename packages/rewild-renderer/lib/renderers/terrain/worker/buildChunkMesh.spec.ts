@@ -4,6 +4,7 @@ import { generateBiomeBlendedHeightMap } from '../Noise';
 import { DEFAULT_CLIMATE_PRESET, resolveClimatePreset } from '../Biomes';
 import { SCATTER_INSTANCE_STRIDE } from '../Scatter';
 import { getScatterLayer } from '../ScatterLayers';
+import { assembleApron } from '../ApronRing';
 
 // Small chunk keeps the test fast; width-1 (24) is divisible by every LOD
 // increment (lod*2), mirroring the 241-sample production layout.
@@ -220,5 +221,74 @@ describe('buildChunkMesh scatter', () => {
           40 + (getScatterLayer(layer.layer).yOffset ?? 0),
           4
         );
+  });
+});
+
+describe('buildChunkMesh reuse across LODs', () => {
+  // What a chunk holds after its first build: its heights and the ring.
+  const firstBuild = buildChunkMesh({ ...baseRequest, lod: 0 });
+  const cachedApron = () =>
+    assembleApron(firstBuild.heights, firstBuild.ring!, CHUNK_SIZE);
+
+  it('returns the generator ring only when it generated the heights', () => {
+    expect(firstBuild.ring).toBeDefined();
+    expect(
+      buildChunkMesh({ ...baseRequest, lod: 0, apron: cachedApron() }).ring
+    ).toBeUndefined();
+    const flat = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(3);
+    expect(
+      buildChunkMesh({ ...baseRequest, lod: 0, heights: flat, edited: true })
+        .ring
+    ).toBeUndefined();
+  });
+
+  it('builds the same chunk from the cached ring as from generation (all LODs)', () => {
+    for (const lod of [0, 1, 2, 3]) {
+      const generated = buildChunkMesh({ ...baseRequest, lod });
+      const cached = buildChunkMesh({
+        ...baseRequest,
+        lod,
+        apron: cachedApron(),
+      });
+
+      expect(cached.vertices).toEqual(generated.vertices);
+      expect(cached.uvs).toEqual(generated.uvs);
+      expect(cached.normals).toEqual(generated.normals);
+      expect(cached.indices).toEqual(generated.indices);
+      expect(cached.splat).toEqual(generated.splat);
+      expect(cached.heights).toEqual(generated.heights);
+      expect(cached.water).toEqual(generated.water);
+    }
+  });
+
+  it('leaves out the splat and water when asked, and nothing else', () => {
+    const full = buildChunkMesh({ ...baseRequest, lod: 2 });
+    const lean = buildChunkMesh({
+      ...baseRequest,
+      lod: 2,
+      apron: cachedApron(),
+      skipSplat: true,
+      skipWater: true,
+    });
+
+    expect(lean.splat).toBeUndefined();
+    expect(lean.water).toBeUndefined();
+    expect(lean.vertices).toEqual(full.vertices);
+    expect(lean.normals).toEqual(full.normals);
+    expect(lean.heights).toEqual(full.heights);
+  });
+
+  it('still places scatter when the splat and water are skipped', () => {
+    const full = buildChunkMesh({ ...baseRequest, lod: 0, scatter: true });
+    const lean = buildChunkMesh({
+      ...baseRequest,
+      lod: 0,
+      apron: cachedApron(),
+      scatter: true,
+      skipSplat: true,
+      skipWater: true,
+    });
+
+    expect(lean.scatter).toEqual(full.scatter);
   });
 });

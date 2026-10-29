@@ -199,13 +199,23 @@ export class LODMesh {
         // omitted to avoid transferring the field twice. If the apron can't be
         // built (no heights yet), `edited` makes the worker fall back to
         // one-sided edges rather than the mismatched noise ring.
+        //
+        // An unedited chunk that has been generated once sends its heights
+        // with the generator's cached ring instead, the exact field generation
+        // would produce, so no later LOD pays to generate it again.
         const apron =
           this.chunk.heightsAreEdited && knownHeights
             ? renderer.terrainRenderer.buildApron(
                 knownHeights,
                 this.chunk.coord
               )
-            : undefined;
+            : this.chunk.cachedApron() ?? undefined;
+
+        // The splat and water maps are chunk-wide. Once the chunk holds them
+        // for these heights and this water edit, a build for another LOD
+        // leaves them out. An edit raises a version, so they come back.
+        const skipSplat = this.chunk.hasSplatFor(version);
+        const skipWater = this.chunk.waterIsCurrent(version, waterEditVersion);
 
         const {
           splat,
@@ -216,6 +226,7 @@ export class LODMesh {
           heights,
           scatter,
           water,
+          ring,
         } = await renderer.terrainRenderer.workerPool.enqueue({
           chunkSize: this.chunkSize,
           lod: this.lod,
@@ -231,6 +242,8 @@ export class LODMesh {
           scatterMask: scatterMask ?? undefined,
           scatterKills: scatterKills ?? undefined,
           waterEdit: waterEdit ?? undefined,
+          skipSplat,
+          skipWater,
         });
 
         // Cache the heightfield on the chunk so later LODs, snapshot writes,
@@ -239,6 +252,7 @@ export class LODMesh {
         // this mesh still reflects `version`, and only a real edit (which
         // bumps the version) makes us rebuild below.
         this.chunk.populateHeights(heights);
+        if (ring) this.chunk.populateRing(ring);
 
         // The chunk was evicted/disposed while the worker ran — drop the
         // result instead of resurrecting GPU state.
@@ -252,8 +266,10 @@ export class LODMesh {
 
         // The splat map is chunk state shared by every LOD — hand it over and
         // let the chunk create or re-upload it as its version warrants.
-        this.chunk.populateSplat(renderer, splat, version);
-        this.chunk.populateWater(renderer, water, version, waterEditVersion);
+        // Absent when this build skipped them. A null water map means dry.
+        if (splat) this.chunk.populateSplat(renderer, splat, version);
+        if (water !== undefined)
+          this.chunk.populateWater(renderer, water, version, waterEditVersion);
 
         if (wantsScatter)
           this.chunk.populateScatter(

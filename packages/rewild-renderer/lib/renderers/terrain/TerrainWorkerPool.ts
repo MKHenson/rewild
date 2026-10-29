@@ -15,10 +15,10 @@ interface TerrainWorkerRequest {
   // generating. Structured-cloned (not transferred): the chunk keeps its copy
   // for the other LOD requests.
   heights?: Float32Array;
-  // Pre-assembled (chunkSize+2)² apron for an edited chunk — its heights plus a
-  // ring of the real neighbour heights, so edge normals are two-sided and match
-  // the neighbour. Supersedes `heights` (it carries them). See
-  // TerrainRenderer.buildApron and BuildChunkMeshRequest.
+  // Pre-assembled (chunkSize+2)² apron — the chunk's heights plus a ring: the
+  // real neighbour heights for an edited chunk, or the cached generator ring for
+  // an unedited one. Supersedes `heights` (it carries them). See
+  // BuildChunkMeshRequest.
   apron?: Float32Array;
   // The heights are an edit/snapshot rather than generator output, so the
   // worker's noise apron would not match them. See BuildChunkMeshRequest.
@@ -38,12 +38,16 @@ interface TerrainWorkerRequest {
   // The chunk's authored water. Structured-cloned on the same terms as
   // biomeMask.
   waterEdit?: WaterEdit;
+  // The chunk already holds a current splat / water map, so the build leaves
+  // them out. See BuildChunkMeshRequest.
+  skipSplat?: boolean;
+  skipWater?: boolean;
 }
 
 export interface TerrainWorkerResponse {
   // RGBA8 splat map — per-texel weights over the climate's material palette
-  // (see BuildChunkMeshResult).
-  splat: Uint8Array;
+  // (see BuildChunkMeshResult). Absent with skipSplat.
+  splat?: Uint8Array;
   vertices: Float32Array;
   uvs: Float32Array;
   normals: Float32Array;
@@ -52,8 +56,11 @@ export interface TerrainWorkerResponse {
   heights: Float32Array;
   // Per-layer instance lists; empty unless the request asked for scatter.
   scatter: ScatterInstances[];
-  // Chunk-wide water map (see BuildChunkMeshResult).
-  water: WaterMap | null;
+  // Chunk-wide water map (see BuildChunkMeshResult). Null means dry. Absent
+  // with skipWater.
+  water?: WaterMap | null;
+  // The generator's apron ring, when this build generated the heights.
+  ring?: Float32Array;
 }
 
 interface QueuedRequest {
