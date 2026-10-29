@@ -162,9 +162,11 @@ This is the largest win the player can see. Medians for one 241 × 241 chunk on 
 
 Port in this order: heights, splat, water map, mesh, scatter. The end state is `buildChunkMesh` as one Rust call per chunk, with the climate presets passed in as data. Then the JS generator is deleted.
 
-**Heights (done).** The `terrain` crate generates heights through one `TerrainHeights` object per world, cached by climate, seed and sea level. `generateBiomeBlendedHeightMap`, `createGroundSampler` and `sampleGround` keep their signatures and call it. Lakes are still TypeScript. They sample the Rust ground, and `carveLakes` runs on the Rust field.
+The `terrain` crate generates through one `TerrainGenerator` object per world, cached by climate, seed and sea level (`TerrainGenerator.ts`). The palette comes from `getClimatePalette`, so it has one source.
 
-- Noise coordinates are `f64`. Field offsets reach ±100000 samples, where `f32` cannot resolve one sample.
+**Heights (done).** `generateBiomeBlendedHeightMap`, `createGroundSampler` and `sampleGround` keep their signatures and call Rust. Lakes are still TypeScript. They sample the Rust ground, and `carveLakes` runs on the Rust field.
+
+- Noise coordinates are `f64`. Field offsets reach ±100000 samples, where `f32` would lose detail in the finest octaves, more so far from the origin.
 - Every field is evaluated from the world sample position, so neighbouring chunks agree bit for bit. `cargo test` checks both seams with erosion and a continent active.
 - Thermal erosion runs as many passes as the most any biome asks for, over a margin of twice that. One pass reads two samples out, because a neighbour's move is shared over its own neighbours.
 - The climate fields (domain warp, temperature, moisture, continent) are evaluated on a world-aligned grid every 8 samples and interpolated. Their finest detail is hundreds of samples across, so the error stays under 0.001. Point queries interpolate the same nodes, so they match chunks exactly.
@@ -172,6 +174,13 @@ Port in this order: heights, splat, water map, mesh, scatter. The end state is `
 - Simplex with integer-hashed gradients in `f32x4`, with the skew done in `f64` so precision holds far from the origin, costs the same per point as the paired `f64` simplex in V8. Stacks of 5 or 6 octaves fill two 4-lane calls, so heights were about 26% slower with it, and it would have changed every world. The paired `f64` simplex stays.
 - Each deformation's `curveExp` is read from a 4096-step table (`math::PowerCurve`) instead of `powf`, which is a software call in WASM. Heights move by at most 0.06 mm.
 - On a Ryzen 9 9950X3D the heights stage fell from 36–50 ms to 10–11 ms.
+
+**Splat (done).** `generateSplatMap` keeps its signature, its validation and its region repaint for the brush, and calls `SplatGenerator`. The `out` buffer is borrowed for the call, so a brush stroke still patches only its window.
+
+- Biomes come from the same climate grid as the heights, so a material follows exactly the biome that shaped the ground.
+- Layer compositing is `layer_weights`, unit tested in the crate. `LayerWeights.spec.ts` pins the shipped mountain table through the whole splat path.
+- Scatter, the water map and the horizon map still read climate and layer rules in TypeScript, so near biome borders they can differ from the splat by the grid's interpolation error.
+- On the same machine splat fell from 15–22 ms to 4.9 ms, with a p95 within 5% of the median. The slope's `atan` costs under 1% of that.
 
 ### Phase 3: The BVH system
 

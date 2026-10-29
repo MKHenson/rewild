@@ -221,23 +221,9 @@ export interface LayerNoiseField {
 }
 
 /**
- * Per-(biome, layer) noise lookups for every layer carrying a noise selector;
- * `null` for layers without one. Indexed `[biomeIndex][layerIndex]`, built once
- * per generation call so the sample loop only ever indexes.
- */
-export function createLayerNoiseFields(
-  seed: number,
-  offset: Vector2,
-  climate: ClimateConfig
-): (LayerNoiseField | null)[][] {
-  return climate.biomes.map((biome) =>
-    biome.layers.map((layer) => createNoiseField(seed, offset, layer.noise))
-  );
-}
-
-/**
- * The same, per (biome, scatter rule). Scatter rules carry the same noise
- * selector as layers do, so they get the same world-continuous field.
+ * Per-(biome, scatter rule) noise lookups for every rule carrying a noise
+ * selector; `null` for rules without one. Indexed `[biomeIndex][ruleIndex]`,
+ * built once per generation call so the sample loop only ever indexes.
  */
 export function createScatterNoiseFields(
   seed: number,

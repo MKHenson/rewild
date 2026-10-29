@@ -4,9 +4,11 @@
 pub mod climate;
 pub mod config;
 pub mod heights;
+pub mod splat;
 
 pub use config::ClimateConfig;
 pub use heights::HeightGenerator;
+pub use splat::{PaintMask, Region, SplatGenerator, SplatSpec};
 
 #[cfg(test)]
 mod tests;

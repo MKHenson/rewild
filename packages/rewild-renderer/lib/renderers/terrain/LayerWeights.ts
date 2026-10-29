@@ -31,71 +31,12 @@ function bandCoverage(selector: Selector | undefined, value: number): number {
   return coverage;
 }
 
-// A layer applies where all of its selectors do, so coverage is their product.
-// `noiseValue` is this layer's noise field at the sample, already resolved by
-// the caller (it needs a Perlin and world offsets this module has no business
-// knowing about); it is ignored unless the layer carries a noise selector.
-function layerCoverage(
-  layer: BiomeLayer,
-  height: number,
-  slopeDegrees: number,
-  noiseValue: number
-): number {
-  return (
-    bandCoverage(layer.slope, slopeDegrees) *
-    bandCoverage(layer.height, height) *
-    bandCoverage(layer.noise?.band, noiseValue)
-  );
-}
-
 /**
- * Weights for one biome's layers at a single sample: `out[i]` is the weight of
- * `biome.layers[i]`, and the written weights sum to exactly 1.
- *
- * Layers composite base-first, like painting. Walking from the top layer down,
- * each takes its coverage of whatever is still uncovered, and layers[0] soaks
- * up the remainder. So a fully-covering top layer wins outright, a partial one
- * lets the layers beneath show through, and the base needs no selector of its
- * own — it is simply what is left.
- *
- * `noiseValues[i]` is layer i's noise field at this sample, in 0..1 (see
- * sampleLayerNoise); entries for layers without a noise selector are never
- * read, so the caller need not fill them. Pass `null` when no layer in the
- * biome uses one.
- *
- * `out` is caller-owned and reused across samples (this runs once per texel);
- * it must be at least `biome.layers.length` long. Only indices
- * [0, layers.length) are written — the caller owns anything beyond that.
- */
-export function resolveLayerWeights(
-  biome: BiomeParams,
-  height: number,
-  slopeDegrees: number,
-  noiseValues: Float64Array | null,
-  out: Float64Array
-): void {
-  const layers = biome.layers;
-  let remaining = 1;
-
-  for (let i = layers.length - 1; i > 0; i--) {
-    const covered =
-      layerCoverage(
-        layers[i],
-        height,
-        slopeDegrees,
-        noiseValues ? noiseValues[i] : 0
-      ) * remaining;
-    out[i] = covered;
-    remaining -= covered;
-  }
-
-  out[0] = remaining;
-}
-
-/**
- * resolveLayerWeights for ground seen from too far for noise patches to
- * resolve: each noise selector is taken at its mean coverage,
- * `noiseCoverage[i]` (see meanNoiseCoverage), instead of at a sample.
+ * One biome's layer weights for ground seen from too far for noise patches to
+ * resolve, into `out[..layers.length]`, summing to 1. Layers composite as the
+ * splat does (`layer_weights` in the Rust terrain crate), but each noise
+ * selector is taken at its mean coverage, `noiseCoverage[i]` (see
+ * meanNoiseCoverage), instead of at a sample.
  */
 export function resolveMeanLayerWeights(
   biome: BiomeParams,

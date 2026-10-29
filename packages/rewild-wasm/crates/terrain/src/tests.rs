@@ -14,7 +14,7 @@ fn stack(amplitude: f64, noise_scale: f64, seed_salt: f64) -> Octaves {
 }
 
 fn biome(name: &str, deformations: Vec<Deformation>, erosion: Option<Erosion>) -> Biome {
-    Biome { name: name.into(), deformations, erosion }
+    Biome { name: name.into(), deformations, erosion, layers: Vec::new() }
 }
 
 /// Two biomes split by temperature, every deformation kind, erosion and a
@@ -54,6 +54,7 @@ fn climate(erosion: bool) -> ClimateConfig {
             coastal_moisture: Some(0.1),
             coastal_moisture_reach: Some(0.1),
         }),
+        coast: None,
         biomes: vec![plain, mountain],
         cells: vec![vec![0], vec![1]],
     }
@@ -162,4 +163,223 @@ fn interpolates_climate_close_to_the_exact_fields() {
     }
     // Coast and biome blends span 0.03 and more of these fields.
     assert!(worst < 1e-3, "worst climate error {worst}");
+}
+
+mod splat {
+    use super::*;
+    use crate::{PaintMask, Region, SplatGenerator, SplatSpec};
+
+    fn layer(material: &str, slope: Option<Band>, height: Option<Band>, noise: Option<NoiseSelector>) -> Layer {
+        Layer { material: material.into(), slope: slope.map(Selector::One), height: height.map(Selector::One), noise }
+    }
+
+    /// The heights climate with layers, noise patches and a coast.
+    fn surfaced() -> ClimateConfig {
+        let mut c = climate(false);
+        c.biomes[0].layers = vec![
+            layer("grass", None, None, None),
+            layer("rock", Some(Band { from: 20.0, to: 40.0 }), None, None),
+        ];
+        c.biomes[1].layers = vec![
+            layer("rock", None, None, None),
+            layer(
+                "snow",
+                None,
+                Some(Band { from: 80.0, to: 120.0 }),
+                Some(NoiseSelector { scale: 30.0, seed_salt: 5.0, band: Band { from: 0.3, to: 0.6 } }),
+            ),
+        ];
+        c.coast = Some(CoastConfig {
+            beach_height: 3.0,
+            wet_height: 0.5,
+            seabed_depth: 2.0,
+            blend: 1.0,
+            slope: Band { from: 30.0, to: 15.0 },
+        });
+        c
+    }
+
+    fn spec() -> SplatSpec {
+        SplatSpec {
+            palette: ["grass", "rock", "snow", "sand", "wet", "seabed"].map(String::from).to_vec(),
+            coast_materials: ["sand", "wet", "seabed"].map(String::from).to_vec(),
+        }
+    }
+
+    fn generator() -> SplatGenerator {
+        SplatGenerator::new(surfaced(), &spec(), 4321.0, 2.0, 2.0).unwrap()
+    }
+
+    fn whole() -> Region {
+        Region { x0: 0, y0: 0, x1: SIZE - 1, y1: SIZE - 1 }
+    }
+
+    fn splat(g: &SplatGenerator, heights: &[f32], mask: Option<&PaintMask>, region: Region, out: &mut [u8]) {
+        g.generate(heights, SIZE, SIZE, 128.0, -64.0, mask, region, out);
+    }
+
+    fn heights() -> Vec<f32> {
+        HeightGenerator::new(surfaced(), 4321.0, 2.0, 2.0).unwrap().generate(SIZE, SIZE, 128.0, -64.0)
+    }
+
+    fn channel_sum(out: &[u8], texel: usize) -> u32 {
+        let plane = SIZE * SIZE * 4;
+        (0..4).map(|c| out[texel * 4 + c] as u32 + out[plane + texel * 4 + c] as u32).sum()
+    }
+
+    #[test]
+    fn sums_to_one_at_every_texel() {
+        let mut out = vec![0u8; SIZE * SIZE * 8];
+        splat(&generator(), &heights(), None, whole(), &mut out);
+        for texel in 0..SIZE * SIZE {
+            let sum = channel_sum(&out, texel);
+            assert!((251..=259).contains(&sum), "texel {texel} sums to {sum}");
+        }
+    }
+
+    #[test]
+    fn uses_more_than_one_material() {
+        let mut out = vec![0u8; SIZE * SIZE * 8];
+        splat(&generator(), &heights(), None, whole(), &mut out);
+        let plane = SIZE * SIZE * 4;
+        let used = (0..6).filter(|&c| (0..SIZE * SIZE).any(|t| out[(c / 4) * plane + t * 4 + c % 4] > 0)).count();
+        assert!(used >= 3, "only {used} materials used");
+    }
+
+    #[test]
+    fn leaves_texels_outside_the_region_alone() {
+        let mut out = vec![7u8; SIZE * SIZE * 8];
+        let region = Region { x0: 10, y0: 20, x1: 30, y1: 25 };
+        splat(&generator(), &heights(), None, region, &mut out);
+        for y in 0..SIZE {
+            for x in 0..SIZE {
+                let inside = (10..=30).contains(&x) && (20..=25).contains(&y);
+                assert_eq!(channel_sum(&out, x + y * SIZE) == 7 * 8, !inside, "texel {x},{y}");
+            }
+        }
+    }
+
+    #[test]
+    fn saturated_paint_replaces_the_climate() {
+        // Every texel painted fully as the mountain (biome 1), whose base is rock.
+        let size = (SIZE - 1) / 4 + 1;
+        let mut weights = vec![0u8; size * size * 2];
+        weights[size * size..].fill(255);
+        let mask = PaintMask { size, step: 4.0, channels: 2, weights: &weights };
+        // Above the beach and below the snow line.
+        let flat = vec![50.0f32; SIZE * SIZE];
+        let mut out = vec![0u8; SIZE * SIZE * 8];
+        splat(&generator(), &flat, Some(&mask), whole(), &mut out);
+        for texel in 0..SIZE * SIZE {
+            assert_eq!(out[texel * 4 + 1], 255, "texel {texel} is not rock");
+        }
+    }
+
+    #[test]
+    fn rejects_a_material_missing_from_the_palette() {
+        let mut s = spec();
+        s.palette.retain(|m| m != "snow");
+        let err = SplatGenerator::new(surfaced(), &s, 1.0, 0.0, 2.0).err().expect("accepted");
+        assert!(err.contains("snow"));
+    }
+
+    mod layers {
+        use super::*;
+        use crate::splat::layer_weights;
+
+        fn weights(layers: &[Layer], height: f64, slope: f64, noise: f64) -> Vec<f64> {
+            let mut out = vec![0.0; layers.len()];
+            layer_weights(layers, height, slope, |_| noise, &mut out);
+            out
+        }
+
+        /// Dirt, then rock on steep ground, then snow up high that slides off
+        /// cliffs (an inverted slope band).
+        fn mountain() -> Vec<Layer> {
+            vec![
+                layer("dirt", None, None, None),
+                layer("rock", Some(Band { from: 30.0, to: 45.0 }), None, None),
+                layer("snow", Some(Band { from: 40.0, to: 25.0 }), Some(Band { from: 100.0, to: 130.0 }), None),
+            ]
+        }
+
+        fn mottled(band: Band) -> Vec<Layer> {
+            vec![
+                layer("base", None, None, None),
+                layer("patch", None, None, Some(NoiseSelector { scale: 20.0, seed_salt: 11.0, band })),
+            ]
+        }
+
+        #[test]
+        fn gives_a_single_layer_all_the_weight() {
+            let solo = [layer("only", None, None, None)];
+            assert_eq!(weights(&solo, 0.0, 0.0, 0.0), [1.0]);
+            assert_eq!(weights(&solo, 500.0, 89.0, 0.0), [1.0]);
+        }
+
+        #[test]
+        fn sums_to_one_and_never_goes_negative() {
+            for h in (0..=200).step_by(10) {
+                for s in (0..=90).step_by(5) {
+                    let w = weights(&mountain(), h as f64, s as f64, 0.0);
+                    assert!((w.iter().sum::<f64>() - 1.0).abs() < 1e-10);
+                    assert!(w.iter().all(|&v| v >= 0.0), "{w:?} at {h} m, {s}°");
+                }
+            }
+        }
+
+        #[test]
+        fn lets_a_partial_top_layer_reveal_what_is_beneath() {
+            // High, but too steep for snow: the rock beneath takes it all.
+            assert_eq!(weights(&mountain(), 150.0, 60.0, 0.0), [0.0, 1.0, 0.0]);
+            assert_eq!(weights(&mountain(), 150.0, 0.0, 0.0), [0.0, 0.0, 1.0]);
+        }
+
+        #[test]
+        fn buries_lower_layers_under_a_selectorless_layer() {
+            let plain = |names: &[&str]| names.iter().map(|n| layer(n, None, None, None)).collect::<Vec<_>>();
+            assert_eq!(weights(&plain(&["a", "b"]), 50.0, 20.0, 0.0), [0.0, 1.0]);
+            assert_eq!(weights(&plain(&["a", "b", "c"]), 50.0, 20.0, 0.0), [0.0, 0.0, 1.0]);
+        }
+
+        #[test]
+        fn splits_and_ramps_by_noise() {
+            let biome = mottled(Band { from: 0.45, to: 0.55 });
+            assert_eq!(weights(&biome, 50.0, 20.0, 0.2), [1.0, 0.0]);
+            assert_eq!(weights(&biome, 50.0, 20.0, 0.8), [0.0, 1.0]);
+            assert!((weights(&biome, 50.0, 20.0, 0.5)[1] - 0.5).abs() < 1e-9);
+        }
+
+        #[test]
+        fn inverts_with_the_band() {
+            let inverted = mottled(Band { from: 0.55, to: 0.45 });
+            assert_eq!(weights(&inverted, 50.0, 20.0, 0.8)[1], 0.0);
+            assert_eq!(weights(&inverted, 50.0, 20.0, 0.2)[1], 1.0);
+        }
+
+        #[test]
+        fn multiplies_noise_with_the_other_selectors() {
+            let mut biome = mottled(Band { from: 0.45, to: 0.55 });
+            biome[1].slope = Some(Selector::One(Band { from: 10.0, to: 20.0 }));
+            assert_eq!(weights(&biome, 50.0, 0.0, 0.8), [1.0, 0.0]);
+            assert_eq!(weights(&biome, 50.0, 30.0, 0.2), [1.0, 0.0]);
+            assert_eq!(weights(&biome, 50.0, 30.0, 0.8), [0.0, 1.0]);
+        }
+
+        #[test]
+        fn multiplies_several_bands_into_a_plateau() {
+            let mut biome = vec![layer("base", None, None, None), layer("band", None, None, None)];
+            biome[1].height = Some(Selector::All(vec![Band { from: 10.0, to: 20.0 }, Band { from: 60.0, to: 50.0 }]));
+            assert_eq!(weights(&biome, 35.0, 0.0, 0.0), [0.0, 1.0]);
+            assert_eq!(weights(&biome, 5.0, 0.0, 0.0), [1.0, 0.0]);
+            assert_eq!(weights(&biome, 70.0, 0.0, 0.0), [1.0, 0.0]);
+        }
+
+        #[test]
+        fn leaves_entries_past_the_layer_count_alone() {
+            let mut out = [-1.0; 4];
+            layer_weights(&[layer("only", None, None, None)], 0.0, 0.0, |_| 0.0, &mut out);
+            assert_eq!(out, [1.0, -1.0, -1.0, -1.0]);
+        }
+    }
 }

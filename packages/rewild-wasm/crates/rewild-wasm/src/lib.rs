@@ -65,43 +65,97 @@ pub fn build_bvh(
     })
 }
 
-/// Terrain heights for one world. Build once per climate preset, seed and sea
-/// level, then generate chunks and sample points from it.
+/// Terrain generation for one world. Build once per climate preset, seed and
+/// sea level, then generate chunks and sample points from it.
 #[wasm_bindgen]
-pub struct TerrainHeights {
-    generator: terrain::HeightGenerator,
+pub struct TerrainGenerator {
+    heights: terrain::HeightGenerator,
+    splat: terrain::SplatGenerator,
+}
+
+fn from_js<T: serde::de::DeserializeOwned>(value: JsValue) -> Result<T, JsError> {
+    serde_wasm_bindgen::from_value(value).map_err(|e| JsError::new(&e.to_string()))
 }
 
 #[wasm_bindgen]
-impl TerrainHeights {
-    /// `climate` is a `ClimateConfig`. Throws if the preset is invalid.
+impl TerrainGenerator {
+    /// `climate` is a `ClimateConfig`; `splat` is `{ palette, coastMaterials }`
+    /// (see `terrain::SplatSpec`). Throws if either is invalid.
     #[wasm_bindgen(constructor)]
     pub fn new(
         climate: JsValue,
+        splat: JsValue,
         seed: f64,
         sea_level: f64,
         meters_per_sample: f64,
-    ) -> Result<TerrainHeights, JsError> {
-        let climate: terrain::ClimateConfig =
-            serde_wasm_bindgen::from_value(climate).map_err(|e| JsError::new(&e.to_string()))?;
-        let generator = terrain::HeightGenerator::new(climate, seed, sea_level, meters_per_sample)
+    ) -> Result<TerrainGenerator, JsError> {
+        let climate: terrain::ClimateConfig = from_js(climate)?;
+        let spec: terrain::SplatSpec = from_js(splat)?;
+        let heights = terrain::HeightGenerator::new(climate.clone(), seed, sea_level, meters_per_sample)
             .map_err(|e| JsError::new(&e))?;
-        Ok(TerrainHeights { generator })
+        let splat = terrain::SplatGenerator::new(climate, &spec, seed, sea_level, meters_per_sample)
+            .map_err(|e| JsError::new(&e))?;
+        Ok(TerrainGenerator { heights, splat })
     }
 
-    /// A `width` × `height` field at chunk offset (`offsetX`, `offsetY`),
-    /// before lakes are carved. See `terrain::HeightGenerator::generate`.
-    pub fn generate(&self, width: u32, height: u32, offset_x: f64, offset_y: f64) -> Vec<f32> {
-        self.generator.generate(width as usize, height as usize, offset_x, offset_y)
+    /// A `width` × `height` height field at chunk offset (`offsetX`,
+    /// `offsetY`), before lakes are carved. See `terrain::HeightGenerator`.
+    pub fn heights(&self, width: u32, height: u32, offset_x: f64, offset_y: f64) -> Vec<f32> {
+        self.heights.generate(width as usize, height as usize, offset_x, offset_y)
     }
 
     /// The un-eroded, uncarved ground at lake-space (u, v).
     pub fn ground(&self, u: f64, v: f64) -> f64 {
-        self.generator.sample(u, v).height
+        self.heights.sample(u, v).height
     }
 
     /// The continent field at lake-space (u, v).
     pub fn continent(&self, u: f64, v: f64) -> f64 {
-        self.generator.continent(u, v)
+        self.heights.continent(u, v)
+    }
+
+    /// Writes the inclusive texel window (`x0`, `y0`)–(`x1`, `y1`) of a chunk's
+    /// splat map into `out`, which holds the whole map. `maskWeights` is the
+    /// chunk's painted biome mask, if any, with its `maskSize` and `maskStep`.
+    /// See `terrain::SplatGenerator::generate`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn splat(
+        &self,
+        heights: &[f32],
+        width: u32,
+        height: u32,
+        offset_x: f64,
+        offset_y: f64,
+        mask_weights: Option<Vec<u8>>,
+        mask_size: u32,
+        mask_step: u32,
+        x0: u32,
+        y0: u32,
+        x1: u32,
+        y1: u32,
+        out: &mut [u8],
+    ) {
+        let mask = mask_weights.as_deref().map(|weights| terrain::PaintMask {
+            size: mask_size as usize,
+            step: mask_step as f64,
+            channels: weights.len() / (mask_size * mask_size) as usize,
+            weights,
+        });
+        let region = terrain::Region {
+            x0: x0 as usize,
+            y0: y0 as usize,
+            x1: x1 as usize,
+            y1: y1 as usize,
+        };
+        self.splat.generate(
+            heights,
+            width as usize,
+            height as usize,
+            offset_x,
+            offset_y,
+            mask.as_ref(),
+            region,
+            out,
+        );
     }
 }

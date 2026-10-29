@@ -9,7 +9,7 @@ use crate::climate::{
     continent_land_weight, continent_seabed_depth, resolve_biomes, BiomeBlend, ClimateField, ClimateSample,
 };
 use crate::config::{ClimateConfig, Deformation, Octaves};
-use math::{smoothstep01, F64x2, ParkMiller, PowerCurve, Simplex};
+use math::{fast_max, fast_min, smoothstep01, F64x2, ParkMiller, PowerCurve, Simplex};
 
 /// Passes of thermal erosion a biome may ask for. Each pass widens the margin
 /// every field generates.
@@ -202,7 +202,7 @@ fn deformation_height(simplex: &Simplex, def: &Deformation, prep: &Prepared, x: 
                     Some(n) => crease.powi(n),
                     None => crease.powf(d.sharpness),
                 } * weight;
-                weight = (r * RIDGE_GAIN).min(1.0);
+                weight = fast_min(r * RIDGE_GAIN, 1.0);
                 sum += r * octave.amplitude;
             }
             shaped(stack, prep, sum / prep.max_amplitude)
@@ -215,7 +215,7 @@ fn deformation_height(simplex: &Simplex, def: &Deformation, prep: &Prepared, x: 
             // into a riser that narrows as sharpness rises.
             let t = n * d.steps;
             let bench = t.floor();
-            let half = ((1.0 - d.sharpness) * 0.5).max(RISER_MIN);
+            let half = fast_max((1.0 - d.sharpness) * 0.5, RISER_MIN);
             let climbed = smoothstep01((t - bench - (0.5 - half)) / (2.0 * half));
             (bench + climbed) / d.steps * stack.amplitude
         }

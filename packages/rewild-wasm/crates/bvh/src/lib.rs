@@ -1,11 +1,10 @@
 //! Bounding volume hierarchy over a triangle mesh.
 //!
-//! A port of `BVHBuilder.ts`. The output is the flat node layout of
-//! `BVHSerializer.ts`, so the main thread reads it with `deserializeBVH`. The
-//! builder writes that layout directly, with no tree of node objects between.
-//!
-//! The tree is not required to match the JS builder node for node. The tests
-//! check that it is a valid BVH of the same mesh instead.
+//! The output is the flat node layout of `BVHSerializer.ts`, so the main thread
+//! reads it with `deserializeBVH`. The builder writes that layout directly,
+//! with no tree of node objects between.
+
+use math::{fast_max, fast_min};
 
 /// Floats per node in the flat layout. Mirrors `FLOATS_PER_NODE` in
 /// `BVHSerializer.ts`:
@@ -22,19 +21,6 @@ const SAH_BUCKETS: usize = 12;
 /// Cost of one traversal step against one triangle test.
 const TRAVERSAL_COST: f32 = 1.0;
 const INTERSECTION_COST: f32 = 1.0;
-
-/// Minimum without NaN handling. `f32::min` lowers to several instructions on
-/// x64 WASM; this is one compare and select. Inputs must not be NaN.
-#[inline(always)]
-fn fast_min(a: f32, b: f32) -> f32 {
-    if a < b { a } else { b }
-}
-
-/// Maximum counterpart of [`fast_min`].
-#[inline(always)]
-fn fast_max(a: f32, b: f32) -> f32 {
-    if a > b { a } else { b }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Strategy {
