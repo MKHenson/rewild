@@ -20,6 +20,7 @@ module.exports = {
     // with it the shader files, which are esbuild-loaded in the app but plain
     // text to jest. Same mock the renderer package's own config uses.
     '\\.wgsl$': '<rootDir>/packages/rewild-renderer/lib/__mocks__/wgslMock.js',
+    '\\.wasm$': '<rootDir>/packages/rewild-renderer/lib/__mocks__/wasmMock.js',
   },
   transform: {
     '^.+\\.[jt]sx?$': '<rootDir>/jest.transform.cjs',

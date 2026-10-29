@@ -14,10 +14,8 @@ import {
 } from '../lib/renderers/terrain/worker/buildChunkMesh';
 import { DEFAULT_CLIMATE_PRESET } from '../lib/renderers/terrain/Biomes';
 import { assembleApron } from '../lib/renderers/terrain/ApronRing';
-import { BVHBuilder } from '../lib/acceleration/BVHBuilder';
 import { BVHOptions } from '../lib/acceleration/BVHNode';
 import { DEFAULT_BVH_CONFIG } from '../lib/acceleration/BVHConfig';
-import { serializeBVH } from '../lib/acceleration/BVHSerializer';
 import {
   BenchOptions,
   CaseResult,
@@ -126,34 +124,8 @@ async function main() {
     timeChunk({ ...chunkRequest(0, i), scatter: true })
   );
 
-  for (const lod of BVH_LODS) {
-    const meshes = POSITIONS.map((_, i) =>
-      buildChunkMesh(chunkRequest(lod, i))
-    );
-    bench(`bvh over terrain lod ${lod}`, (i) => {
-      const mesh = meshes[i % meshes.length];
-      // Copied outside the timing. The builder can reorder what it is given.
-      const vertices = mesh.vertices.slice();
-      const indices = mesh.indices.slice();
-
-      const started = performance.now();
-      const builder = new BVHBuilder(vertices, indices, TERRAIN_BVH_OPTIONS);
-      const root = builder.build();
-      const built = performance.now();
-      serializeBVH(root, builder.triIndices);
-      const serialized = performance.now();
-
-      return {
-        build: built - started,
-        serialize: serialized - built,
-        total: serialized - started,
-      };
-    });
-  }
-
-  // The WASM glue loads after every JS case has run. Loaded up front, it slows
-  // the JS BVH builder in this process by up to 70%, which makes the JS
-  // numbers unfair. The game never runs both in one worker.
+  // The WASM glue loads after every JS case has run. Loaded up front, it has
+  // slowed JS code in the same process by up to 70%.
   const { loadRewildWasmSync } = await import('../lib/wasm/RewildWasm');
   const { buildBVHWasm } = await import('../lib/acceleration/BVHWasm');
   // The bundle runs from bench/build/, which npm run bench builds first.
@@ -171,7 +143,7 @@ async function main() {
     );
     // One call does the build and writes the serialised layout. Its time
     // includes copying the mesh into WASM memory and the result back out.
-    bench(`bvh over terrain lod ${lod} wasm`, (i) => {
+    bench(`bvh over terrain lod ${lod}`, (i) => {
       const mesh = meshes[i % meshes.length];
       const started = performance.now();
       buildBVHWasm(mesh.vertices, mesh.indices, TERRAIN_BVH_OPTIONS);

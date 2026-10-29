@@ -5,12 +5,13 @@
     // Importing a type out of the renderer pulls its whole source into the
     // program, so this tool needs the globals that source expects: rewild-common
     // annotates with AssemblyScript's numeric aliases, and the renderer with
-    // WebGPU's and its own .wgsl module declarations.
+    // WebGPU's and its own .wgsl and .wasm module declarations.
     "types": [
       "node",
       "rewild-common/types/types",
       "@webgpu/types",
       "rewild-renderer/types/wgsl",
+      "rewild-renderer/types/wasm",
       "jest"
     ],
     // Node resolves a sibling module by the extension written here, and it does

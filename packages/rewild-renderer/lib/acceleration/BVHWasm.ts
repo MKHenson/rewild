@@ -6,9 +6,7 @@ import { SerializedBVH } from './BVHSerializer';
  * Builds a BVH with the Rust builder (packages/rewild-wasm/crates/bvh). The
  * module must be loaded first (see RewildWasm).
  *
- * Returns the same flat layout as `serializeBVH`, so `deserializeBVH` reads it
- * unchanged. The tree can differ from the JS builder's, but it is a valid BVH
- * of the same triangles (see BVHWasm.spec.ts).
+ * Returns the flat layout that `deserializeBVH` reads.
  */
 export function buildBVHWasm(
   vertices: Float32Array,

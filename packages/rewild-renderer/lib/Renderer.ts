@@ -30,6 +30,8 @@ import { isVisualComponent } from './typeGuards';
 import { SceneBVH } from './acceleration/SceneBVH';
 import { BVHConfig, DEFAULT_BVH_CONFIG } from './acceleration/BVHConfig';
 import { BVHWorkerManager } from './acceleration/BVHWorkerManager';
+import { hasWasmSimd, loadRewildWasm } from './wasm/RewildWasm';
+import wasmUrl from '../../rewild-wasm/pkg/rewild_wasm_bg.wasm';
 import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowRenderer';
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
 import { FrameCompositor } from './post-processes/FrameCompositor';
@@ -335,7 +337,6 @@ export class Renderer {
 
     if (this.bvhConfig.asyncBuildThreshold > 0) {
       this.bvhWorkerManager = new BVHWorkerManager();
-      this.bvhWorkerManager.wasm = this.bvhConfig.wasmWorkerBuilds;
     }
 
     this.scene.addChild(this.sky.transform);
@@ -356,6 +357,10 @@ export class Renderer {
     this.scene.addChild(this.camera.camera.transform);
     this.camera.camera.transform.position.set(0, 20, 50);
     this.camera.camera.lookAt(0, 0, 0);
+
+    if (!hasWasmSimd())
+      throw new Error('need a browser that supports WebAssembly SIMD');
+    await loadRewildWasm(wasmUrl);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const requiredFeatures: GPUFeatureName[] = [];

@@ -5,19 +5,17 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Ray, Vector3 } from 'rewild-common';
-import { loadRewildWasmSync } from '../wasm/RewildWasm';
+import { hasWasmSimd, loadRewildWasmSync } from '../wasm/RewildWasm';
 import { buildBVHWasm } from './BVHWasm';
-import { BVHBuilder } from './BVHBuilder';
 import { BVH } from './BVH';
 import { BVHNode, BVHOptions, DEFAULT_BVH_OPTIONS } from './BVHNode';
-import { deserializeBVH } from './BVHSerializer';
+import { Geometry } from '../geometry/Geometry';
 import { buildChunkMesh } from '../renderers/terrain/worker/buildChunkMesh';
 import { DEFAULT_CLIMATE_PRESET } from '../renderers/terrain/Biomes';
 
-// The Rust builder is free to build a different tree from the JS builder, for
-// example with SIMD or another split method. These tests hold it to what
-// matters: a valid BVH of the same triangles, raycasts that agree, and a tree
-// about as good.
+// The builder is held to what matters, not to a fixed tree: a valid BVH of the
+// same triangles, raycasts that agree with testing every triangle, and SAH
+// splits that beat midpoint splits.
 
 const WASM = path.resolve(
   __dirname,
@@ -197,54 +195,76 @@ function rays(mesh: Mesh, count: number): Ray[] {
   return result;
 }
 
-describe('buildBVHWasm', () => {
+const _a = new Vector3();
+const _b = new Vector3();
+const _c = new Vector3();
+const _hit = new Vector3();
+
+/** Distance to the closest double-sided hit, testing every triangle. */
+function bruteForceFirst(mesh: Mesh, ray: Ray): number | null {
+  const count = mesh.indices ? mesh.indices.length : mesh.vertices.length / 3;
+  let closest: number | null = null;
+  for (let t = 0; t < count; t += 3) {
+    const i = (v: number) => (mesh.indices ? mesh.indices[t + v] : t + v) * 3;
+    _a.fromBuffer(i(0), mesh.vertices);
+    _b.fromBuffer(i(1), mesh.vertices);
+    _c.fromBuffer(i(2), mesh.vertices);
+    if (!ray.intersectTriangle(_a, _b, _c, false, _hit)) continue;
+    const distance = ray.origin.distanceTo(_hit);
+    if (closest === null || distance < closest) closest = distance;
+  }
+  return closest;
+}
+
+const asGeometry = (mesh: Mesh) =>
+  ({ vertices: mesh.vertices, indices: mesh.indices }) as Geometry;
+
+it('detects WASM SIMD', () => {
+  expect(hasWasmSimd()).toBe(true);
+});
+
+describe('BVH', () => {
   for (const mesh of [terrain(), soup()]) {
     for (const [name, options] of Object.entries(OPTION_SETS)) {
       describe(`${mesh.name}, ${name} options`, () => {
-        const js = new BVHBuilder(mesh.vertices, mesh.indices, options);
-        const jsBVH = BVH.fromTree(
-          mesh.vertices,
-          js.build(),
-          js.triIndices,
-          options
-        );
-        const wasm = buildBVHWasm(mesh.vertices, mesh.indices, options);
-        const wasmBVH = BVH.fromTree(
-          mesh.vertices,
-          deserializeBVH(wasm),
-          wasm.triIndices,
-          options
-        );
+        const bvh = new BVH(asGeometry(mesh), options);
 
         it('builds a valid BVH of the same triangles', () => {
-          expect(wasm.nodes).toHaveLength(wasm.nodeCount * 11);
-          expectValid(wasmBVH.root, wasm.triIndices, mesh, options);
+          expect(bvh.isReady).toBe(true);
+          expectValid(bvh.root, bvh.triIndices, mesh, options);
         });
 
-        it('hits what the JS tree hits, at the same distance', () => {
+        it('hits what a brute-force raycast hits, at the same distance', () => {
           let hits = 0;
           for (const ray of rays(mesh, 300)) {
-            const a = jsBVH.raycastFirst(ray, 'none', 0, Infinity);
-            const b = wasmBVH.raycastFirst(ray, 'none', 0, Infinity);
-            expect(b === null).toBe(a === null);
-            if (a && b) {
+            const expected = bruteForceFirst(mesh, ray);
+            const hit = bvh.raycastFirst(ray, 'none', 0, Infinity);
+            expect(hit === null).toBe(expected === null);
+            if (hit && expected !== null) {
               hits++;
-              expect(b.distance).toBeCloseTo(a.distance, 4);
+              expect(hit.distance).toBeCloseTo(expected, 4);
             }
           }
           // Guard against a pass where nothing was hit.
           expect(hits).toBeGreaterThan(20);
         });
-
-        it('builds a tree about as cheap to raycast as the JS one', () => {
-          const tolerance = options.strategy === 'sah' ? 1.05 : 1.15;
-          expect(sahCost(wasmBVH.root)).toBeLessThanOrEqual(
-            sahCost(jsBVH.root) * tolerance
-          );
-        });
       });
     }
+
+    it(`${mesh.name}: SAH builds a cheaper tree than midpoint splits`, () => {
+      const sah = new BVH(asGeometry(mesh), OPTION_SETS.default);
+      const center = new BVH(asGeometry(mesh), OPTION_SETS.center);
+      expect(sahCost(sah.root)).toBeLessThan(sahCost(center.root));
+    });
   }
+});
+
+describe('buildBVHWasm', () => {
+  it('writes 11 floats for each node', () => {
+    const { vertices } = soup(100);
+    const built = buildBVHWasm(vertices, undefined, DEFAULT_BVH_OPTIONS);
+    expect(built.nodes).toHaveLength(built.nodeCount * 11);
+  });
 
   it('rejects an unknown strategy', () => {
     const { vertices } = soup(10);

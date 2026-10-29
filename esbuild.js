@@ -195,6 +195,9 @@ function getConfig() {
     sourcemap: true,
     tsconfig: './src/tsconfig.json',
     outdir: './public',
+    // Emitted files (.wasm) are fetched by URL. Root-relative, so they resolve
+    // from any page route, like the workers at /bvhWorker.js.
+    publicPath: '/',
     define: defines,
     plugins: [
       logPlugin,
