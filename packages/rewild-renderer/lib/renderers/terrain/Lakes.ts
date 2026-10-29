@@ -2,7 +2,12 @@ import { Vector2, hash01, hashCell, lerp, smoothstep } from 'rewild-common';
 import { ClimateConfig, LakeConfig } from './Biomes';
 import { ClimateField, oceanCoverage, sampleContinent } from './ClimateField';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
-import { GroundSampler, createGroundSampler, sampleGround } from './Noise';
+import {
+  GroundSampler,
+  createGroundSampler,
+  sampleGround,
+  sampleGroundContinent,
+} from './Noise';
 import {
   LAKE_WATER,
   MAX_WATER_TYPES,
@@ -214,17 +219,17 @@ function slideAshore(
   c: Candidate,
   ground: GroundSampler
 ): void {
-  const continent = ground.field.climate.continent;
+  const continent = ground.climate.continent;
   const seaLevel = ground.seaLevel;
   if (!continent || sampleGround(ground, c.u, c.v) >= seaLevel) return;
 
   const e = config.cellSize * COAST_STEP;
   const gu =
-    sampleContinent(ground.field, c.u + e, c.v) -
-    sampleContinent(ground.field, c.u - e, c.v);
+    sampleGroundContinent(ground, c.u + e, c.v) -
+    sampleGroundContinent(ground, c.u - e, c.v);
   const gv =
-    sampleContinent(ground.field, c.u, c.v + e) -
-    sampleContinent(ground.field, c.u, c.v - e);
+    sampleGroundContinent(ground, c.u, c.v + e) -
+    sampleGroundContinent(ground, c.u, c.v - e);
   const length = Math.hypot(gu, gv);
   if (length === 0) return;
   const du = gu / length;
@@ -328,7 +333,7 @@ function sampleRim(
   phases: Float64Array,
   ground: GroundSampler
 ): number {
-  const continent = ground.field.climate.continent;
+  const continent = ground.climate.continent;
   const seaLevel = ground.seaLevel;
   let lowest = Infinity;
   let highest = -Infinity;
@@ -349,7 +354,7 @@ function sampleRim(
     if (
       continent &&
       h < ground.seaLevel &&
-      oceanCoverage(continent, sampleContinent(ground.field, u, v)) > 0
+      oceanCoverage(continent, sampleGroundContinent(ground, u, v)) > 0
     ) {
       wet++;
       if (h < mouthHeight) {
@@ -385,11 +390,11 @@ function settleLake(
   report?: LakeCellReport
 ): Lake | null {
   const seaLevel = ground.seaLevel;
-  const continent = ground.field.climate.continent;
+  const continent = ground.climate.continent;
   if (
     continent &&
     sampleGround(ground, c.u, c.v) < seaLevel &&
-    oceanCoverage(continent, sampleContinent(ground.field, c.u, c.v)) > 0
+    oceanCoverage(continent, sampleGroundContinent(ground, c.u, c.v)) > 0
   ) {
     if (report) report.outcome = 'ocean';
     return null;

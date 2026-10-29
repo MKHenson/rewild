@@ -73,9 +73,9 @@ export interface BiomeScatter {
 // ── Deformations ─────────────────────────────────────────────────────────────
 // A biome's shape is a summed stack of these, each a pure function of world
 // position returning metres. Reading only world position is what keeps them
-// seam-free across chunks. Evaluated by a switch on `kind` (evalDeformation in
-// Noise.ts), never a method call — adding a kind is a member here plus a case
-// there.
+// seam-free across chunks. Evaluated in Rust (`deformation_height` in
+// rewild-wasm's terrain crate) — adding a kind is a member here, a variant in
+// the crate's config.rs and a case there.
 export type Deformation =
   | FbmDeformation
   | DuneDeformation

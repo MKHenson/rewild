@@ -16,6 +16,8 @@ import { DEFAULT_CLIMATE_PRESET } from '../lib/renderers/terrain/Biomes';
 import { assembleApron } from '../lib/renderers/terrain/ApronRing';
 import { BVHOptions } from '../lib/acceleration/BVHNode';
 import { DEFAULT_BVH_CONFIG } from '../lib/acceleration/BVHConfig';
+import { buildBVHWasm } from '../lib/acceleration/BVHWasm';
+import { loadRewildWasmSync } from '../lib/wasm/RewildWasm';
 import {
   BenchOptions,
   CaseResult,
@@ -72,6 +74,15 @@ const timeChunk = (request: BuildChunkMeshRequest) => {
 };
 
 async function main() {
+  // The bundle runs from bench/build/, which npm run bench builds first.
+  loadRewildWasmSync(
+    readFileSync(
+      fileURLToPath(
+        new URL('../../../rewild-wasm/pkg/rewild_wasm_bg.wasm', import.meta.url)
+      )
+    )
+  );
+
   const { values } = parseArgs({
     options: {
       runs: { type: 'string', default: '15' },
@@ -122,19 +133,6 @@ async function main() {
   // does not depend on the LOD.
   bench('terrain lod 0 + scatter', (i) =>
     timeChunk({ ...chunkRequest(0, i), scatter: true })
-  );
-
-  // The WASM glue loads after every JS case has run. Loaded up front, it has
-  // slowed JS code in the same process by up to 70%.
-  const { loadRewildWasmSync } = await import('../lib/wasm/RewildWasm');
-  const { buildBVHWasm } = await import('../lib/acceleration/BVHWasm');
-  // The bundle runs from bench/build/, which npm run bench builds first.
-  loadRewildWasmSync(
-    readFileSync(
-      fileURLToPath(
-        new URL('../../../rewild-wasm/pkg/rewild_wasm_bg.wasm', import.meta.url)
-      )
-    )
   );
 
   for (const lod of BVH_LODS) {
