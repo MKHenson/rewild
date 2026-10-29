@@ -5,5 +5,10 @@
     "resolveJsonModule": true,
     "types": ["node", "rewild-common/types/types", "@webgpu/types", "jest"]
   },
-  "include": ["lib/**/*.wgsl", "lib/**/*.ts", "types/**/*.d.ts"]
+  "include": [
+    "lib/**/*.wgsl",
+    "lib/**/*.ts",
+    "bench/**/*.ts",
+    "types/**/*.d.ts"
+  ]
 }

@@ -20,6 +20,7 @@ npm run server         # live-server on :9001
 npm run test           # Jest (root + all workspaces)
 npm run unit-tests     # Jest (root only)
 npm run ts-check       # TypeScript type-check only
+npm run bench          # Benchmark the worker code (see packages/rewild-renderer/bench/run.mjs)
 npm run clean          # rimraf public/
 ```
 
