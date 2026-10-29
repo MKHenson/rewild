@@ -335,6 +335,7 @@ export class Renderer {
 
     if (this.bvhConfig.asyncBuildThreshold > 0) {
       this.bvhWorkerManager = new BVHWorkerManager();
+      this.bvhWorkerManager.wasm = this.bvhConfig.wasmWorkerBuilds;
     }
 
     this.scene.addChild(this.sky.transform);

@@ -12,6 +12,7 @@ on:
       - 'index.html'
       - 'style.css'
       - 'esbuild.js'
+      - 'scripts/build-wasm.mjs'
   workflow_dispatch:
 
 jobs:
@@ -27,6 +28,21 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/rewild-wasm
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
 
       - name: Install dependencies
         run: npm ci
@@ -68,3 +84,14 @@ jobs:
             --cache-control "max-age=31536000, immutable" \
             --acl public-read \
             --delete
+
+          # The sync guesses content types, and a .wasm needs application/wasm
+          # for the browser to compile it while it downloads.
+          aws s3 cp ./public s3://${{ secrets.CLIENT_BUCKET_NAME }} \
+            --endpoint-url https://s3.fr-par.scw.cloud \
+            --recursive \
+            --exclude "*" \
+            --include "*.wasm" \
+            --content-type "application/wasm" \
+            --cache-control "max-age=31536000, immutable" \
+            --acl public-read

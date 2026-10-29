@@ -41,6 +41,14 @@ export interface BVHConfig {
    */
   asyncBuildThreshold: i32;
 
+  /**
+   * Worker builds use the Rust builder (packages/rewild-wasm). Set false to
+   * build in JS. A worker whose WASM module fails to load builds in JS anyway.
+   * Synchronous builds always use JS.
+   * Default: true.
+   */
+  wasmWorkerBuilds: boolean;
+
   // ── Scene BVH ──
 
   /** Create a SceneBVH and attach it to the Renderer. */
@@ -71,6 +79,7 @@ export const DEFAULT_BVH_CONFIG: BVHConfig = {
   geometryBVHMaxDepth: 32,
   geometryBVHMaxLeafTriangles: 8,
   asyncBuildThreshold: 10000,
+  wasmWorkerBuilds: true,
   enableSceneBVH: true,
   sceneBVHAutoUpdate: true,
   sceneBVHUpdateThreshold: 0.1,

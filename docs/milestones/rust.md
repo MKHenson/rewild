@@ -87,6 +87,38 @@ Rust has a large WASM community and mature tools (`wasm-bindgen`, `wasm-pack`). 
 | One `.wasm` module for all workers.                  | One build, one loader. The file is small and the browser caches it. Split it only if it grows large.                        |
 | Plain library crates, plus one output crate.         | Library crates have no JS types, so `cargo test` tests them directly. Only `rewild-wasm` knows about JS.                    |
 | Data layouts are defined once, with named accessors. | No `nodes[i * 11 + 7]` in callers. In Rust a layout is a `#[repr(C)]` struct. In TypeScript it is a small class.            |
+| JS owns chunk data. Rust borrows it for each call.   | See [Where chunk data lives](#where-chunk-data-lives).                                                                      |
+
+## Where chunk data lives
+
+Chunk heights, and later other chunk data, stay in JS typed arrays. A Rust function borrows them for one call:
+
+```rust
+#[wasm_bindgen]
+pub fn sculpt_stamp(heights: &mut [f32] /* , brush */) { /* ... */ }
+```
+
+The `wasm-bindgen` glue copies the `Float32Array` into WASM memory, runs the function, and copies the result back into the same array. The TypeScript caller passes `chunk.heights` and keeps no other state.
+
+Why JS owns the data:
+
+- **The copies are cheap.** One chunk's heights are about 232 KB, and a copy of that size takes about 0.02 ms. A brush can pass only the window it touches.
+- **WASM ownership would not remove most copies.** Each worker has its own WASM memory, so worker results reach the main thread's instance only by a copy. Rapier keeps its heightfield in its own WASM memory. GPU uploads copy too.
+- **Views into growing WASM memory cause bugs.** When the memory grows, its old `ArrayBuffer` becomes detached, and every view over it reads as empty. JS code that keeps a view across a call that allocates breaks rarely, and far from the cause.
+- **Most readers are in JS:** `sampleHeight`, snapshot saves, physics and the editing tools.
+
+The general rule: data lives where its hot loop runs, and the boundary is crossed once per job, not once per item.
+
+**When to change it.** Move the data into WASM when Rust does most of its reads and writes, or when the benchmark shows the copies cost a real share of a frame. Neither is true today.
+
+**How to change it.** Use a fixed arena, not the growing WASM heap:
+
+- At startup, reserve one region with a slot for each loaded chunk. 169 chunks at 232 KB each is about 39 MB.
+- Set the memory's initial and maximum size, so it never grows after startup. Give the arena its own allocator.
+- Without growth, views never detach, so JS can keep one `Float32Array` view for each slot.
+- A chunk then owns a slot index, and `chunk.heights` becomes the view of its slot.
+
+The cost is a fixed limit on loaded chunks. Do not build the arena until a measurement calls for it.
 
 ## Rules for a port
 
@@ -140,7 +172,7 @@ Port in this order: heights, splat, water map, mesh, scatter. The end state is `
 
 Sculpt stamps (`Sculpt.ts`), splat repaint (`refreshChunkSplat`) and water carving run on the main thread while the user edits. They work over the same chunk data as Phase 2.
 
-This phase depends on an open question: where the chunk heights live (see [Open questions](#open-questions)).
+The Rust functions borrow the chunk data for each call (see [Where chunk data lives](#where-chunk-data-lives)). Benchmark the copies here. They decide whether the fixed arena is needed.
 
 ### Phase 5: Measure, then decide
 
@@ -173,7 +205,6 @@ Two systems are not in this list for now, but they could move later:
 
 ## Open questions
 
-- **Where do chunk heights live?** Today each `TerrainChunk` holds a `Float32Array`. Sculpting, raycasts, `sampleHeight` and the physics heightfield all read it. If the main thread's WASM instance owns the heights, editing tools need no copies. But every JS reader then needs a view into WASM memory, and a view becomes invalid when that memory grows. Decide this before Phase 4.
 - **How many terrain workers?** The pool has at most 4. Faster builds may change the best number.
 - **When to split the module?** One module is right while it is small. Measure its size after Phase 2.
 - **How to debug?** The Chrome "C/C++ DevTools Support (DWARF)" extension lets you step through Rust source. A debug build adds the source maps. Add an `npm run build:wasm:debug` when we first need it.
