@@ -9,7 +9,7 @@
 //! point query and a chunk agree exactly.
 
 use crate::config::{ClimateAxis, ClimateConfig, ContinentConfig};
-use math::{smoothstep01, F64x2, ParkMiller, Simplex};
+use math::{fast_min, smoothstep01, F64x2, ParkMiller, Simplex};
 
 // Domain warp of the climate lookup, so biome borders meander. In samples.
 // WARP_AMPLITUDE / WARP_SAMPLE_SCALE must stay below 0.18, or the warp folds
@@ -91,12 +91,20 @@ pub fn continent_seabed_depth(continent: &ContinentConfig, c: f64) -> f64 {
     if u <= 0.0 {
         return 0.0;
     }
-    let shelf = continent.shelf_depth * (u / continent.shelf_width).min(1.0);
+    let shelf = continent.shelf_depth * fast_min(u / continent.shelf_width, 1.0);
     let t = (u - continent.shelf_width) / continent.slope_width;
     if t <= 0.0 {
         return shelf;
     }
     shelf + (continent.ocean_depth - continent.shelf_depth) * smoothstep01(t)
+}
+
+/// How much ocean may stand at continent value `c`: all of it out to where the
+/// land is at full height, fading over one more blend width inland. Also how
+/// close the ocean is, for beaches.
+pub fn ocean_coverage(continent: &ContinentConfig, c: f64) -> f64 {
+    let half = continent.blend_half_width;
+    1.0 - smoothstep01((c - (continent.coast + half)) / half)
 }
 
 fn coastal_moisture_at(continent: &ContinentConfig, c: f64) -> f64 {

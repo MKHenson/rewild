@@ -40,7 +40,7 @@ export interface NoiseSelector {
 // One material a biome surfaces with. Coverage is the product of its selectors;
 // an omitted selector is 1. Layers composite base-first — each takes its
 // coverage of what the layers above left uncovered — so layers[0] is the base
-// and must be unconstrained. See resolveLayerWeights.
+// and must be unconstrained. See `layer_weights` in the Rust terrain crate.
 export interface BiomeLayer {
   material: string; // key into TERRAIN_MATERIALS
   slope?: Selector; // degrees from horizontal

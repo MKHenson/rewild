@@ -159,9 +159,9 @@ export function samplePaintMaskChannel(
  * The total is what the caller divides the generator's own result by: painted
  * weight takes its share and the generator keeps the remainder, which is the
  * same "each layer takes its coverage of what is left" rule the material layers
- * already composite by (see resolveLayerWeights). It is clamped to 1 because
- * the brush keeps the stored channels summing to <= 1 but quantisation can push
- * an interpolated total a hair over.
+ * already composite by (see `layer_weights` in the Rust terrain crate). It is
+ * clamped to 1 because the brush keeps the stored channels summing to <= 1 but
+ * quantisation can push an interpolated total a hair over.
  *
  * Allocation-free: the caller hoists `out`, and every index below is arithmetic.
  */

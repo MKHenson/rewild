@@ -1,6 +1,6 @@
-//! The parts of a climate preset that shape the ground. Mirrors the TS types in
-//! `Biomes.ts`; fields the heights never read (layers, scatter, water, lakes)
-//! are skipped when a preset is deserialized.
+//! The parts of a climate preset that shape and surface the ground. Mirrors the
+//! TS types in `Biomes.ts`; fields no ported stage reads yet (scatter, water,
+//! lakes) are skipped when a preset is deserialized.
 
 use serde::Deserialize;
 
@@ -10,6 +10,7 @@ pub struct ClimateConfig {
     pub temperature: ClimateAxis,
     pub moisture: ClimateAxis,
     pub continent: Option<ContinentConfig>,
+    pub coast: Option<CoastConfig>,
     pub biomes: Vec<Biome>,
     /// `cells[temperatureBand][moistureBand]` is an index into `biomes`.
     pub cells: Vec<Vec<i64>>,
@@ -39,12 +40,60 @@ pub struct ContinentConfig {
     pub coastal_moisture_reach: Option<f64>,
 }
 
+/// Beaches where the ocean is close. Materials come in the splat palette.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CoastConfig {
+    pub beach_height: f64,
+    pub wet_height: f64,
+    pub seabed_depth: f64,
+    pub blend: f64,
+    pub slope: Band,
+}
+
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Biome {
     pub name: String,
     pub deformations: Vec<Deformation>,
     pub erosion: Option<Erosion>,
+    /// Surfaces the shape, base first.
+    #[serde(default)]
+    pub layers: Vec<Layer>,
+}
+
+/// A smoothstep ramp from `from` to `to`. `from` above `to` fades out instead.
+#[derive(Deserialize, Clone, Copy, Debug)]
+pub struct Band {
+    pub from: f64,
+    pub to: f64,
+}
+
+/// One band, or several that must all apply.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum Selector {
+    One(Band),
+    All(Vec<Band>),
+}
+
+/// Organic patches from a noise field of their own.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct NoiseSelector {
+    pub scale: f64,
+    pub seed_salt: f64,
+    pub band: Band,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct Layer {
+    pub material: String,
+    /// Degrees from horizontal.
+    pub slope: Option<Selector>,
+    /// Absolute world metres.
+    pub height: Option<Selector>,
+    pub noise: Option<NoiseSelector>,
 }
 
 #[derive(Deserialize, Clone, Debug)]

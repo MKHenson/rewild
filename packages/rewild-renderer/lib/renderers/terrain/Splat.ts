@@ -3,23 +3,13 @@ import {
   ClimateConfig,
   MAX_SPLAT_LAYERS,
   SPLAT_BYTES_PER_TEXEL,
-  getClimatePalette,
-  getCoastMaterials,
   validateClimateLayers,
 } from './Biomes';
-import {
-  ClimateField,
-  createBiomeResolver,
-  createClimateField,
-  createLayerNoiseFields,
-  oceanCoverage,
-  resolveActiveBiomes,
-  sampleContinent,
-  sampleLayerNoise,
-} from './ClimateField';
-import { resolveCoastWeights, resolveLayerWeights } from './LayerWeights';
+import { ClimateField, oceanCoverage, sampleContinent } from './ClimateField';
+import { resolveCoastWeights } from './LayerWeights';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { PaintMask } from './PaintMask';
+import { terrainGenerator } from './TerrainGenerator';
 
 // World units between adjacent heightmap samples — the run that the rise between
 // neighbours is taken over, so the slope below comes out in real degrees.
@@ -163,6 +153,9 @@ export function slopeDegreesAt(
  * chunk is sculpted or snapshotted, so a painted biome that moved the ground
  * would either fight the sculpt or be silently ignored on saved chunks. Paint
  * says what the ground is made of; sculpt says what shape it is.
+ *
+ * Generated in Rust (`SplatGenerator` in rewild-wasm's terrain crate), from the
+ * same climate grid the heights use.
  */
 export function generateSplatMap(
   width: number,
@@ -185,8 +178,6 @@ export function generateSplatMap(
       `Biome mask has ${biomeMask.channels} channels but the climate has ${climate.biomes.length} biomes.`
     );
 
-  const palette = getClimatePalette(climate);
-  const field = createClimateField(width, height, seed, offset, climate);
   const expectedBytes = width * height * SPLAT_BYTES_PER_TEXEL;
   const out = options?.out;
   if (out && out.length !== expectedBytes)
@@ -194,8 +185,6 @@ export function generateSplatMap(
       `Splat output buffer is ${out.length} bytes; expected ${expectedBytes}.`
     );
   const splat = out ?? new Uint8Array(expectedBytes);
-  // Where the second plane (channels 4-7) starts.
-  const planeStride = width * height * 4;
 
   // Texel window to (re)generate. A paint stroke only invalidates the disc under
   // the brush, and regenerating 241² texels — each of which resolves several
@@ -213,126 +202,21 @@ export function generateSplatMap(
   const ry1 = region ? Math.min(height - 1, region.y1) : height - 1;
   if (rx1 < rx0 || ry1 < ry0) return splat;
 
-  // Per-biome map from layer index → splat channel, resolved up front so the
-  // sample loop never does a name lookup.
-  const biomeChannels: Int32Array[] = climate.biomes.map((biome) =>
-    Int32Array.from(
-      biome.layers.map((layer) => palette.indexOf(layer.material))
-    )
+  terrainGenerator(seed, climate, options?.seaLevel ?? 0).splat(
+    heights,
+    width,
+    height,
+    offset.x,
+    offset.y,
+    biomeMask?.weights,
+    biomeMask?.size ?? 0,
+    biomeMask?.step ?? 0,
+    rx0,
+    ry0,
+    rx1,
+    ry1,
+    splat
   );
-
-  let maxLayers = 1;
-  for (const biome of climate.biomes)
-    maxLayers = Math.max(maxLayers, biome.layers.length);
-
-  // Noise-selector lookups per (biome, layer), null where a layer has none.
-  // `anyLayerNoise` lets the common case skip the per-layer sampling entirely.
-  const layerNoiseFields = createLayerNoiseFields(seed, offset, climate);
-  const anyLayerNoise = layerNoiseFields.some((biome) =>
-    biome.some((layerField) => layerField !== null)
-  );
-
-  // Scratch reused across samples — nothing is allocated in the loop.
-  const resolver = createBiomeResolver(field, biomeMask);
-  const activeBiomes = resolver.biomes;
-  const activeWeights = resolver.weights;
-  const layerWeights = new Float64Array(maxLayers);
-  const layerNoise = new Float64Array(maxLayers);
-  const channels = new Float64Array(MAX_SPLAT_LAYERS);
-
-  // Splat channels of the beach's dry sand, wet sand and sea bed.
-  const seaLevel = options?.seaLevel ?? 0;
-  const coastMaterials = getCoastMaterials(climate.coast);
-  const coastChannels =
-    coastMaterials.length > 0 && climate.continent
-      ? Int32Array.from(coastMaterials.map((m) => palette.indexOf(m)))
-      : null;
-  const coastWeights = new Float64Array(3);
-
-  for (let y = ry0; y <= ry1; y++) {
-    for (let x = rx0; x <= rx1; x++) {
-      const index = x + y * width;
-      const worldHeight = heights[index];
-      const slope = slopeDegreesAt(heights, width, height, x, y);
-
-      channels.fill(0);
-
-      const activeCount = resolveActiveBiomes(resolver, x, y);
-
-      for (let b = 0; b < activeCount; b++) {
-        const biomeIndex = activeBiomes[b];
-        const biome = climate.biomes[biomeIndex];
-        const biomeWeight = activeWeights[b];
-
-        // Each noise-selecting layer's field at this sample. Sampled here
-        // rather than inside resolveLayerWeights so that module stays free of
-        // the Perlin and the world offsets.
-        if (anyLayerNoise) {
-          const noiseFields = layerNoiseFields[biomeIndex];
-          for (let l = 0; l < noiseFields.length; l++) {
-            const noiseField = noiseFields[l];
-            layerNoise[l] = noiseField
-              ? sampleLayerNoise(
-                  field.perlin,
-                  noiseField,
-                  field.halfWidth,
-                  field.halfHeight,
-                  x,
-                  y
-                )
-              : 0;
-          }
-        }
-
-        resolveLayerWeights(
-          biome,
-          worldHeight,
-          slope,
-          anyLayerNoise ? layerNoise : null,
-          layerWeights
-        );
-
-        const layerChannels = biomeChannels[biomeIndex];
-        for (let l = 0; l < biome.layers.length; l++) {
-          channels[layerChannels[l]] += biomeWeight * layerWeights[l];
-        }
-      }
-
-      // The beach covers the biome layers the way a layer covers those beneath.
-      if (coastChannels) {
-        const beach = coastWeightsAt(
-          field,
-          worldHeight - seaLevel,
-          slope,
-          x,
-          y,
-          coastWeights
-        );
-        if (beach > 0) {
-          const keep = 1 - beach;
-          for (let c = 0; c < MAX_SPLAT_LAYERS; c++) channels[c] *= keep;
-          channels[coastChannels[0]] += coastWeights[0];
-          channels[coastChannels[1]] += coastWeights[1];
-          channels[coastChannels[2]] += coastWeights[2];
-        }
-      }
-
-      // Quantisation loses up to 1/255 per channel, so the eight no longer sum
-      // to exactly 255. The shader renormalises rather than the fix-up being
-      // done here — linear filtering preserves the sum, so one normalise in the
-      // fragment covers both errors at once.
-      const base = index * 4;
-      splat[base] = Math.round(channels[0] * 255);
-      splat[base + 1] = Math.round(channels[1] * 255);
-      splat[base + 2] = Math.round(channels[2] * 255);
-      splat[base + 3] = Math.round(channels[3] * 255);
-      splat[planeStride + base] = Math.round(channels[4] * 255);
-      splat[planeStride + base + 1] = Math.round(channels[5] * 255);
-      splat[planeStride + base + 2] = Math.round(channels[6] * 255);
-      splat[planeStride + base + 3] = Math.round(channels[7] * 255);
-    }
-  }
-
   return splat;
 }
 
