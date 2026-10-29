@@ -23,6 +23,19 @@ const SAH_BUCKETS: usize = 12;
 const TRAVERSAL_COST: f32 = 1.0;
 const INTERSECTION_COST: f32 = 1.0;
 
+/// Minimum without NaN handling. `f32::min` lowers to several instructions on
+/// x64 WASM; this is one compare and select. Inputs must not be NaN.
+#[inline(always)]
+fn fast_min(a: f32, b: f32) -> f32 {
+    if a < b { a } else { b }
+}
+
+/// Maximum counterpart of [`fast_min`].
+#[inline(always)]
+fn fast_max(a: f32, b: f32) -> f32 {
+    if a > b { a } else { b }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Strategy {
     /// Surface area heuristic. Better trees, slower builds.
@@ -77,8 +90,8 @@ impl Aabb {
 
     fn grow(&mut self, other: &Aabb) {
         for k in 0..3 {
-            self.min[k] = self.min[k].min(other.min[k]);
-            self.max[k] = self.max[k].max(other.max[k]);
+            self.min[k] = fast_min(self.min[k], other.min[k]);
+            self.max[k] = fast_max(self.max[k], other.max[k]);
         }
     }
 
@@ -152,8 +165,8 @@ impl Builder {
             let mut aabb = Aabb::EMPTY;
             for k in 0..3 {
                 centroid[k] = (a[k] + b[k] + c[k]) / 3.0;
-                aabb.min[k] = a[k].min(b[k]).min(c[k]);
-                aabb.max[k] = a[k].max(b[k]).max(c[k]);
+                aabb.min[k] = fast_min(fast_min(a[k], b[k]), c[k]);
+                aabb.max[k] = fast_max(fast_max(a[k], b[k]), c[k]);
             }
             centroids.push(centroid);
             bounds.push(aabb);
