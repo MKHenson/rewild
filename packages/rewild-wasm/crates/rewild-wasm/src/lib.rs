@@ -64,3 +64,44 @@ pub fn build_bvh(
         tri_indices: built.tri_indices,
     })
 }
+
+/// Terrain heights for one world. Build once per climate preset, seed and sea
+/// level, then generate chunks and sample points from it.
+#[wasm_bindgen]
+pub struct TerrainHeights {
+    generator: terrain::HeightGenerator,
+}
+
+#[wasm_bindgen]
+impl TerrainHeights {
+    /// `climate` is a `ClimateConfig`. Throws if the preset is invalid.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        climate: JsValue,
+        seed: f64,
+        sea_level: f64,
+        meters_per_sample: f64,
+    ) -> Result<TerrainHeights, JsError> {
+        let climate: terrain::ClimateConfig =
+            serde_wasm_bindgen::from_value(climate).map_err(|e| JsError::new(&e.to_string()))?;
+        let generator = terrain::HeightGenerator::new(climate, seed, sea_level, meters_per_sample)
+            .map_err(|e| JsError::new(&e))?;
+        Ok(TerrainHeights { generator })
+    }
+
+    /// A `width` × `height` field at chunk offset (`offsetX`, `offsetY`),
+    /// before lakes are carved. See `terrain::HeightGenerator::generate`.
+    pub fn generate(&self, width: u32, height: u32, offset_x: f64, offset_y: f64) -> Vec<f32> {
+        self.generator.generate(width as usize, height as usize, offset_x, offset_y)
+    }
+
+    /// The un-eroded, uncarved ground at lake-space (u, v).
+    pub fn ground(&self, u: f64, v: f64) -> f64 {
+        self.generator.sample(u, v).height
+    }
+
+    /// The continent field at lake-space (u, v).
+    pub fn continent(&self, u: f64, v: f64) -> f64 {
+        self.generator.continent(u, v)
+    }
+}

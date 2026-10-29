@@ -2,6 +2,7 @@
   "prettier.printWidth": 120,
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "rust-analyzer.linkedProjects": ["packages/rewild-wasm/Cargo.toml"],
   "[wgsl]": {
     "editor.defaultFormatter": "noah-labrecque.wgsl-lang"
   }

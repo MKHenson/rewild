@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "npm run build:wasm && npm run test:wasm && jest && npm run test --workspaces --if-present",
-    "test:wasm": "cargo test --manifest-path packages/rewild-wasm/Cargo.toml",
+    "test:wasm": "cargo test --manifest-path packages/rewild-wasm/Cargo.toml && wasm-pack test --node packages/rewild-wasm/crates/math",
     "clean": "rimraf public",
     "build": "npm run clean && npm run build:wasm && node ./esbuild.js && npm run ts-check",
     "build:wasm": "node scripts/build-wasm.mjs",

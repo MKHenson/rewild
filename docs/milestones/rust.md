@@ -162,6 +162,17 @@ This is the largest win the player can see. Medians for one 241 × 241 chunk on 
 
 Port in this order: heights, splat, water map, mesh, scatter. The end state is `buildChunkMesh` as one Rust call per chunk, with the climate presets passed in as data. Then the JS generator is deleted.
 
+**Heights (done).** The `terrain` crate generates heights through one `TerrainHeights` object per world, cached by climate, seed and sea level. `generateBiomeBlendedHeightMap`, `createGroundSampler` and `sampleGround` keep their signatures and call it. Lakes are still TypeScript. They sample the Rust ground, and `carveLakes` runs on the Rust field.
+
+- Noise coordinates are `f64`. Field offsets reach ±100000 samples, where `f32` cannot resolve one sample.
+- Every field is evaluated from the world sample position, so neighbouring chunks agree bit for bit. `cargo test` checks both seams with erosion and a continent active.
+- Thermal erosion runs as many passes as the most any biome asks for, over a margin of twice that. One pass reads two samples out, because a neighbour's move is shared over its own neighbours.
+- The climate fields (domain warp, temperature, moisture, continent) are evaluated on a world-aligned grid every 8 samples and interpolated. Their finest detail is hundreds of samples across, so the error stays under 0.001. Point queries interpolate the same nodes, so they match chunks exactly.
+- Simplex runs two points per call with `f64x2` (`math::F64x2`, a plain pair natively). The octaves of a stack are independent, so they pair up; neighbouring samples are not paired, because they can blend different biomes. Each lane does the scalar code's operations in its order, so the output is bit-identical to the scalar path. The lattice lookups stay scalar, because WASM has no gather.
+- Simplex with integer-hashed gradients in `f32x4`, with the skew done in `f64` so precision holds far from the origin, costs the same per point as the paired `f64` simplex in V8. Stacks of 5 or 6 octaves fill two 4-lane calls, so heights were about 26% slower with it, and it would have changed every world. The paired `f64` simplex stays.
+- Each deformation's `curveExp` is read from a 4096-step table (`math::PowerCurve`) instead of `powf`, which is a software call in WASM. Heights move by at most 0.06 mm.
+- On a Ryzen 9 9950X3D the heights stage fell from 36–50 ms to 10–11 ms.
+
 ### Phase 3: The BVH system
 
 1. Add benchmark cases for raycast (first hit and all hits), refit, and the main-thread deserialize.

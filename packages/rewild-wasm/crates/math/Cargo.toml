@@ -1,0 +1,11 @@
+[package]
+name = "math"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+
+# `wasm-pack test --node` runs the tests through the SIMD build.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"

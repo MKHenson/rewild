@@ -20,12 +20,17 @@ import {
   maxLakeReach,
   worldToLakeSpace,
 } from './Lakes';
-import { createGroundSampler, generateBiomeBlendedHeightMap, sampleGround } from './Noise';
+import {
+  createGroundSampler,
+  generateBiomeBlendedHeightMap,
+  sampleGround,
+  sampleGroundContinent,
+} from './Noise';
 import { SCATTER_INSTANCE_STRIDE, scatterChunk } from './Scatter';
 import { buildWaterMap } from './WaterMap';
 import { LAKE_WATER, OCEAN_WATER, getWaterTypeIndex } from './Water';
 import { fromFloat16 } from '../../utils/float16';
-import { oceanCoverage, sampleContinent } from './ClimateField';
+import { oceanCoverage } from './ClimateField';
 
 const SEED = 9001;
 const SIZE = 129;
@@ -316,7 +321,7 @@ describe('lagoons', () => {
         const v = lake.v + (Math.sin(angle) * lake.bank) / r;
         if (
           sampleGround(ground, u, v) < 0 &&
-          oceanCoverage(COAST.continent!, sampleContinent(ground.field, u, v)) > 0
+          oceanCoverage(COAST.continent!, sampleGroundContinent(ground, u, v)) > 0
         )
           sea = true;
       }

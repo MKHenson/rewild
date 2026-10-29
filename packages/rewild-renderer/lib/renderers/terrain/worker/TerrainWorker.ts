@@ -1,8 +1,13 @@
 import './SetupWorkerUtils';
+import wasmUrl from '../../../../../rewild-wasm/pkg/rewild_wasm_bg.wasm';
 import { buildChunkMesh } from './buildChunkMesh';
 import { waterMapTransferables } from '../WaterMap';
+import { loadRewildWasm } from '../../../wasm/RewildWasm';
+
+const wasmReady = loadRewildWasm(wasmUrl);
 
 self.onmessage = async (event: MessageEvent) => {
+  await wasmReady;
   const {
     splat,
     vertices,
