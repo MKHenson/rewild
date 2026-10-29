@@ -21,9 +21,6 @@ export class BVHWorkerManager {
   private nextId: i32 = 0;
   private pending = new Map<i32, PendingBuild>();
 
-  /** Build with the Rust builder. See BVHConfig.wasmWorkerBuilds. */
-  wasm = true;
-
   /** Lazily creates the worker on first use. */
   private ensureWorker(): Worker {
     if (!this.worker) {
@@ -67,7 +64,6 @@ export class BVHWorkerManager {
           vertices: verticesCopy,
           indices: indicesCopy,
           options,
-          wasm: this.wasm,
         },
         { transfer: transferList }
       );

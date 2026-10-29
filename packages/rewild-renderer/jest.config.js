@@ -9,5 +9,6 @@ module.exports = {
   },
   moduleNameMapper: {
     '\\.wgsl$': '<rootDir>/lib/__mocks__/wgslMock.js',
+    '\\.wasm$': '<rootDir>/lib/__mocks__/wasmMock.js',
   },
 };

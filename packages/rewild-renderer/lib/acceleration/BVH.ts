@@ -2,8 +2,9 @@ import { Ray, Triangle, Vector3 } from 'rewild-common';
 import { Geometry } from '../geometry/Geometry';
 import { Intersection, Face } from '../core/Raycaster';
 import { BVHNode, BVHOptions, DEFAULT_BVH_OPTIONS } from './BVHNode';
-import { BVHBuilder } from './BVHBuilder';
 import { BVHWorkerManager } from './BVHWorkerManager';
+import { buildBVHWasm } from './BVHWasm';
+import { deserializeBVH } from './BVHSerializer';
 
 const _vA = new Vector3();
 const _vB = new Vector3();
@@ -43,19 +44,16 @@ export class BVH {
   isReady: boolean = false;
 
   /**
-   * Build a BVH synchronously. Suitable for small/medium geometries.
+   * Build a BVH synchronously with the Rust builder. Suitable for small/medium
+   * geometries. The WASM module must be loaded (see RewildWasm).
    */
   constructor(geometry: Geometry, options?: Partial<BVHOptions>) {
     this.options = { ...DEFAULT_BVH_OPTIONS, ...options };
     this.vertices = geometry.vertices;
 
-    const builder = new BVHBuilder(
-      geometry.vertices,
-      geometry.indices,
-      this.options
-    );
-    this.root = builder.build();
-    this.triIndices = builder.triIndices;
+    const built = buildBVHWasm(geometry.vertices, geometry.indices, this.options);
+    this.root = deserializeBVH(built);
+    this.triIndices = built.triIndices;
     this.isReady = true;
   }
 

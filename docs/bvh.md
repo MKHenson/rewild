@@ -141,13 +141,12 @@ Main thread                           Worker thread
 ───────────                           ─────────────
 geometry.computeBVHAsync()
   → BVHWorkerManager.buildAsync()
-    → postMessage (transfer)  ───────→  BVHBuilder.build()
-                                        serializeBVH()
+    → postMessage (transfer)  ───────→  buildBVHWasm() (Rust)
     ← postMessage (transfer)  ←───────  Float32Array + Uint32Array
   ← deserializeBVH()
   ← BVH.isReady = true
 ```
 
-The worker is a separate esbuild entry point (`bvhWorker.js`) that shares source classes with the main bundle. BVH trees are serialised as flat typed arrays for efficient `postMessage` transfer.
+The worker is a separate esbuild entry point (`bvhWorker.js`) that shares source classes with the main bundle. Both builds use the Rust builder (see [wasm.md](wasm.md)), which writes the tree as flat typed arrays for efficient `postMessage` transfer.
 
 The `BVHWorkerManager` is created automatically by the Renderer when `asyncBuildThreshold > 0`. Access it via `renderer.bvhWorkerManager`. It is disposed in `renderer.dispose()`.

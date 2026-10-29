@@ -60,9 +60,9 @@ Rust has a large WASM community and mature tools (`wasm-bindgen`, `wasm-pack`). 
 ### Testing
 
 - We do not require WASM output to match JS output bit for bit. That rule would block SIMD, fused operations and better algorithms.
-- We test the properties that matter instead. For the BVH: a valid tree, raycasts that hit at the same distance, and an SAH cost within 5% of the JS tree.
-- After a port, a brute-force reference replaces the JS version as the oracle. For the BVH, that is a raycast that tests every triangle.
-- `cargo test` covers the Rust logic. Jest specs cover the WASM boundary. They need `@jest-environment node`, because jsdom has no `TextDecoder`.
+- We test the properties that matter instead. For the BVH: a valid tree, raycasts that hit at the same distance as a brute-force raycast, and SAH splits that beat midpoint splits.
+- While a port is in progress, the JS version is the oracle. After it, a brute-force reference replaces it. For the BVH, that is a raycast that tests every triangle.
+- `cargo test` covers the Rust logic. Jest specs cover the WASM boundary.
 
 ### Benchmark pitfalls
 
@@ -141,9 +141,9 @@ The cost is a fixed limit on loaded chunks. Do not build the arena until a measu
 - The benchmark, with JS and WASM cases.
 - The BVH builder in Rust, used by the BVH worker.
 
-### Phase 1: Require WASM
+### Phase 1: Require WASM (done)
 
-- Check for WASM and SIMD at startup, next to `Renderer.hasWebGPU()`, with the same unsupported-browser message.
+- `Renderer.init` checks for WASM with SIMD before the WebGPU check, and fails the same way when it is missing.
 - Load the module on the main thread too, so small synchronous BVH builds use Rust.
 - Remove `BVHConfig.wasmWorkerBuilds` and the worker's JS fallback. Delete `BVHBuilder.ts`.
 - Tests compare the BVH against a brute-force raycast.

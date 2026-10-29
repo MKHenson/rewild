@@ -1,4 +1,11 @@
 import 'fake-indexeddb/auto';
+import { TextDecoder, TextEncoder } from 'node:util';
+
+// The wasm-bindgen glue creates a TextDecoder when it loads; jsdom has none.
+if (typeof globalThis.TextDecoder === 'undefined') {
+  globalThis.TextDecoder = TextDecoder;
+  globalThis.TextEncoder = TextEncoder;
+}
 
 // CSSStyleSheet polyfill for UI component tests (jsdom lacks constructable stylesheet support)
 if (typeof globalThis.CSSStyleSheet === 'undefined') {
