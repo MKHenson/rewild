@@ -64,6 +64,11 @@ The watch mode does not watch the Rust code. After you change Rust code, run `np
 
 The tests do not require WASM output to match JS output bit for bit. They check the properties that matter, so the Rust code is free to use SIMD or a different algorithm.
 
+## Write fast Rust for WASM
+
+- **Avoid `f32::min`, `f32::max` and `clamp` in hot loops.** WASM min and max must propagate NaN and order -0 below +0. ARM does that in one instruction. On x64, V8 emits several instructions for each call. Use a compare and select, like `fast_min` in the `bvh` crate, on values that cannot be NaN. In the BVH builder this made x64 builds about 2.9x faster.
+- **Benchmark on x64 and ARM.** A cost that one CPU hides can be large on the other.
+
 ## Reference
 
 ### Layout
