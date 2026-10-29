@@ -13,6 +13,9 @@ public/
 .claude/
 node_modules/
 build/
+# Rust build output, and the WASM module npm run build:wasm generates.
+/packages/rewild-wasm/target/
+/packages/rewild-wasm/pkg/
 # Benchmark results are machine-specific.
 bench-results/
 # Anchored: this is the root art directory (large binaries, kept out of git).
