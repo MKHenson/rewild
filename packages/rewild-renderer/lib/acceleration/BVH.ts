@@ -60,6 +60,25 @@ export class BVH {
   }
 
   /**
+   * A ready BVH over `vertices` from a tree built elsewhere, such as a
+   * deserialised worker build.
+   */
+  static fromTree(
+    vertices: Float32Array,
+    root: BVHNode,
+    triIndices: Uint32Array,
+    options?: Partial<BVHOptions>
+  ): BVH {
+    const bvh = Object.create(BVH.prototype) as BVH;
+    bvh.options = { ...DEFAULT_BVH_OPTIONS, ...options };
+    bvh.vertices = vertices;
+    bvh.root = root;
+    bvh.triIndices = triIndices;
+    bvh.isReady = true;
+    return bvh;
+  }
+
+  /**
    * Build a BVH asynchronously using a Web Worker.
    * Returns a BVH instance with `isReady = false` that will be populated
    * when the worker completes. The returned promise resolves when ready.

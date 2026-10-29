@@ -1,0 +1,4 @@
+# Let LLVM use 128-bit SIMD in the WASM build. Every browser rewild targets
+# supports it, and so does Node.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]

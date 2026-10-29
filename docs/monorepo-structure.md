@@ -9,6 +9,7 @@
 | `rewild-common`   | Shared constants, event dispatcher, enums                                 |
 | `rewild-routing`  | Game state machine and routing types                                      |
 | `rewild-audio`    | Web Audio engine: the audio context, bus graph and mixer                  |
+| `rewild-wasm`     | Rust crates compiled to one WASM module for the workers (docs/wasm.md)    |
 
 ## Build & Dev Commands
 
@@ -21,6 +22,7 @@ npm run test           # Jest (root + all workspaces)
 npm run unit-tests     # Jest (root only)
 npm run ts-check       # TypeScript type-check only
 npm run bench          # Benchmark the worker code (see packages/rewild-renderer/bench/run.mjs)
+npm run build:wasm     # Build the Rust/WASM module (see docs/wasm.md)
 npm run clean          # rimraf public/
 ```
 

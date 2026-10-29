@@ -5,6 +5,8 @@
  * options.
  */
 import { parseArgs } from 'node:util';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   buildChunkMesh,
   BuildChunkMeshRequest,
@@ -71,7 +73,7 @@ const timeChunk = (request: BuildChunkMeshRequest) => {
   return timings as Record<string, number>;
 };
 
-function main() {
+async function main() {
   const { values } = parseArgs({
     options: {
       runs: { type: 'string', default: '15' },
@@ -149,6 +151,34 @@ function main() {
     });
   }
 
+  // The WASM glue loads after every JS case has run. Loaded up front, it slows
+  // the JS BVH builder in this process by up to 70%, which makes the JS
+  // numbers unfair. The game never runs both in one worker.
+  const { loadRewildWasmSync } = await import('../lib/wasm/RewildWasm');
+  const { buildBVHWasm } = await import('../lib/acceleration/BVHWasm');
+  // The bundle runs from bench/build/, which npm run bench builds first.
+  loadRewildWasmSync(
+    readFileSync(
+      fileURLToPath(
+        new URL('../../../rewild-wasm/pkg/rewild_wasm_bg.wasm', import.meta.url)
+      )
+    )
+  );
+
+  for (const lod of BVH_LODS) {
+    const meshes = POSITIONS.map((_, i) =>
+      buildChunkMesh(chunkRequest(lod, i))
+    );
+    // One call does the build and writes the serialised layout. Its time
+    // includes copying the mesh into WASM memory and the result back out.
+    bench(`bvh over terrain lod ${lod} wasm`, (i) => {
+      const mesh = meshes[i % meshes.length];
+      const started = performance.now();
+      buildBVHWasm(mesh.vertices, mesh.indices, TERRAIN_BVH_OPTIONS);
+      return { total: performance.now() - started };
+    });
+  }
+
   const report = createReport(options, results);
   printReport(report, values.compare ? readReport(values.compare) : undefined);
   if (values.json) {
@@ -157,4 +187,4 @@ function main() {
   }
 }
 
-main();
+await main();
