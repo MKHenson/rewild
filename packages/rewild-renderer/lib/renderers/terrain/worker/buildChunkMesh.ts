@@ -104,14 +104,38 @@ export interface BuildChunkMeshResult {
   water: WaterMap | null;
 }
 
+// The stages of one build, in the order they run.
+export type ChunkMeshStage =
+  | 'heights'
+  | 'splat'
+  | 'mesh'
+  | 'scatter'
+  | 'water'
+  | 'total';
+
+// Milliseconds each stage took. A stage that did not run has no entry.
+export type ChunkMeshTimings = Partial<Record<ChunkMeshStage, number>>;
+
 // Shared by the terrain worker and tests. Everything downstream of the height
 // array (colour bands, per-LOD downsampling, normals) is identical whether the
 // heights were generated or loaded from a snapshot — the height source is the
 // only branch.
+//
+// Pass `timings` to receive the cost of each stage, for benchmarks.
 export function buildChunkMesh(
-  request: BuildChunkMeshRequest
+  request: BuildChunkMeshRequest,
+  timings?: ChunkMeshTimings
 ): BuildChunkMeshResult {
   const { chunkSize, lod, position, seed, climatePreset, seaLevel } = request;
+
+  const started = timings ? performance.now() : 0;
+  let lapStarted = started;
+  const lap = (stage: ChunkMeshStage) => {
+    if (!timings) return;
+    const now = performance.now();
+    timings[stage] = now - lapStarted;
+    lapStarted = now;
+  };
 
   // Heights in absolute world meters. Which biome shapes each sample comes from
   // the temperature × moisture climate model of the world's climate preset —
@@ -171,6 +195,7 @@ export function buildChunkMesh(
     meshHeights = apronHeights;
     meshApron = APRON;
   }
+  lap('heights');
 
   // Per-biome material weights, derived from the same climate model that shaped
   // the heights plus each biome's slope/height layer rules, with any painted
@@ -185,6 +210,7 @@ export function buildChunkMesh(
     heights,
     { biomeMask: request.biomeMask ?? null, seaLevel }
   );
+  lap('splat');
 
   // Heights are already in meters (no vertical scaling); the mesh is stretched
   // horizontally by TERRAIN_METERS_PER_SAMPLE. The noise offset (position) is
@@ -213,6 +239,7 @@ export function buildChunkMesh(
     uvs[i * 2] = meshData.interleaved[base + 3];
     uvs[i * 2 + 1] = meshData.interleaved[base + 4];
   }
+  lap('mesh');
 
   // Derived from the same heights and climate the splat was, so an instance
   // stands on the material its own rules selected for.
@@ -225,6 +252,7 @@ export function buildChunkMesh(
         waterEdit: request.waterEdit ?? null,
       })
     : [];
+  if (request.scatter) lap('scatter');
 
   // Built from the same heights, so a sculpted chunk's shore follows the edit.
   const water = buildWaterMap(
@@ -236,6 +264,8 @@ export function buildChunkMesh(
     heights,
     request.waterEdit ?? null
   );
+  lap('water');
+  if (timings) timings.total = performance.now() - started;
 
   return {
     splat,
