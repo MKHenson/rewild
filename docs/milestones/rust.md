@@ -92,13 +92,13 @@ Check it worked with `rustc --version`, `cargo --version` and `wasm-pack --versi
 
 Run these from the repo root.
 
-| Command              | What it does                                                                |
-| -------------------- | --------------------------------------------------------------------------- |
-| `npm run build:wasm` | Builds the module into `packages/rewild-wasm/pkg/`.                         |
-| `npm run test:wasm`  | Runs the Rust tests.                                                        |
-| `npm test`           | Builds the module, then runs the Rust tests and the JavaScript tests.       |
-| `npm run bench`      | Benchmarks the terrain, BVH, scatter and editing code.                      |
-| `npm run bench:game` | Benchmarks the game's main-thread systems, such as colliders and placement. |
+| Command              | What it does                                                                      |
+| -------------------- | --------------------------------------------------------------------------------- |
+| `npm run build:wasm` | Builds the module into `packages/rewild-wasm/pkg/`.                               |
+| `npm run test:wasm`  | Runs the Rust tests.                                                              |
+| `npm test`           | Builds the module, then runs the Rust tests and the JavaScript tests.             |
+| `npm run bench`      | Benchmarks the terrain, BVH, scatter, scene graph, water fields and editing code. |
+| `npm run bench:game` | Benchmarks the game's main-thread systems, such as colliders and placement.       |
 
 `npm run build` and `npm start` build the module first. A build with no changes takes under a
 second. The first build takes about 30 seconds while `wasm-pack` installs its tools.

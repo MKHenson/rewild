@@ -374,6 +374,8 @@ export class LODMesh {
         this.chunk.bindWater(uniforms);
 
         const newMesh = new Mesh(geometry, terrainPass);
+        newMesh.transform.matrixAutoUpdate = false;
+        newMesh.transform.updateMatrix();
         this.mesh = newMesh;
         this.chunk.transform.addChild(newMesh.transform);
         // This mesh arrives mid-frame from a worker; until the next render

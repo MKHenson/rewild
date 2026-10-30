@@ -135,9 +135,18 @@ export class WaterLevelField {
     return this.opticsTexture;
   }
 
-  /** The water changed: rebuild once REFRESH has passed. */
-  invalidate(): void {
-    this.dirty = true;
+  /** The water over the world box changed: rebuild once REFRESH has passed,
+   *  if the field covers it. */
+  invalidate(minX: number, minZ: number, maxX: number, maxZ: number): void {
+    const half = (WATER_LEVEL_TEXELS / 2 + 1) * WATER_LEVEL_TEXEL;
+    const covers = (x: number, z: number) =>
+      minX < x + half && maxX > x - half && minZ < z + half && maxZ > z - half;
+    if (
+      !this.built ||
+      covers(this.centreX, this.centreZ) ||
+      (this.row >= 0 && covers(this.buildX, this.buildZ))
+    )
+      this.dirty = true;
   }
 
   update(

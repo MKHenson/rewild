@@ -1,7 +1,12 @@
 import { toFloat16, fromFloat16 } from '../../utils/float16';
 import { LAKE, MAX_WATER_TYPES, OCEAN } from '../terrain/Water';
 import type { WaterMap } from '../terrain/WaterMap';
-import { fillWaterLevels } from './WaterLevelField';
+import {
+  WATER_LEVEL_TEXEL,
+  WATER_LEVEL_TEXELS,
+  WaterLevelField,
+  fillWaterLevels,
+} from './WaterLevelField';
 
 // Chunks span 4 texels, so a map is 5 texels a side and chunk (cx, cy) holds
 // world texels i in [4cx - 2, 4cx + 2], j likewise, row 0 at the highest j.
@@ -77,5 +82,41 @@ describe('fillWaterLevels', () => {
   it('leaves texels with no water map dry', () => {
     const { levels } = fill(new Map());
     expect(levels.every((v) => v === 0)).toBe(true);
+  });
+});
+
+// Node has no WebGPU: textures are created and written into nothing.
+(globalThis as Record<string, unknown>).GPUTextureUsage ??= {
+  COPY_DST: 2,
+  TEXTURE_BINDING: 4,
+};
+const device = {
+  createTexture: () => ({ destroy() {}, createView: () => ({}) }),
+  queue: { writeTexture() {} },
+} as unknown as GPUDevice;
+
+describe('WaterLevelField.invalidate', () => {
+  const update = (field: WaterLevelField, seconds: number) =>
+    field.update(device, seconds, 0, 0, CHUNK_TEXELS, () => null, []);
+
+  function built(): WaterLevelField {
+    const field = new WaterLevelField();
+    for (let i = 0; i < 100 && !field.built; i++) update(field, 0);
+    return field;
+  }
+
+  it('rebuilds for water it covers', () => {
+    const field = built();
+    field.invalidate(0, 0, 10, 10);
+    update(field, 2);
+    expect(field['row']).toBeGreaterThan(0);
+  });
+
+  it('ignores water beyond it', () => {
+    const field = built();
+    const far = WATER_LEVEL_TEXELS * WATER_LEVEL_TEXEL;
+    field.invalidate(far, far, far + 10, far + 10);
+    update(field, 2);
+    expect(field['row']).toBe(-1);
   });
 });

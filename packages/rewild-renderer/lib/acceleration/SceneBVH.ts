@@ -33,8 +33,12 @@ export class SceneBVH {
   /** Flat list of objects currently in the BVH. */
   private objects: Transform[] = [];
 
-  /** World-space AABBs for each object (parallel to `objects`). */
+  /** World-space AABBs for each object (parallel to `objects`). Kept across
+   *  rebuilds, so a rebuild allocates only for objects beyond the last count. */
   private worldBoxes: Box3[] = [];
+
+  /** Each object's index in `objects`, built when a refit first needs it. */
+  private indexOf: Map<Transform, number> | null = null;
 
   // --- Change tracking (manual control) ---
   private isDirty: boolean = true;
@@ -65,7 +69,7 @@ export class SceneBVH {
    */
   rebuild(): void {
     this.objects.length = 0;
-    this.worldBoxes.length = 0;
+    this.indexOf = null;
     this.collectObjects(this.sceneRoot);
     this.computeWorldBoxes();
 
@@ -185,6 +189,7 @@ export class SceneBVH {
     this.root = null;
     this.objects.length = 0;
     this.worldBoxes.length = 0;
+    this.indexOf = null;
     this.movedObjects.clear();
   }
 
@@ -220,7 +225,8 @@ export class SceneBVH {
   /** Compute world-space AABBs for all collected objects. */
   private computeWorldBoxes(): void {
     const { objects, worldBoxes } = this;
-    worldBoxes.length = objects.length;
+    for (let i = worldBoxes.length; i < objects.length; i++)
+      worldBoxes.push(new Box3());
 
     for (let i = 0, l = objects.length; i < l; i++) {
       const transform = objects[i];
@@ -233,10 +239,9 @@ export class SceneBVH {
       if (!local && geometry.boundingBox === null)
         geometry.computeBoundingBox();
 
-      const box = new Box3();
-      box.copy(local ?? geometry.boundingBox!);
-      box.applyMatrix4(transform.matrixWorld);
-      worldBoxes[i] = box;
+      worldBoxes[i]
+        .copy(local ?? geometry.boundingBox!)
+        .applyMatrix4(transform.matrixWorld);
     }
   }
 
@@ -260,9 +265,7 @@ export class SceneBVH {
     // Leaf conditions.
     if (count <= MAX_LEAF_OBJECTS || depth >= MAX_DEPTH) {
       node.isLeaf = true;
-      for (let i = start; i < end; i++) {
-        node.objects.push(this.objects[indices[i]]);
-      }
+      for (let i = start; i < end; i++) node.indices.push(indices[i]);
       return node;
     }
 
@@ -363,9 +366,14 @@ export class SceneBVH {
 
   /** Refit world boxes for manually-marked moved objects only, then update BVH bounds bottom-up. */
   private refitMoved(): void {
+    if (!this.indexOf) {
+      this.indexOf = new Map();
+      for (let i = 0; i < this.objects.length; i++)
+        this.indexOf.set(this.objects[i], i);
+    }
     for (const transform of this.movedObjects) {
-      const idx = this.objects.indexOf(transform);
-      if (idx === -1) continue;
+      const idx = this.indexOf.get(transform);
+      if (idx === undefined) continue;
 
       const component = transform.component as unknown as IVisualComponent;
       const geometry = component.geometry;
@@ -390,11 +398,8 @@ export class SceneBVH {
       bb.min.set(Infinity, Infinity, Infinity);
       bb.max.set(-Infinity, -Infinity, -Infinity);
 
-      for (let i = 0, l = node.objects.length; i < l; i++) {
-        const transform = node.objects[i];
-        const idx = this.objects.indexOf(transform);
-        if (idx === -1) continue;
-        const box = this.worldBoxes[idx];
+      for (let i = 0, l = node.indices.length; i < l; i++) {
+        const box = this.worldBoxes[node.indices[i]];
         bb.expandByPoint(box.min);
         bb.expandByPoint(box.max);
       }
@@ -428,15 +433,15 @@ export class SceneBVH {
     if (!frustum.intersectsBox(node.boundingBox)) return;
 
     if (node.isLeaf) {
-      for (let i = 0, l = node.objects.length; i < l; i++) {
-        const transform = node.objects[i];
+      for (let i = 0, l = node.indices.length; i < l; i++) {
+        const idx = node.indices[i];
+        const transform = this.objects[idx];
         if (!transform.visible) continue;
         // Overlay-layer objects are collected separately; skip here.
         if (transform.renderLayer === RenderLayer.Overlay) continue;
 
         // Fine-grained test against object's own world AABB.
-        const idx = this.objects.indexOf(transform);
-        if (idx !== -1 && frustum.intersectsBox(this.worldBoxes[idx])) {
+        if (frustum.intersectsBox(this.worldBoxes[idx])) {
           results.push(transform);
         }
       }
@@ -469,14 +474,14 @@ export class SceneBVH {
       return;
 
     if (node.isLeaf) {
-      for (let i = 0, l = node.objects.length; i < l; i++) {
-        const transform = node.objects[i];
+      for (let i = 0, l = node.indices.length; i < l; i++) {
+        const idx = node.indices[i];
+        const transform = this.objects[idx];
         if (!transform.visible) continue;
         if (!transform.layers.test(raycaster.layers)) continue;
 
         // Test against object's world AABB before delegating to component.
-        const idx = this.objects.indexOf(transform);
-        if (idx !== -1 && ray.intersectBox(this.worldBoxes[idx], _boxTarget)) {
+        if (ray.intersectBox(this.worldBoxes[idx], _boxTarget)) {
           // Delegate to component raycast (which may use geometry BVH).
           transform.raycast(raycaster, intersects);
         }
@@ -497,12 +502,12 @@ export class SceneBVH {
     if (!node.boundingBox.intersectsBox(box)) return;
 
     if (node.isLeaf) {
-      for (let i = 0, l = node.objects.length; i < l; i++) {
-        const transform = node.objects[i];
+      for (let i = 0, l = node.indices.length; i < l; i++) {
+        const idx = node.indices[i];
+        const transform = this.objects[idx];
         if (!transform.visible) continue;
 
-        const idx = this.objects.indexOf(transform);
-        if (idx !== -1 && this.worldBoxes[idx].intersectsBox(box)) {
+        if (this.worldBoxes[idx].intersectsBox(box)) {
           results.push(transform);
         }
       }
