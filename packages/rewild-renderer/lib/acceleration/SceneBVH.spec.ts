@@ -1,8 +1,9 @@
-import { Frustum, Matrix4 } from 'rewild-common';
+import { Box3, Frustum, Matrix4, Vector3 } from 'rewild-common';
 import { SceneBVH } from './SceneBVH';
 import { Transform } from '../core/Transform';
 import { Geometry } from '../geometry/Geometry';
 import { IS_VISUAL_COMPONENT } from '../typeGuards';
+import { Raycaster } from '../core/Raycaster';
 
 function visualTransform(name: string): Transform {
   const geometry = new Geometry();
@@ -99,5 +100,36 @@ describe('SceneBVH membership', () => {
     // Still a member — organizeVisuals is what skips it, so it comes back the
     // moment the flag flips with no rebuild needed.
     expect(bvh.frustumCull(everythingFrustum(), [])).toContain(child);
+  });
+});
+
+describe('SceneBVH raycast', () => {
+  it('reaches objects in range when the ray starts inside a box that reaches past far', () => {
+    const scene = new Transform();
+    const huge = visualTransform('huge');
+    (huge.component as unknown as { localBounds: Box3 }).localBounds = new Box3(
+      new Vector3(-1e7, -1e4, -1e7),
+      new Vector3(1e7, 1e4, 1e7)
+    );
+    const target = visualTransform('target');
+    target.position.set(0, 0, -10);
+    const hit: Transform[] = [];
+    (target.component as unknown as { raycast: () => void }).raycast = () =>
+      hit.push(target);
+    scene.addChild(huge);
+    scene.addChild(target);
+    scene.updateMatrixWorld();
+
+    const bvh = new SceneBVH(scene);
+    bvh.update();
+
+    const raycaster = new Raycaster(
+      new Vector3(0, 0, 0),
+      new Vector3(0, 0, -1),
+      0,
+      4000
+    );
+    bvh.raycast(raycaster, []);
+    expect(hit.map((t) => t.name)).toEqual(['target']);
   });
 });

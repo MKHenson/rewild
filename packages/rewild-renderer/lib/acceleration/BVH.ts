@@ -1,18 +1,15 @@
 import { Ray, Triangle, Vector3 } from 'rewild-common';
 import { Geometry } from '../geometry/Geometry';
 import { Intersection, Face } from '../core/Raycaster';
-import { BVHNode, BVHOptions, DEFAULT_BVH_OPTIONS } from './BVHNode';
+import { BVHOptions, DEFAULT_BVH_OPTIONS } from './BVHOptions';
+import { BVHTree } from './BVHTree';
 import { BVHWorkerManager } from './BVHWorkerManager';
-import { buildBVHWasm } from './BVHWasm';
-import { deserializeBVH } from './BVHSerializer';
+import { buildBVHWasm, refitBVHWasm } from './BVHWasm';
 
 const _vA = new Vector3();
 const _vB = new Vector3();
 const _vC = new Vector3();
 const _hitPoint = new Vector3();
-const _boxTarget = new Vector3();
-const _leftCenter = new Vector3();
-const _rightCenter = new Vector3();
 
 /**
  * BVH acceleration structure for per-geometry raycasting.
@@ -27,62 +24,82 @@ const _rightCenter = new Vector3();
  * ```
  */
 export class BVH {
-  root: BVHNode;
-  options: BVHOptions;
+  tree!: BVHTree;
+  options!: BVHOptions;
 
   /** Reordered triangle indices matching leaf node ranges. */
-  triIndices: Uint32Array;
+  triIndices!: Uint32Array;
 
   /** Reference to the source geometry's vertex buffer. */
-  private vertices: Float32Array;
+  private vertices!: Float32Array;
+
+  /** True when the tree is built and ready for queries. */
+  isReady!: boolean;
 
   /**
-   * True when the BVH tree is fully built and ready for queries.
-   * False during an async worker build — raycasting falls back to
-   * brute-force until this becomes true.
+   * Nodes a traversal has still to visit, and for raycastFirst the distance
+   * at which the ray enters each. A traversal keeps at most one per level.
    */
-  isReady: boolean = false;
+  private stack!: Int32Array;
+  private stackEntry!: Float64Array;
+
+  /** The closest hit so far of a raycastFirst. */
+  private closestDistance!: f32;
+  private closestTriangle!: i32;
 
   /**
    * Build a BVH synchronously with the Rust builder. Suitable for small/medium
    * geometries. The WASM module must be loaded (see RewildWasm).
    */
   constructor(geometry: Geometry, options?: Partial<BVHOptions>) {
-    this.options = { ...DEFAULT_BVH_OPTIONS, ...options };
-    this.vertices = geometry.vertices;
-
-    const built = buildBVHWasm(geometry.vertices, geometry.indices, this.options);
-    this.root = deserializeBVH(built);
-    this.triIndices = built.triIndices;
-    this.isReady = true;
+    const merged = { ...DEFAULT_BVH_OPTIONS, ...options };
+    const built = buildBVHWasm(geometry.vertices, geometry.indices, merged);
+    this.init(
+      geometry.vertices,
+      new BVHTree(built.nodes),
+      built.triIndices,
+      merged
+    );
   }
 
   /**
    * A ready BVH over `vertices` from a tree built elsewhere, such as a
-   * deserialised worker build.
+   * worker build. `options` must be the ones the tree was built with.
    */
   static fromTree(
     vertices: Float32Array,
-    root: BVHNode,
+    tree: BVHTree,
     triIndices: Uint32Array,
     options?: Partial<BVHOptions>
   ): BVH {
     const bvh = Object.create(BVH.prototype) as BVH;
-    bvh.options = { ...DEFAULT_BVH_OPTIONS, ...options };
-    bvh.vertices = vertices;
-    bvh.root = root;
-    bvh.triIndices = triIndices;
-    bvh.isReady = true;
+    bvh.init(vertices, tree, triIndices, {
+      ...DEFAULT_BVH_OPTIONS,
+      ...options,
+    });
     return bvh;
   }
 
+  private init(
+    vertices: Float32Array,
+    tree: BVHTree,
+    triIndices: Uint32Array,
+    options: BVHOptions
+  ): void {
+    this.options = options;
+    this.vertices = vertices;
+    this.tree = tree;
+    this.triIndices = triIndices;
+    this.stack = new Int32Array(options.maxDepth + 1);
+    this.stackEntry = new Float64Array(options.maxDepth + 1);
+    this.closestDistance = 0;
+    this.closestTriangle = -1;
+    this.isReady = true;
+  }
+
   /**
-   * Build a BVH asynchronously using a Web Worker.
-   * Returns a BVH instance with `isReady = false` that will be populated
-   * when the worker completes. The returned promise resolves when ready.
-   *
-   * Falls back to synchronous build if the triangle count is below
-   * `asyncThreshold`.
+   * Build a BVH using a Web Worker. Falls back to a synchronous build if the
+   * triangle count is below `asyncThreshold`.
    */
   static async buildAsync(
     geometry: Geometry,
@@ -100,25 +117,17 @@ export class BVH {
       return new BVH(geometry, options);
     }
 
-    // Create a shell BVH that will be populated when the worker finishes.
-    const bvh = Object.create(BVH.prototype) as BVH;
-    bvh.options = mergedOptions;
-    bvh.vertices = geometry.vertices;
-    bvh.root = new BVHNode(); // placeholder
-    bvh.triIndices = new Uint32Array(0); // placeholder
-    bvh.isReady = false;
-
-    const result = await workerManager.buildAsync(
+    const built = await workerManager.buildAsync(
       geometry.vertices,
       geometry.indices,
       mergedOptions
     );
-
-    bvh.root = result.root;
-    bvh.triIndices = result.triIndices;
-    bvh.isReady = true;
-
-    return bvh;
+    return BVH.fromTree(
+      geometry.vertices,
+      new BVHTree(built.nodes),
+      built.triIndices,
+      mergedOptions
+    );
   }
 
   /**
@@ -142,7 +151,31 @@ export class BVH {
     intersects: Intersection[]
   ): void {
     if (!this.isReady) return;
-    this.raycastNode(this.root, ray, side, near, far, intersects);
+    const { tree, stack } = this;
+    const { origin, direction } = ray;
+    const ox = origin.x;
+    const oy = origin.y;
+    const oz = origin.z;
+    const ix = 1 / direction.x;
+    const iy = 1 / direction.y;
+    const iz = 1 / direction.z;
+    const length = direction.length();
+
+    let top = 0;
+    let node = 0;
+    while (true) {
+      const entry = tree.rayEntry(node, ox, oy, oz, ix, iy, iz);
+      if (entry >= 0 && entry * length <= far) {
+        if (!tree.isLeaf(node)) {
+          stack[top++] = tree.rightChild(node);
+          node = tree.leftChild(node);
+          continue;
+        }
+        this.intersectLeafTriangles(node, ray, side, near, far, intersects);
+      }
+      if (top === 0) return;
+      node = stack[--top];
+    }
   }
 
   /**
@@ -155,7 +188,62 @@ export class BVH {
     far: f32
   ): Intersection | null {
     if (!this.isReady) return null;
-    return this.raycastFirstNode(this.root, ray, side, near, far);
+    const { tree, stack, stackEntry } = this;
+    const { origin, direction } = ray;
+    const ox = origin.x;
+    const oy = origin.y;
+    const oz = origin.z;
+    const ix = 1 / direction.x;
+    const iy = 1 / direction.y;
+    const iz = 1 / direction.z;
+    const length = direction.length();
+
+    this.closestDistance = far;
+    this.closestTriangle = -1;
+
+    let top = 0;
+    let node = 0;
+    let entry = tree.rayEntry(0, ox, oy, oz, ix, iy, iz) * length;
+    while (true) {
+      if (entry >= 0 && entry <= this.closestDistance) {
+        if (tree.isLeaf(node)) {
+          this.intersectLeafFirst(node, ray, side, near);
+        } else {
+          // Visit the child the ray enters first, so a near hit can prune
+          // the other.
+          const left = tree.leftChild(node);
+          const right = tree.rightChild(node);
+          const leftEntry =
+            tree.rayEntry(left, ox, oy, oz, ix, iy, iz) * length;
+          const rightEntry =
+            tree.rayEntry(right, ox, oy, oz, ix, iy, iz) * length;
+          const leftFirst =
+            leftEntry >= 0 && (rightEntry < 0 || leftEntry <= rightEntry);
+          const secondEntry = leftFirst ? rightEntry : leftEntry;
+          if (secondEntry >= 0) {
+            stack[top] = leftFirst ? right : left;
+            stackEntry[top++] = secondEntry;
+          }
+          const firstEntry = leftFirst ? leftEntry : rightEntry;
+          if (firstEntry >= 0) {
+            node = leftFirst ? left : right;
+            entry = firstEntry;
+            continue;
+          }
+        }
+      }
+      if (top === 0) break;
+      node = stack[--top];
+      entry = stackEntry[top];
+    }
+
+    const t = this.closestTriangle;
+    if (t < 0) return null;
+
+    // Re-intersect the winning triangle to get the exact hit point.
+    this.loadTriangle(t);
+    this.intersectTriangle(ray, side, _vA, _vB, _vC, _hitPoint);
+    return this.createIntersection(t, this.closestDistance, _hitPoint);
   }
 
   /**
@@ -164,7 +252,7 @@ export class BVH {
    * not topology.
    */
   refit(): void {
-    this.refitNode(this.root);
+    refitBVHWasm(this.tree.words, this.vertices, this.triIndices);
   }
 
   /**
@@ -179,195 +267,80 @@ export class BVH {
     this.refit();
   }
 
-  private raycastNode(
-    node: BVHNode,
-    ray: Ray,
-    side: GPUFrontFace | string,
-    near: f32,
-    far: f32,
-    intersects: Intersection[]
-  ): void {
-    // Test ray against node AABB.
-    if (!ray.intersectBox(node.boundingBox, _boxTarget)) return;
-
-    // Check the box hit distance is within range.
-    const boxDist = ray.origin.distanceTo(_boxTarget);
-    if (boxDist > far) return;
-
-    if (node.isLeaf) {
-      this.intersectLeafTriangles(node, ray, side, near, far, intersects);
-    } else {
-      if (node.leftChild) {
-        this.raycastNode(node.leftChild, ray, side, near, far, intersects);
-      }
-      if (node.rightChild) {
-        this.raycastNode(node.rightChild, ray, side, near, far, intersects);
-      }
-    }
-  }
-
-  private raycastFirstNode(
-    node: BVHNode,
-    ray: Ray,
-    side: GPUFrontFace | string,
-    near: f32,
-    far: f32
-  ): Intersection | null {
-    if (!ray.intersectBox(node.boundingBox, _boxTarget)) return null;
-    const boxDist = ray.origin.distanceTo(_boxTarget);
-    if (boxDist > far) return null;
-
-    if (node.isLeaf) {
-      return this.intersectLeafFirst(node, ray, side, near, far);
-    }
-
-    // Traverse closer child first for earlier termination.
-    let firstChild = node.leftChild;
-    let secondChild = node.rightChild;
-
-    if (firstChild && secondChild) {
-      firstChild.boundingBox.getCenter(_leftCenter);
-      secondChild.boundingBox.getCenter(_rightCenter);
-
-      const leftDist = ray.origin.distanceToSquared(_leftCenter);
-      const rightDist = ray.origin.distanceToSquared(_rightCenter);
-
-      if (rightDist < leftDist) {
-        firstChild = node.rightChild;
-        secondChild = node.leftChild;
-      }
-    }
-
-    let closest: Intersection | null = null;
-    let currentFar = far;
-
-    if (firstChild) {
-      closest = this.raycastFirstNode(firstChild, ray, side, near, currentFar);
-      if (closest) {
-        currentFar = closest.distance;
-      }
-    }
-
-    if (secondChild) {
-      const hit = this.raycastFirstNode(
-        secondChild,
-        ray,
-        side,
-        near,
-        currentFar
-      );
-      if (hit) {
-        closest = hit;
-      }
-    }
-
-    return closest;
-  }
-
   /** Test all triangles in a leaf node, pushing hits into intersects. */
   private intersectLeafTriangles(
-    node: BVHNode,
+    node: i32,
     ray: Ray,
     side: GPUFrontFace | string,
     near: f32,
     far: f32,
     intersects: Intersection[]
   ): void {
-    const { triIndices, vertices } = this;
-    const end = node.triangleOffset + node.triangleCount;
+    const start = this.tree.triangleOffset(node);
+    const end = start + this.tree.triangleCount(node);
 
-    for (let t = node.triangleOffset; t < end; t++) {
-      const i0 = triIndices[t * 3];
-      const i1 = triIndices[t * 3 + 1];
-      const i2 = triIndices[t * 3 + 2];
-
-      _vA.fromBuffer(i0 * 3, vertices);
-      _vB.fromBuffer(i1 * 3, vertices);
-      _vC.fromBuffer(i2 * 3, vertices);
-
+    for (let t = start; t < end; t++) {
+      this.loadTriangle(t);
       const hit = this.intersectTriangle(ray, side, _vA, _vB, _vC, _hitPoint);
       if (hit === null) continue;
 
       const distance = ray.origin.distanceTo(hit);
       if (distance < near || distance > far) continue;
 
-      const intersection = new Intersection();
-      intersection.distance = distance;
-      intersection.point = hit.clone();
-      intersection.faceIndex = t;
-
-      const face = new Face();
-      face.a = i0;
-      face.b = i1;
-      face.c = i2;
-      face.normal = new Vector3();
-      Triangle.getNormal(_vA, _vB, _vC, face.normal);
-      intersection.face = face;
-
-      intersects.push(intersection);
+      intersects.push(this.createIntersection(t, distance, hit));
     }
   }
 
-  /** Test all triangles in a leaf, return closest hit only. */
+  /** Tests all triangles in a leaf against the closest hit so far. */
   private intersectLeafFirst(
-    node: BVHNode,
+    node: i32,
     ray: Ray,
     side: GPUFrontFace | string,
-    near: f32,
-    far: f32
-  ): Intersection | null {
-    const { triIndices, vertices } = this;
-    const end = node.triangleOffset + node.triangleCount;
-    let closestDist = far;
-    let closestTriIndex = -1;
-    let closestI0 = 0;
-    let closestI1 = 0;
-    let closestI2 = 0;
+    near: f32
+  ): void {
+    const start = this.tree.triangleOffset(node);
+    const end = start + this.tree.triangleCount(node);
 
-    for (let t = node.triangleOffset; t < end; t++) {
-      const i0 = triIndices[t * 3];
-      const i1 = triIndices[t * 3 + 1];
-      const i2 = triIndices[t * 3 + 2];
-
-      _vA.fromBuffer(i0 * 3, vertices);
-      _vB.fromBuffer(i1 * 3, vertices);
-      _vC.fromBuffer(i2 * 3, vertices);
-
+    for (let t = start; t < end; t++) {
+      this.loadTriangle(t);
       const hit = this.intersectTriangle(ray, side, _vA, _vB, _vC, _hitPoint);
       if (hit === null) continue;
 
       const distance = ray.origin.distanceTo(hit);
-      if (distance < near || distance > closestDist) continue;
+      if (distance < near || distance > this.closestDistance) continue;
 
-      closestDist = distance;
-      closestTriIndex = t;
-      closestI0 = i0;
-      closestI1 = i1;
-      closestI2 = i2;
+      this.closestDistance = distance;
+      this.closestTriangle = t;
     }
+  }
 
-    if (closestTriIndex === -1) return null;
+  /** Loads triangle `t`'s corners into _vA, _vB and _vC. */
+  private loadTriangle(t: i32): void {
+    const { triIndices, vertices } = this;
+    _vA.fromBuffer(triIndices[t * 3] * 3, vertices);
+    _vB.fromBuffer(triIndices[t * 3 + 1] * 3, vertices);
+    _vC.fromBuffer(triIndices[t * 3 + 2] * 3, vertices);
+  }
 
-    // Re-intersect the winning triangle to get the exact hit point.
-    _vA.fromBuffer(closestI0 * 3, vertices);
-    _vB.fromBuffer(closestI1 * 3, vertices);
-    _vC.fromBuffer(closestI2 * 3, vertices);
-    this.intersectTriangle(ray, side, _vA, _vB, _vC, _hitPoint);
-
-    const closest = new Intersection();
-    closest.distance = closestDist;
-    closest.point = _hitPoint.clone();
-    closest.faceIndex = closestTriIndex;
+  /** A hit on triangle `t`, whose corners are loaded. */
+  private createIntersection(
+    t: i32,
+    distance: f32,
+    point: Vector3
+  ): Intersection {
+    const intersection = new Intersection();
+    intersection.distance = distance;
+    intersection.point = point.clone();
+    intersection.faceIndex = t;
 
     const face = new Face();
-    face.a = closestI0;
-    face.b = closestI1;
-    face.c = closestI2;
+    face.a = this.triIndices[t * 3];
+    face.b = this.triIndices[t * 3 + 1];
+    face.c = this.triIndices[t * 3 + 2];
     face.normal = new Vector3();
     Triangle.getNormal(_vA, _vB, _vC, face.normal);
-    closest.face = face;
-
-    return closest;
+    intersection.face = face;
+    return intersection;
   }
 
   /**
@@ -386,54 +359,5 @@ export class BVH {
       return ray.intersectTriangle(c, b, a, true, target);
     }
     return ray.intersectTriangle(a, b, c, side === 'ccw', target);
-  }
-
-  /** Refit bounding boxes bottom-up after vertex modifications. */
-  private refitNode(node: BVHNode): void {
-    if (node.isLeaf) {
-      this.computeLeafBounds(node);
-      return;
-    }
-
-    if (node.leftChild) this.refitNode(node.leftChild);
-    if (node.rightChild) this.refitNode(node.rightChild);
-
-    // Merge child bounds.
-    const bb = node.boundingBox;
-    bb.min.set(Infinity, Infinity, Infinity);
-    bb.max.set(-Infinity, -Infinity, -Infinity);
-
-    if (node.leftChild) {
-      bb.expandByPoint(node.leftChild.boundingBox.min);
-      bb.expandByPoint(node.leftChild.boundingBox.max);
-    }
-    if (node.rightChild) {
-      bb.expandByPoint(node.rightChild.boundingBox.min);
-      bb.expandByPoint(node.rightChild.boundingBox.max);
-    }
-  }
-
-  /** Recompute leaf AABB from its triangles. */
-  private computeLeafBounds(node: BVHNode): void {
-    const { triIndices, vertices } = this;
-    const bb = node.boundingBox;
-    bb.min.set(Infinity, Infinity, Infinity);
-    bb.max.set(-Infinity, -Infinity, -Infinity);
-
-    const end = node.triangleOffset + node.triangleCount;
-    for (let t = node.triangleOffset; t < end; t++) {
-      for (let v = 0; v < 3; v++) {
-        const vi = triIndices[t * 3 + v] * 3;
-        const x = vertices[vi];
-        const y = vertices[vi + 1];
-        const z = vertices[vi + 2];
-        if (x < bb.min.x) bb.min.x = x;
-        if (y < bb.min.y) bb.min.y = y;
-        if (z < bb.min.z) bb.min.z = z;
-        if (x > bb.max.x) bb.max.x = x;
-        if (y > bb.max.y) bb.max.y = y;
-        if (z > bb.max.z) bb.max.z = z;
-      }
-    }
   }
 }

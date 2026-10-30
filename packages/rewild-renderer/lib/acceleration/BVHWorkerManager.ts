@@ -1,8 +1,8 @@
-import { BVHNode, BVHOptions } from './BVHNode';
-import { deserializeBVH, SerializedBVH } from './BVHSerializer';
+import { BVHOptions } from './BVHOptions';
+import { BuiltBVH } from './BVHWasm';
 
 interface PendingBuild {
-  resolve: (result: { root: BVHNode; triIndices: Uint32Array }) => void;
+  resolve: (result: BuiltBVH) => void;
   reject: (error: Error) => void;
 }
 
@@ -12,7 +12,7 @@ interface PendingBuild {
  * Usage:
  * ```
  * const manager = new BVHWorkerManager();
- * const { root, triIndices } = await manager.buildAsync(vertices, indices, options);
+ * const { nodes, triIndices } = await manager.buildAsync(vertices, indices, options);
  * manager.dispose();
  * ```
  */
@@ -37,13 +37,13 @@ export class BVHWorkerManager {
    * Vertex and index data are copied (not transferred) so the caller
    * retains ownership of the original buffers.
    *
-   * @returns The root BVHNode tree and reordered triIndices.
+   * @returns The tree's nodes and reordered triIndices.
    */
   buildAsync(
     vertices: Float32Array,
     indices: Uint32Array | undefined,
     options: Partial<BVHOptions>
-  ): Promise<{ root: BVHNode; triIndices: Uint32Array }> {
+  ): Promise<BuiltBVH> {
     const worker = this.ensureWorker();
     const id = this.nextId++;
 
@@ -74,7 +74,7 @@ export class BVHWorkerManager {
     event: MessageEvent<{
       type: string;
       id: i32;
-      data: SerializedBVH;
+      data: BuiltBVH;
     }>
   ): void {
     const { type, id, data } = event.data;
@@ -84,8 +84,7 @@ export class BVHWorkerManager {
     if (!entry) return;
 
     this.pending.delete(id);
-    const root = deserializeBVH(data);
-    entry.resolve({ root, triIndices: data.triIndices });
+    entry.resolve(data);
   }
 
   private handleError(event: ErrorEvent): void {

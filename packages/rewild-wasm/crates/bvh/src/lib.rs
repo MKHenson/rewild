@@ -1,19 +1,64 @@
 //! Bounding volume hierarchy over a triangle mesh.
 //!
-//! The output is the flat node layout of `BVHSerializer.ts`, so the main thread
-//! reads it with `deserializeBVH`. The builder writes that layout directly,
-//! with no tree of node objects between.
+//! The output is a flat array of `Node`s, which `BVHTree.ts` reads in place.
 
 use math::{fast_max, fast_min};
 
-/// Floats per node in the flat layout. Mirrors `FLOATS_PER_NODE` in
-/// `BVHSerializer.ts`:
+/// `Node::count` of an internal node.
+pub const INTERNAL: u32 = u32::MAX;
+
+/// 32-bit words in a `Node`. Mirrors `NODE_WORDS` in `BVHTree.ts`.
+pub const NODE_WORDS: usize = 8;
+
+/// One node of the tree. Mirrors the layout of `BVHTree.ts`.
 ///
-/// `[is_leaf, min.x, min.y, min.z, max.x, max.y, max.z, tri_offset, tri_count,
-///   left, right]`
-///
-/// `left` and `right` are node indices, -1 on a leaf.
-pub const FLOATS_PER_NODE: usize = 11;
+/// Nodes are stored in pre-order, so a parent comes before its children and an
+/// internal node's left child is the next node.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Node {
+    pub min: [f32; 3],
+    pub max: [f32; 3],
+    /// A leaf's first triangle, or an internal node's right child.
+    pub first: u32,
+    /// A leaf's triangle count, or `INTERNAL`.
+    pub count: u32,
+}
+
+impl Node {
+    fn leaf(aabb: &Aabb, first: usize, count: usize) -> Node {
+        Node {
+            min: aabb.min,
+            max: aabb.max,
+            first: first as u32,
+            count: count as u32,
+        }
+    }
+
+    fn internal(aabb: &Aabb, right: usize) -> Node {
+        Node {
+            min: aabb.min,
+            max: aabb.max,
+            first: right as u32,
+            count: INTERNAL,
+        }
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.count != INTERNAL
+    }
+
+    /// The nodes stored in `words`, `NODE_WORDS` words each.
+    pub fn from_words_mut(words: &mut [u32]) -> &mut [Node] {
+        assert_eq!(words.len() % NODE_WORDS, 0, "not a whole number of nodes");
+        // SAFETY: `Node` is `repr(C)` with only 4-byte `f32` and `u32` fields,
+        // so it has no padding, the alignment of `u32`, and every bit pattern
+        // is a valid `Node`.
+        let (head, nodes, tail) = unsafe { words.align_to_mut::<Node>() };
+        assert!(head.is_empty() && tail.is_empty());
+        nodes
+    }
+}
 
 /// Buckets for each axis when the SAH split is evaluated.
 const SAH_BUCKETS: usize = 12;
@@ -50,12 +95,10 @@ impl Default for Options {
     }
 }
 
-/// A built BVH, in the layout `deserializeBVH` reads.
+/// A built BVH.
 pub struct Bvh {
-    /// `node_count * FLOATS_PER_NODE` floats. The root is node 0, and a parent
-    /// always comes before its children.
-    pub nodes: Vec<f32>,
-    pub node_count: u32,
+    /// The root is node 0.
+    pub nodes: Vec<Node>,
     /// The mesh's triangles, reordered so each leaf covers the contiguous
     /// triangles `[tri_offset, tri_offset + tri_count)`. Three vertex indices
     /// for each triangle.
@@ -117,9 +160,66 @@ pub fn build(vertices: &[f32], indices: Option<&[u32]>, options: Options) -> Bvh
     }
 
     Bvh {
-        node_count: (builder.nodes.len() / FLOATS_PER_NODE) as u32,
         nodes: builder.nodes,
         tri_indices: reordered,
+    }
+}
+
+impl Bvh {
+    /// The nodes as `NODE_WORDS` words each, the layout `BVHTree.ts` reads.
+    pub fn node_words(&self) -> Vec<u32> {
+        let mut words = Vec::with_capacity(self.nodes.len() * NODE_WORDS);
+        for node in &self.nodes {
+            words.extend_from_slice(&[
+                node.min[0].to_bits(),
+                node.min[1].to_bits(),
+                node.min[2].to_bits(),
+                node.max[0].to_bits(),
+                node.max[1].to_bits(),
+                node.max[2].to_bits(),
+                node.first,
+                node.count,
+            ]);
+        }
+        words
+    }
+}
+
+/// Recomputes every node's bounds from `vertices` after they move, keeping
+/// the tree's shape. `tri_indices` are the tree's reordered triangles.
+pub fn refit(nodes: &mut [Node], vertices: &[f32], tri_indices: &[u32]) {
+    // Children come after their parent, so a reverse walk sees them first.
+    for i in (0..nodes.len()).rev() {
+        let node = nodes[i];
+        let mut aabb = Aabb::EMPTY;
+        if node.is_leaf() {
+            // One box for each corner, so the three min/max chains run in
+            // parallel instead of each waiting on the last.
+            let mut corners = [Aabb::EMPTY; 3];
+            let first = node.first as usize * 3;
+            for tri in tri_indices[first..first + node.count as usize * 3].chunks_exact(3) {
+                for (corner, &v) in corners.iter_mut().zip(tri) {
+                    let v = v as usize * 3;
+                    let p = &vertices[v..v + 3];
+                    for k in 0..3 {
+                        corner.min[k] = fast_min(corner.min[k], p[k]);
+                        corner.max[k] = fast_max(corner.max[k], p[k]);
+                    }
+                }
+            }
+            for corner in &corners {
+                aabb.grow(corner);
+            }
+        } else {
+            for child in [&nodes[i + 1], &nodes[node.first as usize]] {
+                aabb.grow(&Aabb {
+                    min: child.min,
+                    max: child.max,
+                });
+            }
+        }
+        nodes[i].min = aabb.min;
+        nodes[i].max = aabb.max;
     }
 }
 
@@ -131,7 +231,7 @@ struct Builder {
     /// `order[i]` is the triangle at position `i`. Splits partition ranges of
     /// it, so each node covers a contiguous range.
     order: Vec<u32>,
-    nodes: Vec<f32>,
+    nodes: Vec<Node>,
     /// Reused by every SAH partition.
     partition: Vec<(f32, u32)>,
 }
@@ -165,7 +265,7 @@ impl Builder {
             order: (0..tri_count as u32).collect(),
             // A binary tree over n leaves has under 2n nodes, and SAH leaves
             // hold a few triangles each, so this rarely grows.
-            nodes: Vec::with_capacity(tri_count / 2 * FLOATS_PER_NODE),
+            nodes: Vec::with_capacity(tri_count / 2),
             partition: Vec::new(),
         }
     }
@@ -175,8 +275,8 @@ impl Builder {
     fn build_node(&mut self, start: usize, end: usize, depth: u32) -> usize {
         // Nodes are written in pre-order, so a parent always precedes its
         // children. The slot is filled in once the children are known.
-        let index = self.nodes.len() / FLOATS_PER_NODE;
-        self.nodes.extend_from_slice(&[0.0; FLOATS_PER_NODE]);
+        let index = self.nodes.len();
+        self.nodes.push(Node::leaf(&Aabb::EMPTY, 0, 0));
 
         let mut aabb = Aabb::EMPTY;
         for &t in &self.order[start..end] {
@@ -185,7 +285,7 @@ impl Builder {
 
         let count = end - start;
         if count <= self.options.max_leaf_triangles as usize || depth >= self.options.max_depth {
-            self.write_leaf(index, &aabb, start, count);
+            self.nodes[index] = Node::leaf(&aabb, start, count);
             return index;
         }
 
@@ -195,45 +295,14 @@ impl Builder {
         };
         // No split separates the triangles.
         if split <= start || split >= end {
-            self.write_leaf(index, &aabb, start, count);
+            self.nodes[index] = Node::leaf(&aabb, start, count);
             return index;
         }
 
-        let left = self.build_node(start, split, depth + 1);
+        self.build_node(start, split, depth + 1);
         let right = self.build_node(split, end, depth + 1);
-        self.write_node(index, &aabb, false, 0, 0, left as f32, right as f32);
+        self.nodes[index] = Node::internal(&aabb, right);
         index
-    }
-
-    fn write_leaf(&mut self, index: usize, aabb: &Aabb, start: usize, count: usize) {
-        self.write_node(index, aabb, true, start, count, -1.0, -1.0);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn write_node(
-        &mut self,
-        index: usize,
-        aabb: &Aabb,
-        leaf: bool,
-        tri_offset: usize,
-        tri_count: usize,
-        left: f32,
-        right: f32,
-    ) {
-        let o = index * FLOATS_PER_NODE;
-        self.nodes[o..o + FLOATS_PER_NODE].copy_from_slice(&[
-            if leaf { 1.0 } else { 0.0 },
-            aabb.min[0],
-            aabb.min[1],
-            aabb.min[2],
-            aabb.max[0],
-            aabb.max[1],
-            aabb.max[2],
-            tri_offset as f32,
-            tri_count as f32,
-            left,
-            right,
-        ]);
     }
 
     /// Picks the cheapest bucket boundary on any axis by the surface area
@@ -406,12 +475,8 @@ mod tests {
         vertices
     }
 
-    fn node(bvh: &Bvh, i: usize) -> &[f32] {
-        &bvh.nodes[i * FLOATS_PER_NODE..(i + 1) * FLOATS_PER_NODE]
-    }
-
-    fn contains(outer: &[f32], inner: &[f32; 6]) -> bool {
-        (0..3).all(|k| outer[1 + k] <= inner[k] && inner[3 + k] <= outer[4 + k])
+    fn contains(outer: &Node, inner: &[f32; 6]) -> bool {
+        (0..3).all(|k| outer.min[k] <= inner[k] && inner[3 + k] <= outer.max[k])
     }
 
     fn tri_bounds(vertices: &[f32], tri: &[u32]) -> [f32; 6] {
@@ -438,7 +503,6 @@ mod tests {
     /// and the leaf and depth limits hold.
     fn assert_valid(bvh: &Bvh, vertices: &[f32], original: &[u32], options: Options) {
         let tri_count = original.len() / 3;
-        assert_eq!(bvh.nodes.len(), bvh.node_count as usize * FLOATS_PER_NODE);
 
         // Same triangles, reordered.
         let sorted = |tris: &[u32]| {
@@ -449,27 +513,34 @@ mod tests {
         assert_eq!(sorted(&bvh.tri_indices), sorted(original));
 
         let mut covered = vec![0u32; tri_count];
-        let mut visited = vec![false; bvh.node_count as usize];
+        let mut visited = vec![false; bvh.nodes.len()];
         let mut stack = vec![(0usize, 0u32)];
         while let Some((i, depth)) = stack.pop() {
             assert!(!visited[i], "node {i} is reached twice");
             visited[i] = true;
             assert!(depth <= options.max_depth);
-            let n = node(bvh, i);
+            let n = &bvh.nodes[i];
 
-            if n[0] == 1.0 {
-                let (offset, count) = (n[7] as usize, n[8] as usize);
-                for t in offset..offset + count {
+            if n.is_leaf() {
+                let (first, count) = (n.first as usize, n.count as usize);
+                for t in first..first + count {
                     covered[t] += 1;
                     let b = tri_bounds(vertices, &bvh.tri_indices[t * 3..t * 3 + 3]);
                     assert!(contains(n, &b), "leaf {i} does not contain triangle {t}");
                 }
-                assert_eq!((n[9], n[10]), (-1.0, -1.0));
             } else {
-                for child in [n[9] as usize, n[10] as usize] {
-                    assert!(child > i, "child {child} comes before parent {i}");
-                    let c = node(bvh, child);
-                    assert!(contains(n, &[c[1], c[2], c[3], c[4], c[5], c[6]]));
+                let right = n.first as usize;
+                assert!(
+                    right > i + 1,
+                    "right child {right} of {i} is not after its left"
+                );
+                for child in [i + 1, right] {
+                    let c = &bvh.nodes[child];
+                    let (min, max) = (c.min, c.max);
+                    assert!(contains(
+                        n,
+                        &[min[0], min[1], min[2], max[0], max[1], max[2]]
+                    ));
                     stack.push((child, depth + 1));
                 }
             }
@@ -491,7 +562,7 @@ mod tests {
             };
             let bvh = build(&vertices, Some(&indices), options);
             assert_valid(&bvh, &vertices, &indices, options);
-            assert!(bvh.node_count > 1);
+            assert!(bvh.nodes.len() > 1);
         }
     }
 
@@ -517,11 +588,8 @@ mod tests {
             ..Options::default()
         };
         let bvh = build(&vertices, Some(&indices), options);
-        for i in 0..bvh.node_count as usize {
-            let n = node(&bvh, i);
-            if n[0] == 1.0 {
-                assert!(n[8] as u32 <= options.max_leaf_triangles);
-            }
+        for n in bvh.nodes.iter().filter(|n| n.is_leaf()) {
+            assert!(n.count <= options.max_leaf_triangles);
         }
     }
 
@@ -534,7 +602,7 @@ mod tests {
         };
         let bvh = build(&vertices, Some(&indices), options);
         assert_valid(&bvh, &vertices, &indices, options);
-        assert!(bvh.node_count <= 15);
+        assert!(bvh.nodes.len() <= 15);
     }
 
     #[test]
@@ -542,15 +610,60 @@ mod tests {
         // Every triangle is the same point, so no split separates any.
         let vertices = vec![1.0f32; 9 * 20];
         let bvh = build(&vertices, None, Options::default());
-        assert_eq!(bvh.node_count, 1);
-        assert_eq!(node(&bvh, 0)[8], 20.0);
+        assert_eq!(bvh.nodes.len(), 1);
+        assert_eq!(bvh.nodes[0].count, 20);
     }
 
     #[test]
     fn handles_an_empty_mesh() {
         let bvh = build(&[], None, Options::default());
-        assert_eq!(bvh.node_count, 1);
+        assert_eq!(bvh.nodes.len(), 1);
         assert!(bvh.tri_indices.is_empty());
-        assert_eq!(node(&bvh, 0)[0], 1.0);
+        assert!(bvh.nodes[0].is_leaf());
+    }
+
+    #[test]
+    fn refit_matches_a_fresh_build_of_the_same_shape() {
+        let (mut vertices, indices) = grid(30);
+        let options = Options::default();
+        let mut bvh = build(&vertices, Some(&indices), options);
+        for v in vertices.chunks_exact_mut(3) {
+            v[0] += v[1] * 0.5;
+            v[1] = v[1] * 3.0 - 7.0;
+        }
+        refit(&mut bvh.nodes, &vertices, &bvh.tri_indices);
+        assert_valid(&bvh, &vertices, &indices, options);
+
+        // The root bounds every vertex.
+        let mut all = Aabb::EMPTY;
+        for v in vertices.chunks_exact(3) {
+            all.grow(&Aabb {
+                min: [v[0], v[1], v[2]],
+                max: [v[0], v[1], v[2]],
+            });
+        }
+        assert_eq!((bvh.nodes[0].min, bvh.nodes[0].max), (all.min, all.max));
+    }
+
+    #[test]
+    fn reads_nodes_in_place_from_words() {
+        let (vertices, indices) = grid(8);
+        let bvh = build(&vertices, Some(&indices), Options::default());
+        let mut words = bvh.node_words();
+        assert_eq!(Node::from_words_mut(&mut words), &bvh.nodes[..]);
+    }
+
+    #[test]
+    fn writes_each_node_as_its_words() {
+        let (vertices, indices) = grid(8);
+        let bvh = build(&vertices, Some(&indices), Options::default());
+        let words = bvh.node_words();
+        assert_eq!(std::mem::size_of::<Node>(), NODE_WORDS * 4);
+        assert_eq!(words.len(), bvh.nodes.len() * NODE_WORDS);
+        for (n, w) in bvh.nodes.iter().zip(words.chunks_exact(NODE_WORDS)) {
+            assert_eq!(f32::from_bits(w[0]), n.min[0]);
+            assert_eq!(f32::from_bits(w[5]), n.max[2]);
+            assert_eq!((w[6], w[7]), (n.first, n.count));
+        }
     }
 }

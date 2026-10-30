@@ -216,11 +216,23 @@ The `terrain` crate generates through one `TerrainGenerator` object per world, c
 - `biomesAt` resolves one point, painted biomes included, the way a chunk does.
 - A near far map rebuild fell from 51 ms to 18 ms, and a wide one from 16 ms to 5 ms. At the 1 ms frame budget a near rebuild now takes about 18 frames.
 
-### Phase 3: The BVH system
+### Phase 3: The BVH system (done)
 
-1. Add benchmark cases for raycast (first hit and all hits), refit, and the main-thread deserialize.
-2. Replace the `BVHNode` object tree with a flat tree behind a `BVHTree` accessor class. This removes the deserialize step and most of the BVH memory. Today terrain gets a BVH only at LOD 0 and 1, because object trees reached about 2.7 million nodes.
-3. Move raycast and refit to Rust where the benchmark shows a gain.
+The BVH is a flat array of nodes, which the builder writes and `BVHTree` reads in place. Medians on a Ryzen 9 9950X3D, for one terrain chunk:
+
+| Case                            | Object tree | Flat tree | Speedup |
+| ------------------------------- | ----------- | --------- | ------- |
+| Deserialize, LOD 0              | 1.10 ms     | none      |         |
+| 1000 raycasts, all hits, LOD 0  | 2.82 ms     | 1.88 ms   | 1.5x    |
+| 1000 raycasts, first hit, LOD 0 | 3.84 ms     | 1.55 ms   | 2.5x    |
+| Refit, LOD 0                    | 2.15 ms     | 0.84 ms   | 2.6x    |
+| Refit, LOD 1                    | 0.49 ms     | 0.21 ms   | 2.3x    |
+
+- A node is a `#[repr(C)]` `bvh::Node` of 32 bytes: bounds, then a leaf's first triangle or an internal node's right child, then a leaf's triangle count or `INTERNAL`. Nodes are in pre-order, so the left child is the next node.
+- The worker transfers the node words, and the main thread wraps them. There is no deserialize step and no node objects.
+- Raycasts stay in TypeScript. One raycast costs about 1.5 µs, and copying a LOD 0 mesh into WASM memory for one call would cost more than that.
+- Refit is in Rust (`bvh::refit`). It walks the nodes in reverse, so children come before their parent. The flat TypeScript refit took 1.22 ms at LOD 0, and Rust takes 0.84 ms, of which the copies are 0.07 ms. The same loop takes 0.57 ms natively, so it is bound by the vertex reads, not the language. Three corner boxes per leaf run the min/max chains in parallel (0.97 ms to 0.88 ms).
+- Terrain still gets a BVH only at LOD 0 and 1 (`TERRAIN_BVH_MAX_LOD`). The flat tree makes more LODs affordable, if a measurement calls for them.
 
 ### Phase 4: Editing on the main thread
 

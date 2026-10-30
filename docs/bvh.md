@@ -80,7 +80,7 @@ geometry.bvh?.refit();
 geometry.bvhNeedsUpdate = false;
 ```
 
-Refit updates bounding boxes bottom-up without restructuring the tree. Much faster than a full rebuild.
+Refit updates bounding boxes bottom-up without restructuring the tree, in Rust (`refitBVHWasm`). Much faster than a full rebuild.
 
 ## Scene-Level BVH
 
@@ -143,10 +143,16 @@ geometry.computeBVHAsync()
   → BVHWorkerManager.buildAsync()
     → postMessage (transfer)  ───────→  buildBVHWasm() (Rust)
     ← postMessage (transfer)  ←───────  Float32Array + Uint32Array
-  ← deserializeBVH()
+  ← new BVHTree(nodes)
   ← BVH.isReady = true
 ```
 
 The worker is a separate esbuild entry point (`bvhWorker.js`) that shares source classes with the main bundle. Both builds use the Rust builder (see [wasm.md](wasm.md)), which writes the tree as flat typed arrays for efficient `postMessage` transfer.
+
+## Tree Layout
+
+`BVH.tree` is a `BVHTree`: the builder's nodes, read in place through named accessors (`isLeaf`, `triangleOffset`, `rightChild`, `minX`, ...). Each node is 8 words (32 bytes), in pre-order, so a parent comes before its children and an internal node's left child is the next node. The Rust `bvh::Node` struct defines the same layout.
+
+Raycasts walk the tree with a preallocated stack and no recursion. `raycastFirst` visits the child the ray enters first, so a near hit prunes the other.
 
 The `BVHWorkerManager` is created automatically by the Renderer when `asyncBuildThreshold > 0`. Access it via `renderer.bvhWorkerManager`. It is disposed in `renderer.dispose()`.
