@@ -55,6 +55,8 @@ fn climate(erosion: bool) -> ClimateConfig {
             coastal_moisture_reach: Some(0.1),
         }),
         coast: None,
+        water: Vec::new(),
+        lakes: None,
         biomes: vec![plain, mountain],
         cells: vec![vec![0], vec![1]],
     }
@@ -380,6 +382,523 @@ mod splat {
             let mut out = [-1.0; 4];
             layer_weights(&[layer("only", None, None, None)], 0.0, 0.0, |_| 0.0, &mut out);
             assert_eq!(out, [1.0, -1.0, -1.0, -1.0]);
+        }
+    }
+}
+
+mod lakes {
+    use super::*;
+    use crate::{Lake, Lakes};
+
+    pub fn lake_config() -> LakeConfig {
+        LakeConfig {
+            cell_size: 400.0,
+            seed_salt: 70001.0,
+            chance: 1.0,
+            radius: Band { from: 15.0, to: 30.0 },
+            irregularity: 0.25,
+            bank: 1.8,
+            depth: Band { from: 3.0, to: 8.0 },
+            margin: 1.0,
+            max_rim_slope: 8.0,
+            max_lagoon_slope: 25.0,
+            lagoon_chance: 0.8,
+            lagoon_radius: Band { from: 30.0, to: 50.0 },
+            moraine: 1.0,
+            spacing: 10.0,
+            tarns: Some(TarnConfig { radius: Band { from: 6.0, to: 12.0 }, max_rim_slope: 50.0, lip_share: 0.2 }),
+        }
+    }
+
+    /// Gentle plains for lakes, steep mountains for tarns, and a coast for
+    /// lagoons, at scales a few lake cells cross.
+    pub fn lake_climate() -> ClimateConfig {
+        let plain = biome("plain", vec![Deformation::Fbm(stack(12.0, 400.0, 0.0))], None);
+        let mountain =
+            biome("mountain", vec![Deformation::Ridged(Ridged { stack: stack(160.0, 160.0, 7.0), sharpness: 2.0 })], None);
+        let mut c = climate(false);
+        c.temperature = ClimateAxis { scale: 900.0, seed_salt: 11.0, cuts: vec![0.6], blend_half_width: 0.05 };
+        if let Some(continent) = c.continent.as_mut() {
+            continent.scale = 2400.0;
+            continent.coast = 0.4;
+        }
+        c.biomes = vec![plain, mountain];
+        c.water = vec![WaterType { name: "ocean".into() }, WaterType { name: "lake".into() }];
+        c.lakes = Some(lake_config());
+        c
+    }
+
+    pub fn ground(c: ClimateConfig) -> HeightGenerator {
+        HeightGenerator::new(c, 9001.0, 0.0, 2.0).unwrap()
+    }
+
+    pub const AREA: f64 = 400.0 * 6.0;
+
+    fn lakes_in(g: &HeightGenerator) -> Vec<Lake> {
+        Lakes::of(g).map_or_else(Vec::new, |l| l.find(-AREA, -AREA, AREA, AREA))
+    }
+
+    fn with_lakes(edit: impl FnOnce(&mut LakeConfig)) -> HeightGenerator {
+        let mut c = lake_climate();
+        edit(c.lakes.as_mut().unwrap());
+        ground(c)
+    }
+
+    fn rim_ground(g: &HeightGenerator, lake: &Lake, angle: f64, d: f64) -> (f64, f64, f64) {
+        let (u, v) = along(lake, angle, d);
+        (u, v, g.sample(u, v).height)
+    }
+
+    /// The point `d` shore radii from the centre toward `angle`.
+    pub fn along(lake: &Lake, angle: f64, d: f64) -> (f64, f64) {
+        let unit = lake.distance(lake.u + angle.cos(), lake.v + angle.sin());
+        (lake.u + angle.cos() * d / unit, lake.v + angle.sin() * d / unit)
+    }
+
+    fn angles(n: usize) -> impl Iterator<Item = f64> {
+        (0..n).map(move |k| k as f64 / n as f64 * std::f64::consts::TAU)
+    }
+
+    #[test]
+    fn finds_the_same_lakes_from_any_box_they_reach() {
+        let g = ground(lake_climate());
+        let lakes = lakes_in(&g);
+        assert!(lakes.len() > 10);
+        // Debug, as a lake's mouth is NaN.
+        assert_eq!(format!("{:?}", lakes_in(&g)), format!("{lakes:?}"));
+        let finder = Lakes::of(&g).unwrap();
+        for lake in lakes.iter().take(5) {
+            let found = finder.find(lake.u, lake.v, lake.u + 1.0, lake.v + 1.0);
+            assert_eq!(found.iter().map(|l| l.body_id).collect::<Vec<_>>(), vec![lake.body_id]);
+        }
+    }
+
+    #[test]
+    fn keeps_neighbouring_lakes_a_shore_apart() {
+        let lakes = lakes_in(&ground(lake_climate()));
+        for (i, a) in lakes.iter().enumerate() {
+            for b in &lakes[i + 1..] {
+                let gap = (a.u - b.u).hypot(a.v - b.v) - a.reach - b.reach;
+                assert!(gap >= lake_config().spacing, "{gap}");
+            }
+        }
+    }
+
+    #[test]
+    fn levels_each_lake_below_every_rim_sample() {
+        let g = ground(lake_climate());
+        for lake in lakes_in(&g).iter().filter(|l| !l.tarn && !l.lagoon) {
+            for angle in angles(24) {
+                let (_, _, h) = rim_ground(&g, lake, angle, lake.bank);
+                assert!(h >= lake.level + lake_config().margin - 1e-6);
+            }
+        }
+    }
+
+    #[test]
+    fn holds_every_lake_in_behind_its_bank() {
+        let g = ground(lake_climate());
+        for lake in lakes_in(&g).iter().filter(|l| !l.lagoon) {
+            for angle in angles(48) {
+                for d in [1.2, 1.5, lake.bank] {
+                    let (u, v, h) = rim_ground(&g, lake, angle, d);
+                    assert!(lake.carve(u, v, h) >= lake.level - 1e-3);
+                }
+                let (u, v, h) = rim_ground(&g, lake, angle, lake.bank);
+                assert!(lake.carve(u, v, h) >= lake.lip - 1e-3);
+            }
+        }
+    }
+
+    #[test]
+    fn settles_tarns_part_way_up_a_steep_rim() {
+        let g = ground(lake_climate());
+        let lakes = lakes_in(&g);
+        let tarns: Vec<_> = lakes.iter().filter(|l| l.tarn).collect();
+        assert!(!tarns.is_empty());
+        for tarn in tarns {
+            let lowest = angles(24).map(|a| rim_ground(&g, tarn, a, tarn.bank).2).fold(f64::INFINITY, f64::min);
+            assert!(tarn.level >= lowest - 1e-6);
+            assert!(tarn.radius < lake_config().radius.from);
+        }
+    }
+
+    #[test]
+    fn gives_every_lake_its_own_body() {
+        let lakes = lakes_in(&ground(lake_climate()));
+        let mut ids: Vec<_> = lakes.iter().map(|l| l.body_id).collect();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), lakes.len());
+        assert!(!ids.contains(&crate::lakes::OCEAN_BODY_ID));
+    }
+
+    #[test]
+    fn makes_no_lakes_under_the_ocean_or_without_a_lake_config() {
+        let mut ocean = lake_climate();
+        ocean.continent.as_mut().unwrap().coast = 2.0;
+        assert!(lakes_in(&ground(ocean)).is_empty());
+        let mut none = lake_climate();
+        none.lakes = None;
+        assert!(Lakes::of(&ground(none)).is_none());
+    }
+
+    #[test]
+    fn rejects_every_dry_site_when_no_rim_may_vary() {
+        let g = with_lakes(|l| {
+            l.max_rim_slope = 0.0;
+            l.tarns = None;
+        });
+        assert!(lakes_in(&g).iter().all(|l| l.lagoon));
+    }
+
+    #[test]
+    fn tries_a_tarn_only_where_a_lake_is_too_steep() {
+        let g = with_lakes(|l| {
+            l.max_rim_slope = 0.0;
+            l.lagoon_chance = 0.0;
+        });
+        let lakes = lakes_in(&g);
+        assert!(!lakes.is_empty());
+        assert!(lakes.iter().all(|l| l.tarn || l.lagoon));
+        assert!(lakes.iter().any(|l| l.tarn));
+    }
+
+    #[test]
+    fn digs_the_bed_to_its_depth_and_meets_the_level_at_the_shore() {
+        let lakes = lakes_in(&ground(lake_climate()));
+        let lake = lakes.iter().find(|l| !l.tarn && !l.lagoon).unwrap();
+        assert!((lake.carve(lake.u, lake.v, 500.0) - (lake.level - lake.depth)).abs() < 1e-6);
+        assert_eq!(lake.carve(lake.u + lake.reach + 1.0, lake.v, 500.0), 500.0);
+        let (u, v) = along(lake, 0.3, 1.0);
+        assert!((lake.carve(u, v, 500.0) - lake.level).abs() < 1e-3);
+    }
+
+    #[test]
+    fn reports_every_cell_and_settles_the_lakes_find_finds() {
+        let g = ground(lake_climate());
+        let lakes = Lakes::of(&g).unwrap();
+        let size = lake_config().cell_size;
+        let reports = lakes.inspect(0.0, 0.0, size * 3.0 - 1.0, size * 3.0 - 1.0);
+        assert_eq!(reports.len(), 9);
+        let mut settled: Vec<_> = reports.iter().filter_map(|r| r.lake.as_ref().map(|l| l.body_id)).collect();
+        let mut found: Vec<_> = lakes
+            .find(0.0, 0.0, size * 3.0 - 1.0, size * 3.0 - 1.0)
+            .iter()
+            .filter(|l| (0..3).contains(&l.cell_x) && (0..3).contains(&l.cell_y))
+            .map(|l| l.body_id)
+            .collect();
+        settled.sort();
+        found.sort();
+        assert_eq!(settled, found);
+        for r in &reports {
+            use crate::lakes::Outcome;
+            let settles = matches!(r.outcome, Outcome::Lake | Outcome::Tarn | Outcome::Lagoon);
+            assert_eq!(settles, r.lake.is_some());
+        }
+    }
+
+    #[test]
+    fn carves_chunks_that_meet_exactly() {
+        let g = ground(lake_climate());
+        let lakes = lakes_in(&g);
+        let lake = lakes.iter().find(|l| !l.tarn && !l.lagoon).unwrap();
+        let (ox, oy) = (lake.u.round(), -lake.v.round());
+        let carved = |ox: f64, oy: f64| {
+            let mut h = g.generate(SIZE, SIZE, ox, oy);
+            Lakes::of(&g).unwrap().carve(&mut h, SIZE, SIZE, ox, oy);
+            h
+        };
+        let centre = carved(ox, oy);
+        let mid = (SIZE - 1) / 2;
+        assert!((centre[mid + mid * SIZE] as f64) < lake.level);
+        let step = (SIZE - 1) as f64;
+        let right = carved(ox + step, oy);
+        let below = carved(ox, oy - step);
+        for i in 0..SIZE {
+            assert_eq!(right[i * SIZE], centre[SIZE - 1 + i * SIZE]);
+            assert_eq!(below[i], centre[i + (SIZE - 1) * SIZE]);
+        }
+    }
+
+    mod lagoons {
+        use super::*;
+
+        #[test]
+        fn open_to_the_sea_at_sea_level() {
+            let g = ground(lake_climate());
+            let lakes = lakes_in(&g);
+            let lagoons: Vec<_> = lakes.iter().filter(|l| l.lagoon).collect();
+            assert!(!lagoons.is_empty());
+            for l in lagoons {
+                assert_eq!((l.level, l.spill_height, l.tarn), (0.0, 0.0, false));
+                assert_eq!(l.carve(l.u + l.reach * 0.99, l.v, -3.0), -3.0);
+                assert!(!l.mouth.is_nan());
+            }
+        }
+
+        #[test]
+        fn open_only_where_the_sea_stands_on_the_rim() {
+            let g = ground(lake_climate());
+            let continent = g.climate().continent.clone().unwrap();
+            for lake in lakes_in(&g) {
+                let sea = angles(24).any(|a| {
+                    let (u, v) = along(&lake, a, lake.bank);
+                    let s = g.sample(u, v);
+                    s.height < 0.0 && crate::climate::ocean_coverage(&continent, s.continent) > 0.0
+                });
+                assert_eq!(lake.lagoon, sea);
+            }
+        }
+
+        #[test]
+        fn cut_a_mouth_below_sea_level_from_the_shore_to_the_sea() {
+            let g = ground(lake_climate());
+            for l in lakes_in(&g).iter().filter(|l| l.lagoon) {
+                let mut d = 1.0;
+                while d <= l.bank {
+                    let (u, v, h) = rim_ground(&g, l, l.mouth, d);
+                    assert!(l.carve(u, v, h) < 0.0);
+                    d += 0.05;
+                }
+            }
+        }
+
+        #[test]
+        fn settle_no_lake_out_at_sea() {
+            let g = ground(lake_climate());
+            for lake in lakes_in(&g) {
+                if g.sample(lake.u, lake.v).height < 0.0 {
+                    assert!(lake.lagoon);
+                }
+            }
+        }
+    }
+}
+
+mod water {
+    use super::lakes::{along, ground, lake_climate, AREA};
+    use super::*;
+    use crate::water::{build_map, resolve, to_f16, WaterEdit, WaterPoint, EDIT_CHANNELS, SWASH_REACH, WET_BAND_REACH};
+    use crate::{Lake, Lakes};
+
+    const CHUNK: usize = 65;
+    const STEP: usize = 4;
+    const TEXELS: usize = (CHUNK - 1) / STEP + 1;
+
+    fn with_coast(coast: f64) -> HeightGenerator {
+        let mut c = lake_climate();
+        c.continent.as_mut().unwrap().coast = coast;
+        c.lakes = None;
+        ground(c)
+    }
+
+    fn flat(height: f32) -> Vec<f32> {
+        vec![height; CHUNK * CHUNK]
+    }
+
+    fn from_f16(half: u16) -> f64 {
+        let sign = if half & 0x8000 != 0 { -1.0 } else { 1.0 };
+        let exponent = ((half >> 10) & 0x1f) as i32;
+        let mantissa = (half & 0x3ff) as f64;
+        if exponent == 0 {
+            return sign * mantissa * 2f64.powi(-24);
+        }
+        sign * (1.0 + mantissa / 1024.0) * 2f64.powi(exponent - 15)
+    }
+
+    #[test]
+    fn rounds_to_half_precision_as_the_ts_does() {
+        // toFloat16 in float16.ts.
+        assert_eq!(to_f16(0.0), 0);
+        assert_eq!(to_f16(1.0), 0x3c00);
+        assert_eq!(to_f16(-2.5), 0xc100);
+        assert_eq!(to_f16(65520.0), 0x7c00);
+        assert_eq!(to_f16(1.0e-7), 0x0002);
+        assert_eq!(to_f16(f64::NAN), 0x7e00);
+    }
+
+    #[test]
+    fn is_none_inland_and_where_the_ground_stands_above_the_sea() {
+        let inland = with_coast(-1.0);
+        assert!(build_map(&inland, CHUNK, STEP, 0.0, 0.0, &flat(-5.0), None).is_none());
+        let sea = with_coast(2.0);
+        assert!(build_map(&sea, CHUNK, STEP, 0.0, 0.0, &flat(5.0), None).is_none());
+    }
+
+    #[test]
+    fn finds_a_single_hollow_below_sea_level_between_texels() {
+        let sea = with_coast(2.0);
+        let mut heights = flat(5.0);
+        heights[3 + 5 * CHUNK] = -1.0;
+        assert!(build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None).unwrap().shows);
+    }
+
+    #[test]
+    fn keeps_a_map_that_shows_no_water_for_ground_within_the_wet_band() {
+        let sea = with_coast(2.0);
+        let mut heights = flat(5.0);
+        heights[3 + 5 * CHUNK] = ((SWASH_REACH + WET_BAND_REACH) / 2.0) as f32;
+        let map = build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None).unwrap();
+        assert!(!map.shows);
+    }
+
+    #[test]
+    fn stores_terrain_heights_relative_to_the_base_level() {
+        let sea = HeightGenerator::new(with_coast(2.0).climate().clone(), 9001.0, 1000.0, 2.0).unwrap();
+        let heights: Vec<f32> = (0..CHUNK * CHUNK).map(|i| 1000.0 - 3.0 + (i % 7) as f32 * 0.9).collect();
+        let map = build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None).unwrap();
+        assert_eq!(map.base_level, 1000.0);
+        for my in 0..TEXELS {
+            for mx in 0..TEXELS {
+                let source = heights[mx * STEP + my * STEP * CHUNK] as f64 - 1000.0;
+                // Within 3 m of the level, f16 steps are under 2 mm.
+                assert!((from_f16(map.heights[mx + my * TEXELS]) - source).abs() < 0.002);
+            }
+        }
+    }
+
+    #[test]
+    fn shares_edge_texels_with_its_neighbours() {
+        let mut c = lake_climate();
+        c.continent.as_mut().unwrap().scale = 40.0;
+        c.continent.as_mut().unwrap().coast = 0.5;
+        let g = ground(c);
+        let span = (CHUNK - 1) as f64;
+        let at = |ox: f64, oy: f64| resolve(&g, CHUNK, STEP, ox, oy, None);
+        let (centre, right, below) = (at(0.0, 0.0), at(span, 0.0), at(0.0, span));
+        let (mut wet, mut dry) = (0, 0);
+        for i in 0..TEXELS {
+            assert_eq!(right.coverage[i * TEXELS], centre.coverage[i * TEXELS + TEXELS - 1]);
+            assert_eq!(below.coverage[(TEXELS - 1) * TEXELS + i], centre.coverage[i]);
+        }
+        for &c in &centre.coverage {
+            if c == 255 {
+                wet += 1;
+            } else if c == 0 {
+                dry += 1;
+            }
+        }
+        assert!(wet > 0 && dry > 0);
+    }
+
+    // A chunk offset whose centre sample sits on the first lake `pick` takes.
+    fn lake_chunk(pick: impl Fn(&Lake) -> bool) -> (HeightGenerator, Lake, f64, f64) {
+        let g = ground(lake_climate());
+        let lake = Lakes::of(&g).unwrap().find(-AREA, -AREA, AREA, AREA).into_iter().find(pick).unwrap();
+        let (ox, oy) = (lake.u.round(), -lake.v.round());
+        (g, lake, ox, oy)
+    }
+
+    #[test]
+    fn fills_a_lake_with_lake_water_at_its_level() {
+        let (g, lake, ox, oy) = lake_chunk(|l| !l.tarn && !l.lagoon);
+        let water = resolve(&g, CHUNK, STEP, ox, oy, None);
+        let t = (TEXELS - 1) / 2;
+        let texel = t + t * TEXELS;
+        assert_eq!(water.coverage[texel], 255);
+        assert_eq!(water.body_ids[texel], lake.body_id);
+        assert_eq!(water.levels[texel], lake.level);
+        assert_eq!(water.type_weights[texel * 4 + 1], 255);
+        assert!(water.lakes.iter().any(|l| l.body_id == lake.body_id));
+    }
+
+    #[test]
+    fn blends_a_lagoon_from_lake_water_at_the_centre_to_sea_water_at_the_shore() {
+        const BIG: usize = 257;
+        let (g, lagoon, ox, oy) = lake_chunk(|l| l.lagoon);
+        let water = resolve(&g, BIG, STEP, ox, oy, None);
+        let size = (BIG - 1) / STEP + 1;
+        let (u0, v0) = crate::lakes::field_origin(BIG, BIG, ox, oy);
+        let texel = |u: f64, v: f64| {
+            let mx = ((u - u0) / STEP as f64).round() as usize;
+            let my = ((v - v0) / STEP as f64).round() as usize;
+            mx + my * size
+        };
+        let centre = texel(lagoon.u, lagoon.v);
+        assert_eq!(water.body_ids[centre], lagoon.body_id);
+        assert_eq!(water.levels[centre], 0.0);
+        assert!(water.type_weights[centre * 4 + 1] > water.type_weights[centre * 4]);
+        let (u, v) = along(&lagoon, 0.0, 0.95);
+        let shore = texel(u, v);
+        assert!(water.type_weights[shore * 4] > water.type_weights[shore * 4 + 1]);
+    }
+
+    mod edit {
+        use super::*;
+
+        fn edit() -> WaterEdit {
+            let texels = TEXELS * TEXELS;
+            WaterEdit {
+                size: TEXELS,
+                step: STEP as f64,
+                weights: vec![0; texels * EDIT_CHANNELS],
+                level: vec![0.0; texels],
+                body_ids: vec![0; texels],
+            }
+        }
+
+        fn fill(e: &mut WaterEdit, channel: usize, value: u8) {
+            let plane = e.size * e.size;
+            e.weights[channel * plane..(channel + 1) * plane].fill(value);
+        }
+
+        // Every texel owned outright, holding `coverage` of lake water at `level`.
+        fn own_all(coverage: f64, level: f32) -> WaterEdit {
+            let mut e = edit();
+            fill(&mut e, 0, 255);
+            fill(&mut e, 1, (coverage * 255.0).round() as u8);
+            fill(&mut e, 2 + 1, 255);
+            e.level.fill(level);
+            e.body_ids.fill(7);
+            e
+        }
+
+        fn sea() -> WaterPoint {
+            WaterPoint { coverage: 1.0, level: 12.0, ocean: 1.0, body_id: 0, types: [1.0, 0.0, 0.0, 0.0] }
+        }
+
+        #[test]
+        fn leaves_the_generated_water_where_the_edit_owns_nothing() {
+            let mut water = sea();
+            edit().apply(8.0, 8.0, &mut water);
+            assert_eq!((water.coverage, water.level, water.body_id, water.types), (1.0, 12.0, 0, [1.0, 0.0, 0.0, 0.0]));
+        }
+
+        #[test]
+        fn adds_water_on_dry_ground_at_its_own_level_and_type() {
+            let mut water = WaterPoint { level: 0.0, ..Default::default() };
+            own_all(1.0, 30.0).apply(9.5, 20.0, &mut water);
+            assert_eq!(water.coverage, 1.0);
+            assert!((water.level - 30.0).abs() < 1e-9);
+            assert_eq!(water.body_id, 7);
+            assert_eq!(water.types, [0.0, 1.0, 0.0, 0.0]);
+        }
+
+        #[test]
+        fn removes_generated_water_and_keeps_its_level() {
+            let mut water = sea();
+            own_all(0.0, 30.0).apply(8.0, 8.0, &mut water);
+            assert_eq!(water.coverage, 0.0);
+            assert_eq!(water.level, 12.0);
+        }
+
+        #[test]
+        fn shares_a_point_by_its_authority() {
+            let mut e = own_all(0.0, 30.0);
+            fill(&mut e, 0, (255.0f64 * 0.25).round() as u8);
+            let mut water = sea();
+            e.apply(8.0, 8.0, &mut water);
+            assert!((water.coverage - 0.75).abs() < 0.01);
+        }
+
+        #[test]
+        fn blends_into_the_resolved_water() {
+            let g = with_coast(-1.0);
+            let water = resolve(&g, CHUNK, STEP, 0.0, 0.0, Some(own_all(1.0, 30.0)));
+            assert!(water.covered);
+            assert!(water.coverage.iter().all(|&c| c == 255));
+            assert!(water.body_ids.iter().all(|&id| id == 7));
         }
     }
 }

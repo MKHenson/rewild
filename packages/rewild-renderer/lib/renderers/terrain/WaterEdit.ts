@@ -11,7 +11,8 @@ import type { WaterBody } from './Lakes';
 import { ResolvedWater, SWASH_REACH, waterShowsAt } from './WaterMap';
 import { MAX_WATER_TYPES } from './Water';
 
-// A chunk's authored water, blended over what the generator makes.
+// A chunk's authored water, blended over what the generator makes. The blend
+// runs in Rust with the water it blends over (crates/terrain/src/water.rs).
 //
 // A PaintMask at the water map's resolution carries the u8 planes: how much of
 // each texel the edit owns (its authority), the edit's coverage, and its type
@@ -152,8 +153,7 @@ export type WaterEditProvider = (
 
 /**
  * An id for a body the editor creates, from any integer `seed`. Generated lakes
- * set the top bit (lakeBodyId) and the ocean is 0, so these never collide with
- * either.
+ * set the top bit and the ocean is 0, so these never collide with either.
  */
 export function editedBodyId(seed: number): number {
   let h = Math.imul(seed | 0, 0x9e3779b1);
@@ -175,127 +175,6 @@ export function editedBody(
   for (let c = 0; c < MAX_WATER_TYPES; c++)
     typeWeights[c] = (weights[c] ?? 0) / 255;
   return { id, level, spillHeight: level, typeWeights };
-}
-
-// ── Sampling ─────────────────────────────────────────────────────────────────
-
-/** An edit at one point. Caller-owned scratch for sampleWaterEdit. */
-export interface WaterEditSample {
-  authority: number;
-  coverage: number;
-  level: number;
-  bodyId: number;
-  types: Float64Array;
-}
-
-export function createWaterEditSample(): WaterEditSample {
-  return {
-    authority: 0,
-    coverage: 0,
-    level: 0,
-    bodyId: 0,
-    types: new Float64Array(MAX_WATER_TYPES),
-  };
-}
-
-/**
- * Bilinearly samples `edit` at LOD-0 sample (x, y) into `out`, and returns the
- * authority. The level is weighted by each corner's authority, since a texel
- * the edit does not own has no level; the body is the corner that owns most.
- */
-export function sampleWaterEdit(
-  edit: WaterEdit,
-  x: number,
-  y: number,
-  out: WaterEditSample
-): number {
-  const { size, step, weights } = edit.mask;
-  const max = size - 1;
-  const fx = x / step;
-  const fy = y / step;
-  let x0 = Math.floor(fx);
-  let y0 = Math.floor(fy);
-  if (x0 < 0) x0 = 0;
-  else if (x0 > max) x0 = max;
-  if (y0 < 0) y0 = 0;
-  else if (y0 > max) y0 = max;
-  const x1 = x0 < max ? x0 + 1 : x0;
-  const y1 = y0 < max ? y0 + 1 : y0;
-  const tx = Math.min(Math.max(fx - x0, 0), 1);
-  const ty = Math.min(Math.max(fy - y0, 0), 1);
-  const plane = size * size;
-
-  out.authority = 0;
-  out.coverage = 0;
-  out.level = 0;
-  out.bodyId = 0;
-  out.types.fill(0);
-  let levelWeight = 0;
-  let owner = 0;
-
-  for (let corner = 0; corner < 4; corner++) {
-    const cx = corner & 1 ? x1 : x0;
-    const cy = corner & 2 ? y1 : y0;
-    const w = (corner & 1 ? tx : 1 - tx) * (corner & 2 ? ty : 1 - ty);
-    if (w <= 0) continue;
-    const t = cy * size + cx;
-    const authority = weights[WATER_EDIT_AUTHORITY * plane + t] / 255;
-    out.authority += w * authority;
-    out.coverage += (w * weights[WATER_EDIT_COVERAGE * plane + t]) / 255;
-    for (let c = 0; c < MAX_WATER_TYPES; c++)
-      out.types[c] += (w * weights[(WATER_EDIT_TYPES + c) * plane + t]) / 255;
-    const owned = w * authority;
-    if (owned > 0) {
-      out.level += owned * edit.level[t];
-      levelWeight += owned;
-      if (owned > owner) {
-        owner = owned;
-        out.bodyId = edit.bodyIds[t];
-      }
-    }
-  }
-  if (levelWeight > 0) out.level /= levelWeight;
-  return out.authority;
-}
-
-/** What the generator resolved at a point, which applyWaterEdit blends into. */
-export interface GeneratedWater {
-  level: number;
-  bodyId: number;
-}
-
-/**
- * Blends `edit` at LOD-0 sample (x, y) over the generated water at that point:
- * `coverage`, `water.level`, `water.bodyId` and the palette weights `types`,
- * which it rewrites. Each side counts by its coverage times its share of the
- * authority, so an edit that removes water leaves the level alone. Returns the
- * blended coverage. `scratch` is caller-owned.
- */
-export function applyWaterEdit(
-  edit: WaterEdit,
-  x: number,
-  y: number,
-  water: GeneratedWater,
-  coverage: number,
-  types: Float64Array,
-  scratch: WaterEditSample
-): number {
-  const authority = sampleWaterEdit(edit, x, y, scratch);
-  if (authority <= 0) return coverage;
-
-  const generated = coverage * (1 - authority);
-  const edited = scratch.coverage * authority;
-  const total = generated + edited;
-  if (total <= 0) {
-    types.fill(0);
-    return 0;
-  }
-  if (edited > 0)
-    water.level = (generated * water.level + edited * scratch.level) / total;
-  for (let c = 0; c < MAX_WATER_TYPES; c++)
-    types[c] = (generated * types[c] + edited * scratch.types[c]) / total;
-  if (edited >= generated) water.bodyId = scratch.bodyId;
-  return total;
 }
 
 // ── Stamps ───────────────────────────────────────────────────────────────────

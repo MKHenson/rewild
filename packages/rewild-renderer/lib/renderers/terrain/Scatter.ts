@@ -30,10 +30,10 @@ import {
   ScatterKillSet,
   scatterKillKey,
 } from './ScatterKillSet';
-import { createWaterSampler, sampleWater } from './Lakes';
+import { createWaterSampler, freeWaterSampler, sampleWater } from './Lakes';
 import { heightGradientAt, slopeDegreesAt } from './Splat';
 import { MAX_WATER_TYPES, getWaterTypeIndex } from './Water';
-import { WaterEdit, applyWaterEdit, createWaterEditSample } from './WaterEdit';
+import type { WaterEdit } from './WaterEdit';
 
 // Per-chunk scatter placement: which instances of which layer stand where.
 //
@@ -158,7 +158,6 @@ const _normal = new Float64Array(3);
 const _quaternion = new Float64Array(4);
 const _coastWeights = new Float64Array(3);
 const _waterTypes = new Float64Array(MAX_WATER_TYPES);
-const _waterEdit = createWaterEditSample();
 const _tilt = new Float64Array(4);
 const _product = new Float64Array(4);
 
@@ -306,8 +305,14 @@ export function scatterChunk(
   if (layerNames.length === 0) return [];
 
   const field = createClimateField(chunkSize, chunkSize, seed, offset, climate);
-  const water = createWaterSampler(field, seed, offset, seaLevel);
-  const waterEdit = options?.waterEdit ?? null;
+  const water = createWaterSampler(
+    chunkSize,
+    seed,
+    offset,
+    climate,
+    seaLevel,
+    options?.waterEdit ?? null
+  );
   const resolver = createBiomeResolver(field, options?.biomeMask ?? null);
   const noiseFields = createScatterNoiseFields(seed, offset, climate);
 
@@ -455,16 +460,6 @@ export function scatterChunk(
           // wants to grow here.
           if (waterCoverage < 0) {
             waterCoverage = sampleWater(water, sx, sy, _waterTypes);
-            if (waterEdit)
-              waterCoverage = applyWaterEdit(
-                waterEdit,
-                sx,
-                sy,
-                water,
-                waterCoverage,
-                _waterTypes,
-                _waterEdit
-              );
             depth = water.level - worldHeight;
             const heightAboveSea = worldHeight - seaLevel;
             beach =
@@ -568,6 +563,7 @@ export function scatterChunk(
       });
   }
 
+  freeWaterSampler(water);
   return results;
 }
 

@@ -4,11 +4,15 @@
 pub mod climate;
 pub mod config;
 pub mod heights;
+pub mod lakes;
 pub mod splat;
+pub mod water;
 
 pub use config::ClimateConfig;
 pub use heights::HeightGenerator;
+pub use lakes::{CellReport, Lake, Lakes};
 pub use splat::{PaintMask, Region, SplatGenerator, SplatSpec};
+pub use water::{WaterEdit, WaterMap, WaterPoint, WaterSampler};
 
 #[cfg(test)]
 mod tests;

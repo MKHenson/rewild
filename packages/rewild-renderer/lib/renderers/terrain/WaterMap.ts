@@ -1,26 +1,20 @@
 import { Vector2 } from 'rewild-common';
 import { ClimateConfig } from './Biomes';
-import { createClimateField } from './ClimateField';
 import {
   Lake,
   OCEAN_BODY_ID,
   WaterBody,
-  createWaterSampler,
   lakeBody,
   oceanBody,
-  sampleWater,
+  waterEditData,
 } from './Lakes';
 import { BIOME_MASK_STEP, paintMaskSize } from './PaintMask';
-import { MAX_WATER_TYPES } from './Water';
-import {
-  WaterEdit,
-  applyWaterEdit,
-  createWaterEditSample,
-  editedBody,
-} from './WaterEdit';
+import { terrainGenerator } from './TerrainGenerator';
+import { WaterEdit, editedBody } from './WaterEdit';
 import { toFloat16 } from '../../utils/float16';
 
-// Where a chunk's water is, how high, and what kind.
+// Where a chunk's water is, how high, and what kind. Generated in Rust
+// (crates/terrain/src/water.rs), which also blends the chunk's edit.
 //
 // Texels sit on LOD-0 samples every WATER_MAP_STEP samples, like a paint mask,
 // so neighbouring chunks share their edge texels. Heights and levels are f16
@@ -30,7 +24,7 @@ import { toFloat16 } from '../../utils/float16';
 export const WATER_MAP_STEP = BIOME_MASK_STEP;
 
 /** Metres above a covered level the swash can run up: water shows over ground
- *  below it. */
+ *  below it. Mirrors SWASH_REACH in water.rs. */
 export const SWASH_REACH = 1.5;
 /** Metres above a covered level within which a chunk keeps its water map for
  *  the terrain's wet band, though no water shows. */
@@ -95,52 +89,25 @@ export function resolveWater(
 ): ResolvedWater {
   const step = WATER_MAP_STEP;
   const size = paintMaskSize(chunkSize, step);
-  const texels = size * size;
-  const field = createClimateField(chunkSize, chunkSize, seed, offset, climate);
-  const sampler = createWaterSampler(field, seed, offset, seaLevel);
-  const editSample = edit ? createWaterEditSample() : null;
-
-  const coverage = new Uint8Array(texels);
-  const levels = new Float64Array(texels);
-  const typeWeights = new Uint8Array(texels * 4);
-  const bodyIds = new Uint32Array(texels);
-  const types = new Float64Array(MAX_WATER_TYPES);
-  let covered = false;
-  for (let my = 0; my < size; my++) {
-    for (let mx = 0; mx < size; mx++) {
-      const t = mx + my * size;
-      let water = sampleWater(sampler, mx * step, my * step, types);
-      if (edit)
-        water = applyWaterEdit(
-          edit,
-          mx * step,
-          my * step,
-          sampler,
-          water,
-          types,
-          editSample!
-        );
-      const value = Math.round(water * 255);
-      coverage[t] = value;
-      levels[t] = sampler.level;
-      bodyIds[t] = sampler.bodyId;
-      if (value > 0) {
-        covered = true;
-        for (let c = 0; c < MAX_WATER_TYPES; c++)
-          typeWeights[t * 4 + c] = Math.round(types[c] * 255);
-      }
-    }
-  }
-  return {
+  const built = terrainGenerator(seed, climate, seaLevel).water(
+    chunkSize,
+    step,
+    offset.x,
+    offset.y,
+    waterEditData(edit)
+  );
+  const resolved: ResolvedWater = {
     size,
     step,
-    coverage,
-    levels,
-    typeWeights,
-    bodyIds,
-    lakes: sampler.lakes,
-    covered,
+    coverage: built.takeCoverage(),
+    levels: built.takeLevels(),
+    typeWeights: built.takeTypeWeights(),
+    bodyIds: built.takeBodyIds(),
+    lakes: built.lakes(),
+    covered: built.covered,
   };
+  built.free();
+  return resolved;
 }
 
 /**
@@ -186,96 +153,52 @@ export function buildWaterMap(
   heights: Float32Array,
   edit: WaterEdit | null = null
 ): WaterMap | null {
-  if (!climate.continent && !climate.lakes && !edit) return null;
-
-  const resolved = resolveWater(
+  const step = WATER_MAP_STEP;
+  const size = paintMaskSize(chunkSize, step);
+  const built = terrainGenerator(seed, climate, seaLevel).waterMap(
     chunkSize,
-    seed,
-    offset,
-    climate,
-    seaLevel,
-    edit
+    step,
+    offset.x,
+    offset.y,
+    heights,
+    waterEditData(edit)
   );
-  if (!resolved.covered) return null;
-  const { size, step, coverage, levels, typeWeights, bodyIds } = resolved;
-  const texels = size * size;
+  if (!built) return null;
 
-  // Water shows where a covered texel's footprint dips below its level, or
-  // where the swash can run over it. The footprint reaches half a step either
-  // side, so no full-resolution hollow is missed between texels.
-  const reach = step >> 1;
-  let shows = false;
-  let near = false;
-  let baseLevel = Infinity;
-  let maxLevel = -Infinity;
-  for (let my = 0; my < size; my++) {
-    for (let mx = 0; mx < size; mx++) {
-      const t = mx + my * size;
-      if (coverage[t] === 0) continue;
-      const level = levels[t];
-      if (level < baseLevel) baseLevel = level;
-      if (level > maxLevel) maxLevel = level;
-      if (shows) continue;
-      const x0 = Math.max(0, mx * step - reach);
-      const x1 = Math.min(chunkSize - 1, mx * step + reach);
-      const y0 = Math.max(0, my * step - reach);
-      const y1 = Math.min(chunkSize - 1, my * step + reach);
-      for (let y = y0; y <= y1 && !shows; y++)
-        for (let x = x0; x <= x1; x++) {
-          const height = heights[x + y * chunkSize];
-          if (height < level + WET_BAND_REACH) near = true;
-          if (height < level + SWASH_REACH) {
-            shows = true;
-            break;
-          }
-        }
-    }
-  }
-  if (!near) return null;
-
-  const level = new Uint16Array(texels);
-  const relHeights = new Uint16Array(texels);
-  const flow = new Int8Array(texels * 2);
-
+  const typeWeights = built.takeTypeWeights();
+  const bodyIds = built.takeBodyIds();
+  const lakes: Lake[] = built.lakes();
+  const bodyTexels = built.bodyTexels();
+  const bodyLevels = built.bodyLevels();
   const bodies: WaterBody[] = [];
-  const seen = new Set<number>();
-  for (let t = 0; t < texels; t++) {
+  for (let i = 0; i < bodyTexels.length; i++) {
+    const t = bodyTexels[i];
     const id = bodyIds[t];
-    if (coverage[t] === 0 || seen.has(id)) continue;
-    seen.add(id);
-    const lake = resolved.lakes.find((l) => l.bodyId === id);
+    const lake = lakes.find((l) => l.bodyId === id);
     if (lake) bodies.push(lakeBody(lake, climate));
     else if (id === OCEAN_BODY_ID) bodies.push(oceanBody(climate, seaLevel));
     else
       bodies.push(
-        editedBody(id, levels[t], typeWeights.subarray(t * 4, t * 4 + 4))
+        editedBody(id, bodyLevels[i], typeWeights.subarray(t * 4, t * 4 + 4))
       );
   }
 
-  for (let my = 0; my < size; my++) {
-    for (let mx = 0; mx < size; mx++) {
-      const t = mx + my * size;
-      level[t] = toFloat16(levels[t] - baseLevel);
-      relHeights[t] = toFloat16(
-        heights[mx * step + my * step * chunkSize] - baseLevel
-      );
-    }
-  }
-
-  return {
+  const water: WaterMap = {
     size,
     step,
-    baseLevel,
-    maxLevel,
-    shows,
-    level,
-    heights: relHeights,
-    coverage,
+    baseLevel: built.baseLevel,
+    maxLevel: built.maxLevel,
+    shows: built.shows,
+    level: built.takeLevel(),
+    heights: built.takeHeights(),
+    coverage: built.takeCoverage(),
     typeWeights,
     bodyIds,
-    flow,
+    flow: new Int8Array(size * size * 2),
     bodies,
   };
+  built.free();
+  return water;
 }
 
 /** The buffers a worker transfers rather than copies. */

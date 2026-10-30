@@ -1,7 +1,6 @@
 import { Vector2 } from 'rewild-common';
 import { TerrainGenerator } from '../../../../rewild-wasm/pkg/rewild_wasm';
 import { ClimateConfig } from './Biomes';
-import { carveLakes } from './Lakes';
 import { terrainGenerator } from './TerrainGenerator';
 
 /**
@@ -34,15 +33,6 @@ export function sampleGround(
   return sampler.generator.ground(u, v);
 }
 
-/** The continent field at lake space (u, v). See sampleContinent. */
-export function sampleGroundContinent(
-  sampler: GroundSampler,
-  u: number,
-  v: number
-): number {
-  return sampler.generator.continent(u, v);
-}
-
 /**
  * Generates a heightmap in absolute world meters, with the biome at each
  * sample selected by a temperature × moisture climate model, eroded, and with
@@ -63,12 +53,10 @@ export function generateBiomeBlendedHeightMap(
   if (width <= 0 || height <= 0)
     throw new Error('Width and height must be positive integers.');
 
-  const heights = terrainGenerator(seed, climate, seaLevel).heights(
+  return terrainGenerator(seed, climate, seaLevel).heights(
     width,
     height,
     offset.x,
     offset.y
   );
-  carveLakes(heights, width, height, seed, offset, climate, seaLevel);
-  return heights;
 }
