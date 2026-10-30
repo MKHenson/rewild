@@ -1,5 +1,5 @@
 import { accentRng, buildAccent, cardsAt, type AccentSite } from './accents.ts';
-import { accentCells, leafCells, type AtlasLayout } from './atlas.ts';
+import { accentCells, cellUvs, type AtlasLayout, type UvRect } from './atlas.ts';
 import { createBuilder, finish, pushVertex, type ForgeMesh, type MeshAttributes } from './mesh.ts';
 import type { Params } from './params.ts';
 import { createRng, hash2, type Rng } from './rng.ts';
@@ -118,7 +118,7 @@ function buildTuft(
   out: ReturnType<typeof createBuilder>,
   rng: Rng,
   cells: number,
-  uvCells: ReturnType<typeof leafCells>,
+  uvCells: UvRect[],
   tuft: number,
   origin: Vec3,
   tuftYaw: number,
@@ -198,7 +198,7 @@ function buildTuft(
 
 function buildBlades(params: Params, atlas: AtlasLayout): MeshAttributes {
   const cells = atlas.cells;
-  const uvCells = leafCells(params.textureSize, atlas.grid).slice(0, cells);
+  const uvCells = cellUvs(params.textureSize, atlas).slice(0, cells);
   const rng = createRng(params.seed ^ 0x2d51f39b);
   const out = createBuilder();
   const origins = patchOrigins(params, rng);

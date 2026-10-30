@@ -645,7 +645,8 @@ function describeStamps(label: string, source: LeafSource, fit: StampFit, size: 
 
 function describeBlades(params: Params, source: LeafSource | null, layout: AtlasLayout): string[] {
   if (!source) return [`  blades   generated — no sources listed${onImage(layout)}`];
-  return describeStamps('blades', source, fitClump(source, params.textureSize, layout.grid), 'tall', layout);
+  const lines = describeStamps('blades', source, fitClump(source, params.textureSize, layout), 'tall', layout);
+  return [...lines, ...tooWide(layout, widestAspect(source), params.cardAspect, 'cardAspect')];
 }
 
 /**

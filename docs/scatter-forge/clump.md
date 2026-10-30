@@ -77,9 +77,14 @@ Default: `0.22`.
 
 ### `cardAspect`
 
-The width of a card as a fraction of its height.
+The width of a card as a fraction of its height. With `blades` listed, the texture is cut into
+strips of the same shape, so a narrow tuft gets the full height of the texture instead of a square
+cell that is mostly see-through. Changing it paints the texture again.
 
-Default: `1`.
+Default: `1`. `thistle-01` uses `0.55`.
+
+Set it close to the width of the tuft art. If a tuft is wider than `cardAspect`, it is painted
+smaller to fit its strip. The run tells you the value to use.
 
 ![cardAspect 0.5, 1 and 1.5](images/clump-cardAspect.webp)
 
@@ -131,8 +136,13 @@ Default: `0`. `plains-01` uses `2.1`. Maximum: `2.2`.
 | `textureSize` | `2048` | The size of the texture in pixels. It holds every tuft picture, so it starts larger than a tree's. |
 | `leafAlphaCutoff` | `0.4` | The transparency level below which a pixel is cut away. See [Trees](tree.md#leafalphacutoff). |
 
-Each tuft picture gets one square cell in the texture. The run prints the cell size. Try for 512
-pixels a cell for anything the camera goes near.
+Each tuft picture gets one strip in the texture, shaped like a card (`cardAspect`). The strips are
+placed side by side in rows, as tall as the texture allows. Made tufts (`blades` `[]`) use a square
+grid instead. The run prints the cell size. Try for 512 pixels a cell for anything the camera goes
+near.
+
+A variant with `skipTextures` can use a lower `cardAspect` than the set was painted with, but not a
+higher one. The run stops and tells you.
 
 A card picks its cell when the model is made. So all copies of one model look the same, apart from
 their rotation and size. To get variety, make two or three variants from one texture set.

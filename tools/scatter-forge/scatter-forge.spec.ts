@@ -32,7 +32,7 @@ import { renderComparison, renderPreview } from './lib/preview.ts';
 import type { Canvas } from './lib/textures.ts';
 import { buildSkeleton } from './lib/skeleton.ts';
 import { LOOK } from './lib/look.ts';
-import { clumpAtlas, CLUMP_CELLS_GENERATED, crownAtlas, CROWN_CELLS_GENERATED, LEAF_GRID_GENERATED } from './lib/sources.ts';
+import { atlasLayoutFor, clumpAtlas, CLUMP_CELLS_GENERATED, crownAtlas, CROWN_CELLS_GENERATED, LEAF_GRID_GENERATED } from './lib/sources.ts';
 import {
   clumpLayer,
   colliderFor,
@@ -222,15 +222,16 @@ describe('texture reuse', () => {
     expect(sameTexture(base, paramsFor({ leaves: ['oak'] }))).toBe(false);
   });
 
-  it("repaints a crown's strips when a card's aspect changes, and a clump's never", () => {
+  it("repaints a crown's or a clump's strips when a card's aspect changes", () => {
     const crown = (extra: RawConfig = {}) => resolveParams({ type: 'crown', name: 'c', seed: 1, ...extra });
     const accent = { stamps: ['reed'], count: 1, pitch: 0, length: 1 };
     expect(sameTexture(crown(), crown({ cardAspect: 0.2 }))).toBe(false);
     expect(sameTexture(crown({ accents: [accent] }), crown({ accents: [{ ...accent, aspect: 0.2 }] }))).toBe(false);
     expect(sameTexture(crown({ accents: [accent] }), crown({ accents: [{ ...accent, pitch: 20 }] }))).toBe(true);
+    expect(sameTexture(crown(), crown({ frondWidth: 0.5 }))).toBe(true);
 
     const clump = (extra: RawConfig = {}) => resolveParams({ type: 'clump', name: 'c', seed: 1, ...extra });
-    expect(sameTexture(clump(), clump({ cardAspect: 0.2 }))).toBe(true);
+    expect(sameTexture(clump(), clump({ cardAspect: 0.2 }))).toBe(false);
   });
 
 });
@@ -1668,6 +1669,26 @@ describe('clump', () => {
     expect(phases.size).toBe(clumpParams().cardsPerTuft);
   });
 
+  it('cuts authored blades into strips of the card and keeps generated ones on the grid', () => {
+    const params = clumpParams({ cardAspect: 0.5 });
+    const source = { stamps: new Array(2) } as never;
+    expect(atlasLayoutFor(params, null, []).aspects).toBeUndefined();
+
+    const layout = atlasLayoutFor(params, source, []);
+    expect(layout.aspects).toEqual([0.5, 0.5]);
+    expect(cellInnerPx(params.textureSize, layout)).toBeGreaterThan(cellInnerPx(params.textureSize, layoutAtlas(2, [])));
+
+    const { uvs, vertexCount } = buildClump(params, layout).mesh.pieces[0].attributes;
+    const strips = cellUvs(params.textureSize, layout);
+    for (let i = 0; i < vertexCount; i++) {
+      const u = uvs[i * 2];
+      const v = uvs[i * 2 + 1];
+      expect(
+        strips.some((cell) => u >= cell.u0 - 1e-6 && u <= cell.u1 + 1e-6 && v >= cell.v0 - 1e-6 && v <= cell.v1 + 1e-6)
+      ).toBe(true);
+    }
+  });
+
   it('never addresses a cell nothing painted', () => {
     // Ten stamps land in a 4x4, which leaves six cells blank.
     const cells = 10;
@@ -1848,6 +1869,16 @@ describe('crown', () => {
     expect(Math.min(...bends(frond))).toBeCloseTo(6 / 9, 5);
   });
 
+  it('narrows a frond card by frondWidth and keeps its texture column', () => {
+    const full = pieceOf(build({ cardAspect: 0.25 }).mesh, 'frond');
+    const thin = pieceOf(build({ cardAspect: 0.25, frondWidth: 0.5 }).mesh, 'frond');
+    // Vertices 0 and 1 are the two sides of the first frond's base row.
+    const width = ({ positions: p }: typeof full) => Math.hypot(p[3] - p[0], p[4] - p[1], p[5] - p[2]);
+
+    expect(width(thin)).toBeCloseTo(width(full) * 0.5, 5);
+    expect(Array.from(thin.uvs)).toEqual(Array.from(full.uvs));
+  });
+
   it('samples only the column of its cell that the card is wide', () => {
     const params = crownParams({ cardAspect: 0.25 });
     const { uvs, vertexCount } = pieceOf(build({ cardAspect: 0.25 }).mesh, 'frond');
@@ -1944,6 +1975,7 @@ describe('crown', () => {
     expect(() => crownParams({ stemHeight: -1 })).toThrow(/stemHeight/);
     expect(() => crownParams({ frondCount: 0 })).toThrow(/frondCount/);
     expect(() => crownParams({ frondAngle: 100 })).toThrow(/frondAngle/);
+    expect(() => crownParams({ frondWidth: 0 })).toThrow(/frondWidth/);
     expect(() => crownParams({ leafNormalMode: 'rosette' })).toThrow(/leafNormalMode/);
   });
 
