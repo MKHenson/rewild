@@ -234,11 +234,26 @@ The BVH is a flat array of nodes, which the builder writes and `BVHTree` reads i
 - Refit is in Rust (`bvh::refit`). It walks the nodes in reverse, so children come before their parent. The flat TypeScript refit took 1.22 ms at LOD 0, and Rust takes 0.84 ms, of which the copies are 0.07 ms. The same loop takes 0.57 ms natively, so it is bound by the vertex reads, not the language. Three corner boxes per leaf run the min/max chains in parallel (0.97 ms to 0.88 ms).
 - Terrain still gets a BVH only at LOD 0 and 1 (`TERRAIN_BVH_MAX_LOD`). The flat tree makes more LODs affordable, if a measurement calls for them.
 
-### Phase 4: Editing on the main thread
+### Phase 4: Editing on the main thread (done)
 
-Sculpt stamps (`Sculpt.ts`), splat repaint (`refreshChunkSplat`) and water carving run on the main thread while the user edits. They work over the same chunk data as Phase 2.
+Sculpt stamps (`Sculpt.ts`) and the water brush's bed, lip and bank (`WaterCarve.ts`) run in Rust (`terrain::edit`). Medians on a Ryzen 9 9950X3D, for the largest brush on the corner of four chunks:
 
-The Rust functions borrow the chunk data for each call (see [Where chunk data lives](#where-chunk-data-lives)). Benchmark the copies here. They decide whether the fixed arena is needed.
+| Edit                                     | JS      | Rust    | Speedup |
+| ---------------------------------------- | ------- | ------- | ------- |
+| Sculpt raise or flatten, 100 m           | 0.67 ms | 0.14 ms | 4.6x    |
+| Sculpt smooth, 100 m, kernel 8           | 3.01 ms | 0.19 ms | 16x     |
+| Sculpt reset, 100 m                      | 0.62 ms | 0.08 ms | 7.6x    |
+| Water bed, 200 m                         | 8.06 ms | 0.82 ms | 9.8x    |
+| Water lip, a stroke of three 200 m discs | 13.2 ms | 0.85 ms | 15x     |
+| Water bank, the same stroke              | 27.0 ms | 2.38 ms | 11x     |
+
+- An edit works on a patch: the box of world samples under the brush. `HeightPatch` gathers it from every chunk that owns its samples a row at a time, flags the samples with an owner that is not loaded, and writes it back to the chunks Rust reports as changed. Per-chunk planes, such as the generated heights and the stroke's bed, are read from each sample's first owner.
+- Smooth averages through summed tables of the patch, so a box average costs four reads whatever the kernel.
+- Against the JS, over hundreds of random stamps across chunk borders with chunks not loaded, the heights matched within 1e-13 m and the changed chunks matched exactly.
+- Splat repaint already called Rust. Under the largest brush it takes 1.06 ms, of which copying the chunk's heights and splat across the boundary is about 0.03 ms.
+- The water guard, shore grid and cut grid stay in TypeScript. They work per water map texel, which spans 4 × 4 samples.
+
+**The copies.** For the largest sculpt stamp, gathering the patch takes 0.04 ms, the copies across the boundary 0.01 ms, and writing back 0.01 ms (`sculpt copies` in the benchmark). A fixed arena could save at most these, under 0.4% of a 60 fps frame, so chunk data stays in JS (see [Where chunk data lives](#where-chunk-data-lives)).
 
 ### Phase 5: Measure, then decide
 
