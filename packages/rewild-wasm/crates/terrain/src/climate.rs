@@ -107,7 +107,7 @@ pub fn ocean_coverage(continent: &ContinentConfig, c: f64) -> f64 {
     1.0 - smoothstep01((c - (continent.coast + half)) / half)
 }
 
-fn coastal_moisture_at(continent: &ContinentConfig, c: f64) -> f64 {
+pub(crate) fn coastal_moisture_at(continent: &ContinentConfig, c: f64) -> f64 {
     let amount = continent.coastal_moisture.unwrap_or(0.0);
     let reach = continent.coastal_moisture_reach.unwrap_or(0.0);
     if amount == 0.0 || reach <= 0.0 {
@@ -290,6 +290,23 @@ pub struct ClimateGrid {
 }
 
 impl ClimateGrid {
+    /// The least and greatest of each climate value over the grid's nodes.
+    /// Interpolation stays within its nodes, so these bound every sample the
+    /// grid answers.
+    pub fn bounds(&self) -> (ClimateSample, ClimateSample) {
+        let mut lo = self.nodes[0];
+        let mut hi = self.nodes[0];
+        for n in &self.nodes {
+            lo.temperature = lo.temperature.min(n.temperature);
+            lo.moisture = lo.moisture.min(n.moisture);
+            lo.continent = lo.continent.min(n.continent);
+            hi.temperature = hi.temperature.max(n.temperature);
+            hi.moisture = hi.moisture.max(n.moisture);
+            hi.continent = hi.continent.max(n.continent);
+        }
+        (lo, hi)
+    }
+
     /// The climate values at (x, y), which must lie inside the grid.
     pub fn at(&self, x: f64, y: f64) -> ClimateSample {
         let (gx, fx) = grid_cell(x);
@@ -304,6 +321,31 @@ impl ClimateGrid {
             fy,
         )
     }
+}
+
+/// Every biome that can take weight at climate values between `lo` and `hi`,
+/// including through the blend either side of a cut. May list a biome more
+/// than once.
+pub fn reachable_biomes(climate: &ClimateConfig, lo: &ClimateSample, hi: &ClimateSample) -> Vec<usize> {
+    let bands = |axis: &ClimateAxis, lo: f64, hi: f64| {
+        let band = |v: f64| axis.cuts.iter().filter(|&&cut| v >= cut).count();
+        band(lo - axis.blend_half_width)..=band(hi + axis.blend_half_width)
+    };
+    let (mut m_lo, mut m_hi) = (lo.moisture, hi.moisture);
+    // Coastal moisture falls as the continent rises.
+    if let Some(continent) = &climate.continent {
+        if continent.coastal_moisture.is_some_and(|m| m != 0.0) {
+            m_lo += coastal_moisture_at(continent, hi.continent);
+            m_hi += coastal_moisture_at(continent, lo.continent);
+        }
+    }
+    let mut biomes = Vec::new();
+    for t in bands(&climate.temperature, lo.temperature, hi.temperature) {
+        for m in bands(&climate.moisture, m_lo, m_hi) {
+            biomes.push(climate.cells[t][m] as usize);
+        }
+    }
+    biomes
 }
 
 /// The climate biomes for `values`, bilinear over up to four climate cells.

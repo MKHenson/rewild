@@ -13,7 +13,6 @@ import {
   buildWaterMap,
   packWaterSurface,
 } from './WaterMap';
-import { oceanCoverage } from './ClimateField';
 import { fromFloat16 } from '../../utils/float16';
 
 const CHUNK_SIZE = 65;
@@ -96,19 +95,6 @@ describe('buildWaterMap', () => {
     expect(wet).toBeGreaterThan(0);
   });
 
-});
-
-describe('oceanCoverage', () => {
-  const c = DEFAULT_CONTINENT;
-
-  it('is full across the whole coast blend and fades out inland', () => {
-    expect(oceanCoverage(c, 0)).toBe(1);
-    expect(oceanCoverage(c, c.coast)).toBe(1);
-    expect(oceanCoverage(c, c.coast + c.blendHalfWidth)).toBe(1);
-    expect(oceanCoverage(c, c.coast + 1.5 * c.blendHalfWidth)).toBeCloseTo(0.5, 6);
-    expect(oceanCoverage(c, c.coast + 2 * c.blendHalfWidth)).toBe(0);
-    expect(oceanCoverage(c, 1)).toBe(0);
-  });
 });
 
 describe('packWaterSurface', () => {

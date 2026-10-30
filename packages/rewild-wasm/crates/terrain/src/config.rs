@@ -2,7 +2,13 @@
 //! Mirrors the TS types in `Biomes.ts`; fields no ported stage reads yet
 //! (scatter) are skipped when a preset is deserialized.
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
+
+/// A field that may be absent, null or undefined, any of which mean its
+/// default.
+fn or_default<'de, D: Deserializer<'de>, T: Default + Deserialize<'de>>(d: D) -> Result<T, D::Error> {
+    Ok(Option::<T>::deserialize(d)?.unwrap_or_default())
+}
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -12,7 +18,7 @@ pub struct ClimateConfig {
     pub continent: Option<ContinentConfig>,
     pub coast: Option<CoastConfig>,
     /// The water palette a water map's type weights index.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub water: Vec<WaterType>,
     pub lakes: Option<LakeConfig>,
     pub biomes: Vec<Biome>,
@@ -113,8 +119,34 @@ pub struct Biome {
     pub deformations: Vec<Deformation>,
     pub erosion: Option<Erosion>,
     /// Surfaces the shape, base first.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "or_default")]
     pub layers: Vec<Layer>,
+    /// What grows here, one rule per scatter layer.
+    #[serde(default, deserialize_with = "or_default")]
+    pub scatter: Vec<ScatterRule>,
+}
+
+/// How densely a biome grows one scatter layer. Rules do not composite: each
+/// is its own density field.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ScatterRule {
+    /// The scatter layer's name.
+    pub layer: String,
+    /// Share of what the layer's footprint allows.
+    pub density: f64,
+    /// Degrees from horizontal.
+    pub slope: Option<Selector>,
+    /// Absolute world metres.
+    pub height: Option<Selector>,
+    pub noise: Option<NoiseSelector>,
+    /// Metres below the water surface; negative is height above it.
+    pub water_depth: Option<Selector>,
+    /// Grows only where this water type has weight.
+    pub water_type: Option<String>,
+    /// Grows under water. Otherwise the rule stops at the waterline.
+    #[serde(default, deserialize_with = "or_default")]
+    pub underwater: bool,
 }
 
 /// A smoothstep ramp from `from` to `to`. `from` above `to` fades out instead.

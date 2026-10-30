@@ -22,48 +22,15 @@
 export const SCATTER_KILL_SET_VERSION = 1;
 export const SCATTER_KILL_SET_HEADER_BYTES = 8;
 
-// Bits per cell axis in a packed key. 4096 cells across a chunk covers a
-// footprint down to about 6cm at the current chunk size — far below anything
-// the library holds — and leaves 8 bits for the layer slot in one u32.
-const CELL_BITS = 12;
-const CELL_MAX = (1 << CELL_BITS) - 1;
-const SLOT_MAX = 255;
-
-/** Cells per chunk axis a key can address. */
-export const SCATTER_KILL_CELL_LIMIT = CELL_MAX + 1;
+// A key packs the layer slot into the top 8 bits, then the chunk-relative cell
+// as 12 bits of y and 12 of x (`kill_key` in crates/terrain/src/scatter.rs).
+// 4096 cells across a chunk covers a footprint down to about 6cm at the current
+// chunk size, far below anything the library holds.
 
 /**
  * The killed instances of one chunk, as packed cell keys.
  */
 export type ScatterKillSet = Set<number>;
-
-/**
- * Packs (layer slot, chunk-relative cell) into one u32 key.
- *
- * Throws rather than returning a sentinel: every value of the packing is a
- * valid key, so there is no spare bit pattern to mean "unaddressable", and a
- * caller that silently dropped one would leave an instance that cannot be
- * plucked with no way to tell. scatterChunk checks the bound per layer up
- * front, so nothing reaches this with an out-of-range cell.
- */
-export function scatterKillKey(
-  slot: number,
-  relCellX: number,
-  relCellY: number
-): number {
-  if (slot < 0 || slot > SLOT_MAX)
-    throw new Error(`Scatter kill slot ${slot} is outside 0..${SLOT_MAX}.`);
-  if (
-    relCellX < 0 ||
-    relCellX > CELL_MAX ||
-    relCellY < 0 ||
-    relCellY > CELL_MAX
-  )
-    throw new Error(
-      `Scatter kill cell (${relCellX}, ${relCellY}) is outside 0..${CELL_MAX}.`
-    );
-  return ((slot << 24) | (relCellY << CELL_BITS) | relCellX) >>> 0;
-}
 
 // ── Persistence ──────────────────────────────────────────────────────────────
 // Layout (little-endian):

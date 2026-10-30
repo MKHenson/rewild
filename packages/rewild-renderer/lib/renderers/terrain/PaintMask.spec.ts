@@ -9,7 +9,6 @@ import {
   PaintStamp,
   paintMaskSize,
   samplePaintMask,
-  samplePaintMaskChannel,
   serializePaintMask,
 } from './PaintMask';
 
@@ -132,34 +131,6 @@ describe('samplePaintMask', () => {
     expect(
       samplePaintMask(mask, CHUNK_SIZE - 1, CHUNK_SIZE - 1, out)
     ).toBeCloseTo(1);
-  });
-});
-
-describe('samplePaintMaskChannel', () => {
-  it('bilinearly interpolates one channel', () => {
-    const mask = createPaintMask(CHUNK_SIZE, CHANNELS, STEP);
-    mask.weights[SIZE * SIZE] = 255; // texel (0,0) of channel 1
-
-    expect(samplePaintMaskChannel(mask, 1, 0, 0)).toBeCloseTo(1);
-    expect(samplePaintMaskChannel(mask, 1, 1, 0)).toBeCloseTo(0.5);
-    expect(samplePaintMaskChannel(mask, 0, 0, 0)).toBe(0);
-  });
-
-  // The point of the single-channel read: scatter densities are independent
-  // quantities, so two full channels are two full channels.
-  it('does not renormalise channels that out-sum 1', () => {
-    const mask = createPaintMask(CHUNK_SIZE, CHANNELS, STEP);
-    mask.weights[0] = 255;
-    mask.weights[SIZE * SIZE] = 255;
-
-    expect(samplePaintMaskChannel(mask, 0, 0, 0)).toBeCloseTo(1);
-    expect(samplePaintMaskChannel(mask, 1, 0, 0)).toBeCloseTo(1);
-  });
-
-  it('reads 0 for a channel the mask does not carry', () => {
-    const mask = createPaintMask(CHUNK_SIZE, CHANNELS, STEP);
-    expect(samplePaintMaskChannel(mask, CHANNELS, 0, 0)).toBe(0);
-    expect(samplePaintMaskChannel(mask, -1, 0, 0)).toBe(0);
   });
 });
 

@@ -1,45 +1,11 @@
 import {
-  SCATTER_KILL_CELL_LIMIT,
   ScatterKillSet,
   deserializeScatterKillSet,
-  scatterKillKey,
   serializeScatterKillSet,
 } from './ScatterKillSet';
 
-describe('scatterKillKey', () => {
-  it('packs slot and cell into one key, distinctly', () => {
-    const keys = new Set([
-      scatterKillKey(0, 0, 0),
-      scatterKillKey(1, 0, 0),
-      scatterKillKey(0, 1, 0),
-      scatterKillKey(0, 0, 1),
-    ]);
-    expect(keys.size).toBe(4);
-  });
-
-  it('addresses the whole cell range', () => {
-    const max = SCATTER_KILL_CELL_LIMIT - 1;
-    expect(scatterKillKey(255, max, max)).toBe(0xffffffff);
-    expect(scatterKillKey(0, 0, 0)).toBe(0);
-  });
-
-  // Every bit pattern is a valid key, so there is no sentinel to return — a
-  // caller that quietly dropped one would leave an unpluckable instance.
-  it('throws rather than folding an out-of-range cell onto another key', () => {
-    expect(() => scatterKillKey(0, SCATTER_KILL_CELL_LIMIT, 0)).toThrow(
-      /outside/
-    );
-    expect(() => scatterKillKey(0, -1, 0)).toThrow(/outside/);
-    expect(() => scatterKillKey(256, 0, 0)).toThrow(/slot/);
-  });
-});
-
 describe('scatter kill set serialization', () => {
-  const kills: ScatterKillSet = new Set([
-    scatterKillKey(2, 40, 7),
-    scatterKillKey(0, 0, 0),
-    scatterKillKey(1, 4095, 4095),
-  ]);
+  const kills: ScatterKillSet = new Set([0x02007028, 0, 0x01ffffff]);
 
   it('round-trips a set', () => {
     const restored = deserializeScatterKillSet(serializeScatterKillSet(kills));

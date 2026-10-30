@@ -1,12 +1,10 @@
 import { Vector2 } from 'rewild-common';
 import {
-  BiomeScatter,
   ClimateConfig,
   MOUNTAIN,
   SelectorBand,
   getClimatePalette,
 } from './Biomes';
-import { resolveScatterDensity } from './LayerWeights';
 import { generateSplatMap } from './Splat';
 
 // The layer rules themselves are unit tested with the Rust splat generator
@@ -104,56 +102,5 @@ describe('the mountain table', () => {
     expect(mid).toBeLessThan(1);
     expect(steep).toBe(1);
     expect(weightsFor(low, 0)[DIRT]).toBe(1);
-  });
-});
-
-describe('resolveScatterDensity', () => {
-  const rule: BiomeScatter = {
-    layer: 'granite_pebble_01',
-    density: 0.4,
-    slope: { from: 40, to: 10 },
-    height: { from: 0, to: 50 },
-  };
-
-  it('is the density scaled by the product of its selectors', () => {
-    expect(resolveScatterDensity(rule, 100, 0, 0)).toBeCloseTo(0.4);
-  });
-
-  it('is zero outside any one selector', () => {
-    expect(resolveScatterDensity(rule, 100, 60, 0)).toBe(0);
-    expect(resolveScatterDensity(rule, -10, 0, 0)).toBe(0);
-  });
-
-  // Rules are independent fields, so nothing here caps at the biome level.
-  it('ignores the noise value when the rule has no noise selector', () => {
-    expect(resolveScatterDensity(rule, 100, 0, 0)).toBe(
-      resolveScatterDensity(rule, 100, 0, 1)
-    );
-  });
-
-  it('applies a noise selector when the rule carries one', () => {
-    const noisy: BiomeScatter = {
-      ...rule,
-      noise: { scale: 100, seedSalt: 1, band: { from: 0.4, to: 0.6 } },
-    };
-    expect(resolveScatterDensity(noisy, 100, 0, 0.2)).toBe(0);
-    expect(resolveScatterDensity(noisy, 100, 0, 0.8)).toBeCloseTo(0.4);
-  });
-
-  // A treeline fades in above the foothills and out again under the snow,
-  // which one ramp cannot say. A pair of bands multiplies into a plateau.
-  it('multiplies a pair of bands into a plateau', () => {
-    const treeline: BiomeScatter = {
-      ...rule,
-      height: [
-        { from: 40, to: 100 },
-        { from: 150, to: 110 },
-      ],
-    };
-    expect(resolveScatterDensity(treeline, 20, 0, 0)).toBe(0);
-    expect(resolveScatterDensity(treeline, 70, 0, 0)).toBeCloseTo(0.2);
-    expect(resolveScatterDensity(treeline, 105, 0, 0)).toBeCloseTo(0.4);
-    expect(resolveScatterDensity(treeline, 130, 0, 0)).toBeCloseTo(0.2);
-    expect(resolveScatterDensity(treeline, 160, 0, 0)).toBe(0);
   });
 });

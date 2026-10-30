@@ -13,8 +13,6 @@ import {
   getClimatePalette,
   validateClimateLayers,
 } from './Biomes';
-import { coastalMoistureAt } from './ClimateField';
-import { resolveCoastWeights, resolveScatterWater } from './LayerWeights';
 import { SCATTER_INSTANCE_STRIDE, scatterChunk } from './Scatter';
 import { generateSplatMap } from './Splat';
 
@@ -37,41 +35,6 @@ function climateFor(
 }
 
 const flat = (height: number) => new Float32Array(SIZE * SIZE).fill(height);
-
-describe('resolveCoastWeights', () => {
-  const out = new Float64Array(3);
-  const c = DEFAULT_COAST;
-
-  it('is dry sand on the beach, wet sand at the waterline and sea bed below', () => {
-    // A narrow blend, so each height sits wholly in one band.
-    const sharp: CoastConfig = { ...c, blend: 0.5 };
-    expect(resolveCoastWeights(sharp, 2, 0, 1, out)).toBeCloseTo(1, 6);
-    expect(Array.from(out)).toEqual([1, 0, 0]);
-
-    resolveCoastWeights(sharp, 0, 0, 1, out);
-    expect(Array.from(out)).toEqual([0, 1, 0]);
-
-    resolveCoastWeights(sharp, -5, 0, 1, out);
-    expect(Array.from(out)).toEqual([0, 0, 1]);
-  });
-
-  it('takes nothing above the beach, on steep ground or away from the ocean', () => {
-    expect(resolveCoastWeights(c, c.beachHeight + c.blend + 1, 0, 1, out)).toBe(0);
-    expect(resolveCoastWeights(c, 1, 45, 1, out)).toBe(0);
-    expect(resolveCoastWeights(c, 1, 0, 0, out)).toBe(0);
-  });
-
-  it('splits exactly its total into non-negative bands, even when blends overlap', () => {
-    const overlapping: CoastConfig = { ...c, wetHeight: 0.2, seabedDepth: 0.5, blend: 3 };
-    for (const coast of [c, overlapping]) {
-      for (let h = -8; h <= 8; h += 0.25) {
-        const total = resolveCoastWeights(coast, h, 10, 0.7, out);
-        expect(out[0] + out[1] + out[2]).toBeCloseTo(total, 9);
-        for (const w of out) expect(w).toBeGreaterThanOrEqual(0);
-      }
-    }
-  });
-});
 
 describe('beach splat', () => {
   const sandChannel = (climate: ClimateConfig) =>
@@ -150,34 +113,6 @@ describe('beach scatter', () => {
   });
 });
 
-describe('resolveScatterWater', () => {
-  const plain = { layer: 'granite_01', density: 1 };
-
-  it('keeps a rule out of the water unless it grows underwater', () => {
-    expect(resolveScatterWater(plain, 2, 1, 1, 0)).toBe(0);
-    expect(resolveScatterWater({ ...plain, underwater: true }, 2, 1, 1, 0)).toBe(1);
-    expect(resolveScatterWater(plain, 2, 0, 1, 0)).toBe(1);
-  });
-
-  it('thins only a rule without water conditions by the beach', () => {
-    expect(resolveScatterWater(plain, -1, 1, 1, 0.75)).toBe(0.25);
-    const shore = { ...plain, waterDepth: { from: -4, to: -2 } };
-    expect(resolveScatterWater(shore, -1, 1, 1, 0.75)).toBe(1);
-  });
-
-  it('grows by depth, coverage and type weight', () => {
-    const shelf = { ...plain, underwater: true, waterDepth: { from: 1, to: 3 } };
-    expect(resolveScatterWater(shelf, 0.5, 1, 1, 0)).toBe(0);
-    expect(resolveScatterWater(shelf, 4, 1, 1, 0)).toBe(1);
-    expect(resolveScatterWater(shelf, 4, 0.5, 1, 0)).toBe(0.5);
-    expect(resolveScatterWater(shelf, 4, 0, 1, 0)).toBe(0);
-
-    const lake = { ...plain, waterType: 'lake' as const };
-    expect(resolveScatterWater(lake, -1, 1, 0, 0)).toBe(0);
-    expect(resolveScatterWater(lake, -1, 1, 0.5, 0)).toBe(0.5);
-  });
-});
-
 describe('water scatter', () => {
   const withRule = (rule: Partial<BiomeScatter>): BiomeParams => ({
     ...PLAIN,
@@ -219,22 +154,5 @@ describe('water scatter', () => {
       lakes: undefined,
     };
     expect(() => validateClimateLayers(climate)).toThrow(/water type 'lake'/);
-  });
-});
-
-describe('coastalMoistureAt', () => {
-  const continent = DEFAULT_CONTINENT;
-
-  it('adds the full amount at the coast and seaward, fading out inland', () => {
-    const amount = continent.coastalMoisture!;
-    const reach = continent.coastalMoistureReach!;
-    expect(coastalMoistureAt(continent, continent.coast - 0.1)).toBe(amount);
-    expect(coastalMoistureAt(continent, continent.coast)).toBe(amount);
-    expect(coastalMoistureAt(continent, continent.coast + reach / 2)).toBeCloseTo(amount / 2, 6);
-    expect(coastalMoistureAt(continent, continent.coast + reach)).toBe(0);
-  });
-
-  it('adds nothing when the continent asks for none', () => {
-    expect(coastalMoistureAt({ ...continent, coastalMoisture: undefined }, 0)).toBe(0);
   });
 });

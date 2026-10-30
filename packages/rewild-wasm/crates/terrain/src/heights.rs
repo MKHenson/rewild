@@ -6,7 +6,7 @@
 //! neighbouring chunks agree exactly where they meet.
 
 use crate::climate::{
-    continent_land_weight, continent_seabed_depth, resolve_biomes, BiomeBlend, ClimateField, ClimateGrid,
+    continent_land_weight, continent_seabed_depth, reachable_biomes, resolve_biomes, BiomeBlend, ClimateField, ClimateGrid,
     ClimateSample,
 };
 use crate::config::{ClimateConfig, Deformation, Octaves};
@@ -362,6 +362,19 @@ impl HeightGenerator {
         self.sample_with(x, y, &values)
     }
 
+    /// The climate values at world sample (x, y), as a chunk interpolates them.
+    pub fn climate_at(&self, x: f64, y: f64) -> ClimateSample {
+        self.field.sample(&self.climate, &self.simplex, x, y)
+    }
+
+    /// `sample` with the climate evaluated at (x, y) rather than interpolated,
+    /// and those values. For maps far coarser than the climate grid, where one
+    /// evaluation costs a quarter of four nodes and differs by under 0.001.
+    pub fn sample_exact(&self, x: f64, y: f64) -> (HeightSample, ClimateSample) {
+        let values = self.field.exact(&self.climate, &self.simplex, x, y);
+        (self.sample_with(x, y, &values), values)
+    }
+
     fn sample_with(&self, x: f64, y: f64, values: &ClimateSample) -> HeightSample {
         let blend = resolve_biomes(&self.climate, values);
 
@@ -391,10 +404,35 @@ impl HeightGenerator {
     /// Sample (i, j) sits at world sample (i - width / 2 + offset_x,
     /// j - height / 2 - offset_y), the convention of every TS terrain field.
     pub fn generate(&self, width: usize, height: usize, offset_x: f64, offset_y: f64) -> Vec<f32> {
-        // A pass moves a cell by its neighbours' moves, and each of those is
-        // shared over the neighbour's own neighbours, so one pass reads two
-        // samples out. The edge, which never moves, spoils two rings a pass.
+        let grid = self.eroded_grid(width, height, offset_x, offset_y);
+        // Every pass or none, so neighbouring chunks erode alike. With nothing
+        // in reach that erodes, no cell would move, so the margin is skipped.
+        let erodes = self.erodes_within(&grid);
+        self.generate_on(&grid, width, height, offset_x, offset_y, erodes)
+    }
+
+    /// The climate grid over a field and the margin its erosion needs. A pass
+    /// moves a cell by its neighbours' moves, and each of those is shared over
+    /// the neighbour's own neighbours, so one pass reads two samples out.
+    pub(crate) fn eroded_grid(&self, width: usize, height: usize, offset_x: f64, offset_y: f64) -> ClimateGrid {
         let margin = self.passes * 2;
+        let (w, h) = (width + margin * 2, height + margin * 2);
+        self.field.grid(&self.climate, &self.simplex, offset_x - w as f64 / 2.0, -offset_y - h as f64 / 2.0, w, h)
+    }
+
+    /// `generate` over `grid`, eroding or not. The edge, which never moves,
+    /// spoils two rings a pass, so erosion runs over a margin it discards.
+    pub(crate) fn generate_on(
+        &self,
+        grid: &ClimateGrid,
+        width: usize,
+        height: usize,
+        offset_x: f64,
+        offset_y: f64,
+        erode: bool,
+    ) -> Vec<f32> {
+        let passes = if erode { self.passes } else { 0 };
+        let margin = passes * 2;
         let field_width = width + margin * 2;
         let field_height = height + margin * 2;
         let x0 = offset_x - field_width as f64 / 2.0;
@@ -404,7 +442,6 @@ impl HeightGenerator {
         let mut heights = vec![0.0f32; cells];
         let mut talus = vec![0.0f32; if margin > 0 { cells } else { 0 }];
         let mut strength = vec![0.0f32; talus.len()];
-        let grid = self.field.grid(&self.climate, &self.simplex, x0, y0, field_width, field_height);
 
         for j in 0..field_height {
             let y = y0 + j as f64;
@@ -424,7 +461,7 @@ impl HeightGenerator {
         if margin == 0 {
             return heights;
         }
-        erode_thermal(&mut heights, field_width, field_height, self.passes, &talus, &strength);
+        erode_thermal(&mut heights, field_width, field_height, passes, &talus, &strength);
 
         let mut out = Vec::with_capacity(width * height);
         for j in 0..height {
@@ -432,6 +469,23 @@ impl HeightGenerator {
             out.extend_from_slice(&heights[start..start + width]);
         }
         out
+    }
+
+    /// Whether any sample `grid` answers can erode: on land, in reach of a
+    /// biome that erodes.
+    pub(crate) fn erodes_within(&self, grid: &ClimateGrid) -> bool {
+        if self.passes == 0 {
+            return false;
+        }
+        let (lo, hi) = grid.bounds();
+        if let Some(c) = &self.climate.continent {
+            if continent_land_weight(c, hi.continent) <= 0.0 {
+                return false;
+            }
+        }
+        reachable_biomes(&self.climate, &lo, &hi)
+            .into_iter()
+            .any(|b| self.climate.biomes[b].erosion.as_ref().is_some_and(|e| e.strength > 0.0 && e.iterations > 0.0))
     }
 
     /// Talus height and erosion strength at one sample, from the weathered
@@ -463,19 +517,28 @@ fn erode_thermal(heights: &mut [f32], width: usize, height: usize, passes: usize
     for _ in 0..passes {
         delta.fill(0.0);
         for y in 1..height - 1 {
+            // Row slices of the cell's row and the rows either side, so the
+            // neighbour reads and writes need no bounds checks of their own.
+            let row = y * width;
+            let (h_up, rest) = heights[row - width..].split_at(width);
+            let (h_row, h_down) = rest.split_at(width);
+            let (d_above, d_rest) = delta.split_at_mut(row);
+            let (d_row, d_below) = d_rest.split_at_mut(width);
+            let d_up = &mut d_above[row - width..];
+            let d_down = &mut d_below[..width];
+            let (s_row, t_row) = (&strength[row..row + width], &talus[row..row + width]);
             for x in 1..width - 1 {
-                let c = x + y * width;
-                let s = strength[c];
+                let s = s_row[x];
                 if s <= 0.0 {
                     continue;
                 }
-                let h = heights[c];
-                let threshold = talus[c];
+                let h = h_row[x];
+                let threshold = t_row[x];
                 let excess = [
-                    h - heights[c - 1] - threshold,
-                    h - heights[c + 1] - threshold,
-                    h - heights[c - width] - threshold,
-                    h - heights[c + width] - threshold,
+                    h - h_row[x - 1] - threshold,
+                    h - h_row[x + 1] - threshold,
+                    h - h_up[x] - threshold,
+                    h - h_down[x] - threshold,
                 ];
 
                 let mut total = 0.0;
@@ -496,13 +559,19 @@ fn erode_thermal(heights: &mut [f32], width: usize, height: usize, passes: usize
                 // never trade the same material back and forth.
                 let moved = s * 0.5 * steepest;
                 let share = moved / total;
-                let neighbours = [c - 1, c + 1, c - width, c + width];
-                for (&n, &e) in neighbours.iter().zip(&excess) {
-                    if e > 0.0 {
-                        delta[n] += e * share;
-                    }
+                if excess[0] > 0.0 {
+                    d_row[x - 1] += excess[0] * share;
                 }
-                delta[c] -= moved;
+                if excess[1] > 0.0 {
+                    d_row[x + 1] += excess[1] * share;
+                }
+                if excess[2] > 0.0 {
+                    d_up[x] += excess[2] * share;
+                }
+                if excess[3] > 0.0 {
+                    d_down[x] += excess[3] * share;
+                }
+                d_row[x] -= moved;
             }
         }
         for (h, d) in heights.iter_mut().zip(&delta) {

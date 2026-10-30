@@ -1,16 +1,13 @@
 import {
-  ARID_CLIMATE,
   BiomeScatter,
   CLIMATE_PRESETS,
   ClimateConfig,
   DEFAULT_CLIMATE,
   DEFAULT_CLIMATE_PRESET,
   MOUNTAIN,
-  getClimateScatterLayers,
   resolveClimatePreset,
   validateBiomeScatter,
 } from './Biomes';
-import { getScatterLayerOrder } from './ScatterLayers';
 
 function climateWithScatter(scatter: BiomeScatter[]): ClimateConfig {
   return {
@@ -40,32 +37,6 @@ describe('resolveClimatePreset', () => {
   });
 });
 
-describe('getClimateScatterLayers', () => {
-  it('lists only the layers a climate actually grows', () => {
-    const grown = new Set(
-      DEFAULT_CLIMATE.biomes.flatMap((biome) =>
-        (biome.scatter ?? []).map((rule) => rule.layer)
-      )
-    );
-    expect(new Set(getClimateScatterLayers(DEFAULT_CLIMATE))).toEqual(grown);
-  });
-
-  // Channels are library slots, so the order has to come from the library
-  // rather than from which biome happened to mention a layer first.
-  it('orders by library slot, not by biome', () => {
-    const library = getScatterLayerOrder();
-    for (const climate of [DEFAULT_CLIMATE, ARID_CLIMATE]) {
-      const slots = getClimateScatterLayers(climate).map((name) =>
-        library.indexOf(name)
-      );
-      expect(slots).toEqual([...slots].sort((a, b) => a - b));
-    }
-  });
-
-  it('is empty for a climate that grows nothing', () => {
-    expect(getClimateScatterLayers(climateWithScatter([]))).toEqual([]);
-  });
-});
 
 describe('validateBiomeScatter', () => {
   it('accepts the shipped presets', () => {

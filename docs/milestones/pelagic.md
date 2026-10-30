@@ -50,8 +50,8 @@ The coast changes the land next to it:
 **How to use it.** Open **Terrain settings** in the editor ribbon. Sea level sits next to the seed
 and the climate. Changing it rebuilds the world.
 
-**Files to look at:** `ClimateField.ts` (the continent field), `Biomes.ts` (the beach, in a
-climate's `coast`).
+**Files to look at:** `climate.rs` in the terrain crate (the continent field), `Biomes.ts` (the
+beach, in a climate's `coast`).
 
 ---
 
