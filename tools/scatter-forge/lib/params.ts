@@ -256,7 +256,7 @@ export const PARAM_SPEC = {
   cardLean: { type: 'number', default: 18, help: 'Degrees a card leans outward from upright over its length.', types: CLUMP },
   cardCurve: { type: 'number', default: 26, byType: { crown: 80 }, help: 'Degrees a card bows over its own length, on top of the lean.', types: CARDED },
   cardSpread: { type: 'number', default: 0.22, help: 'How far card bases sit from the tuft centre, as a fraction of height.', types: CLUMP },
-  cardAspect: { type: 'number', default: 1, byType: { crown: 0.3 }, help: 'Card width as a fraction of its height. A crown cuts its frond texture strips to the same shape.', texture: ['crown'], types: CARDED },
+  cardAspect: { type: 'number', default: 1, byType: { crown: 0.3 }, help: 'Card width as a fraction of its height. A crown, and a clump with blades listed, cut their texture strips to the same shape.', texture: ['crown', 'clump'], types: CARDED },
   normalLean: { type: 'number', default: 0.45, byType: { crown: 0.6 }, help: 'How far every normal leans outward from straight up. 0 faces the whole tuft at the sky.', types: CARDED },
 
   fronds: { type: 'list', default: [], help: 'Folders under sources/fronds whose stamps fill the frond atlas. Empty generates them.', texture: true, types: CROWN },
@@ -268,6 +268,7 @@ export const PARAM_SPEC = {
   frondAngle: { type: 'number', default: 45, help: 'Degrees above horizontal a frond leaves the rosette at, before cardCurve bends it down.', types: CROWN },
   frondVariance: { type: 'number', default: 20, help: 'Random degrees added to each frond angle: the spread between young fronds standing up and old ones hanging.', types: CROWN },
   frondSpan: { type: 'number', default: 0, help: 'Fraction of the stem, down from its top, the fronds attach along. 0 puts every frond at the top; the lowest hang most.', types: CROWN },
+  frondWidth: { type: 'number', default: 1, help: 'Frond card width multiplier that leaves the texture alone. Below 1 squeezes the frond art thinner; above 1 spreads it wider.', types: CROWN },
 
   width: { type: 'number', default: 0, help: 'Metres across the stone along x, before its relief. On a cluster it is the largest pebble, and the rest scale with it. 0 derives it from height.', texture: true, types: STONE },
   depth: { type: 'number', default: 0, help: 'Metres across the stone along z, before its relief. On a cluster it is the largest pebble, and the rest scale with it. 0 derives it from height.', texture: true, types: STONE },
@@ -927,6 +928,8 @@ function validateCrown(params: Params): void {
   if (params.frondSpan < 0 || params.frondSpan > 1)
     throw new Error(`frondSpan must be within 0..1, got ${params.frondSpan}.`);
 
+  if (!(params.frondWidth > 0)) throw new Error(`frondWidth must be positive, got ${params.frondWidth}.`);
+
   validateLeafNormalMode(params);
   validateCards(params);
 }
@@ -1268,7 +1271,7 @@ export function textureKeys(type: ForgeType): (keyof typeof PARAM_SPEC)[] {
 export function sameTexture(a: Params, b: Params): boolean {
   const seen = (params: Params, key: keyof typeof PARAM_SPEC): unknown =>
     key === 'accents'
-      ? params.accents.map((accent) => (params.type === 'crown' ? [accent.stamps, accent.aspect] : accent.stamps))
+      ? params.accents.map((accent) => (params.type === 'crown' || params.type === 'clump' ? [accent.stamps, accent.aspect] : accent.stamps))
       : params[key];
   return a.type === b.type && textureKeys(a.type).every((key) => JSON.stringify(seen(a, key)) === JSON.stringify(seen(b, key)));
 }

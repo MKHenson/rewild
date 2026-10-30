@@ -194,6 +194,17 @@ run tells you the value to use.
 
 ![cardAspect 0.3, 0.7 and 1](images/crown-cardAspect.webp)
 
+### `frondWidth`
+
+Multiplies the width of each frond card without changing the frond texture. Below `1`, the frond
+art is squeezed thinner across its width while its length stays the same. Above `1`, it is spread
+wider. Because nothing is painted again, it also works on a variant with `skipTextures`.
+
+Default: `1`.
+
+To make thin leaves from broad art, use `frondWidth`. To stop wasting texture on see-through card,
+use `cardAspect`.
+
 ### `normalLean`
 
 How far the lighting direction of each frond leans out from straight up. `0` lights all fronds as if

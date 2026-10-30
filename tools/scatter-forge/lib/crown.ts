@@ -252,7 +252,7 @@ function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, atlas
     // Frond 0 is always full length, so frondLength means what it says. The
     // rest fall short, or the rosette comes to a machined rim.
     const frondLength = params.frondLength * (frond === 0 ? 1 : rng.range(0.75, 1));
-    const halfWidth = (frondLength * params.cardAspect) / 2;
+    const halfWidth = (frondLength * params.cardAspect * params.frondWidth) / 2;
 
     // Off the stem's surface rather than its axis. A fern has no stem, and its
     // fronds still leave a crown a few centimetres across.

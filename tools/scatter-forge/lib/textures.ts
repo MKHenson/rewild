@@ -809,8 +809,8 @@ const bladeStyle: StyleFor = (params, rng, rect, variant) => ({
 });
 
 /**
- * The clump atlas: one whole stamp per cell, or generated tufts where none are
- * listed.
+ * The clump atlas: one whole stamp per `cardAspect` strip, or generated tufts
+ * on a square grid where none are listed.
  *
  * Only `cells` of the grid are painted. The mesh is handed the same number, so
  * a card never addresses a cell nothing drew.
@@ -819,10 +819,10 @@ export function buildBladeCanvas(params: Params, source: LeafSource | null = nul
   const size = params.textureSize;
   const gutter = gutterFor(size);
   const layout = atlasLayoutFor(params, source, accents);
-  const rects = leafCellPixels(size, layout.grid).slice(0, layout.cells);
+  const rects = cellPixels(size, layout).slice(0, layout.cells);
 
   if (source) {
-    const fit = fitClump(source, size, layout.grid);
+    const fit = fitClump(source, size, layout);
     const canvas = createCanvas(size, size, gradientGainFor(source, params, fit.cellPx));
 
     rects.forEach((rect, index) => {

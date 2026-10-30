@@ -736,11 +736,8 @@ function fitStamps(source: LeafSource, inner: number, { grid, cells }: StampAtla
   return { grid, cells, cellPx: Math.round(inner), placedPx, sourcePx };
 }
 
-/** `imageGrid` is the grid the image is actually cut on, where accents have
- *  pushed it past the one the stamps alone would take. */
-export function fitClump(source: LeafSource, textureSize: number, imageGrid?: number): StampFit {
-  const atlas = clumpAtlas(source);
-  return fitStamps(source, textureSize / (imageGrid ?? atlas.grid) - 2 * gutterFor(textureSize), atlas);
+export function fitClump(source: LeafSource, textureSize: number, layout: AtlasLayout): StampFit {
+  return fitStamps(source, cellInnerPx(textureSize, layout), clumpAtlas(source));
 }
 
 export function fitCrown(source: LeafSource, textureSize: number, layout: AtlasLayout): StampFit {
@@ -754,8 +751,9 @@ export function fitAccent(source: LeafSource, textureSize: number, layout: Atlas
 
 /**
  * The cutout image's layout for a set being written: the host's cells from
- * its own sources, then each accent's stamps. A crown's are strips; the
- * others' a square grid.
+ * its own sources, then each accent's stamps. A crown's and a sourced clump's
+ * are strips; the others' a square grid. Generated blades are painted for a
+ * square cell, so they keep it.
  */
 export function atlasLayoutFor(params: Params, host: LeafSource | null, accents: LeafSource[]): AtlasLayout {
   const cells =
@@ -765,9 +763,9 @@ export function atlasLayoutFor(params: Params, host: LeafSource | null, accents:
       ? crownAtlas(host).cells
       : leafGrid(host, params.leafSize, params.leafGrid) ** 2;
   const accentCells = accents.map((source) => source.stamps.length);
-  if (params.type !== 'crown') return layoutAtlas(cells, accentCells);
+  if (params.type !== 'crown' && !(params.type === 'clump' && host)) return layoutAtlas(cells, accentCells);
 
-  // A crown's cells are strips of the cards that sample them.
+  // Strips of the cards that sample them.
   const aspects = [
     ...Array<number>(cells).fill(params.cardAspect),
     ...accentCells.flatMap((count, index) => Array<number>(count).fill(params.accents[index].aspect)),

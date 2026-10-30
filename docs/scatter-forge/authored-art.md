@@ -124,13 +124,14 @@ a larger source image.
 "fronds": ["palm/palm-01", "palm/palm-02"]
 ```
 
-- Each set is one whole tuft or one whole frond. Each set gets one square cell in the texture.
+- Each set is one whole tuft or one whole frond. Each set gets one strip in the texture, shaped
+  like its card (`cardAspect`).
 - Draw the base at the **bottom-middle** and the top at the **top-middle**. The tool does not turn
   the picture.
-- The grid is the smallest square that holds all the sets. For example, 4 sets make a 2x2 grid and
-  10 sets make a 4x4 grid with 6 empty cells. The cards use only the filled cells.
-- A frond uses only a column of its cell that is `cardAspect` wide. If the frond is wider, the card
-  cuts its sides and the run tells you the `cardAspect` to use.
+- The strips are placed side by side in rows, as tall as the texture allows. Set `cardAspect` close
+  to the width of the art, or the strip carries see-through space on both sides.
+- If a picture is wider than `cardAspect`, it is painted smaller to fit its strip, and the run tells
+  you the `cardAspect` to use.
 
 `source.json` for a clump:
 
