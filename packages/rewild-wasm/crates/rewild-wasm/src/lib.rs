@@ -65,6 +65,39 @@ pub fn build_bvh(
     })
 }
 
+/// A far map for the horizon, built a few rows at a time. See
+/// `terrain::FarMap`. Take its arrays once it is done, then call `free()`.
+#[wasm_bindgen]
+pub struct FarMapBuild(terrain::FarMap);
+
+#[wasm_bindgen]
+impl FarMapBuild {
+    /// A map of `texels`² over `span` metres centred on world (`centreX`,
+    /// `centreZ`).
+    #[wasm_bindgen(constructor)]
+    pub fn new(centre_x: f64, centre_z: f64, span: f64, texels: u32) -> FarMapBuild {
+        FarMapBuild(terrain::FarMap::new(centre_x, centre_z, span, texels as usize))
+    }
+
+    /// Builds up to `rows` more rows of `generator`'s world; returns whether
+    /// the map is complete.
+    pub fn build(&mut self, generator: &TerrainGenerator, rows: u32) -> bool {
+        self.0.build(&generator.heights, &generator.splat, rows as usize)
+    }
+
+    /// rg16float bits per texel: height, then continent.
+    #[wasm_bindgen(js_name = takeGround)]
+    pub fn take_ground(&mut self) -> Vec<u16> {
+        std::mem::take(&mut self.0.ground)
+    }
+
+    /// Palette weights as two RGBA8 planes.
+    #[wasm_bindgen(js_name = takeWeights)]
+    pub fn take_weights(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.0.weights)
+    }
+}
+
 /// A built chunk mesh. Take each array once, then call `free()`.
 #[wasm_bindgen]
 pub struct TerrainMeshBuild(terrain::mesh::Mesh);
@@ -113,6 +146,126 @@ pub fn build_terrain_mesh(
 pub struct TerrainGenerator {
     heights: terrain::HeightGenerator,
     splat: terrain::SplatGenerator,
+    scatter: terrain::ScatterGenerator,
+}
+
+/// An owned paint mask, copied in for one call.
+struct OwnedMask {
+    weights: Vec<u8>,
+    size: usize,
+    step: f64,
+}
+
+impl OwnedMask {
+    fn view(&self) -> terrain::PaintMask<'_> {
+        terrain::PaintMask {
+            size: self.size,
+            step: self.step,
+            channels: self.weights.len() / (self.size * self.size),
+            weights: &self.weights,
+        }
+    }
+}
+
+fn owned_mask(weights: Vec<u8>, size: u32, step: u32) -> Result<OwnedMask, JsError> {
+    let plane = (size * size) as usize;
+    if plane == 0 || !weights.len().is_multiple_of(plane) {
+        return Err(JsError::new("Paint mask weights do not fill whole planes."));
+    }
+    Ok(OwnedMask { weights, size: size as usize, step: step as f64 })
+}
+
+/// What a chunk adds to scatter placement. See `terrain::ScatterRequest`.
+#[wasm_bindgen]
+#[derive(Default)]
+pub struct ScatterRequestData {
+    biome_mask: Option<OwnedMask>,
+    density_mask: Option<OwnedMask>,
+    kills: Vec<u32>,
+    region: Option<terrain::scatter::SampleBox>,
+    with_ids: bool,
+    water_edit: Option<terrain::WaterEdit>,
+}
+
+#[wasm_bindgen]
+impl ScatterRequestData {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> ScatterRequestData {
+        ScatterRequestData::default()
+    }
+
+    /// The chunk's painted biomes, channel-major planes.
+    #[wasm_bindgen(js_name = setBiomeMask)]
+    pub fn set_biome_mask(&mut self, weights: Vec<u8>, size: u32, step: u32) -> Result<(), JsError> {
+        self.biome_mask = Some(owned_mask(weights, size, step)?);
+        Ok(())
+    }
+
+    /// The chunk's painted scatter density, channel-major planes.
+    #[wasm_bindgen(js_name = setDensityMask)]
+    pub fn set_density_mask(&mut self, weights: Vec<u8>, size: u32, step: u32) -> Result<(), JsError> {
+        self.density_mask = Some(owned_mask(weights, size, step)?);
+        Ok(())
+    }
+
+    /// Kill keys of the chunk's plucked instances, in any order.
+    #[wasm_bindgen(js_name = setKills)]
+    pub fn set_kills(&mut self, mut keys: Vec<u32>) {
+        keys.sort_unstable();
+        self.kills = keys;
+    }
+
+    /// Places only the cells overlapping chunk samples (x0, y0)–(x1, y1).
+    #[wasm_bindgen(js_name = setRegion)]
+    pub fn set_region(&mut self, x0: f64, y0: f64, x1: f64, y1: f64) {
+        self.region = Some(terrain::scatter::SampleBox { x0, y0, x1, y1 });
+    }
+
+    /// Report each instance's kill key.
+    #[wasm_bindgen(js_name = setWithIds)]
+    pub fn set_with_ids(&mut self, with_ids: bool) {
+        self.with_ids = with_ids;
+    }
+
+    #[wasm_bindgen(js_name = setWaterEdit)]
+    pub fn set_water_edit(&mut self, edit: WaterEditData) {
+        self.water_edit = Some(edit.0);
+    }
+}
+
+/// A chunk's scatter, one entry per layer that placed anything, in slot
+/// order. Take each layer's arrays once, then call `free()`.
+#[wasm_bindgen]
+pub struct ScatterBuild(Vec<terrain::scatter::LayerInstances>);
+
+#[wasm_bindgen]
+impl ScatterBuild {
+    #[wasm_bindgen(getter, js_name = layerCount)]
+    pub fn layer_count(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Entry `i`'s library slot.
+    pub fn slot(&self, i: usize) -> usize {
+        self.0[i].slot
+    }
+
+    /// Entry `i`'s instance count.
+    pub fn count(&self, i: usize) -> usize {
+        self.0[i].count
+    }
+
+    /// Entry `i`'s instances, `INSTANCE_STRIDE` floats each.
+    #[wasm_bindgen(js_name = takeData)]
+    pub fn take_data(&mut self, i: usize) -> Vec<f32> {
+        std::mem::take(&mut self.0[i].data)
+    }
+
+    /// Entry `i`'s kill keys; empty unless asked for.
+    #[wasm_bindgen(js_name = takeIds)]
+    pub fn take_ids(&mut self, i: usize) -> Vec<u32> {
+        std::mem::take(&mut self.0[i].ids)
+    }
 }
 
 fn from_js<T: serde::de::DeserializeOwned>(value: JsValue) -> Result<T, JsError> {
@@ -244,63 +397,30 @@ impl WaterMapBuild {
     }
 }
 
-/// The water of one chunk at any point in it. Call `free()` when done.
-#[wasm_bindgen]
-pub struct WaterSampler {
-    sampler: terrain::WaterSampler,
-    last: terrain::WaterPoint,
-}
-
-#[wasm_bindgen]
-impl WaterSampler {
-    /// The water's coverage at chunk sample (x, y), 0..1. The getters read
-    /// the rest of the sample. Passes no arrays, so a call allocates nothing.
-    pub fn sample(&mut self, x: f64, y: f64) -> f64 {
-        self.last = self.sampler.sample(x, y);
-        self.last.coverage
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn level(&self) -> f64 {
-        self.last.level
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn ocean(&self) -> f64 {
-        self.last.ocean
-    }
-
-    #[wasm_bindgen(getter, js_name = bodyId)]
-    pub fn body_id(&self) -> u32 {
-        self.last.body_id
-    }
-
-    /// Weight of water type `index` at the last sample.
-    #[wasm_bindgen(js_name = typeWeight)]
-    pub fn type_weight(&self, index: usize) -> f64 {
-        self.last.types.get(index).copied().unwrap_or(0.0)
-    }
-}
-
 #[wasm_bindgen]
 impl TerrainGenerator {
     /// `climate` is a `ClimateConfig`; `splat` is `{ palette, coastMaterials }`
-    /// (see `terrain::SplatSpec`). Throws if either is invalid.
+    /// (see `terrain::SplatSpec`); `scatterLayers` is the scatter layer library
+    /// in slot order. Throws if any is invalid.
     #[wasm_bindgen(constructor)]
     pub fn new(
         climate: JsValue,
         splat: JsValue,
+        scatter_layers: JsValue,
         seed: f64,
         sea_level: f64,
         meters_per_sample: f64,
     ) -> Result<TerrainGenerator, JsError> {
         let climate: terrain::ClimateConfig = from_js(climate)?;
         let spec: terrain::SplatSpec = from_js(splat)?;
+        let layers: Vec<terrain::ScatterLayer> = from_js(scatter_layers)?;
+        let scatter = terrain::ScatterGenerator::new(climate.clone(), layers, seed, sea_level, meters_per_sample)
+            .map_err(|e| JsError::new(&e))?;
         let heights = terrain::HeightGenerator::new(climate.clone(), seed, sea_level, meters_per_sample)
             .map_err(|e| JsError::new(&e))?;
         let splat = terrain::SplatGenerator::new(climate, &spec, seed, sea_level, meters_per_sample)
             .map_err(|e| JsError::new(&e))?;
-        Ok(TerrainGenerator { heights, splat })
+        Ok(TerrainGenerator { heights, splat, scatter })
     }
 
     /// A `width` × `height` height field at chunk offset (`offsetX`,
@@ -317,6 +437,41 @@ impl TerrainGenerator {
     /// The un-eroded, uncarved ground at lake-space (u, v).
     pub fn ground(&self, u: f64, v: f64) -> f64 {
         self.heights.sample(u, v).height
+    }
+
+    /// The biomes at lake-space (u, v), as a chunk resolves them, into
+    /// `biomes` and `weights`; returns how many. `maskWeights` is the painted
+    /// biome mask of the chunk there, if any (empty for none), and (`localX`,
+    /// `localY`) the point's sample in that chunk. Each output holds the
+    /// climate's biome count plus four.
+    #[wasm_bindgen(js_name = biomesAt)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn biomes_at(
+        &self,
+        u: f64,
+        v: f64,
+        mask_weights: &[u8],
+        mask_size: u32,
+        mask_step: u32,
+        local_x: f64,
+        local_y: f64,
+        biomes: &mut [i32],
+        weights: &mut [f64],
+    ) -> usize {
+        let mask = (!mask_weights.is_empty()).then(|| terrain::PaintMask {
+            size: mask_size as usize,
+            step: mask_step as f64,
+            channels: mask_weights.len() / (mask_size * mask_size) as usize,
+            weights: mask_weights,
+        });
+        let climate = self.heights.climate();
+        let mut active = terrain::paint::ActiveBiomes::new(climate, mask.as_ref());
+        active.resolve(climate, &self.heights.climate_at(u, v), mask.as_ref(), local_x, local_y);
+        for i in 0..active.count {
+            biomes[i] = active.biomes[i] as i32;
+            weights[i] = active.weights[i];
+        }
+        active.count
     }
 
     /// Every lake whose bank reaches the lake-space box [u0, u1] × [v0, v1],
@@ -378,14 +533,30 @@ impl TerrainGenerator {
         .map(WaterMapBuild)
     }
 
-    /// A sampler over the water of a `chunkSize` chunk at chunk offset
-    /// (`offsetX`, `offsetY`), with `edit` over it.
-    #[wasm_bindgen(js_name = waterSampler)]
-    pub fn water_sampler(&self, chunk_size: u32, offset_x: f64, offset_y: f64, edit: Option<WaterEditData>) -> WaterSampler {
-        WaterSampler {
-            sampler: terrain::WaterSampler::new(&self.heights, chunk_size as usize, offset_x, offset_y, edit.map(|e| e.0)),
-            last: terrain::WaterPoint::default(),
-        }
+    /// Every scatter instance a `chunkSize` chunk at chunk offset (`offsetX`,
+    /// `offsetY`) with LOD-0 `heights` carries. See
+    /// `terrain::ScatterGenerator::generate`.
+    pub fn scatter(
+        &self,
+        heights: &[f32],
+        chunk_size: u32,
+        offset_x: f64,
+        offset_y: f64,
+        request: ScatterRequestData,
+    ) -> Result<ScatterBuild, JsError> {
+        let request_data = request;
+        let request = terrain::ScatterRequest {
+            biome_mask: request_data.biome_mask.as_ref().map(OwnedMask::view),
+            density_mask: request_data.density_mask.as_ref().map(OwnedMask::view),
+            kills: &request_data.kills,
+            region: request_data.region,
+            with_ids: request_data.with_ids,
+            water_edit: request_data.water_edit,
+        };
+        self.scatter
+            .generate(&self.heights, heights, chunk_size as usize, offset_x, offset_y, request)
+            .map(ScatterBuild)
+            .map_err(|e| JsError::new(&e))
     }
 
     /// Writes the inclusive texel window (`x0`, `y0`)–(`x1`, `y1`) of a chunk's

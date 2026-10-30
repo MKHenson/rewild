@@ -5,26 +5,8 @@ import {
   SPLAT_BYTES_PER_TEXEL,
   validateClimateLayers,
 } from './Biomes';
-import { ClimateField, oceanCoverage, sampleContinent } from './ClimateField';
-import { resolveCoastWeights } from './LayerWeights';
-import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { PaintMask } from './PaintMask';
 import { terrainGenerator } from './TerrainGenerator';
-
-// World units between adjacent heightmap samples — the run that the rise between
-// neighbours is taken over, so the slope below comes out in real degrees.
-//
-// This was hardcoded to 1, with a comment claiming "241 samples spanning 240
-// units". That stopped being true when the terrain gained a world scale: a chunk
-// spans (chunkSize - 1) * TERRAIN_METERS_PER_SAMPLE, so the run is 2 m, not 1.
-// Dividing the rise by half the real run made every slope read about twice its
-// true steepness — atan(dh/1) where it should be atan(dh/2) — so a band written
-// as 35°-75° actually opened at a true 19°, and cliff materials spread across
-// ground that is merely rolling. Deriving it from the constant means it cannot
-// drift from the world scale again.
-const SAMPLE_SPACING = TERRAIN_METERS_PER_SAMPLE;
-
-const RAD_TO_DEG = 180 / Math.PI;
 
 /** An inclusive texel window of a chunk's splat map. */
 export interface SplatRegion {
@@ -51,75 +33,6 @@ export interface SplatOptions {
   region?: SplatRegion;
   /** World height of the sea, which the beach bands are measured from. */
   seaLevel?: number;
-}
-
-/**
- * The beach's weights at chunk-local sample (x, y), written into `out` as
- * [dry sand, wet sand, sea bed] (see resolveCoastWeights); returns their sum,
- * the share the beach takes. 0 for a climate without a coast or continent.
- */
-export function coastWeightsAt(
-  field: ClimateField,
-  heightAboveSea: number,
-  slopeDegrees: number,
-  x: number,
-  y: number,
-  out: Float64Array
-): number {
-  const { coast, continent } = field.climate;
-  if (!coast || !continent) return 0;
-  // Most ground stands above the beach; skip the continent noise there.
-  if (heightAboveSea >= coast.beachHeight + coast.blend) return 0;
-  const nearness = oceanCoverage(continent, sampleContinent(field, x, y));
-  if (nearness <= 0) return 0;
-  return resolveCoastWeights(coast, heightAboveSea, slopeDegrees, nearness, out);
-}
-
-/**
- * The heightfield's central-difference gradient at sample (x, y), written into
- * `out` as [dh/dx, dh/dy] — the shared basis for slope and surface normal.
- *
- * Edge samples fall back to a one-sided difference, which disagrees very
- * slightly with the same world position computed from the neighbouring chunk
- * (which has that sample in its interior). The disagreement is second-order in
- * the terrain's curvature and the layer selectors smoothstep over ~20°, so it
- * stays far below one quantisation step — but it is the reason a visible seam,
- * if one ever appears in the splat, would appear at chunk borders first.
- */
-export function heightGradientAt(
-  heights: Float32Array,
-  width: number,
-  height: number,
-  x: number,
-  y: number,
-  out: Float64Array
-): void {
-  const x0 = x > 0 ? x - 1 : x;
-  const x1 = x < width - 1 ? x + 1 : x;
-  const y0 = y > 0 ? y - 1 : y;
-  const y1 = y < height - 1 ? y + 1 : y;
-
-  out[0] =
-    (heights[y * width + x1] - heights[y * width + x0]) /
-    ((x1 - x0) * SAMPLE_SPACING);
-  out[1] =
-    (heights[y1 * width + x] - heights[y0 * width + x]) /
-    ((y1 - y0) * SAMPLE_SPACING);
-}
-
-const _gradient = new Float64Array(2);
-
-export function slopeDegreesAt(
-  heights: Float32Array,
-  width: number,
-  height: number,
-  x: number,
-  y: number
-): number {
-  heightGradientAt(heights, width, height, x, y, _gradient);
-  const dhdx = _gradient[0];
-  const dhdy = _gradient[1];
-  return Math.atan(Math.sqrt(dhdx * dhdx + dhdy * dhdy)) * RAD_TO_DEG;
 }
 
 /**

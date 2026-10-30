@@ -3,16 +3,22 @@
 
 pub mod climate;
 pub mod config;
+pub mod far;
 pub mod heights;
 pub mod lakes;
 pub mod mesh;
+pub mod paint;
+pub mod scatter;
 pub mod splat;
 pub mod water;
 
 pub use config::ClimateConfig;
+pub use far::FarMap;
 pub use heights::HeightGenerator;
 pub use lakes::{CellReport, Lake, Lakes};
-pub use splat::{PaintMask, Region, SplatGenerator, SplatSpec};
+pub use paint::PaintMask;
+pub use scatter::{ScatterGenerator, ScatterLayer, ScatterRequest};
+pub use splat::{Region, SplatGenerator, SplatSpec};
 pub use water::{WaterEdit, WaterMap, WaterPoint, WaterSampler};
 
 #[cfg(test)]

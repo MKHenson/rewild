@@ -1,4 +1,3 @@
-import { Vector2 } from 'rewild-common';
 import {
   ARID_CLIMATE,
   ARID_CLIMATE_PRESET,
@@ -6,8 +5,6 @@ import {
   DEFAULT_CLIMATE_PRESET,
 } from './Biomes';
 import { BiomeProbe, BiomeProbeTerrain } from './BiomeProbe';
-import { createClimateField, resolveBiomeWeights } from './ClimateField';
-import { worldToLakeSpace } from './Lakes';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { PaintMask, createPaintMask } from './PaintMask';
 
@@ -52,34 +49,22 @@ for (let i = 0; i < 40; i++)
   POINTS.push([((i * 7919) % 60000) - 30000, ((i * 104729) % 60000) - 30000]);
 
 describe('BiomeProbe', () => {
-  it('matches the world climate field where nothing is painted', () => {
+  it('resolves the climate where nothing is painted, weights summing to 1', () => {
     const terrain = makeTerrain();
     const probe = new BiomeProbe();
-    const field = createClimateField(
-      0,
-      0,
-      SEED,
-      new Vector2(0, 0),
-      DEFAULT_CLIMATE
-    );
-    const lakeSpace = new Float64Array(2);
-    const biomes = new Int32Array(4);
-    const weights = new Float64Array(4);
-
+    const dominant = new Set<number>();
     for (const [x, z] of POINTS) {
-      probe.probe(terrain, x, z);
-      worldToLakeSpace(x, z, lakeSpace);
-      const count = resolveBiomeWeights(
-        field,
-        lakeSpace[0],
-        lakeSpace[1],
-        biomes,
-        weights
-      );
-      expect(probe.count).toBe(count);
-      for (let i = 0; i < count; i++)
-        expect(probedWeight(probe, biomes[i])).toBeCloseTo(weights[i], 6);
+      expect(probe.probe(terrain, x, z)).toBeGreaterThan(0);
+      expect(sum(probe)).toBeCloseTo(1, 9);
+      let best = 0;
+      for (let i = 0; i < probe.count; i++) {
+        expect(probe.biomes![i]).toBeLessThan(DEFAULT_CLIMATE.biomes.length);
+        if (probe.weights![i] > probe.weights![best]) best = i;
+      }
+      dominant.add(probe.biomes![best]);
     }
+    // The points lie a long way apart in climate.
+    expect(dominant.size).toBeGreaterThan(1);
   });
 
   it('gives a fully painted biome all the weight', () => {

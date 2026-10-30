@@ -109,49 +109,7 @@ export function isPaintMaskChannelEmpty(
 }
 
 /**
- * Bilinearly samples one channel at LOD-0 sample (x, y) as a 0..1 weight.
- *
- * The counterpart to samplePaintMask for masks whose channels are independent
- * quantities rather than a budget shared between them — a scatter layer's
- * density says nothing about its neighbour slot's, so there is nothing to
- * renormalise and no reason to read the other planes.
- */
-export function samplePaintMaskChannel(
-  mask: PaintMask,
-  channel: number,
-  x: number,
-  y: number
-): number {
-  if (channel < 0 || channel >= mask.channels) return 0;
-
-  const { size, step, weights } = mask;
-  const max = size - 1;
-
-  const fx = x / step;
-  const fy = y / step;
-  let x0 = Math.floor(fx);
-  let y0 = Math.floor(fy);
-  if (x0 < 0) x0 = 0;
-  else if (x0 > max) x0 = max;
-  if (y0 < 0) y0 = 0;
-  else if (y0 > max) y0 = max;
-  const x1 = x0 < max ? x0 + 1 : x0;
-  const y1 = y0 < max ? y0 + 1 : y0;
-  const tx = fx - x0;
-  const ty = fy - y0;
-
-  const base = channel * size * size;
-  const w00 = weights[base + y0 * size + x0];
-  const w10 = weights[base + y0 * size + x1];
-  const w01 = weights[base + y1 * size + x0];
-  const w11 = weights[base + y1 * size + x1];
-
-  const top = w00 + (w10 - w00) * tx;
-  const bottom = w01 + (w11 - w01) * tx;
-  return (top + (bottom - top) * ty) / 255;
-}
-
-/**
+ * Bilinearly samples every channel/**
  * Bilinearly samples every channel at LOD-0 sample (x, y) into `out` (length
  * >= mask.channels, caller-owned scratch) as 0..1 weights, and returns their
  * total.

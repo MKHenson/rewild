@@ -12,12 +12,22 @@ import {
   BuildChunkMeshRequest,
   ChunkMeshTimings,
 } from '../lib/renderers/terrain/worker/buildChunkMesh';
-import { DEFAULT_CLIMATE_PRESET } from '../lib/renderers/terrain/Biomes';
+import {
+  DEFAULT_CLIMATE_PRESET,
+  resolveClimatePreset,
+} from '../lib/renderers/terrain/Biomes';
 import { assembleApron } from '../lib/renderers/terrain/ApronRing';
 import { BVHOptions } from '../lib/acceleration/BVHNode';
 import { DEFAULT_BVH_CONFIG } from '../lib/acceleration/BVHConfig';
 import { buildBVHWasm } from '../lib/acceleration/BVHWasm';
 import { loadRewildWasmSync } from '../lib/wasm/RewildWasm';
+import {
+  FAR_MAP_TEXELS,
+  FarMapBuilder,
+  NEAR_FAR_MAP_SPAN,
+  NEAR_FAR_MAP_TEXELS,
+  WIDE_FAR_MAP_SPAN,
+} from '../lib/renderers/water/HorizonCoverage';
 import {
   BenchOptions,
   CaseResult,
@@ -134,6 +144,21 @@ async function main() {
   bench('terrain lod 0 + scatter', (i) =>
     timeChunk({ ...chunkRequest(0, i), scatter: true })
   );
+
+  // A whole far map rebuild of each HorizonOcean level. In the game it is
+  // spread over frames; this is its total.
+  const climate = resolveClimatePreset(DEFAULT_CLIMATE_PRESET);
+  for (const [level, span, texels] of [
+    ['near', NEAR_FAR_MAP_SPAN, NEAR_FAR_MAP_TEXELS],
+    ['wide', WIDE_FAR_MAP_SPAN, FAR_MAP_TEXELS],
+  ] as const) {
+    bench(`far map ${level}`, (i) => {
+      const position = POSITIONS[i % POSITIONS.length];
+      const started = performance.now();
+      new FarMapBuilder(SEED, climate, position.x, position.y, span, texels).build();
+      return { total: performance.now() - started };
+    });
+  }
 
   for (const lod of BVH_LODS) {
     const meshes = POSITIONS.map((_, i) =>

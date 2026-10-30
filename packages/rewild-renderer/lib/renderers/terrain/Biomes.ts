@@ -1044,18 +1044,6 @@ export function getCoastMaterials(
   return [coast.sand, wet, coast.seabed ?? wet];
 }
 
-// Every scatter layer this climate grows, in library slot order rather than
-// biome order — a paint mask's channels are library slots, so it stays readable
-// when a biome's rules change. The splat channel budget is what forces
-// getClimatePalette into the opposite trade.
-export function getClimateScatterLayers(climate: ClimateConfig): string[] {
-  const used = new Set<string>();
-  for (const biome of climate.biomes)
-    for (const rule of biome.scatter ?? []) used.add(rule.layer);
-
-  return Object.keys(SCATTER_LAYERS).filter((name) => used.has(name));
-}
-
 // Run by validateClimateLayers, so a bad rule surfaces at world load rather
 // than at the first scattered chunk.
 export function validateBiomeScatter(climate: ClimateConfig): void {

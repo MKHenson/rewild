@@ -1,8 +1,4 @@
-import { Vector2 } from 'rewild-common';
-import {
-  WaterSampler as WasmWaterSampler,
-  WaterEditData,
-} from '../../../../rewild-wasm/pkg/rewild_wasm';
+import { WaterEditData } from '../../../../rewild-wasm/pkg/rewild_wasm';
 import { ClimateConfig } from './Biomes';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { terrainGenerator } from './TerrainGenerator';
@@ -190,66 +186,4 @@ export function waterEditData(
     edit.level,
     edit.bodyIds
   );
-}
-
-/**
- * The water of one chunk at any point in it: the ocean from the continent, the
- * lakes that reach it, and its edit over both. sampleWater writes its answer
- * into the fields below. Free it when done.
- */
-export interface WaterSampler {
-  wasm: WasmWaterSampler;
-  /** Surface height at the last sample. */
-  level: number;
-  /** The ocean's coverage at the last sample. */
-  ocean: number;
-  /** The body that owns the last sample. */
-  bodyId: number;
-}
-
-/** A water sampler over a `chunkSize` chunk at chunk offset `offset`. */
-export function createWaterSampler(
-  chunkSize: number,
-  seed: number,
-  offset: Vector2,
-  climate: ClimateConfig,
-  seaLevel: number,
-  edit: WaterEdit | null
-): WaterSampler {
-  return {
-    wasm: terrainGenerator(seed, climate, seaLevel).waterSampler(
-      chunkSize,
-      offset.x,
-      offset.y,
-      waterEditData(edit)
-    ),
-    level: seaLevel,
-    ocean: 0,
-    bodyId: OCEAN_BODY_ID,
-  };
-}
-
-/**
- * The water's coverage at chunk sample (x, y), 0..1, with the palette's type
- * weights written into `types`. Also sets the sampler's level, ocean and
- * bodyId. Water shows where coverage is above zero and the ground is below
- * the level.
- */
-export function sampleWater(
-  s: WaterSampler,
-  x: number,
-  y: number,
-  types: Float64Array
-): number {
-  const wasm = s.wasm;
-  const coverage = wasm.sample(x, y);
-  s.level = wasm.level;
-  s.ocean = wasm.ocean;
-  s.bodyId = wasm.bodyId;
-  for (let c = 0; c < types.length; c++) types[c] = wasm.typeWeight(c);
-  return coverage;
-}
-
-export function freeWaterSampler(s: WaterSampler): void {
-  s.wasm.free();
 }

@@ -148,19 +148,23 @@ The cost is a fixed limit on loaded chunks. Do not build the arena until a measu
 - Remove `BVHConfig.wasmWorkerBuilds` and the worker's JS fallback. Delete `BVHBuilder.ts`.
 - Tests compare the BVH against a brute-force raycast.
 
-### Phase 2: Terrain generation
+### Phase 2: Terrain generation (done)
 
-This is the largest win the player can see. Medians for one 241 × 241 chunk on an Apple M5:
+This is the largest win the player can see. Medians for one 241 × 241 chunk on a Ryzen 9 9950X3D:
 
-| Stage                                 | Cost        | Notes              |
-| ------------------------------------- | ----------- | ------------------ |
-| Heights (noise, biome blend, erosion) | 26 to 33 ms | Every chunk, once. |
-| Scatter placement                     | about 48 ms | Near chunks, once. |
-| Splat                                 | 12 to 16 ms | Every chunk, once. |
-| Mesh and normals                      | 0.1 to 6 ms | Every LOD.         |
-| Water map                             | under 1 ms  | Every chunk, once. |
+| Stage                                 | JS          | Rust         | Notes              |
+| ------------------------------------- | ----------- | ------------ | ------------------ |
+| Heights (noise, biome blend, erosion) | 36 to 50 ms | 7 to 19 ms   | Every chunk, once. |
+| Scatter placement                     | about 60 ms | 6 ms         | Near chunks, once. |
+| Splat                                 | 15 to 22 ms | 5 ms         | Every chunk, once. |
+| Mesh and normals                      | 0.1 to 6 ms | 0.02–0.7 ms  | Every LOD.         |
+| Water map                             | 2.7 ms      | 0.4 ms       | Every chunk, once. |
 
-Port in this order: heights, splat, water map, mesh, scatter. The end state is `buildChunkMesh` as one Rust call per chunk, with the climate presets passed in as data. Then the JS generator is deleted.
+A near chunk (LOD 0 with scatter) fell from about 125 ms to 20 ms, a far chunk from about 65 ms to 15 ms, and a later LOD of a chunk already built from 7.5 ms to 0.7 ms.
+
+Heights cost what the ground is made of: a plains chunk takes 7 ms and a mountain chunk 19 ms, because the mountain biome sums 17 octaves and erodes.
+
+The stages ported in the order heights, splat, water map, mesh, scatter, and the JS generator is deleted. `buildChunkMesh` still calls each stage on its own. Each call copies the heights across the boundary, which costs under 0.02 ms, so one call per chunk would save about 0.1 ms of a 15 ms build.
 
 The `terrain` crate generates through one `TerrainGenerator` object per world, cached by climate, seed and sea level (`TerrainGenerator.ts`). The palette comes from `getClimatePalette`, so it has one source.
 
@@ -169,6 +173,7 @@ The `terrain` crate generates through one `TerrainGenerator` object per world, c
 - Noise coordinates are `f64`. Field offsets reach ±100000 samples, where `f32` would lose detail in the finest octaves, more so far from the origin.
 - Every field is evaluated from the world sample position, so neighbouring chunks agree bit for bit. `cargo test` checks both seams with erosion and a continent active.
 - Thermal erosion runs as many passes as the most any biome asks for, over a margin of twice that. One pass reads two samples out, because a neighbour's move is shared over its own neighbours.
+- A field runs every pass or none, so neighbouring chunks erode alike. It runs none when no biome that erodes is in reach of the field and its margin: the climate grid's node values bound every interpolated sample, so `reachable_biomes` lists every biome the field can hold. Nothing would move, so the result is the same, and a plains chunk skips the margin and the passes (9.4 ms to 6.8 ms).
 - The climate fields (domain warp, temperature, moisture, continent) are evaluated on a world-aligned grid every 8 samples and interpolated. Their finest detail is hundreds of samples across, so the error stays under 0.001. Point queries interpolate the same nodes, so they match chunks exactly.
 - Simplex runs two points per call with `f64x2` (`math::F64x2`, a plain pair natively). The octaves of a stack are independent, so they pair up; neighbouring samples are not paired, because they can blend different biomes. Each lane does the scalar code's operations in its order, so the output is bit-identical to the scalar path. The lattice lookups stay scalar, because WASM has no gather.
 - Simplex with integer-hashed gradients in `f32x4`, with the skew done in `f64` so precision holds far from the origin, costs the same per point as the paired `f64` simplex in V8. Stacks of 5 or 6 octaves fill two 4-lane calls, so heights were about 26% slower with it, and it would have changed every world. The paired `f64` simplex stays.
@@ -179,7 +184,6 @@ The `terrain` crate generates through one `TerrainGenerator` object per world, c
 
 - Biomes come from the same climate grid as the heights, so a material follows exactly the biome that shaped the ground.
 - Layer compositing is `layer_weights`, unit tested in the crate. `LayerWeights.spec.ts` pins the shipped mountain table through the whole splat path.
-- Scatter and the horizon map still read climate and layer rules in TypeScript, so near biome borders they can differ from the splat by the grid's interpolation error.
 - On the same machine splat fell from 15–22 ms to 4.9 ms, with a p95 within 5% of the median. The slope's `atan` costs under 1% of that.
 
 **Water map and lakes (done).** Lakes moved with the water map, because the heights, the water map, scatter and the edit rules all read them. `buildWaterMap` and `resolveWater` keep their signatures and make one Rust call each. `findLakes` and `inspectLakeCells` return the lake records from Rust.
@@ -187,7 +191,7 @@ The `terrain` crate generates through one `TerrainGenerator` object per world, c
 - `Lakes` (`lakes.rs`) finds, settles and carves lakes. It samples the Rust ground directly, so a chunk makes no WASM call per rim point. Cells hash as in `Hash.ts`, so lakes sit in the same cells as before.
 - The ocean reads the continent from the same climate grid as the heights, so the water follows exactly the coast that shaped the ground.
 - The chunk's water edit blends in Rust (`WaterEdit::apply`), passed as `WaterEditData`. The TS body records (`oceanBody`, `lakeBody`, `editedBody`) stay, because the edit rules build them too. The water map returns the first texel of each body for them.
-- Scatter samples water per candidate through `WaterSampler` until scatter moves to Rust. The sample returns only the coverage, and getters read the rest. An output array allocated in WASM memory on every call and made scatter 7% slower.
+- Scatter reads the same `WaterSampler` per candidate, inside Rust.
 - `waterShowsAt` stays in TypeScript for the editing tools and mirrors `SWASH_REACH`.
 - On the same machine the water map fell from 2.7 ms (0.77 ms with the JS warm) to 0.45 ms. Scatter fell from 62 ms to 57 ms.
 
@@ -196,6 +200,21 @@ The `terrain` crate generates through one `TerrainGenerator` object per world, c
 - The mesh reads only the heights and apron it is given, so it stays position-only through them. Its output matched the JS bit for bit, normals included, at every production LOD with and without the apron.
 - `cargo test` checks the layout, winding, skirts, slope normals and shared edge normals between chunks and LODs.
 - On the same machine the LOD 0 mesh fell from 5.9 ms to 0.74 ms, and a later LOD 0 build that reuses the heights from 7.5 ms to 0.70 ms. Most of the JS time was allocating the interleaved buffer and copying out of it, so the spread between p95 and minimum went from 7x to 1.4x.
+
+**Scatter (done).** `scatterChunk` and `pickScatterInstance` keep their signatures. `scatterChunk` passes its masks, kills, region and water edit in a `ScatterRequestData` and makes one call to `ScatterGenerator`. The generator takes the scatter layer library at construction, in slot order, so a rule names its layer and a kill key its slot as before.
+
+- Biomes come from the same climate grid as the heights and splat, and paint merges with them through `ActiveBiomes` (`paint.rs`), which the splat uses too. Scatter's noise selectors read the same simplex as the splat's layers.
+- Against the JS, 61,487 of 61,489 instances over twelve chunks of both presets matched bit for bit in position, rotation, scale and phase. The other two swapped across a density threshold beside a biome border, where the grid moves the biome weights by its interpolation error.
+- Rule density, the water conditions and kill keys are unit tested in the crate, with placement's purity, shared borders, regions, kills and paint. `Scatter.spec.ts` runs unchanged against the Rust placement through `scatterChunk`.
+- Each layer returns its own arrays, because the worker transfers each layer's buffer.
+- A candidate is accepted when its roll falls below its density, and no density exceeds the layer's densest rule unless paint raises it. A roll above that is rejected before anything is sampled, which skips about 80% of the 200,000 candidates in a default chunk with the same output.
+- On the same machine scatter fell from 58 ms to 6 ms, with a p95 of 6.2 ms, from 68 ms.
+
+**The horizon map and the biome probe (done).** `FarMapBuilder` (`HorizonOcean`'s far map) and `BiomeProbe` (the soundscape's biomes) call Rust, so the climate has one implementation, in the terrain crate.
+
+- `FarMap` (`far.rs`) builds a few rows a call, as before, and reads the splat's rules with each noise selector at its mean coverage. A texel is dozens of samples across, so it evaluates the climate at its centre instead of interpolating four grid nodes. Heights differ from the interpolated ground by under one f16 step.
+- `biomesAt` resolves one point, painted biomes included, the way a chunk does.
+- A near far map rebuild fell from 51 ms to 18 ms, and a wide one from 16 ms to 5 ms. At the 1 ms frame budget a near rebuild now takes about 18 frames.
 
 ### Phase 3: The BVH system
 
@@ -213,7 +232,6 @@ The Rust functions borrow the chunk data for each call (see [Where chunk data li
 
 These systems do real CPU work, but we have no numbers for them yet. Add benchmark cases first:
 
-- The far map rebuild (`HorizonOcean`). It already has a 1 ms per frame budget, so it is a known cost.
 - Scatter culling and selection for each frame (`ChunkScatter`, `ScatterChunkLayer`).
 - Placement that follows the ground (`ConformedPlacement`).
 - Scatter collider streaming (`ScatterColliderStreamer`).
@@ -241,7 +259,7 @@ Two systems are not in this list for now, but they could move later:
 ## Open questions
 
 - **How many terrain workers?** The pool has at most 4. Faster builds may change the best number.
-- **When to split the module?** One module is right while it is small. Measure its size after Phase 2.
+- **When to split the module?** One module is right while it is small. After Phase 2 it is 291 KB, 114 KB gzipped.
 - **How to debug?** The Chrome "C/C++ DevTools Support (DWARF)" extension lets you step through Rust source. A debug build adds the source maps. Add an `npm run build:wasm:debug` when we first need it.
 
 ## Later

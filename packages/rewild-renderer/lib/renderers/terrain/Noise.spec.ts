@@ -1,6 +1,5 @@
 import { Vector2 } from 'rewild-common';
 import { generateBiomeBlendedHeightMap } from './Noise';
-import { continentLandWeight, continentSeabedDepth } from './ClimateField';
 import {
   BiomeParams,
   CLIMATE_PRESETS,
@@ -432,32 +431,5 @@ describe('continent', () => {
   it('rejects an ocean floor shallower than the shelf', () => {
     const bad = withContinent({ ...DEFAULT_CONTINENT, oceanDepth: 2, shelfDepth: 6 });
     expect(() => generate(0, 0, SEED, bad)).toThrow();
-  });
-});
-
-describe('continent profile', () => {
-  const c = DEFAULT_CONTINENT;
-
-  it('keeps all the land height inland and none on the sea bed', () => {
-    expect(continentLandWeight(c, c.coast + c.blendHalfWidth)).toBe(1);
-    expect(continentLandWeight(c, c.coast - c.blendHalfWidth)).toBe(0);
-    expect(continentLandWeight(c, c.coast)).toBeCloseTo(0.5, 6);
-  });
-
-  it('falls from the coast across the shelf to the ocean floor', () => {
-    expect(continentSeabedDepth(c, c.coast + 0.1)).toBe(0);
-    expect(continentSeabedDepth(c, c.coast)).toBe(0);
-    expect(continentSeabedDepth(c, c.coast - c.shelfWidth)).toBeCloseTo(c.shelfDepth, 6);
-    expect(
-      continentSeabedDepth(c, c.coast - c.shelfWidth - c.slopeWidth)
-    ).toBeCloseTo(c.oceanDepth, 6);
-    expect(continentSeabedDepth(c, 0)).toBeCloseTo(c.oceanDepth, 6);
-
-    let previous = 0;
-    for (let v = c.coast; v >= 0; v -= 0.005) {
-      const depth = continentSeabedDepth(c, v);
-      expect(depth).toBeGreaterThanOrEqual(previous - 1e-9);
-      previous = depth;
-    }
   });
 });

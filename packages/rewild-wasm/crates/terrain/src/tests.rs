@@ -14,7 +14,7 @@ fn stack(amplitude: f64, noise_scale: f64, seed_salt: f64) -> Octaves {
 }
 
 fn biome(name: &str, deformations: Vec<Deformation>, erosion: Option<Erosion>) -> Biome {
-    Biome { name: name.into(), deformations, erosion, layers: Vec::new() }
+    Biome { name: name.into(), deformations, erosion, layers: Vec::new(), scatter: Vec::new() }
 }
 
 /// Two biomes split by temperature, every deformation kind, erosion and a
@@ -97,6 +97,29 @@ fn erodes_without_changing_the_field_size() {
     let raw = generator(false).generate(SIZE, SIZE, 0.0, 0.0);
     assert_eq!(eroded.len(), SIZE * SIZE);
     assert_ne!(eroded, raw);
+}
+
+#[test]
+fn skips_erosion_only_where_it_would_move_nothing() {
+    let mut c = super::tests::lakes::lake_climate();
+    c.lakes = None;
+    c.biomes[1].erosion = Some(Erosion { iterations: 6.0, talus_deg: 30.0, strength: 0.5 });
+    let g = HeightGenerator::new(c, 9001.0, 0.0, 2.0).unwrap();
+    let step = (SIZE - 1) as f64;
+    let (mut skipped, mut eroded) = (0, 0);
+    for j in -6..6 {
+        for i in -6..6 {
+            let (ox, oy) = (i as f64 * step * 3.0, j as f64 * step * 3.0);
+            let grid = g.eroded_grid(SIZE, SIZE, ox, oy);
+            if g.erodes_within(&grid) {
+                eroded += 1;
+            } else {
+                skipped += 1;
+            }
+            assert_eq!(g.generate(SIZE, SIZE, ox, oy), g.generate_on(&grid, SIZE, SIZE, ox, oy, true));
+        }
+    }
+    assert!(skipped > 0 && eroded > 0, "{skipped} skipped, {eroded} eroded");
 }
 
 #[test]
@@ -1016,5 +1039,434 @@ mod mesh {
         assert!(build(&h, SIZE, 1, 0, 2.0).is_err());
         assert!(build(&h, SIZE, 0, 3, 2.0).is_err());
         assert!(build(&h, SIZE, 0, 0, 0.0).is_err());
+    }
+}
+
+mod scatter {
+    use super::lakes::{ground, lake_climate};
+    use super::*;
+    use crate::scatter::{
+        kill_key, rule_density, rule_water, Jitter, LayerInstances, SampleBox, ScatterGenerator, ScatterLayer,
+        ScatterRequest, INSTANCE_STRIDE,
+    };
+    use crate::PaintMask;
+
+    const SIZE: usize = 65;
+
+    fn rule(layer: &str, density: f64) -> ScatterRule {
+        ScatterRule {
+            layer: layer.into(),
+            density,
+            slope: None,
+            height: None,
+            noise: None,
+            water_depth: None,
+            water_type: None,
+            underwater: false,
+        }
+    }
+
+    fn layer(name: &str, footprint: f64, align: f64) -> ScatterLayer {
+        ScatterLayer {
+            name: name.into(),
+            footprint,
+            jitter: Jitter { scale: Band { from: 0.8, to: 1.2 }, yaw: None, tilt: Some(10.0) },
+            align_to_normal: Some(align),
+            y_offset: Some(0.25),
+        }
+    }
+
+    fn library() -> Vec<ScatterLayer> {
+        vec![layer("rock", 2.0, 1.0), layer("grass", 1.0, 0.0), layer("painted", 1.5, 0.0)]
+    }
+
+    /// Rocks in every biome, grass only on the plain, and a layer only paint
+    /// grows.
+    fn scatter_climate() -> ClimateConfig {
+        let mut c = lake_climate();
+        c.lakes = None;
+        c.biomes[0].scatter = vec![rule("rock", 0.6), rule("grass", 0.8)];
+        c.biomes[1].scatter = vec![rule("rock", 0.9)];
+        c
+    }
+
+    struct World {
+        ground: HeightGenerator,
+        scatter: ScatterGenerator,
+    }
+
+    fn world() -> World {
+        let c = scatter_climate();
+        World { ground: ground(c.clone()), scatter: ScatterGenerator::new(c, library(), 9001.0, 0.0, 2.0).unwrap() }
+    }
+
+    impl World {
+        fn place(&self, ox: f64, oy: f64, request: ScatterRequest) -> Vec<LayerInstances> {
+            let heights = self.ground.generate(SIZE, SIZE, ox, oy);
+            self.scatter.generate(&self.ground, &heights, SIZE, ox, oy, request).unwrap()
+        }
+    }
+
+    fn with_ids<'a>() -> ScatterRequest<'a> {
+        ScatterRequest { with_ids: true, ..Default::default() }
+    }
+
+    fn total(layers: &[LayerInstances]) -> usize {
+        layers.iter().map(|l| l.count).sum()
+    }
+
+    // Each instance as (slot, x, z) in global millimetres, for a chunk at
+    // chunk offset (ox, oy) of 2 m samples.
+    fn global(layers: &[LayerInstances], ox: f64, oy: f64) -> Vec<(usize, i64, i64)> {
+        layers
+            .iter()
+            .flat_map(|l| {
+                l.data.chunks(INSTANCE_STRIDE).map(move |d| {
+                    let x = d[0] as f64 + ox * 2.0;
+                    let z = d[2] as f64 - oy * 2.0;
+                    (l.slot, (x * 1000.0).round() as i64, (z * 1000.0).round() as i64)
+                })
+            })
+            .collect()
+    }
+
+    mod rules {
+        use super::*;
+
+        fn pebbles() -> ScatterRule {
+            ScatterRule {
+                slope: Some(Selector::One(Band { from: 40.0, to: 10.0 })),
+                height: Some(Selector::One(Band { from: 0.0, to: 50.0 })),
+                ..rule("pebbles", 0.4)
+            }
+        }
+
+        #[test]
+        fn scales_the_density_by_the_product_of_its_selectors() {
+            assert!((rule_density(&pebbles(), 100.0, 0.0, 0.0) - 0.4).abs() < 1e-12);
+            assert_eq!(rule_density(&pebbles(), 100.0, 60.0, 0.0), 0.0);
+            assert_eq!(rule_density(&pebbles(), -10.0, 0.0, 0.0), 0.0);
+            assert_eq!(rule_density(&pebbles(), 100.0, 0.0, 0.0), rule_density(&pebbles(), 100.0, 0.0, 1.0));
+        }
+
+        #[test]
+        fn applies_a_noise_selector_when_the_rule_carries_one() {
+            let noisy = ScatterRule {
+                noise: Some(NoiseSelector { scale: 100.0, seed_salt: 1.0, band: Band { from: 0.4, to: 0.6 } }),
+                ..pebbles()
+            };
+            assert_eq!(rule_density(&noisy, 100.0, 0.0, 0.2), 0.0);
+            assert!((rule_density(&noisy, 100.0, 0.0, 0.8) - 0.4).abs() < 1e-12);
+        }
+
+        #[test]
+        fn multiplies_a_pair_of_bands_into_a_plateau() {
+            let treeline = ScatterRule {
+                height: Some(Selector::All(vec![Band { from: 40.0, to: 100.0 }, Band { from: 150.0, to: 110.0 }])),
+                ..pebbles()
+            };
+            let at = |h: f64| rule_density(&treeline, h, 0.0, 0.0);
+            assert_eq!(at(20.0), 0.0);
+            assert!((at(70.0) - 0.2).abs() < 1e-9);
+            assert!((at(105.0) - 0.4).abs() < 1e-9);
+            assert!((at(130.0) - 0.2).abs() < 1e-9);
+            assert_eq!(at(160.0), 0.0);
+        }
+
+        #[test]
+        fn keeps_a_rule_out_of_the_water_unless_it_grows_underwater() {
+            let plain = rule("rock", 1.0);
+            assert_eq!(rule_water(&plain, 2.0, 1.0, 1.0, 0.0), 0.0);
+            assert_eq!(rule_water(&ScatterRule { underwater: true, ..plain.clone() }, 2.0, 1.0, 1.0, 0.0), 1.0);
+            assert_eq!(rule_water(&plain, 2.0, 0.0, 1.0, 0.0), 1.0);
+        }
+
+        #[test]
+        fn thins_only_a_rule_without_water_conditions_by_the_beach() {
+            let plain = rule("rock", 1.0);
+            assert_eq!(rule_water(&plain, -1.0, 1.0, 1.0, 0.75), 0.25);
+            let shore = ScatterRule { water_depth: Some(Selector::One(Band { from: -4.0, to: -2.0 })), ..plain };
+            assert_eq!(rule_water(&shore, -1.0, 1.0, 1.0, 0.75), 1.0);
+        }
+
+        #[test]
+        fn grows_by_depth_coverage_and_type_weight() {
+            let shelf = ScatterRule {
+                underwater: true,
+                water_depth: Some(Selector::One(Band { from: 1.0, to: 3.0 })),
+                ..rule("weed", 1.0)
+            };
+            assert_eq!(rule_water(&shelf, 0.5, 1.0, 1.0, 0.0), 0.0);
+            assert_eq!(rule_water(&shelf, 4.0, 1.0, 1.0, 0.0), 1.0);
+            assert_eq!(rule_water(&shelf, 4.0, 0.5, 1.0, 0.0), 0.5);
+            assert_eq!(rule_water(&shelf, 4.0, 0.0, 1.0, 0.0), 0.0);
+            let lake = ScatterRule { water_type: Some("lake".into()), ..rule("reed", 1.0) };
+            assert_eq!(rule_water(&lake, -1.0, 1.0, 0.0, 0.0), 0.0);
+            assert_eq!(rule_water(&lake, -1.0, 1.0, 0.5, 0.0), 0.5);
+        }
+
+        #[test]
+        fn packs_a_kill_key_as_the_ts_does() {
+            // scatterKillKey(3, 5, 7) in ScatterKillSet.ts.
+            assert_eq!(kill_key(3, 5, 7), (3 << 24) | (7 << 12) | 5);
+            assert_eq!(kill_key(255, 4095, 4095), 0xffff_ffff);
+            assert_eq!(kill_key(0, 0, 0), 0);
+        }
+    }
+
+    #[test]
+    fn is_a_pure_function_of_its_inputs() {
+        let w = world();
+        let a = w.place(128.0, -64.0, with_ids());
+        let b = w.place(128.0, -64.0, with_ids());
+        assert!(total(&a) > 100);
+        for (x, y) in a.iter().zip(&b) {
+            assert_eq!((x.slot, &x.data, &x.ids), (y.slot, &y.data, &y.ids));
+        }
+    }
+
+    #[test]
+    fn places_only_the_layers_its_biomes_grow_in_slot_order() {
+        let layers = world().place(0.0, 0.0, ScatterRequest::default());
+        let slots: Vec<_> = layers.iter().map(|l| l.slot).collect();
+        assert!(slots.windows(2).all(|w| w[0] < w[1]));
+        assert!(!slots.contains(&2));
+    }
+
+    #[test]
+    fn keeps_instances_inside_the_chunk_with_unit_rotations() {
+        let layers = world().place(0.0, 0.0, ScatterRequest::default());
+        let edge = (SIZE - 1) as f32;
+        for l in &layers {
+            for d in l.data.chunks(INSTANCE_STRIDE) {
+                assert!(d[0] >= -edge && d[0] < edge && d[2] <= edge && d[2] > -edge);
+                let q = (d[3] * d[3] + d[4] * d[4] + d[5] * d[5] + d[6] * d[6]).sqrt();
+                assert!((q - 1.0).abs() < 1e-5);
+                assert!((0.8..=1.2).contains(&d[7]) && (0.0..1.0).contains(&d[8]));
+            }
+        }
+    }
+
+    #[test]
+    fn places_a_cell_on_a_shared_border_in_one_chunk_only() {
+        let w = world();
+        let span = (SIZE - 1) as f64;
+        let mut both = global(&w.place(0.0, 0.0, ScatterRequest::default()), 0.0, 0.0);
+        both.extend(global(&w.place(span, 0.0, ScatterRequest::default()), span, 0.0));
+        let count = both.len();
+        both.sort();
+        both.dedup();
+        assert_eq!(both.len(), count);
+    }
+
+    #[test]
+    fn places_inside_a_region_exactly_what_the_whole_chunk_does() {
+        let w = world();
+        let whole = w.place(0.0, 0.0, with_ids());
+        let region = SampleBox { x0: 10.0, y0: 20.0, x1: 30.0, y1: 40.0 };
+        let part = w.place(0.0, 0.0, ScatterRequest { region: Some(region), ..with_ids() });
+        assert!(total(&part) > 0 && total(&part) < total(&whole));
+        for l in &part {
+            let full = whole.iter().find(|f| f.slot == l.slot).unwrap();
+            for (i, id) in l.ids.iter().enumerate() {
+                let j = full.ids.iter().position(|f| f == id).unwrap();
+                assert_eq!(
+                    &l.data[i * INSTANCE_STRIDE..(i + 1) * INSTANCE_STRIDE],
+                    &full.data[j * INSTANCE_STRIDE..(j + 1) * INSTANCE_STRIDE]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn drops_exactly_the_instances_the_kill_set_names() {
+        let w = world();
+        let whole = w.place(0.0, 0.0, with_ids());
+        let mut kills: Vec<u32> = whole.iter().flat_map(|l| l.ids.iter().step_by(3).copied()).collect();
+        kills.sort();
+        let kept = w.place(0.0, 0.0, ScatterRequest { kills: &kills, ..with_ids() });
+        assert_eq!(total(&kept), total(&whole) - kills.len());
+        assert!(kept.iter().all(|l| l.ids.iter().all(|id| kills.binary_search(id).is_err())));
+    }
+
+    // A density mask over the test library, every channel `fill(channel)`.
+    fn density_weights(fill: impl Fn(usize) -> u8) -> Vec<u8> {
+        let size = (SIZE - 1) / 4 + 1;
+        (0..library().len() + 1).flat_map(|c| std::iter::repeat_n(fill(c), size * size)).collect()
+    }
+
+    fn density_mask(weights: &[u8]) -> PaintMask<'_> {
+        let size = (SIZE - 1) / 4 + 1;
+        PaintMask { size, step: 4.0, channels: library().len() + 1, weights }
+    }
+
+    #[test]
+    fn grows_a_painted_layer_no_biome_grows() {
+        let weights = density_weights(|c| if c == 2 { 255 } else { 0 });
+        let layers = world().place(0.0, 0.0, ScatterRequest { density_mask: Some(density_mask(&weights)), ..Default::default() });
+        assert!(layers.iter().any(|l| l.slot == 2 && l.count > 0));
+    }
+
+    #[test]
+    fn clears_every_layer_through_the_exclusion_channel() {
+        let weights = density_weights(|c| if c >= 2 { 255 } else { 0 });
+        let layers = world().place(0.0, 0.0, ScatterRequest { density_mask: Some(density_mask(&weights)), ..Default::default() });
+        assert_eq!(total(&layers), 0);
+    }
+
+    #[test]
+    fn ignores_a_density_mask_with_the_wrong_channel_count() {
+        let w = world();
+        let plain = total(&w.place(0.0, 0.0, ScatterRequest::default()));
+        let weights = vec![255u8; 17 * 17 * 2];
+        let mask = PaintMask { size: 17, step: 4.0, channels: 2, weights: &weights };
+        assert_eq!(total(&w.place(0.0, 0.0, ScatterRequest { density_mask: Some(mask), ..Default::default() })), plain);
+    }
+
+    #[test]
+    fn rejects_a_footprint_too_fine_for_a_kill_key_and_the_wrong_heights() {
+        let c = scatter_climate();
+        let fine = vec![layer("rock", 0.0001, 0.0), layer("grass", 1.0, 0.0), layer("painted", 1.0, 0.0)];
+        let g = ground(c.clone());
+        let s = ScatterGenerator::new(c, fine, 9001.0, 0.0, 2.0).unwrap();
+        let heights = g.generate(SIZE, SIZE, 0.0, 0.0);
+        assert!(s.generate(&g, &heights, SIZE, 0.0, 0.0, ScatterRequest::default()).is_err());
+        assert!(s.generate(&g, &heights[1..], SIZE, 0.0, 0.0, ScatterRequest::default()).is_err());
+    }
+
+    #[test]
+    fn rejects_a_rule_for_a_layer_the_library_lacks() {
+        let mut c = scatter_climate();
+        c.biomes[0].scatter.push(rule("missing", 1.0));
+        assert!(ScatterGenerator::new(c, library(), 9001.0, 0.0, 2.0).is_err());
+    }
+}
+
+mod climate_rules {
+    use super::*;
+    use crate::climate::{
+        coastal_moisture_at, continent_land_weight, continent_seabed_depth, ocean_coverage, reachable_biomes,
+        resolve_biomes,
+    };
+    use crate::splat::coast_weights;
+
+    fn continent() -> ContinentConfig {
+        climate(false).continent.unwrap()
+    }
+
+    fn coast() -> CoastConfig {
+        CoastConfig {
+            beach_height: 2.5,
+            wet_height: 0.6,
+            seabed_depth: 1.5,
+            blend: 1.0,
+            slope: Band { from: 30.0, to: 15.0 },
+        }
+    }
+
+    #[test]
+    fn keeps_all_the_land_height_inland_and_none_on_the_sea_bed() {
+        let c = continent();
+        assert_eq!(continent_land_weight(&c, c.coast + c.blend_half_width), 1.0);
+        assert_eq!(continent_land_weight(&c, c.coast - c.blend_half_width), 0.0);
+        assert!((continent_land_weight(&c, c.coast) - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn falls_from_the_coast_across_the_shelf_to_the_ocean_floor() {
+        let c = continent();
+        assert_eq!(continent_seabed_depth(&c, c.coast + 0.1), 0.0);
+        assert_eq!(continent_seabed_depth(&c, c.coast), 0.0);
+        assert!((continent_seabed_depth(&c, c.coast - c.shelf_width) - c.shelf_depth).abs() < 1e-9);
+        assert!((continent_seabed_depth(&c, c.coast - c.shelf_width - c.slope_width) - c.ocean_depth).abs() < 1e-9);
+        let mut previous = 0.0;
+        let mut v = c.coast;
+        while v >= 0.0 {
+            let depth = continent_seabed_depth(&c, v);
+            assert!(depth >= previous - 1e-9);
+            previous = depth;
+            v -= 0.005;
+        }
+    }
+
+    #[test]
+    fn covers_the_whole_coast_blend_with_ocean_and_fades_out_inland() {
+        let c = continent();
+        let half = c.blend_half_width;
+        assert_eq!(ocean_coverage(&c, 0.0), 1.0);
+        assert_eq!(ocean_coverage(&c, c.coast + half), 1.0);
+        assert!((ocean_coverage(&c, c.coast + 1.5 * half) - 0.5).abs() < 1e-9);
+        assert_eq!(ocean_coverage(&c, c.coast + 2.0 * half), 0.0);
+    }
+
+    #[test]
+    fn adds_coastal_moisture_at_the_coast_and_seaward_fading_inland() {
+        let c = continent();
+        let (amount, reach) = (c.coastal_moisture.unwrap(), c.coastal_moisture_reach.unwrap());
+        assert_eq!(coastal_moisture_at(&c, c.coast - 0.1), amount);
+        assert_eq!(coastal_moisture_at(&c, c.coast), amount);
+        assert!((coastal_moisture_at(&c, c.coast + reach / 2.0) - amount / 2.0).abs() < 1e-9);
+        assert_eq!(coastal_moisture_at(&c, c.coast + reach), 0.0);
+        assert_eq!(coastal_moisture_at(&ContinentConfig { coastal_moisture: None, ..c }, 0.0), 0.0);
+    }
+
+    #[test]
+    fn lays_dry_sand_wet_sand_and_sea_bed_down_the_beach() {
+        let sharp = CoastConfig { blend: 0.5, ..coast() };
+        assert_eq!(coast_weights(&sharp, 2.0, 0.0, 1.0), (1.0, [1.0, 0.0, 0.0]));
+        assert_eq!(coast_weights(&sharp, 0.0, 0.0, 1.0).1, [0.0, 1.0, 0.0]);
+        assert_eq!(coast_weights(&sharp, -5.0, 0.0, 1.0).1, [0.0, 0.0, 1.0]);
+        let c = coast();
+        assert_eq!(coast_weights(&c, c.beach_height + c.blend + 1.0, 0.0, 1.0).0, 0.0);
+        assert_eq!(coast_weights(&c, 1.0, 45.0, 1.0).0, 0.0);
+        assert_eq!(coast_weights(&c, 1.0, 0.0, 0.0).0, 0.0);
+    }
+
+    #[test]
+    fn splits_exactly_the_beach_total_even_when_blends_overlap() {
+        let overlapping = CoastConfig { wet_height: 0.2, seabed_depth: 0.5, blend: 3.0, ..coast() };
+        for c in [coast(), overlapping] {
+            let mut h = -8.0;
+            while h <= 8.0 {
+                let (total, bands) = coast_weights(&c, h, 10.0, 0.7);
+                assert!((bands.iter().sum::<f64>() - total).abs() < 1e-9);
+                assert!(bands.iter().all(|&w| w >= 0.0));
+                h += 0.25;
+            }
+        }
+    }
+
+    #[test]
+    fn reaches_every_biome_any_sample_between_the_bounds_resolves() {
+        let c = climate(false);
+        let g = generator(false);
+        for (ox, oy) in [(0.0, 0.0), (448.0, -320.0), (-2048.0, 1024.0), (900.0, 900.0)] {
+            let grid = g.climate_grid(ox, oy, SIZE, SIZE);
+            let (lo, hi) = grid.bounds();
+            let reachable = reachable_biomes(&c, &lo, &hi);
+            for j in 0..SIZE {
+                for i in 0..SIZE {
+                    let blend = resolve_biomes(&c, &grid.at(ox + i as f64, oy + j as f64));
+                    assert!(blend.biomes[..blend.count].iter().all(|b| reachable.contains(b)));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn builds_the_same_far_map_a_few_rows_at_a_time() {
+        let c = climate(false);
+        let ground = generator(false);
+        let spec = crate::SplatSpec { palette: vec![], coast_materials: vec![] };
+        let splat = crate::SplatGenerator::new(c, &spec, 4321.0, 2.0, 2.0).unwrap();
+        let mut whole = crate::FarMap::new(500.0, -700.0, 4000.0, 8);
+        assert!(whole.build(&ground, &splat, usize::MAX));
+        let mut sliced = crate::FarMap::new(500.0, -700.0, 4000.0, 8);
+        let mut frames = 0;
+        while !sliced.build(&ground, &splat, 3) {
+            frames += 1;
+        }
+        assert_eq!(frames, 5);
+        assert_eq!((sliced.ground, sliced.weights), (whole.ground, whole.weights));
     }
 }
