@@ -60,6 +60,12 @@ import { ScatterInstances } from '../lib/renderers/terrain/Scatter';
 import { Transform } from '../lib/core/Transform';
 import { NUM_CASCADES } from '../lib/renderers/shadow/DirectionalShadowRenderer';
 import { shadowConfig } from '../lib/renderers/shadow/ShadowQuality';
+import { SceneBVH } from '../lib/acceleration/SceneBVH';
+import { TerrainRenderer } from '../lib/renderers/terrain/TerrainRenderer';
+import { WATER_MAP_STEP } from '../lib/renderers/terrain/WaterMap';
+import { OCEAN_WATER } from '../lib/renderers/terrain/Water';
+import { ShoreField } from '../lib/renderers/water/ShoreField';
+import { WaterLevelField } from '../lib/renderers/water/WaterLevelField';
 import { runBenchmarks } from './harness';
 
 /** Production chunk size. Mirrors TerrainRenderer.mapChunkSizeLod. */
@@ -182,7 +188,7 @@ const IDENTITY_MATRIX = new Float32Array([
  * the primitives from GPU models, which the benchmark has none of.
  */
 function scatterLayers(
-  chunk: Transform,
+  scatter: ChunkScatter,
   instances: ScatterInstances[]
 ): ScatterChunkLayer[] {
   const layers: ScatterChunkLayer[] = [];
@@ -190,8 +196,7 @@ function scatterLayers(
     if (list.count === 0) continue;
     const layer = getScatterLayer(list.layer);
     for (let tier = 0; tier < lodTierCount(layer); tier++) {
-      const transform = new Transform();
-      chunk.addChild(transform);
+      const transform = scatter['attach'](list.layer);
       layers.push(
         new ScatterChunkLayer(
           transform,
@@ -218,11 +223,14 @@ interface ScatterChunk {
   layers: ScatterChunkLayer[];
 }
 
-/** Every chunk that holds scatter around a viewer at the origin. */
-function scatterWorld(): ScatterChunk[] {
+/** Every chunk that holds scatter around a viewer at the origin, under one
+ *  scene root. */
+function scatterWorld(): { root: Transform; chunks: ScatterChunk[] } {
   const reach = getScatterGenerationDistance();
   const rings = Math.ceil(reach / CHUNK_METRES) + 1;
+  // The scene root, which Renderer composes by hand.
   const root = new Transform();
+  root.matrixAutoUpdate = false;
   const chunks: ScatterChunk[] = [];
   for (let cy = -rings; cy <= rings; cy++)
     for (let cx = -rings; cx <= rings; cx++) {
@@ -235,11 +243,14 @@ function scatterWorld(): ScatterChunk[] {
         position: { x: cx * (CHUNK_SIZE - 1), y: cy * (CHUNK_SIZE - 1) },
         scatter: true,
       });
+      // Placed as TerrainChunk places its transform.
       const transform = new Transform();
       transform.position.set(cx * CHUNK_METRES, 0, cy * CHUNK_METRES);
+      transform.matrixAutoUpdate = false;
+      transform.updateMatrix();
       root.addChild(transform);
       const scatter = new ChunkScatter(transform);
-      const layers = scatterLayers(transform, instances);
+      const layers = scatterLayers(scatter, instances);
       (scatter as unknown as { layers: ScatterChunkLayer[] }).layers = layers;
       chunks.push({ transform, instances, scatter, layers });
     }
@@ -250,7 +261,7 @@ function scatterWorld(): ScatterChunk[] {
     `  ${chunks.length} chunks with scatter, ${draws} layer tiers
 `
   );
-  return chunks;
+  return { root, chunks };
 }
 
 /** The frustum of a camera at `eye` looking along +x. */
@@ -272,6 +283,90 @@ function viewFrustum(eye: Vector3): Frustum {
   return new Frustum().setFromProjectionMatrix(
     new Matrix4().multiplyMatrices(projection, camera.clone().invert())
   );
+}
+
+/** A device that takes texture uploads and drops them. Node has no WebGPU, so
+ *  the usage flags textures are created with are stood in for too. */
+(globalThis as Record<string, unknown>).GPUTextureUsage ??= {
+  COPY_SRC: 1,
+  COPY_DST: 2,
+  TEXTURE_BINDING: 4,
+  STORAGE_BINDING: 8,
+  RENDER_ATTACHMENT: 16,
+};
+const STUB_DEVICE = {
+  createTexture: () => ({ destroy() {}, createView: () => ({}) }),
+  queue: { writeTexture() {} },
+} as unknown as GPUDevice;
+
+/** Runs `frame` until `done`, timing the whole and the slowest frame. */
+function timeFrames(done: () => boolean, frame: () => void) {
+  let total = 0;
+  let worst = 0;
+  for (let i = 0; i < 100 && !done(); i++) {
+    const started = performance.now();
+    frame();
+    const spent = performance.now() - started;
+    total += spent;
+    worst = Math.max(worst, spent);
+  }
+  return { total, frame: worst };
+}
+
+/**
+ * The 5 × 5 chunks around the first chunk, searching outward from the origin,
+ * whose ground crosses sea level, held by a TerrainRenderer with only their
+ * heights and water maps. The real one needs a GPU device to build.
+ */
+function coastWorld() {
+  const climate = resolveClimatePreset(DEFAULT_CLIMATE_PRESET);
+  const build = (cx: number, cy: number) =>
+    buildChunkMesh({
+      ...chunkRequest(LODS[LODS.length - 1], 0),
+      position: { x: cx * (CHUNK_SIZE - 1), y: cy * (CHUNK_SIZE - 1) },
+    });
+
+  let centre: { cx: number; cy: number } | undefined;
+  for (let ring = 0; !centre && ring <= 40; ring += 4)
+    for (let cy = -ring; !centre && cy <= ring; cy += 4)
+      for (let cx = -ring; !centre && cx <= ring; cx += 4) {
+        if (Math.max(Math.abs(cx), Math.abs(cy)) !== ring) continue;
+        const { heights } = build(cx, cy);
+        let low = Infinity;
+        let high = -Infinity;
+        for (const h of heights) {
+          low = Math.min(low, h);
+          high = Math.max(high, h);
+        }
+        if (low < 0 && high > 0) centre = { cx, cy };
+      }
+  if (!centre) throw new Error('No coast within 40 chunks of the origin.');
+
+  const terrainChunks = new Map<string, unknown>();
+  for (let cy = centre.cy - 2; cy <= centre.cy + 2; cy++)
+    for (let cx = centre.cx - 2; cx <= centre.cx + 2; cx++) {
+      const { heights, water } = build(cx, cy);
+      terrainChunks.set(`${cx},${cy}`, { heights, water });
+    }
+  const palette = climate.water ?? [];
+  const terrain: TerrainRenderer = Object.assign(
+    Object.create(TerrainRenderer.prototype),
+    {
+      chunkSize: CHUNK_METRES,
+      mapChunkSizeLod: CHUNK_SIZE,
+      terrainChunks,
+      _seaLevel: 0,
+      oceanType: palette.findIndex((w) => w.name === OCEAN_WATER),
+    }
+  );
+  process.stderr.write(`  coast at chunk (${centre.cx}, ${centre.cy})
+`);
+  return {
+    terrain,
+    palette,
+    x: centre.cx * CHUNK_METRES,
+    z: centre.cy * CHUNK_METRES,
+  };
 }
 
 const timeChunk = (request: BuildChunkMeshRequest) => {
@@ -500,14 +595,14 @@ await runBenchmarks((bench) => {
   // caster reaches only some cascades, and the far one draws every other
   // frame, so the shadow stage is an upper bound.
   const shadowFar = shadowConfig('ultra').shadowFar;
-  let scatterChunks: ScatterChunk[] | undefined;
-  const scatterFixture = () => (scatterChunks ??= scatterWorld());
+  let scatterScene: ReturnType<typeof scatterWorld> | undefined;
+  const scatterFixture = () => (scatterScene ??= scatterWorld()).chunks;
   bench('scatter chunk build', (i) => {
     const near = scatterFixture().slice(0, POSITIONS.length);
     const chunk = near[i % near.length];
-    const transform = new Transform();
+    const scatter = new ChunkScatter(new Transform());
     const started = performance.now();
-    scatterLayers(transform, chunk.instances);
+    scatterLayers(scatter, chunk.instances);
     return { total: performance.now() - started };
   });
   bench('scatter cull frame', (i) => {
@@ -546,6 +641,63 @@ await runBenchmarks((bench) => {
       scene: scene - culled,
       shadow: shadow - scene,
     };
+  });
+
+  // The scene graph over the same chunks. Every frame updates the world
+  // matrices from the root, and a change to the scene's structure, such as a
+  // chunk swapping its mesh, rebuilds the scene BVH.
+  bench('scene matrices', () => {
+    scatterFixture();
+    const { root } = scatterScene!;
+    const started = performance.now();
+    root.updateMatrixWorld();
+    return { total: performance.now() - started };
+  });
+  let sceneBVH: SceneBVH | undefined;
+  bench('scene bvh rebuild', () => {
+    scatterFixture();
+    sceneBVH ??= new SceneBVH(scatterScene!.root);
+    const started = performance.now();
+    sceneBVH.rebuild();
+    return { total: performance.now() - started };
+  });
+
+  bench('scene bvh cull', (i) => {
+    scatterFixture();
+    sceneBVH ??= new SceneBVH(scatterScene!.root);
+    sceneBVH.update();
+    const frustum = viewFrustum(new Vector3(i * 3, 30, 0));
+    const visible: Transform[] = [];
+    const started = performance.now();
+    sceneBVH.frustumCull(frustum, visible);
+    return { total: performance.now() - started };
+  });
+
+  // The water fields around the camera, rebuilt a few rows a frame at a coast.
+  // `total` is the whole rebuild and `frame` its most expensive frame.
+  let coast: ReturnType<typeof coastWorld> | undefined;
+  const coastFixture = () => (coast ??= coastWorld());
+  bench('water shore field', () => {
+    const { terrain, x, z } = coastFixture();
+    const sample = terrain['sampleOceanDepth'].bind(terrain);
+    const field = new ShoreField(STUB_DEVICE);
+    return timeFrames(
+      () => field['built'],
+      () => {
+        terrain['resetOceanCache']();
+        field.update(STUB_DEVICE, 1 / 60, x, z, sample);
+      }
+    );
+  });
+  bench('water level field', () => {
+    const { terrain, x, z, palette } = coastFixture();
+    const waterMapAt = terrain.waterMapAt.bind(terrain);
+    const field = new WaterLevelField();
+    const texels = (CHUNK_SIZE - 1) / WATER_MAP_STEP;
+    return timeFrames(
+      () => field.built,
+      () => field.update(STUB_DEVICE, 1 / 60, x, z, texels, waterMapAt, palette)
+    );
   });
 
   // A whole far map rebuild of each HorizonOcean level. In the game it is

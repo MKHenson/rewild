@@ -36,6 +36,8 @@ export class ChunkScatter {
   constructor(chunkTransform: Transform) {
     this.root = new Transform();
     this.root.name = 'scatter';
+    this.root.matrixAutoUpdate = false;
+    this.root.updateMatrix();
     chunkTransform.addChild(this.root);
   }
 
@@ -96,6 +98,8 @@ export class ChunkScatter {
   private attach(name: string): Transform {
     const transform = new Transform();
     transform.name = name;
+    transform.matrixAutoUpdate = false;
+    transform.updateMatrix();
     this.root.addChild(transform);
     return transform;
   }

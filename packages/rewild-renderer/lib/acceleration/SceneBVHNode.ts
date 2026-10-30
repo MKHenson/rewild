@@ -1,9 +1,8 @@
 import { Box3 } from 'rewild-common';
-import { Transform } from '../core/Transform';
 
 /**
  * A node in the scene-level BVH tree. Internal nodes have two children;
- * leaf nodes hold references to Transform objects.
+ * leaf nodes hold the objects inside them.
  */
 export class SceneBVHNode {
   boundingBox: Box3;
@@ -13,8 +12,8 @@ export class SceneBVHNode {
   /** Whether this is a leaf node containing object references. */
   isLeaf: boolean = false;
 
-  /** Transform objects stored in leaf nodes. */
-  objects: Transform[] = [];
+  /** A leaf's objects, as indices into the BVH's object list. */
+  indices: number[] = [];
 
   constructor() {
     this.boundingBox = new Box3();

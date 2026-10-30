@@ -295,6 +295,12 @@ export class TerrainRenderer implements WaterQuerySource {
   private oceanChunk: TerrainChunk | null = null;
   private oceanChunkX = NaN;
   private oceanChunkY = NaN;
+  // The heights and water each chunk last fed the water fields, so a LOD swap,
+  // which changes neither, does not rebuild them.
+  private waterFieldInputs = new WeakMap<
+    TerrainChunk,
+    { heights: Float32Array | null; version: number; water: WaterMap | null }
+  >();
   private waterLodDistances = new Float32Array(MAX_WATER_GRID_BANDS);
   private waterLodSpacings = new Float32Array(MAX_WATER_GRID_BANDS);
   // Resolved once per preset rather than every frame: resolving an unknown id
@@ -495,8 +501,7 @@ export class TerrainRenderer implements WaterQuerySource {
 
   private onChunkLoaded(event: TerrainChunkEvent) {
     this._needsVisibilityUpdate = true;
-    this.shoreField?.invalidate();
-    this.waterLevels.invalidate();
+    this.invalidateWaterFields(event.chunk);
     // Note: a re-mesh (edit) raises chunk-loaded again for that LOD without a
     // preceding chunk-unloaded — the chunk never went away. Listeners holding
     // per-chunk resources built from a mesh must release the old one when they
@@ -510,6 +515,33 @@ export class TerrainRenderer implements WaterQuerySource {
       chunk: event.chunk,
       lod: event.mesh,
     });
+  }
+
+  // Rebuilds the shore and water level fields over a chunk whose heights or
+  // water changed since it last loaded.
+  private invalidateWaterFields(chunk: TerrainChunk) {
+    const seen = this.waterFieldInputs.get(chunk);
+    if (
+      seen &&
+      seen.heights === chunk.heights &&
+      seen.version === chunk.heightsVersion &&
+      seen.water === chunk.water
+    )
+      return;
+    if (seen) {
+      seen.heights = chunk.heights;
+      seen.version = chunk.heightsVersion;
+      seen.water = chunk.water;
+    } else
+      this.waterFieldInputs.set(chunk, {
+        heights: chunk.heights,
+        version: chunk.heightsVersion,
+        water: chunk.water,
+      });
+
+    const { min, max } = chunk.bounds;
+    this.shoreField?.invalidate(min.x, min.z, max.x, max.z);
+    this.waterLevels.invalidate(min.x, min.z, max.x, max.z);
   }
 
   get levelOfDetail() {

@@ -420,9 +420,18 @@ export class ShoreField {
     return true;
   }
 
-  /** The ground changed: rebuild once REFRESH has passed. */
-  invalidate(): void {
-    this.dirty = true;
+  /** The ground over the world box changed: rebuild once REFRESH has passed,
+   *  if the field covers it. */
+  invalidate(minX: number, minZ: number, maxX: number, maxZ: number): void {
+    const half = SHORE_FIELD_SPAN / 2;
+    const covers = (x: number, z: number) =>
+      minX < x + half && maxX > x - half && minZ < z + half && maxZ > z - half;
+    if (
+      !this.built ||
+      covers(this.centreX, this.centreZ) ||
+      (this.row >= 0 && covers(this.buildX, this.buildZ))
+    )
+      this.dirty = true;
   }
 
   update(

@@ -1,6 +1,8 @@
 import { fromFloat16 } from '../../utils/float16';
 import {
+  SHORE_FIELD_SPAN,
   SWASH_REACH_TEXELS,
+  ShoreField,
   collectShore,
   extendArrival,
   packShoreField,
@@ -261,5 +263,40 @@ describe('collectShore', () => {
     const { count, xs } = shore(depth);
     expect(count).toBe(SIZE);
     for (let i = 0; i < count; i++) expect(xs[i]).toBe(100 + 23 * TEXEL);
+  });
+});
+
+// Node has no WebGPU: textures are created and written into nothing.
+(globalThis as Record<string, unknown>).GPUTextureUsage ??= {
+  COPY_DST: 2,
+  TEXTURE_BINDING: 4,
+};
+const device = {
+  createTexture: () => ({ destroy() {}, createView: () => ({}) }),
+  queue: { writeTexture() {} },
+} as unknown as GPUDevice;
+
+describe('ShoreField.invalidate', () => {
+  const update = (field: ShoreField, seconds: number) =>
+    field.update(device, seconds, 0, 0, () => 0);
+
+  function built(): ShoreField {
+    const field = new ShoreField(device);
+    for (let i = 0; i < 100 && !field['built']; i++) update(field, 0);
+    return field;
+  }
+
+  it('rebuilds for ground it covers', () => {
+    const field = built();
+    field.invalidate(0, 0, 10, 10);
+    update(field, 2);
+    expect(field['row']).toBeGreaterThan(0);
+  });
+
+  it('ignores ground beyond it', () => {
+    const field = built();
+    field.invalidate(SHORE_FIELD_SPAN, 0, SHORE_FIELD_SPAN + 10, 10);
+    update(field, 2);
+    expect(field['row']).toBe(-1);
   });
 });

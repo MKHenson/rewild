@@ -231,6 +231,10 @@ export class TerrainChunk implements IComponent {
     this.transform = new Transform();
     this.transform.component = this;
     this.transform.position.set(this.position.x, 0, this.position.y);
+    // A chunk never moves, so its matrices are composed once rather than
+    // every frame.
+    this.transform.matrixAutoUpdate = false;
+    this.transform.updateMatrix();
 
     for (let i = 0; i < detailLevels.length; i++) {
       this.lodMesh[i] = new LODMesh(
