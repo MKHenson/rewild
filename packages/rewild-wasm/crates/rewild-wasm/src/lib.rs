@@ -65,6 +65,48 @@ pub fn build_bvh(
     })
 }
 
+/// A built chunk mesh. Take each array once, then call `free()`.
+#[wasm_bindgen]
+pub struct TerrainMeshBuild(terrain::mesh::Mesh);
+
+#[wasm_bindgen]
+impl TerrainMeshBuild {
+    #[wasm_bindgen(js_name = takeVertices)]
+    pub fn take_vertices(&mut self) -> Vec<f32> {
+        std::mem::take(&mut self.0.vertices)
+    }
+
+    #[wasm_bindgen(js_name = takeUvs)]
+    pub fn take_uvs(&mut self) -> Vec<f32> {
+        std::mem::take(&mut self.0.uvs)
+    }
+
+    #[wasm_bindgen(js_name = takeNormals)]
+    pub fn take_normals(&mut self) -> Vec<f32> {
+        std::mem::take(&mut self.0.normals)
+    }
+
+    #[wasm_bindgen(js_name = takeIndices)]
+    pub fn take_indices(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.0.indices)
+    }
+}
+
+/// The mesh of a `size` × `size` chunk at `lod` over `heights`, which carries
+/// `apron` rings of neighbour samples. See `terrain::mesh::build`.
+#[wasm_bindgen(js_name = buildTerrainMesh)]
+pub fn build_terrain_mesh(
+    heights: &[f32],
+    size: u32,
+    apron: u32,
+    lod: u32,
+    horizontal_scale: f64,
+) -> Result<TerrainMeshBuild, JsError> {
+    terrain::mesh::build(heights, size as usize, apron as usize, lod, horizontal_scale)
+        .map(TerrainMeshBuild)
+        .map_err(|e| JsError::new(&e))
+}
+
 /// Terrain generation for one world. Build once per climate preset, seed and
 /// sea level, then generate chunks and sample points from it.
 #[wasm_bindgen]

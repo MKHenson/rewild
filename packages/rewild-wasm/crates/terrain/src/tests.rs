@@ -902,3 +902,119 @@ mod water {
         }
     }
 }
+
+mod mesh {
+    use crate::mesh::{build, lod_step, Mesh};
+
+    const SIZE: usize = 33;
+
+    // A field with an apron ring, from world sample position.
+    fn field(apron: usize, offset: (i64, i64), height: impl Fn(f64, f64) -> f64) -> Vec<f32> {
+        let f = SIZE + 2 * apron;
+        let mut h = Vec::with_capacity(f * f);
+        for y in 0..f {
+            for x in 0..f {
+                let wx = (x as i64 - apron as i64 + offset.0) as f64;
+                let wy = (y as i64 - apron as i64 + offset.1) as f64;
+                h.push(height(wx, wy) as f32);
+            }
+        }
+        h
+    }
+
+    fn hills(x: f64, y: f64) -> f64 {
+        (x * 0.3).sin() * 4.0 + (y * 0.17).cos() * 6.0
+    }
+
+    fn normal(m: &Mesh, i: usize) -> [f32; 3] {
+        [m.normals[i * 3], m.normals[i * 3 + 1], m.normals[i * 3 + 2]]
+    }
+
+    #[test]
+    fn lays_one_vertex_every_lod_step_plus_a_skirt_per_edge() {
+        let h = field(0, (0, 0), |_, _| 0.0);
+        for lod in [0, 1, 2, 4, 8] {
+            let m = build(&h, SIZE, 0, lod, 2.0).unwrap();
+            let vpl = (SIZE - 1) / lod_step(lod) + 1;
+            assert_eq!(m.vertices.len(), (vpl * vpl + 4 * vpl) * 3);
+            assert_eq!(m.uvs.len(), m.vertices.len() / 3 * 2);
+            assert_eq!(m.normals.len(), m.vertices.len());
+            assert_eq!(m.indices.len(), ((vpl - 1) * (vpl - 1) + 4 * (vpl - 1)) * 6);
+            let count = (m.vertices.len() / 3) as u32;
+            assert!(m.indices.iter().all(|&i| i < count));
+        }
+    }
+
+    #[test]
+    fn centres_the_chunk_and_runs_z_against_the_sample_rows() {
+        let m = build(&field(0, (0, 0), |_, _| 0.0), SIZE, 0, 0, 2.0).unwrap();
+        let half = (SIZE - 1) as f32;
+        assert_eq!(&m.vertices[..3], &[-half, 0.0, half]);
+        let last = (SIZE * SIZE - 1) * 3;
+        assert_eq!(&m.vertices[last..last + 3], &[half, 0.0, -half]);
+        assert_eq!(&m.uvs[(SIZE * SIZE - 1) * 2..SIZE * SIZE * 2], &[1.0, 1.0]);
+    }
+
+    #[test]
+    fn faces_every_surface_triangle_up() {
+        let m = build(&field(1, (0, 0), hills), SIZE, 1, 0, 2.0).unwrap();
+        let surface = (SIZE - 1) * (SIZE - 1) * 6;
+        let v = |i: u32| {
+            let i = i as usize * 3;
+            [m.vertices[i] as f64, m.vertices[i + 1] as f64, m.vertices[i + 2] as f64]
+        };
+        for t in m.indices[..surface].chunks(3) {
+            let (a, b, c) = (v(t[0]), v(t[1]), v(t[2]));
+            let (e1, e2) = ([b[0] - a[0], b[2] - a[2]], [c[0] - a[0], c[2] - a[2]]);
+            // y of (b - a) × (c - a).
+            assert!(e1[1] * e2[0] - e1[0] * e2[1] > 0.0);
+        }
+    }
+
+    #[test]
+    fn tilts_normals_against_the_slope() {
+        // Rising 1 m per sample toward +x, at 2 m per sample.
+        let m = build(&field(1, (0, 0), |x, _| x), SIZE, 1, 0, 2.0).unwrap();
+        let n = normal(&m, SIZE * 16 + 16);
+        let expected = 1.0 / 5f32.sqrt();
+        assert!((n[0] + expected).abs() < 1e-6 && (n[1] - 2.0 * expected).abs() < 1e-6 && n[2].abs() < 1e-6);
+        let flat = build(&field(0, (0, 0), |_, _| 3.0), SIZE, 0, 0, 2.0).unwrap();
+        assert!(flat.normals.chunks(3).all(|n| n == [0.0, 1.0, 0.0]));
+    }
+
+    #[test]
+    fn shades_shared_edges_as_the_neighbour_does_with_an_apron() {
+        let span = (SIZE - 1) as i64;
+        let left = build(&field(1, (0, 0), hills), SIZE, 1, 0, 2.0).unwrap();
+        let right = build(&field(1, (span, 0), hills), SIZE, 1, 0, 2.0).unwrap();
+        for y in 0..SIZE {
+            assert_eq!(normal(&right, y * SIZE), normal(&left, y * SIZE + SIZE - 1));
+        }
+        // A coarser LOD shades its edge from the same gradient.
+        let coarse = build(&field(1, (span, 0), hills), SIZE, 1, 2, 2.0).unwrap();
+        let vpl = (SIZE - 1) / lod_step(2) + 1;
+        for gy in 0..vpl {
+            assert_eq!(normal(&coarse, gy * vpl), normal(&left, gy * lod_step(2) * SIZE + SIZE - 1));
+        }
+    }
+
+    #[test]
+    fn hangs_skirts_below_the_edge_they_copy() {
+        let m = build(&field(0, (0, 0), hills), SIZE, 0, 0, 2.0).unwrap();
+        let surface = SIZE * SIZE;
+        for (i, edge) in (0..SIZE).enumerate() {
+            let s = (surface + i) * 3;
+            assert_eq!(m.vertices[s], m.vertices[edge * 3]);
+            assert!(m.vertices[s + 1] < m.vertices[edge * 3 + 1]);
+            assert_eq!(normal(&m, surface + i), normal(&m, edge));
+        }
+    }
+
+    #[test]
+    fn rejects_a_field_that_does_not_fit() {
+        let h = field(0, (0, 0), |_, _| 0.0);
+        assert!(build(&h, SIZE, 1, 0, 2.0).is_err());
+        assert!(build(&h, SIZE, 0, 3, 2.0).is_err());
+        assert!(build(&h, SIZE, 0, 0, 0.0).is_err());
+    }
+}
