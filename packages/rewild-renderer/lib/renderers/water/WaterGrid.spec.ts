@@ -1,4 +1,4 @@
-import { generateTerrainMesh, MESH_STRIDE } from '../terrain/MeshGenerator';
+import { generateTerrainMesh } from '../terrain/MeshGenerator';
 import { buildWaterGrid, waterGridBands, waterGridQuads } from './WaterGrid';
 
 describe('waterGridQuads', () => {
@@ -42,23 +42,22 @@ describe('buildWaterGrid', () => {
     // and one vertex per water map texel.
     const samples = 61;
     const flat = new Float32Array(samples * samples);
-    const terrain = generateTerrainMesh(flat, samples, samples, 0, 1, 8);
+    const terrain = generateTerrainMesh(flat, samples, 0, 8);
     const grid = buildWaterGrid(60, 480);
 
     const vertexCount = samples * samples;
     for (let i = 0; i < vertexCount; i++) {
-      const base = i * MESH_STRIDE;
-      expect(grid.vertices[i * 3]).toBeCloseTo(terrain.interleaved[base], 5);
+      expect(grid.vertices[i * 3]).toBeCloseTo(terrain.vertices[i * 3], 5);
       expect(grid.vertices[i * 3 + 1]).toBe(0);
       expect(grid.vertices[i * 3 + 2]).toBeCloseTo(
-        terrain.interleaved[base + 2],
+        terrain.vertices[i * 3 + 2],
         5
       );
-      expect(grid.uvs[i * 2]).toBeCloseTo(terrain.interleaved[base + 3], 6);
-      expect(grid.uvs[i * 2 + 1]).toBeCloseTo(terrain.interleaved[base + 4], 6);
+      expect(grid.uvs[i * 2]).toBeCloseTo(terrain.uvs[i * 2], 6);
+      expect(grid.uvs[i * 2 + 1]).toBeCloseTo(terrain.uvs[i * 2 + 1], 6);
     }
     expect(Array.from(grid.indices)).toEqual(
-      Array.from(terrain.triangles.subarray(0, grid.indices.length))
+      Array.from(terrain.indices.subarray(0, grid.indices.length))
     );
   });
 

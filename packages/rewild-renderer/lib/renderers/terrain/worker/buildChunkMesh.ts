@@ -1,6 +1,5 @@
 import {
   generateTerrainMesh,
-  MESH_STRIDE,
   TERRAIN_METERS_PER_SAMPLE,
 } from '../MeshGenerator';
 import { generateBiomeBlendedHeightMap } from '../Noise';
@@ -235,27 +234,13 @@ export function buildChunkMesh(
   // chunks stay seam-free at any scale. meshHeights/meshApron carry the apron
   // (two-sided seamless normals) for unedited chunks, or the bare heights
   // (one-sided edges) for edited ones.
-  const meshData = generateTerrainMesh(
+  const mesh = generateTerrainMesh(
     meshHeights,
     chunkSize,
-    chunkSize,
     lod,
-    1,
     TERRAIN_METERS_PER_SAMPLE,
     meshApron
   );
-
-  const vertexCount = meshData.interleaved.length / MESH_STRIDE;
-  const vertices = new Float32Array(vertexCount * 3);
-  const uvs = new Float32Array(vertexCount * 2);
-  for (let i = 0; i < vertexCount; i++) {
-    const base = i * MESH_STRIDE;
-    vertices[i * 3] = meshData.interleaved[base];
-    vertices[i * 3 + 1] = meshData.interleaved[base + 1];
-    vertices[i * 3 + 2] = meshData.interleaved[base + 2];
-    uvs[i * 2] = meshData.interleaved[base + 3];
-    uvs[i * 2 + 1] = meshData.interleaved[base + 4];
-  }
   lap('mesh');
 
   // Derived from the same heights and climate the splat was, so an instance
@@ -289,10 +274,10 @@ export function buildChunkMesh(
 
   return {
     splat,
-    vertices,
-    uvs,
-    normals: meshData.normals,
-    indices: meshData.triangles,
+    vertices: mesh.vertices,
+    uvs: mesh.uvs,
+    normals: mesh.normals,
+    indices: mesh.indices,
     heights,
     scatter,
     water,

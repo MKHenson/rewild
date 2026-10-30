@@ -191,6 +191,12 @@ The `terrain` crate generates through one `TerrainGenerator` object per world, c
 - `waterShowsAt` stays in TypeScript for the editing tools and mirrors `SWASH_REACH`.
 - On the same machine the water map fell from 2.7 ms (0.77 ms with the JS warm) to 0.45 ms. Scatter fell from 62 ms to 57 ms.
 
+**Mesh (done).** `generateTerrainMesh` calls `mesh::build` and returns the vertices, uvs, normals and indices the worker transfers. The interleaved buffer it wrote before, which `buildChunkMesh` then split into those arrays, is gone.
+
+- The mesh reads only the heights and apron it is given, so it stays position-only through them. Its output matched the JS bit for bit, normals included, at every production LOD with and without the apron.
+- `cargo test` checks the layout, winding, skirts, slope normals and shared edge normals between chunks and LODs.
+- On the same machine the LOD 0 mesh fell from 5.9 ms to 0.74 ms, and a later LOD 0 build that reuses the heights from 7.5 ms to 0.70 ms. Most of the JS time was allocating the interleaved buffer and copying out of it, so the spread between p95 and minimum went from 7x to 1.4x.
+
 ### Phase 3: The BVH system
 
 1. Add benchmark cases for raycast (first hit and all hits), refit, and the main-thread deserialize.
