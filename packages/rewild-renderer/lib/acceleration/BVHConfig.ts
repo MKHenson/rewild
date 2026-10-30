@@ -1,4 +1,4 @@
-import { BVHStrategy } from './BVHNode';
+import { BVHStrategy } from './BVHOptions';
 
 /**
  * Global configuration for BVH acceleration structures.

@@ -8,7 +8,9 @@ import { Ray, Vector3 } from 'rewild-common';
 import { hasWasmSimd, loadRewildWasmSync } from '../wasm/RewildWasm';
 import { buildBVHWasm } from './BVHWasm';
 import { BVH } from './BVH';
-import { BVHNode, BVHOptions, DEFAULT_BVH_OPTIONS } from './BVHNode';
+import { BVHOptions, DEFAULT_BVH_OPTIONS } from './BVHOptions';
+import { BVHTree, NODE_WORDS } from './BVHTree';
+import { Intersection } from '../core/Raycaster';
 import { Geometry } from '../geometry/Geometry';
 import { buildChunkMesh } from '../renderers/terrain/worker/buildChunkMesh';
 import { DEFAULT_CLIMATE_PRESET } from '../renderers/terrain/Biomes';
@@ -87,13 +89,22 @@ const trianglesOf = (indices: Uint32Array) => {
   return keys.sort();
 };
 
-const contains = (outer: BVHNode, min: number[], max: number[]) =>
-  outer.boundingBox.min.x <= min[0] &&
-  outer.boundingBox.min.y <= min[1] &&
-  outer.boundingBox.min.z <= min[2] &&
-  outer.boundingBox.max.x >= max[0] &&
-  outer.boundingBox.max.y >= max[1] &&
-  outer.boundingBox.max.z >= max[2];
+const boundsOf = (tree: BVHTree, node: number) => ({
+  min: [tree.minX(node), tree.minY(node), tree.minZ(node)],
+  max: [tree.maxX(node), tree.maxY(node), tree.maxZ(node)],
+});
+
+const contains = (
+  tree: BVHTree,
+  outer: number,
+  min: number[],
+  max: number[]
+) => {
+  const bounds = boundsOf(tree, outer);
+  return [0, 1, 2].every(
+    (k) => bounds.min[k] <= min[k] && bounds.max[k] >= max[k]
+  );
+};
 
 /**
  * Asserts what a raycast relies on: every triangle sits in exactly one leaf,
@@ -101,7 +112,7 @@ const contains = (outer: BVHNode, min: number[], max: number[]) =>
  * deeper than the limit.
  */
 function expectValid(
-  root: BVHNode,
+  tree: BVHTree,
   triIndices: Uint32Array,
   mesh: Mesh,
   options: BVHOptions
@@ -109,17 +120,14 @@ function expectValid(
   expect(trianglesOf(triIndices)).toEqual(triangles(mesh));
 
   const covered = new Uint8Array(triIndices.length / 3);
-  const stack: [BVHNode, number][] = [[root, 0]];
+  const stack: [number, number][] = [[0, 0]];
   while (stack.length > 0) {
     const [node, depth] = stack.pop()!;
     expect(depth).toBeLessThanOrEqual(options.maxDepth);
 
-    if (node.isLeaf) {
-      for (
-        let t = node.triangleOffset;
-        t < node.triangleOffset + node.triangleCount;
-        t++
-      ) {
+    if (tree.isLeaf(node)) {
+      const offset = tree.triangleOffset(node);
+      for (let t = offset; t < offset + tree.triangleCount(node); t++) {
         covered[t]++;
         const min = [Infinity, Infinity, Infinity];
         const max = [-Infinity, -Infinity, -Infinity];
@@ -130,37 +138,39 @@ function expectValid(
             max[k] = Math.max(max[k], mesh.vertices[i + k]);
           }
         }
-        expect(contains(node, min, max)).toBe(true);
+        expect(contains(tree, node, min, max)).toBe(true);
       }
       continue;
     }
 
-    for (const child of [node.leftChild!, node.rightChild!]) {
-      const { min, max } = child.boundingBox;
-      expect(contains(node, [min.x, min.y, min.z], [max.x, max.y, max.z])).toBe(
-        true
-      );
+    for (const child of [tree.leftChild(node), tree.rightChild(node)]) {
+      expect(child).toBeGreaterThan(node);
+      const { min, max } = boundsOf(tree, child);
+      expect(contains(tree, node, min, max)).toBe(true);
       stack.push([child, depth + 1]);
     }
   }
   expect(covered.every((c) => c === 1)).toBe(true);
 }
 
-const area = (node: BVHNode) => {
-  const { min, max } = node.boundingBox;
-  const [dx, dy, dz] = [max.x - min.x, max.y - min.y, max.z - min.z];
+const area = (tree: BVHTree, node: number) => {
+  const { min, max } = boundsOf(tree, node);
+  const [dx, dy, dz] = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
   return 2 * (dx * dy + dy * dz + dz * dx);
 };
 
 /** Expected cost of a raycast through the tree, by the surface area heuristic. */
-function sahCost(node: BVHNode): number {
-  if (node.isLeaf) return node.triangleCount;
-  const parent = area(node);
-  if (parent === 0) return node.triangleCount;
-  const left = node.leftChild!;
-  const right = node.rightChild!;
+function sahCost(tree: BVHTree, node = 0): number {
+  if (tree.isLeaf(node)) return tree.triangleCount(node);
+  const parent = area(tree, node);
+  if (parent === 0) return 0;
+  const left = tree.leftChild(node);
+  const right = tree.rightChild(node);
   return (
-    1 + (area(left) * sahCost(left) + area(right) * sahCost(right)) / parent
+    1 +
+    (area(tree, left) * sahCost(tree, left) +
+      area(tree, right) * sahCost(tree, right)) /
+      parent
   );
 }
 
@@ -200,20 +210,35 @@ const _b = new Vector3();
 const _c = new Vector3();
 const _hit = new Vector3();
 
-/** Distance to the closest double-sided hit, testing every triangle. */
-function bruteForceFirst(mesh: Mesh, ray: Ray): number | null {
+/** Distances to every double-sided hit, sorted, testing every triangle. */
+function bruteForce(mesh: Mesh, ray: Ray): number[] {
   const count = mesh.indices ? mesh.indices.length : mesh.vertices.length / 3;
-  let closest: number | null = null;
+  const distances: number[] = [];
   for (let t = 0; t < count; t += 3) {
     const i = (v: number) => (mesh.indices ? mesh.indices[t + v] : t + v) * 3;
     _a.fromBuffer(i(0), mesh.vertices);
     _b.fromBuffer(i(1), mesh.vertices);
     _c.fromBuffer(i(2), mesh.vertices);
     if (!ray.intersectTriangle(_a, _b, _c, false, _hit)) continue;
-    const distance = ray.origin.distanceTo(_hit);
-    if (closest === null || distance < closest) closest = distance;
+    distances.push(ray.origin.distanceTo(_hit));
   }
-  return closest;
+  return distances.sort((a, b) => a - b);
+}
+
+/** Asserts raycastFirst finds the closest hit that testing every triangle finds. */
+function expectFirstHits(bvh: BVH, mesh: Mesh) {
+  let hits = 0;
+  for (const ray of rays(mesh, 300)) {
+    const expected = bruteForce(mesh, ray);
+    const hit = bvh.raycastFirst(ray, 'none', 0, Infinity);
+    expect(hit === null).toBe(expected.length === 0);
+    if (hit && expected.length > 0) {
+      hits++;
+      expect(hit.distance).toBeCloseTo(expected[0], 4);
+    }
+  }
+  // Guard against a pass where nothing was hit.
+  expect(hits).toBeGreaterThan(20);
 }
 
 const asGeometry = (mesh: Mesh) =>
@@ -231,22 +256,22 @@ describe('BVH', () => {
 
         it('builds a valid BVH of the same triangles', () => {
           expect(bvh.isReady).toBe(true);
-          expectValid(bvh.root, bvh.triIndices, mesh, options);
+          expectValid(bvh.tree, bvh.triIndices, mesh, options);
         });
 
-        it('hits what a brute-force raycast hits, at the same distance', () => {
-          let hits = 0;
-          for (const ray of rays(mesh, 300)) {
-            const expected = bruteForceFirst(mesh, ray);
-            const hit = bvh.raycastFirst(ray, 'none', 0, Infinity);
-            expect(hit === null).toBe(expected === null);
-            if (hit && expected !== null) {
-              hits++;
-              expect(hit.distance).toBeCloseTo(expected, 4);
-            }
+        it('hits first what a brute-force raycast hits first', () => {
+          expectFirstHits(bvh, mesh);
+        });
+
+        it('hits everything a brute-force raycast hits', () => {
+          for (const ray of rays(mesh, 100)) {
+            const hits: Intersection[] = [];
+            bvh.raycast(ray, 'none', 0, Infinity, hits);
+            const distances = hits.map((h) => h.distance).sort((a, b) => a - b);
+            const expected = bruteForce(mesh, ray);
+            expect(distances).toHaveLength(expected.length);
+            distances.forEach((d, i) => expect(d).toBeCloseTo(expected[i], 4));
           }
-          // Guard against a pass where nothing was hit.
-          expect(hits).toBeGreaterThan(20);
         });
       });
     }
@@ -254,16 +279,43 @@ describe('BVH', () => {
     it(`${mesh.name}: SAH builds a cheaper tree than midpoint splits`, () => {
       const sah = new BVH(asGeometry(mesh), OPTION_SETS.default);
       const center = new BVH(asGeometry(mesh), OPTION_SETS.center);
-      expect(sahCost(sah.root)).toBeLessThan(sahCost(center.root));
+      expect(sahCost(sah.tree)).toBeLessThan(sahCost(center.tree));
+    });
+
+    it(`${mesh.name}: refit follows moved vertices`, () => {
+      const moved = { ...mesh, vertices: new Float32Array(mesh.vertices) };
+      const bvh = new BVH(asGeometry(moved), OPTION_SETS.default);
+      // A shear and a lift move every triangle, and across leaves.
+      for (let i = 0; i < moved.vertices.length; i += 3) {
+        moved.vertices[i] += moved.vertices[i + 1] * 0.5;
+        moved.vertices[i + 1] = moved.vertices[i + 1] * 2 + 30;
+      }
+      bvh.refit();
+      expectValid(bvh.tree, bvh.triIndices, moved, OPTION_SETS.default);
+      expectFirstHits(bvh, moved);
     });
   }
 });
 
 describe('buildBVHWasm', () => {
-  it('writes 11 floats for each node', () => {
+  it('writes NODE_WORDS words for each node', () => {
     const { vertices } = soup(100);
     const built = buildBVHWasm(vertices, undefined, DEFAULT_BVH_OPTIONS);
-    expect(built.nodes).toHaveLength(built.nodeCount * 11);
+    const tree = new BVHTree(built.nodes);
+    expect(tree.nodeCount).toBeGreaterThan(1);
+    expect(built.nodes).toHaveLength(tree.nodeCount * NODE_WORDS);
+  });
+
+  it('builds a leaf with no triangles over an empty mesh', () => {
+    const built = buildBVHWasm(
+      new Float32Array(0),
+      undefined,
+      DEFAULT_BVH_OPTIONS
+    );
+    const tree = new BVHTree(built.nodes);
+    expect(tree.nodeCount).toBe(1);
+    expect(tree.isLeaf(0)).toBe(true);
+    expect(tree.triangleCount(0)).toBe(0);
   });
 
   it('rejects an unknown strategy', () => {

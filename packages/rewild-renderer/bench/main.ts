@@ -17,9 +17,13 @@ import {
   resolveClimatePreset,
 } from '../lib/renderers/terrain/Biomes';
 import { assembleApron } from '../lib/renderers/terrain/ApronRing';
-import { BVHOptions } from '../lib/acceleration/BVHNode';
+import { BVHOptions } from '../lib/acceleration/BVHOptions';
 import { DEFAULT_BVH_CONFIG } from '../lib/acceleration/BVHConfig';
 import { buildBVHWasm } from '../lib/acceleration/BVHWasm';
+import { BVH } from '../lib/acceleration/BVH';
+import { Geometry } from '../lib/geometry/Geometry';
+import { Intersection } from '../lib/core/Raycaster';
+import { Ray, Vector3 } from 'rewild-common';
 import { loadRewildWasmSync } from '../lib/wasm/RewildWasm';
 import {
   FAR_MAP_TEXELS,
@@ -67,6 +71,42 @@ const TERRAIN_BVH_OPTIONS: BVHOptions = {
   // Mirrors TERRAIN_BVH_LEAF_TRIANGLES in LODMesh.
   maxLeafTriangles: 32,
 };
+
+/** Rays for each raycast run. */
+const RAY_COUNT = 1000;
+
+/**
+ * Rays over a mesh: half fall steeply from above, like a player or object
+ * probing the ground, and half cross it at a shallow angle, like a cursor
+ * pick from a standing camera. An LCG keeps them stable.
+ */
+function terrainRays(vertices: Float32Array): Ray[] {
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < vertices.length; i += 3)
+    for (let k = 0; k < 3; k++) {
+      min[k] = Math.min(min[k], vertices[i + k]);
+      max[k] = Math.max(max[k], vertices[i + k]);
+    }
+
+  let state = 7;
+  const next = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 2 ** 32;
+  };
+  const at = (k: number) => min[k] + next() * (max[k] - min[k]);
+
+  const rays: Ray[] = [];
+  for (let i = 0; i < RAY_COUNT; i++) {
+    const target = new Vector3(at(0), at(1), at(2));
+    const origin =
+      i % 2 === 0
+        ? new Vector3(target.x, max[1] + 10, target.z)
+        : new Vector3(next() < 0.5 ? min[0] : max[0], max[1] + 2, at(2));
+    rays.push(new Ray(origin, target.sub(origin).normalize()));
+  }
+  return rays;
+}
 
 const chunkRequest = (lod: number, index: number): BuildChunkMeshRequest => ({
   chunkSize: CHUNK_SIZE,
@@ -170,6 +210,38 @@ async function main() {
       const mesh = meshes[i % meshes.length];
       const started = performance.now();
       buildBVHWasm(mesh.vertices, mesh.indices, TERRAIN_BVH_OPTIONS);
+      return { total: performance.now() - started };
+    });
+
+    const bvhs = meshes.map(
+      (mesh) =>
+        new BVH(
+          { vertices: mesh.vertices, indices: mesh.indices } as Geometry,
+          TERRAIN_BVH_OPTIONS
+        )
+    );
+    const rays = meshes.map((mesh) => terrainRays(mesh.vertices));
+    // RAY_COUNT rays a run, double-sided, as Mesh.raycast casts them.
+    bench(`bvh raycast lod ${lod}`, (i) => {
+      const bvh = bvhs[i % bvhs.length];
+      const started = performance.now();
+      for (const ray of rays[i % rays.length]) {
+        const hits: Intersection[] = [];
+        bvh.raycast(ray, 'none', 0, Infinity, hits);
+      }
+      return { total: performance.now() - started };
+    });
+    bench(`bvh raycast first lod ${lod}`, (i) => {
+      const bvh = bvhs[i % bvhs.length];
+      const started = performance.now();
+      for (const ray of rays[i % rays.length])
+        bvh.raycastFirst(ray, 'none', 0, Infinity);
+      return { total: performance.now() - started };
+    });
+    bench(`bvh refit lod ${lod}`, (i) => {
+      const bvh = bvhs[i % bvhs.length];
+      const started = performance.now();
+      bvh.refit();
       return { total: performance.now() - started };
     });
   }

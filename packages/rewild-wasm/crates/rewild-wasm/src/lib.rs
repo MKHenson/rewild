@@ -6,22 +6,16 @@ use wasm_bindgen::prelude::*;
 /// A built BVH. Take each array once, then call `free()`.
 #[wasm_bindgen]
 pub struct BvhBuild {
-    nodes: Vec<f32>,
-    node_count: u32,
+    nodes: Vec<u32>,
     tri_indices: Vec<u32>,
 }
 
 #[wasm_bindgen]
 impl BvhBuild {
-    #[wasm_bindgen(getter, js_name = nodeCount)]
-    pub fn node_count(&self) -> u32 {
-        self.node_count
-    }
-
-    /// The flat node data, in the layout `deserializeBVH` reads. Copied into
-    /// a new `Float32Array`. Empty after the first call.
+    /// The nodes, in the layout `BVHTree` reads. Copied into a new
+    /// `Uint32Array`. Empty after the first call.
     #[wasm_bindgen(js_name = takeNodes)]
-    pub fn take_nodes(&mut self) -> Vec<f32> {
+    pub fn take_nodes(&mut self) -> Vec<u32> {
         std::mem::take(&mut self.nodes)
     }
 
@@ -59,10 +53,16 @@ pub fn build_bvh(
         },
     );
     Ok(BvhBuild {
-        nodes: built.nodes,
-        node_count: built.node_count,
+        nodes: built.node_words(),
         tri_indices: built.tri_indices,
     })
+}
+
+/// Recomputes the bounds of a built BVH's `nodes` in place after `vertices`
+/// move. See `bvh::refit`.
+#[wasm_bindgen(js_name = refitBvh)]
+pub fn refit_bvh(nodes: &mut [u32], vertices: &[f32], tri_indices: &[u32]) {
+    bvh::refit(bvh::Node::from_words_mut(nodes), vertices, tri_indices);
 }
 
 /// A far map for the horizon, built a few rows at a time. See

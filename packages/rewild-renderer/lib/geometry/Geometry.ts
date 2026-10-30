@@ -8,7 +8,7 @@ import {
 } from 'rewild-common';
 import { Transform } from '../core/Transform';
 import { BVH } from '../acceleration/BVH';
-import { BVHOptions } from '../acceleration/BVHNode';
+import { BVHOptions } from '../acceleration/BVHOptions';
 import { BVHConfig } from '../acceleration/BVHConfig';
 import { BVHWorkerManager } from '../acceleration/BVHWorkerManager';
 

@@ -2,12 +2,12 @@
  * Web Worker entry point for off-main-thread BVH construction.
  *
  * Receives vertex/index data + options, builds the tree with the Rust builder
- * (BVHWasm), and sends back a serialised BVH tree that can be deserialised on
- * the main thread.
+ * (BVHWasm), and sends back the tree's typed arrays, which the main thread
+ * reads in place.
  */
 import '../../renderers/terrain/worker/SetupWorkerUtils';
 import wasmUrl from '../../../../rewild-wasm/pkg/rewild_wasm_bg.wasm';
-import { BVHOptions, DEFAULT_BVH_OPTIONS } from '../BVHNode';
+import { BVHOptions, DEFAULT_BVH_OPTIONS } from '../BVHOptions';
 import { buildBVHWasm } from '../BVHWasm';
 import { loadRewildWasm } from '../../wasm/RewildWasm';
 
@@ -28,12 +28,12 @@ self.onmessage = async (event: MessageEvent<BVHWorkerRequest>) => {
 
   await wasmReady;
   const mergedOptions: BVHOptions = { ...DEFAULT_BVH_OPTIONS, ...options };
-  const serialized = buildBVHWasm(vertices, indices, mergedOptions);
+  const built = buildBVHWasm(vertices, indices, mergedOptions);
 
   self.postMessage(
-    { type: 'complete', id, data: serialized },
+    { type: 'complete', id, data: built },
     {
-      transfer: [serialized.nodes.buffer, serialized.triIndices.buffer],
+      transfer: [built.nodes.buffer, built.triIndices.buffer],
     }
   );
 };

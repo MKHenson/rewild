@@ -460,8 +460,13 @@ export class SceneBVH {
 
     if (!ray.intersectBox(node.boundingBox, _boxTarget)) return;
 
-    const boxDist = ray.origin.distanceTo(_boxTarget);
-    if (boxDist > far) return;
+    // From inside a box, intersectBox gives the exit point, which can lie past
+    // `far` (the horizon ocean's bounds do) while objects in range remain.
+    if (
+      !node.boundingBox.containsPoint(ray.origin) &&
+      ray.origin.distanceTo(_boxTarget) > far
+    )
+      return;
 
     if (node.isLeaf) {
       for (let i = 0, l = node.objects.length; i < l; i++) {
