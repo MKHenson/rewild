@@ -69,10 +69,33 @@ rectangles or the bark turns inside out.
 | `foliageNormalMap` | `false` | With `foliage`, the leaves also use their normal map, so leaf detail shows up close while keeping the soft foliage lighting. It costs one more texture read per pixel, so use it for large plants near the player, not grass. Impostors do not use it. |
 | `collider` | `true` | Stop the player at the trunk. Trees and crowns with a stem have a capsule measured off the trunk; clumps, pebbles and stemless crowns never have one. Set `false` on a plant low enough to walk through, such as heather: a waist-high bush that stops the player reads as a wall. Rocks stop the player at their own hull and do not read this key. |
 | `footprint` | `0` (clump `0.7`) | The clear space in metres that the engine keeps round each model. `0` lets the tool choose. See [Density](#density). |
-| `yOffset` | `0` | Metres added to the height the engine places the model at. Negative sinks it into the ground. Clumps, rocks and pebbles are already sunk a little by the tool; this adds to that. |
+| `yOffset` | `0` | Metres added to the height the engine places the model at. Negative sinks it into the ground. Most types are already sunk a little by the tool; this adds to that. See [Sinking](#sinking). |
 | `scaleMin`, `scaleMax` | `0.8`, `1.25` | The range of random sizes for each copy. Rocks use `0.6` to `1.6`, so one model can be a stone or a boulder. |
 | `impostor` | see [Impostors](#impostors) | The flat picture that the engine draws at far distances. |
 | `lods` | `[]` | Simpler versions of the model. See [LOD tiers](#lod-tiers). |
+
+### Sinking
+
+The `yOffset` written to the layer is the tool's own sink plus your `yOffset`. The sink depends on
+the type:
+
+| Type | Sink in metres |
+| ---- | -------------- |
+| tree, crown with a stem | none on flat ground (see slopes below) |
+| clump | the larger of `height × 0.05` and `patchRadius × 0.06` |
+| crown with no stem | `height × 0.05` |
+| rock | `height × 0.2` |
+| pebble | the smaller of `height × 0.15` and `spread × 0.05` |
+
+`height`, `spread` and `patchRadius` are measured from the made model, not read from the config. A
+clump patch and a pebble cluster are placed from one ground height and slope, so the far side can
+float. Sinking it hides that gap. A rock is sunk so it sits in the slope instead of on top of it.
+
+On a slope, the engine also sinks each copy so the downhill side of an upright trunk meets the
+ground. It takes the base radius as 1.5 × the collider's radius, or a tenth of `footprint` with no
+collider, and sinks by `radius × gradient × scale × (1 − alignToNormal)`. Flat ground is not
+changed, and a model laid fully onto the slope is not sunk. Nothing needs to be set for this; to
+sink a model further on every slope, use `yOffset`.
 
 ### Wind
 

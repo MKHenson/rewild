@@ -23,8 +23,8 @@ export const FLOAT_RATE = 3;
 /** Per second: how fast water takes a falling or rising player's speed. */
 export const WATER_DRAG = 3;
 /** Metres a second a swimmer dives or rises. */
-export const DIVE_SPEED = 2.1;
-export const RISE_SPEED = 2.1;
+export const DIVE_SPEED = 1.2;
+export const RISE_SPEED = 1.2;
 /** Metres below the floating height within which a swimmer who stops diving
  *  floats again. */
 export const FLOAT_SNAP = 0.4;

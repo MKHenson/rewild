@@ -43,7 +43,19 @@ pub struct ScatterLayer {
     pub align_to_normal: Option<f64>,
     /// Metres above the surface.
     pub y_offset: Option<f64>,
+    /// Read for its radius alone, which stands in for the trunk's.
+    pub collider: Option<Collider>,
 }
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct Collider {
+    pub radius: Option<f64>,
+}
+
+/// How much wider than its collider a trunk's foot is taken to be.
+const FOOT_FLARE: f64 = 1.5;
+/// The share of the footprint taken as the base radius when there is no collider.
+const FOOT_SHARE: f64 = 0.1;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Jitter {
@@ -320,6 +332,10 @@ impl ScatterGenerator {
         let tilt = jitter.tilt.unwrap_or(0.0);
         let align = layer.align_to_normal.unwrap_or(0.0).clamp(0.0, 1.0);
         let y_offset = layer.y_offset.unwrap_or(0.0);
+        // An upright instance on a slope stands its downhill side clear of the
+        // ground by about its base radius times the gradient, so it is sunk by that.
+        let foot = layer.collider.as_ref().and_then(|c| c.radius).map_or(layer.footprint * FOOT_SHARE, |r| r * FOOT_FLARE);
+        let slope_sink = foot * (1.0 - align);
 
         let cell_size = 2.0 * layer.footprint / mps;
         // A kill key addresses a cell within its chunk, so a footprint fine
@@ -448,7 +464,7 @@ impl ScatterGenerator {
 
                 out.data.extend_from_slice(&[
                     ((sx - half) * mps) as f32,
-                    (height + y_offset) as f32,
+                    (height + y_offset - slope_sink * slope.to_radians().tan() * scale) as f32,
                     ((half - sy) * mps) as f32,
                     rotation[0] as f32,
                     rotation[1] as f32,

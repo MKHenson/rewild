@@ -367,13 +367,13 @@ export const PLAIN: BiomeParams = {
     REEDS,
     {
       layer: 'plains_01',
-      density: 0.3,
+      density: 0.7,
       slope: { from: 55, to: 25 },
       noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
     },
     {
       layer: 'plains_02',
-      density: 0.3,
+      density: 0.7,
       slope: { from: 55, to: 25 },
       noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
     },
@@ -441,7 +441,7 @@ export const FOREST: BiomeParams = {
     },
     {
       layer: 'plains_01',
-      density: 0.3,
+      density: 0.7,
       slope: { from: 55, to: 25 },
       height: [{ from: 100, to: 50 }],
       // The stand's own field, inverted. Grass fills the glades.
@@ -642,7 +642,7 @@ export const MOUNTAIN: BiomeParams = {
     },
     {
       layer: 'plains_01',
-      density: 0.1,
+      density: 0.7,
       height: [{ from: 80, to: 50 }],
       slope: { from: 42, to: 20 },
     },

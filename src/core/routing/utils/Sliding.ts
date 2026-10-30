@@ -107,7 +107,7 @@ export function impactDamage(speed: number): number {
 }
 
 /**
- * Health landing at `speed` takes. A plain jump lands at about 10.5 and does
+ * Health landing at `speed` takes. A plain jump lands at about 4.5 and does
  * no harm; a fall of about 19 m kills.
  */
 export function fallDamage(speed: number): number {
