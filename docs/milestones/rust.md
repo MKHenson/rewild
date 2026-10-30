@@ -164,7 +164,7 @@ Port in this order: heights, splat, water map, mesh, scatter. The end state is `
 
 The `terrain` crate generates through one `TerrainGenerator` object per world, cached by climate, seed and sea level (`TerrainGenerator.ts`). The palette comes from `getClimatePalette`, so it has one source.
 
-**Heights (done).** `generateBiomeBlendedHeightMap`, `createGroundSampler` and `sampleGround` keep their signatures and call Rust. Lakes are still TypeScript. They sample the Rust ground, and `carveLakes` runs on the Rust field.
+**Heights (done).** `generateBiomeBlendedHeightMap`, `createGroundSampler` and `sampleGround` keep their signatures and call Rust. The heights come back with lakes carved.
 
 - Noise coordinates are `f64`. Field offsets reach ±100000 samples, where `f32` would lose detail in the finest octaves, more so far from the origin.
 - Every field is evaluated from the world sample position, so neighbouring chunks agree bit for bit. `cargo test` checks both seams with erosion and a continent active.
@@ -179,8 +179,17 @@ The `terrain` crate generates through one `TerrainGenerator` object per world, c
 
 - Biomes come from the same climate grid as the heights, so a material follows exactly the biome that shaped the ground.
 - Layer compositing is `layer_weights`, unit tested in the crate. `LayerWeights.spec.ts` pins the shipped mountain table through the whole splat path.
-- Scatter, the water map and the horizon map still read climate and layer rules in TypeScript, so near biome borders they can differ from the splat by the grid's interpolation error.
+- Scatter and the horizon map still read climate and layer rules in TypeScript, so near biome borders they can differ from the splat by the grid's interpolation error.
 - On the same machine splat fell from 15–22 ms to 4.9 ms, with a p95 within 5% of the median. The slope's `atan` costs under 1% of that.
+
+**Water map and lakes (done).** Lakes moved with the water map, because the heights, the water map, scatter and the edit rules all read them. `buildWaterMap` and `resolveWater` keep their signatures and make one Rust call each. `findLakes` and `inspectLakeCells` return the lake records from Rust.
+
+- `Lakes` (`lakes.rs`) finds, settles and carves lakes. It samples the Rust ground directly, so a chunk makes no WASM call per rim point. Cells hash as in `Hash.ts`, so lakes sit in the same cells as before.
+- The ocean reads the continent from the same climate grid as the heights, so the water follows exactly the coast that shaped the ground.
+- The chunk's water edit blends in Rust (`WaterEdit::apply`), passed as `WaterEditData`. The TS body records (`oceanBody`, `lakeBody`, `editedBody`) stay, because the edit rules build them too. The water map returns the first texel of each body for them.
+- Scatter samples water per candidate through `WaterSampler` until scatter moves to Rust. The sample returns only the coverage, and getters read the rest. An output array allocated in WASM memory on every call and made scatter 7% slower.
+- `waterShowsAt` stays in TypeScript for the editing tools and mirrors `SWASH_REACH`.
+- On the same machine the water map fell from 2.7 ms (0.77 ms with the JS warm) to 0.45 ms. Scatter fell from 62 ms to 57 ms.
 
 ### Phase 3: The BVH system
 

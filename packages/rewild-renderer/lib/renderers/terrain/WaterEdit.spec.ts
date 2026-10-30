@@ -1,7 +1,6 @@
 import { Vector2 } from 'rewild-common';
 import { ClimateConfig, DEFAULT_CLIMATE, DEFAULT_CONTINENT } from './Biomes';
 import { OCEAN_BODY_ID } from './Lakes';
-import { MAX_WATER_TYPES } from './Water';
 import {
   WATER_EDIT_AUTHORITY,
   WATER_EDIT_COVERAGE,
@@ -9,10 +8,8 @@ import {
   WATER_EDIT_TYPES,
   WaterEdit,
   WaterStamp,
-  applyWaterEdit,
   applyWaterStamp,
   createWaterEdit,
-  createWaterEditSample,
   deserializeWaterEdit,
   editedBodyId,
   isWaterEditEmpty,
@@ -109,52 +106,6 @@ describe('water edit format', () => {
       expect(id).toBeGreaterThan(OCEAN_BODY_ID);
       expect(id & 0x80000000).toBe(0);
     }
-  });
-});
-
-describe('applyWaterEdit', () => {
-  const types = new Float64Array(MAX_WATER_TYPES);
-  const scratch = createWaterEditSample();
-
-  it('leaves the generated water where the edit owns nothing', () => {
-    const edit = createWaterEdit(CHUNK_SIZE);
-    types.set([1, 0, 0, 0]);
-    const water = { level: 12, bodyId: OCEAN_BODY_ID };
-    expect(applyWaterEdit(edit, 8, 8, water, 1, types, scratch)).toBe(1);
-    expect(water).toEqual({ level: 12, bodyId: OCEAN_BODY_ID });
-    expect(Array.from(types)).toEqual([1, 0, 0, 0]);
-  });
-
-  it('adds water on dry ground at its own level and type', () => {
-    const edit = createWaterEdit(CHUNK_SIZE);
-    ownAll(edit, 1, 30);
-    types.fill(0);
-    const water = { level: 0, bodyId: OCEAN_BODY_ID };
-    expect(applyWaterEdit(edit, 9.5, 20, water, 0, types, scratch)).toBe(1);
-    expect(water.level).toBeCloseTo(30);
-    expect(water.bodyId).toBe(7);
-    expect(Array.from(types)).toEqual([0, 1, 0, 0]);
-  });
-
-  it('removes generated water and keeps its level', () => {
-    const edit = createWaterEdit(CHUNK_SIZE);
-    ownAll(edit, 0, 30);
-    types.set([1, 0, 0, 0]);
-    const water = { level: 12, bodyId: OCEAN_BODY_ID };
-    expect(applyWaterEdit(edit, 8, 8, water, 1, types, scratch)).toBe(0);
-    expect(water.level).toBe(12);
-  });
-
-  it('shares a texel by its authority', () => {
-    const edit = createWaterEdit(CHUNK_SIZE);
-    ownAll(edit, 0, 30);
-    plane(edit, WATER_EDIT_AUTHORITY).fill(Math.round(255 * 0.25));
-    types.set([1, 0, 0, 0]);
-    const water = { level: 12, bodyId: OCEAN_BODY_ID };
-    expect(applyWaterEdit(edit, 8, 8, water, 1, types, scratch)).toBeCloseTo(
-      0.75,
-      2
-    );
   });
 });
 

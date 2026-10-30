@@ -1,6 +1,6 @@
-//! The parts of a climate preset that shape and surface the ground. Mirrors the
-//! TS types in `Biomes.ts`; fields no ported stage reads yet (scatter, water,
-//! lakes) are skipped when a preset is deserialized.
+//! The parts of a climate preset that shape, surface and flood the ground.
+//! Mirrors the TS types in `Biomes.ts`; fields no ported stage reads yet
+//! (scatter) are skipped when a preset is deserialized.
 
 use serde::Deserialize;
 
@@ -11,6 +11,10 @@ pub struct ClimateConfig {
     pub moisture: ClimateAxis,
     pub continent: Option<ContinentConfig>,
     pub coast: Option<CoastConfig>,
+    /// The water palette a water map's type weights index.
+    #[serde(default)]
+    pub water: Vec<WaterType>,
+    pub lakes: Option<LakeConfig>,
     pub biomes: Vec<Biome>,
     /// `cells[temperatureBand][moistureBand]` is an index into `biomes`.
     pub cells: Vec<Vec<i64>>,
@@ -49,6 +53,57 @@ pub struct CoastConfig {
     pub seabed_depth: f64,
     pub blend: f64,
     pub slope: Band,
+}
+
+/// One entry of the water palette. Only its name matters here.
+#[derive(Deserialize, Clone, Debug)]
+pub struct WaterType {
+    pub name: String,
+}
+
+/// Seeded lakes, at most one per cell. Lengths are in samples.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct LakeConfig {
+    pub cell_size: f64,
+    pub seed_salt: f64,
+    /// Share of cells that try to hold a lake.
+    pub chance: f64,
+    /// Shore radius, picked per lake.
+    pub radius: Band,
+    /// How far the shore wanders from a circle, as a share of the radius.
+    pub irregularity: f64,
+    /// The bank's reach as a multiple of the shore radius. The rim is sampled
+    /// there.
+    pub bank: f64,
+    /// Metres at the centre, picked per lake.
+    pub depth: Band,
+    /// Metres the lip stands above the level.
+    pub margin: f64,
+    /// Degrees of rim spread over the rim radius. A steeper site is rejected.
+    pub max_rim_slope: f64,
+    /// The same for a lagoon, over its dry rim only.
+    pub max_lagoon_slope: f64,
+    /// Share of candidates out at sea that slide ashore to try for a lagoon.
+    pub lagoon_chance: f64,
+    pub lagoon_radius: Band,
+    /// Past the bank, as a multiple of the shore radius: where a raised lip
+    /// eases back down to the ground.
+    pub moraine: f64,
+    /// Shore kept between the banks of neighbouring lakes.
+    pub spacing: f64,
+    /// Without it, a site too steep for a lake stays dry.
+    pub tarns: Option<TarnConfig>,
+}
+
+/// A small lake in a cirque, tried where a site is too steep for a lake.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TarnConfig {
+    pub radius: Band,
+    pub max_rim_slope: f64,
+    /// How far up the rim's spread the level sits, 0..1.
+    pub lip_share: f64,
 }
 
 #[derive(Deserialize, Clone, Debug)]

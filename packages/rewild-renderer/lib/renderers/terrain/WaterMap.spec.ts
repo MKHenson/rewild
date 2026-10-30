@@ -8,9 +8,7 @@ import {
 import { generateBiomeBlendedHeightMap } from './Noise';
 import {
   OCEAN_BODY_ID,
-  SWASH_REACH,
   WATER_MAP_STEP,
-  WET_BAND_REACH,
   WaterMap,
   buildWaterMap,
   packWaterSurface,
@@ -52,6 +50,8 @@ const INLAND = climateWith({ ...DEFAULT_CONTINENT, coast: -1 });
 // A continent small enough that a coast crosses one test chunk.
 const COASTAL = climateWith({ ...DEFAULT_CONTINENT, scale: 40, coast: 0.5 });
 
+// The water map rules are tested in Rust (crates/terrain/src/tests.rs). These
+// pin the shipped presets through the WASM boundary.
 describe('buildWaterMap', () => {
   it('is null for a climate with no continent', () => {
     expect(build(climateWith(undefined))).toBeNull();
@@ -64,20 +64,6 @@ describe('buildWaterMap', () => {
   it('is null where the ocean is covered but the ground stands above it', () => {
     const high = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(5);
     expect(build(OPEN_OCEAN, 0, 0, 0, high)).toBeNull();
-  });
-
-  it('finds a single hollow below sea level between texels', () => {
-    const heights = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(5);
-    heights[3 + 5 * CHUNK_SIZE] = -1;
-    expect(build(OPEN_OCEAN, 0, 0, 0, heights)!.shows).toBe(true);
-  });
-
-  it('keeps a map that shows no water for ground within the wet band', () => {
-    const heights = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(5);
-    heights[3 + 5 * CHUNK_SIZE] = (SWASH_REACH + WET_BAND_REACH) / 2;
-    const water = build(OPEN_OCEAN, 0, 0, 0, heights)!;
-    expect(water).not.toBeNull();
-    expect(water.shows).toBe(false);
   });
 
   it('fills open ocean at sea level with ocean water', () => {
@@ -96,24 +82,6 @@ describe('buildWaterMap', () => {
     }
   });
 
-  it('stores terrain heights relative to the base level', () => {
-    const seaLevel = 1000;
-    const heights = new Float32Array(CHUNK_SIZE * CHUNK_SIZE);
-    for (let i = 0; i < heights.length; i++)
-      heights[i] = seaLevel - 3 + (i % 7) * 0.9;
-    const water = build(OPEN_OCEAN, 0, 0, seaLevel, heights)!;
-
-    for (let my = 0; my < SIZE; my++) {
-      for (let mx = 0; mx < SIZE; mx++) {
-        const source =
-          heights[mx * WATER_MAP_STEP + my * WATER_MAP_STEP * CHUNK_SIZE];
-        const stored = fromFloat16(water.heights[mx + my * SIZE]);
-        // Within 3 m of the level, f16 steps are under 2 mm.
-        expect(Math.abs(stored - (source - seaLevel))).toBeLessThan(0.002);
-      }
-    }
-  });
-
   it('covers only part of a coastal chunk', () => {
     const water = build(COASTAL)!;
     expect(water).not.toBeNull();
@@ -128,21 +96,6 @@ describe('buildWaterMap', () => {
     expect(wet).toBeGreaterThan(0);
   });
 
-  it('shares edge texels with its neighbours', () => {
-    const span = CHUNK_SIZE - 1;
-    const left = build(COASTAL, 0, 0)!;
-    const right = build(COASTAL, span, 0)!;
-    const below = build(COASTAL, 0, span)!;
-
-    for (let i = 0; i < SIZE; i++) {
-      expect(right.coverage[i * SIZE]).toBe(left.coverage[i * SIZE + SIZE - 1]);
-      expect(right.heights[i * SIZE]).toBe(left.heights[i * SIZE + SIZE - 1]);
-      // offset.y enters the noise negatively, so the +y neighbour's last row
-      // meets this chunk's first.
-      expect(below.coverage[(SIZE - 1) * SIZE + i]).toBe(left.coverage[i]);
-      expect(below.heights[(SIZE - 1) * SIZE + i]).toBe(left.heights[i]);
-    }
-  });
 });
 
 describe('oceanCoverage', () => {

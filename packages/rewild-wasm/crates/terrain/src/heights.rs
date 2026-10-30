@@ -6,7 +6,8 @@
 //! neighbouring chunks agree exactly where they meet.
 
 use crate::climate::{
-    continent_land_weight, continent_seabed_depth, resolve_biomes, BiomeBlend, ClimateField, ClimateSample,
+    continent_land_weight, continent_seabed_depth, resolve_biomes, BiomeBlend, ClimateField, ClimateGrid,
+    ClimateSample,
 };
 use crate::config::{ClimateConfig, Deformation, Octaves};
 use math::{fast_max, fast_min, smoothstep01, F64x2, ParkMiller, PowerCurve, Simplex};
@@ -276,6 +277,8 @@ pub struct HeightSample {
     pub height: f64,
     pub blend: BiomeBlend,
     pub land: f64,
+    /// The continent field. 1 with no continent.
+    pub continent: f64,
 }
 
 /// Heights for one world: a climate preset, a seed and a sea level.
@@ -284,6 +287,7 @@ pub struct HeightGenerator {
     simplex: Simplex,
     field: ClimateField,
     prepared: Vec<Vec<Prepared>>,
+    seed: f64,
     sea_level: f64,
     meters_per_sample: f64,
     /// Erosion passes: the most any biome asks for.
@@ -316,16 +320,39 @@ impl HeightGenerator {
             simplex: Simplex::new(seed),
             climate,
             prepared,
+            seed,
             sea_level,
             meters_per_sample,
             passes,
         })
     }
 
+    pub fn climate(&self) -> &ClimateConfig {
+        &self.climate
+    }
+
+    pub fn seed(&self) -> f64 {
+        self.seed
+    }
+
+    pub fn sea_level(&self) -> f64 {
+        self.sea_level
+    }
+
+    pub fn meters_per_sample(&self) -> f64 {
+        self.meters_per_sample
+    }
+
     /// The continent field at world sample (x, y), in 0..1. Below the
     /// preset's `coast` is ocean.
     pub fn continent(&self, x: f64, y: f64) -> f64 {
         self.field.sample(&self.climate, &self.simplex, x, y).continent
+    }
+
+    /// The climate grid covering world samples `x0..=x0 + width - 1` ×
+    /// `y0..=y0 + height - 1`, the grid the heights read.
+    pub fn climate_grid(&self, x0: f64, y0: f64, width: usize, height: usize) -> ClimateGrid {
+        self.field.grid(&self.climate, &self.simplex, x0, y0, width, height)
     }
 
     /// The un-eroded, uncarved height at world sample (x, y): the biomes'
@@ -355,7 +382,7 @@ impl HeightGenerator {
                 h += blend.weights[i] * biome_height;
             }
         }
-        HeightSample { height: seabed + land * (h - seabed), blend, land }
+        HeightSample { height: seabed + land * (h - seabed), blend, land, continent: values.continent }
     }
 
     /// A `width` × `height` field of heights centred on chunk offset
