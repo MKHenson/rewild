@@ -29,7 +29,7 @@
   "barkLevels": 2,
   "splitAngle": 72,
   "splitVariance": 12,
-  "splitSpread": 0.75,
+  "splitSpread": 0.65,
   "branchLevels": 3,
   "lengthRatio": 0.45,
   "radiusRatio": 0.6,

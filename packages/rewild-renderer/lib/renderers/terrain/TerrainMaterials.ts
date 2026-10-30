@@ -69,7 +69,7 @@ export interface TerrainMaterial {
 
 // Matches the shader's current `fragUV * 25.0`, so the detail tiling of the
 // existing single-material terrain carries over unchanged.
-const DETAIL_UV_SCALE = 60;
+const DETAIL_UV_SCALE = 140;
 
 // Much coarser than the detail scale: features spanning metres rather than
 // centimetres, which is what survives mipping at distance.

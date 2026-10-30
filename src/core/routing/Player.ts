@@ -77,9 +77,10 @@ import { PlayerSounds } from '../audio/PlayerSounds';
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
 const _PI_HALF = Math.PI / 2 - 0.01;
 const _MOUSE_SENSITIVITY = 0.002;
-const _MOVE_SPEED: f32 = 3.0;
+// Per dt (two seconds' worth of delta): walking is 3 m/s.
+const _MOVE_SPEED: f32 = 1.5;
 const _RUN_MULTIPLIER: f32 = 3.0;
-const _SWIM_RUN_MULTIPLIER: f32 = 2.5;
+const _SWIM_RUN_MULTIPLIER: f32 = 1.8;
 const _CROUCH_SPEED_MULTIPLIER: f32 = 0.5;
 // The body is 1.78 m tall; eye heights are over the capsule centre (0.89 m up).
 const _STANDING_EYE_HEIGHT: f32 = 0.77;
@@ -802,7 +803,8 @@ export class Player extends Node {
     if (this.swimming) this._crouching = false;
 
     // Jump
-    const JUMP_IMPULSE: f32 = 10.5;
+    // Rises about 1 m.
+    const JUMP_IMPULSE: f32 = 8.5;
     if (this.jumpRequested) {
       if (this.grounded && !this.swimming) {
         this._sounds?.jump();

@@ -48,11 +48,11 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 2
+      "tilt": 3
     },
     "alignToNormal": 1,
-    "yOffset": -0.06,
-    "footprint": 8.4,
+    "yOffset": -0.025,
+    "footprint": 2.7,
     "castShadow": false
   },
   "alien_plant": {
@@ -160,10 +160,10 @@
     "collider": {
       "type": "capsule",
       "radius": 0.46,
-      "height": 1.79,
+      "height": 2.85,
       "offset": [
         0,
-        1.35,
+        1.89,
         0
       ]
     },
@@ -179,6 +179,12 @@
   "plains_01": {
     "name": "plains_01",
     "geometryId": "plains-01",
+    "cullDistance": 420,
+    "impostor": {
+      "fromDistance": 120,
+      "views": 2,
+      "tileSize": 64
+    },
     "jitter": {
       "scale": {
         "from": 0.8,
@@ -188,16 +194,10 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 3
+      "tilt": 2
     },
-    "cullDistance": 420,
-    "impostor": {
-      "fromDistance": 160,
-      "views": 2,
-      "tileSize": 64
-    },
-    "yOffset": -0.084,
     "alignToNormal": 0.6,
+    "yOffset": -0.132,
     "footprint": 1.6,
     "wind": {
       "amplitude": 5.18,
@@ -213,8 +213,8 @@
     "geometryId": "plains-02",
     "cullDistance": 420,
     "impostor": {
-      "fromDistance": 160,
-      "views": 2,
+      "fromDistance": 120,
+      "views": 4,
       "tileSize": 64
     },
     "jitter": {
@@ -228,8 +228,8 @@
       },
       "tilt": 2
     },
-    "yOffset": -0.09,
     "alignToNormal": 0.6,
+    "yOffset": -0.132,
     "footprint": 1.6,
     "wind": {
       "amplitude": 5.18,
@@ -507,11 +507,11 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 4
+      "tilt": 7
     },
     "alignToNormal": 0.6,
-    "yOffset": -0.122,
-    "footprint": 2.53,
+    "yOffset": -0.054,
+    "footprint": 1.26,
     "wind": {
       "amplitude": 1.2,
       "frequency": 1.1,
@@ -539,11 +539,11 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 2
+      "tilt": 4
     },
     "alignToNormal": 0.6,
-    "yOffset": -0.061,
-    "footprint": 4.33,
+    "yOffset": -0.036,
+    "footprint": 2.37,
     "wind": {
       "amplitude": 2.15,
       "frequency": 0.9,
@@ -571,11 +571,11 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 3
+      "tilt": 4
     },
     "alignToNormal": 0.6,
-    "yOffset": -0.071,
-    "footprint": 3.12,
+    "yOffset": -0.038,
+    "footprint": 2.1,
     "wind": {
       "amplitude": 2.15,
       "frequency": 0.9,
@@ -603,10 +603,10 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 2
+      "tilt": 4
     },
     "alignToNormal": 0.6,
-    "yOffset": -0.16,
+    "yOffset": -0.06,
     "footprint": 1.6,
     "wind": {
       "amplitude": 2.18,
@@ -1302,8 +1302,8 @@
       "tilt": 2
     },
     "alignToNormal": 1,
-    "yOffset": -0.045,
-    "footprint": 5.3,
+    "yOffset": -0.031,
+    "footprint": 3.7,
     "castShadow": false
   },
   "sandstone_cobbles_01": {
@@ -1322,11 +1322,11 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 2
+      "tilt": 4
     },
     "alignToNormal": 1,
-    "yOffset": -0.062,
-    "footprint": 5.9,
+    "yOffset": -0.019,
+    "footprint": 2.5,
     "castShadow": false
   },
   "granite_pebble_snow_01": {
@@ -1345,11 +1345,11 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 2
+      "tilt": 3
     },
     "alignToNormal": 1,
-    "yOffset": -0.057,
-    "footprint": 5.5,
+    "yOffset": -0.023,
+    "footprint": 2.5,
     "castShadow": false
   },
   "sandstone_04": {
@@ -1680,10 +1680,10 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 3
+      "tilt": 4
     },
     "alignToNormal": 0.6,
-    "yOffset": -0.116,
+    "yOffset": -0.07,
     "footprint": 1.1,
     "wind": {
       "amplitude": 1.15,

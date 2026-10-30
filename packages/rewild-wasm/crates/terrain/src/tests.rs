@@ -1046,7 +1046,7 @@ mod scatter {
     use super::lakes::{ground, lake_climate};
     use super::*;
     use crate::scatter::{
-        kill_key, rule_density, rule_water, Jitter, LayerInstances, SampleBox, ScatterGenerator, ScatterLayer,
+        kill_key, rule_density, rule_water, Collider, Jitter, LayerInstances, SampleBox, ScatterGenerator, ScatterLayer,
         ScatterRequest, INSTANCE_STRIDE,
     };
     use crate::PaintMask;
@@ -1073,6 +1073,7 @@ mod scatter {
             jitter: Jitter { scale: Band { from: 0.8, to: 1.2 }, yaw: None, tilt: Some(10.0) },
             align_to_normal: Some(align),
             y_offset: Some(0.25),
+            collider: None,
         }
     }
 
@@ -1332,6 +1333,35 @@ mod scatter {
         let heights = g.generate(SIZE, SIZE, 0.0, 0.0);
         assert!(s.generate(&g, &heights, SIZE, 0.0, 0.0, ScatterRequest::default()).is_err());
         assert!(s.generate(&g, &heights[1..], SIZE, 0.0, 0.0, ScatterRequest::default()).is_err());
+    }
+
+    #[test]
+    fn sinks_an_instance_on_a_slope_by_its_foot_as_far_as_it_stays_upright() {
+        let c = scatter_climate();
+        let g = ground(c.clone());
+        // A plane rising 0.1 m per metre along x, at 2 m samples.
+        let heights: Vec<f32> = (0..SIZE * SIZE).map(|i| 20.0 + 0.2 * (i % SIZE) as f32).collect();
+        let layers = |collider: Option<f64>| -> Vec<ScatterLayer> {
+            let mut l = library();
+            l[0].align_to_normal = Some(0.5);
+            l.into_iter().map(|l| ScatterLayer { collider: collider.map(|r| Collider { radius: Some(r) }), ..l }).collect()
+        };
+
+        for (collider, foot) in [(None, 2.0 * 0.1), (Some(0.4), 0.4 * 1.5)] {
+            let library = layers(collider);
+            let s = ScatterGenerator::new(c.clone(), library.clone(), 9001.0, 0.0, 2.0).unwrap();
+            let placed = s.generate(&g, &heights, SIZE, 0.0, 0.0, ScatterRequest::default()).unwrap();
+            assert!(total(&placed) > 0);
+
+            for l in &placed {
+                let align = library[l.slot].align_to_normal.unwrap();
+                for d in l.data.chunks(INSTANCE_STRIDE) {
+                    let ground = 20.0 + 0.1 * (d[0] as f64 + 64.0);
+                    let expected = ground + 0.25 - foot * 0.1 * d[7] as f64 * (1.0 - align);
+                    assert!((d[1] as f64 - expected).abs() < 1e-3, "slot {} at {} not {}", l.slot, d[1], expected);
+                }
+            }
+        }
     }
 
     #[test]
