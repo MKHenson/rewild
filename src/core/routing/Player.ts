@@ -81,17 +81,18 @@ const _MOVE_SPEED: f32 = 3.0;
 const _RUN_MULTIPLIER: f32 = 3.0;
 const _SWIM_RUN_MULTIPLIER: f32 = 2.5;
 const _CROUCH_SPEED_MULTIPLIER: f32 = 0.5;
-const _STANDING_EYE_HEIGHT: f32 = 1.8;
-const _CROUCH_EYE_HEIGHT: f32 = 0.9;
+// The body is 1.78 m tall; eye heights are over the capsule centre (0.89 m up).
+const _STANDING_EYE_HEIGHT: f32 = 0.77;
+const _CROUCH_EYE_HEIGHT: f32 = 0.11;
 // Flashlight hangs below the camera eye line (chest/hip level) to create natural shadow offset.
-const _FLASHLIGHT_BODY_DROP: f32 = 0.8;
+const _FLASHLIGHT_BODY_DROP: f32 = 0.5;
 const _DEG2RAD = Math.PI / 180;
-const _CAPSULE_HALF_HEIGHT: f32 = 0.9;
-const _CAPSULE_RADIUS: f32 = 0.5;
+const _CAPSULE_HALF_HEIGHT: f32 = 0.59;
+const _CAPSULE_RADIUS: f32 = 0.3;
 // Distance from the capsule's centre to its base.
 const _CAPSULE_HALF_EXTENT: f32 = _CAPSULE_HALF_HEIGHT + _CAPSULE_RADIUS;
 // A swimmer's capsule is half as long, so they can dive close to the bed.
-const _SWIM_HALF_HEIGHT: f32 = 0.2;
+const _SWIM_HALF_HEIGHT: f32 = 0.15;
 const _SWIM_HALF_EXTENT: f32 = _SWIM_HALF_HEIGHT + _CAPSULE_RADIUS;
 // How far the capsule centre moves up as the swimmer's capsule shrinks to it.
 const _SWIM_CENTRE_SHIFT: f32 = _CAPSULE_HALF_EXTENT - _SWIM_HALF_EXTENT;
