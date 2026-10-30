@@ -1,9 +1,14 @@
 import { Geometry } from 'rewild-renderer/lib/geometry/Geometry';
 import { Mesh, Transform } from 'rewild-renderer';
 import { IMaterialPass } from 'rewild-renderer/lib/materials/IMaterialPass';
-import { Vector2 } from 'rewild-common';
+import { Face, Intersection } from 'rewild-renderer/lib/core/Raycaster';
+import { Quaternion, Vector2, Vector3 } from 'rewild-common';
 import { TerrainChunk } from 'rewild-renderer/lib/renderers/terrain/TerrainChunk';
-import { computeGroundOffset, isTerrainTransform } from './WorldPlacement';
+import {
+  computeGroundOffset,
+  isTerrainTransform,
+  restOnHit,
+} from './WorldPlacement';
 
 function fakeMaterial(): IMaterialPass {
   return { isGeometryCompatible: () => true } as unknown as IMaterialPass;
@@ -130,5 +135,55 @@ describe('isTerrainTransform', () => {
 
   it('rejects null', () => {
     expect(isTerrainTransform(null)).toBe(false);
+  });
+});
+
+describe('restOnHit', () => {
+  /** A hit on a crate tilted 45° about z, on the face whose local normal is +y. */
+  function hitOnTiltedTop(localNormal: Vector3): Intersection {
+    const crate = new Transform();
+    crate.rotation.z = Math.PI / 4;
+    crate.updateMatrixWorld(true);
+
+    const hit = new Intersection();
+    hit.object = crate;
+    hit.point = new Vector3(1, 2, 3);
+    hit.face = new Face();
+    hit.face.normal = localNormal;
+    return hit;
+  }
+
+  const down = new Vector3(0, -1, 0);
+  const s = Math.SQRT1_2;
+
+  it('stands the object out along the world normal by its ground offset', () => {
+    const position = new Vector3();
+    restOnHit(hitOnTiltedTop(new Vector3(0, 1, 0)), down, 2, position);
+
+    expect(position.x).toBeCloseTo(1 - 2 * s);
+    expect(position.y).toBeCloseTo(2 + 2 * s);
+    expect(position.z).toBeCloseTo(3);
+  });
+
+  it('tilts the object up onto the world normal', () => {
+    const position = new Vector3();
+    const [x, y, z, w] = restOnHit(
+      hitOnTiltedTop(new Vector3(0, 1, 0)),
+      down,
+      1,
+      position
+    );
+    const up = new Vector3(0, 1, 0).applyQuaternion(new Quaternion(x, y, z, w));
+
+    expect(up.x).toBeCloseTo(-s);
+    expect(up.y).toBeCloseTo(s);
+    expect(up.z).toBeCloseTo(0);
+  });
+
+  it('turns a back face normal towards the ray', () => {
+    const position = new Vector3();
+    restOnHit(hitOnTiltedTop(new Vector3(0, -1, 0)), down, 2, position);
+
+    expect(position.y).toBeCloseTo(2 + 2 * s);
   });
 });

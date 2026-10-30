@@ -13,8 +13,8 @@ import {
   computeGroundOffset,
   placeOnSurface,
   raycastMouseToWorld,
-  computeRotationFromNormal,
   isTerrainTransform,
+  restOnHit,
 } from './WorldPlacement';
 
 const _planeHit = new Vector3();
@@ -103,12 +103,13 @@ export class GizmoDragController {
       const worldHit = raycastMouseToWorld(mouseRay, this.renderer, excludes);
 
       if (worldHit) {
+        let rotation: [number, number, number, number];
         if (this.mode === GizmoDragMode.PlaneXZ) {
-          // Place exactly where the mouse points on the world
-          _newPosition.set(
-            worldHit.point.x,
-            worldHit.point.y + this.objectGroundOffset,
-            worldHit.point.z
+          rotation = restOnHit(
+            worldHit,
+            mouseRay.direction,
+            this.objectGroundOffset,
+            _newPosition
           );
           this.lastOnTerrain = isTerrainTransform(worldHit.object);
         } else {
@@ -128,15 +129,12 @@ export class GizmoDragController {
           if (surfaceResult) {
             _newPosition.y = surfaceResult.y;
           }
+          rotation = surfaceResult ? surfaceResult.rotation : this.lastRotation;
           // The down-ray, not the mouse ray, is what the object ends up
           // standing on once its x/z are constrained.
           this.lastOnTerrain = surfaceResult ? surfaceResult.onTerrain : false;
         }
 
-        // Apply rotation from surface normal
-        const rotation = worldHit.face
-          ? computeRotationFromNormal(worldHit.face.normal)
-          : this.lastRotation;
         this.lastRotation = rotation;
         this.transform.rotation.setFromQuaternion(
           _tempQuat.set(rotation[0], rotation[1], rotation[2], rotation[3])

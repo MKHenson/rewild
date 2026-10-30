@@ -1,4 +1,11 @@
-import { Box3, Matrix4, Quaternion, Ray, Vector3 } from 'rewild-common';
+import {
+  Box3,
+  Matrix3,
+  Matrix4,
+  Quaternion,
+  Ray,
+  Vector3,
+} from 'rewild-common';
 import { Mesh, Renderer, Transform } from 'rewild-renderer';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
 import { quaternionFromUpToNormal } from 'src/core/placement/ConformedPlacement';
@@ -12,6 +19,8 @@ const _bounds = new Box3();
 const _meshBounds = new Box3();
 const _inverseRoot = new Matrix4();
 const _toRoot = new Matrix4();
+const _normalMatrix = new Matrix3();
+const _surfaceNormal = new Vector3();
 
 export function computeRotationFromNormal(
   normal: Vector3
@@ -101,6 +110,39 @@ export function isTerrainTransform(transform: Transform | null): boolean {
   return false;
 }
 
+/**
+ * The hit face's world normal, turned to face back along `rayDirection` so a
+ * back face hit on a double-sided mesh still points out of the surface.
+ */
+function worldNormal(
+  hit: Intersection,
+  rayDirection: Vector3,
+  out: Vector3
+): Vector3 {
+  _normalMatrix.getNormalMatrix(hit.object.matrixWorld);
+  out.copy(hit.face!.normal).applyNormalMatrix(_normalMatrix);
+  if (out.dot(rayDirection) > 0) out.negate();
+  return out;
+}
+
+/**
+ * Rests an object on `hit`, aligned to the surface: its origin is written to
+ * `outPosition`, `groundOffset` out along the world normal from the hit point,
+ * and the rotation tilting it onto the normal is returned.
+ */
+export function restOnHit(
+  hit: Intersection,
+  rayDirection: Vector3,
+  groundOffset: number,
+  outPosition: Vector3
+): [number, number, number, number] {
+  if (hit.face) worldNormal(hit, rayDirection, _surfaceNormal);
+  else _surfaceNormal.set(0, 1, 0);
+
+  outPosition.copy(_surfaceNormal).multiplyScalar(groundOffset).add(hit.point);
+  return computeRotationFromNormal(_surfaceNormal);
+}
+
 export function placeOnSurface(
   renderer: Renderer,
   position: Vector3,
@@ -114,9 +156,12 @@ export function placeOnSurface(
   const hit = raycastToSurface(renderer, position, excludeTransforms);
   if (!hit || !hit.face) return null;
 
+  // Lifting the origin straight up by groundOffset / normal.y keeps it
+  // groundOffset out from the surface's plane, as an aligned object needs.
+  worldNormal(hit, _downDir, _surfaceNormal);
   return {
-    y: hit.point.y + groundOffset,
-    rotation: computeRotationFromNormal(hit.face.normal),
+    y: hit.point.y + groundOffset / Math.max(_surfaceNormal.y, 0.1),
+    rotation: computeRotationFromNormal(_surfaceNormal),
     onTerrain: isTerrainTransform(hit.object),
   };
 }
