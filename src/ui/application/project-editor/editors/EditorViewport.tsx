@@ -42,8 +42,8 @@ import { TerrainSculptController } from './utils/TerrainSculptController';
 import {
   computeGroundOffset,
   isTerrainTransform,
-  computeRotationFromNormal,
   raycastToSurface,
+  restOnHit,
 } from './utils/WorldPlacement';
 import { sculptStore } from 'src/ui/stores/SculptStore';
 import { SculptToolbar } from './SculptToolbar';
@@ -947,40 +947,39 @@ export class EditorViewport extends Component<Props> {
       const json = compelteDragDrop<ITreeNodeAction>(e);
       if (!json) return;
 
-      const intersection = get3DCoords(e.clientX, e.clientY);
-      const point = intersection?.point;
+      const raycaster = createRaycaster(e.clientX, e.clientY);
+      const intersection =
+        raycaster.intersectObjects([this.renderer.scene], true)[0] ?? null;
 
-      if (point && json.node.resource) {
+      if (intersection && json.node.resource) {
         const createdResource = (await this.templateLoader.createResource(
           json.node.resource,
           this.renderer
         )) as Asset3D;
 
-        point.y += computeGroundOffset(createdResource.transform);
-
-        const normal = intersection!.face!.normal;
-        const rotation = computeRotationFromNormal(normal);
+        const point = this._placementPosition;
+        const rotation = restOnHit(
+          intersection,
+          raycaster.ray.direction,
+          computeGroundOffset(createdResource.transform),
+          point
+        );
         const placement: IAssetPlacement = {
           id: json.node.resource.id,
           position: [point.x, point.y, point.z],
           rotation,
         };
 
-        const dropPosition = this._placementPosition.set(
-          point.x,
-          point.y,
-          point.z
-        );
         applyConformPolicy(
           placement,
           this.renderer.terrainRenderer,
-          dropPosition,
-          isTerrainTransform(intersection!.object)
+          point,
+          isTerrainTransform(intersection.object)
         );
         writeBackPlacement(
           placement,
           this.renderer.terrainRenderer,
-          dropPosition,
+          point,
           rotation
         );
 
