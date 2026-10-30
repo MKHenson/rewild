@@ -151,6 +151,10 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
   private bindGroupPipeline: GPURenderPipeline | null = null;
   private frameUniforms = new Float32Array(SCATTER_UNIFORM_BYTES / 4);
   private nodeMatrixWritten = false;
+  // What the band was last derived from: the bias and the layer's cull
+  // distance, which a debug command can change at runtime.
+  private bandBias = NaN;
+  private bandCull = NaN;
 
   /**
    * `reach` is how far the drawn thing extends from an instance's origin at
@@ -271,6 +275,11 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
    *  Picked up by the next frame's uniform write, so a bias set at runtime
    *  lands without touching the instance buffer. */
   applyLodBias(lodBias: number): void {
+    if (lodBias === this.bandBias && this.layer.cullDistance === this.bandCull)
+      return;
+    this.bandBias = lodBias;
+    this.bandCull = this.layer.cullDistance;
+
     const near = lodTierNear(this.layer, this.tier, lodBias);
     const far = lodTierFar(this.layer, this.tier, lodBias);
     this.nearDistance = near;

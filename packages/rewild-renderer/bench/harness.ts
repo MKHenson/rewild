@@ -1,6 +1,9 @@
 import { arch, cpus, platform } from 'node:os';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+import { loadRewildWasmSync } from '../lib/wasm/RewildWasm';
 
 /** Milliseconds for each stage of one run. */
 export type Sample = Record<string, number>;
@@ -160,4 +163,54 @@ export function printReport(report: BenchReport, baseline?: BenchReport) {
   }
   console.log('');
   console.log('all values are milliseconds per run.');
+}
+
+/** Adds a case, which runs only when its name contains `--filter`. */
+export type Bench = (name: string, run: (index: number) => Sample) => void;
+
+/**
+ * Loads the WASM module, runs the cases `define` adds with the options on the
+ * command line (see run.mjs), prints the report and saves it with `--json`.
+ */
+export async function runBenchmarks(
+  define: (bench: Bench) => void | Promise<void>
+) {
+  // The bundle runs from bench/build/, which run.mjs builds first.
+  loadRewildWasmSync(
+    readFileSync(
+      fileURLToPath(
+        new URL('../../../rewild-wasm/pkg/rewild_wasm_bg.wasm', import.meta.url)
+      )
+    )
+  );
+
+  const { values } = parseArgs({
+    options: {
+      runs: { type: 'string', default: '15' },
+      warmup: { type: 'string', default: '3' },
+      filter: { type: 'string' },
+      json: { type: 'string' },
+      compare: { type: 'string' },
+    },
+  });
+
+  const options: BenchOptions = {
+    runs: Number(values.runs),
+    warmup: Number(values.warmup),
+    filter: values.filter,
+  };
+  const results: CaseResult[] = [];
+  await define((name, run) => {
+    if (options.filter && !name.includes(options.filter)) return;
+    process.stderr.write(`${name}...
+`);
+    results.push(runCase(name, options, run));
+  });
+
+  const report = createReport(options, results);
+  printReport(report, values.compare ? readReport(values.compare) : undefined);
+  if (values.json) {
+    writeReport(values.json, report);
+    console.log(`wrote ${values.json}`);
+  }
 }

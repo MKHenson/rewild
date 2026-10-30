@@ -18,6 +18,7 @@
     "start": "npm run build:wasm && npm-run-all --parallel serve ts-check-watch",
     "serve": "node ./esbuild.js --serve",
     "bench": "npm run build:wasm && node packages/rewild-renderer/bench/run.mjs",
+    "bench:game": "npm run build:wasm && node packages/rewild-renderer/bench/run.mjs --game",
     "generate:types": "cd server && .\\gradlew.bat generateSpec && npx openapi-typescript ../openapi.json -o ../src/types/api.ts",
     "assets:pull": "node --env-file=.env scripts/assets-pull.js",
     "assets:push": "node --env-file=.env scripts/assets-push.js",

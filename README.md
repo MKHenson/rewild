@@ -18,6 +18,7 @@ Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (
 - [Materials & Shading](./docs/milestones/lichen.md)
 - [Terrain](./docs/milestones/strata.md)
 - [Foliage & Scatter](./docs/milestones/understory.md)
+- [Rust](./docs/milestones/rust.md)
 
 ## Debugging
 
