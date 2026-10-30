@@ -4,7 +4,7 @@
  *     npm run build:wasm
  *
  * Needs a Rust toolchain with the wasm32-unknown-unknown target, and wasm-pack.
- * See docs/wasm.md.
+ * See docs/milestones/rust.md.
  */
 import { spawnSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
@@ -34,7 +34,7 @@ const result = spawnSync(
 
 if (result.error) {
   console.error(
-    `Could not run wasm-pack: ${result.error.message}. See docs/wasm.md.`
+    `Could not run wasm-pack: ${result.error.message}. See docs/milestones/rust.md.`
   );
   process.exit(1);
 }

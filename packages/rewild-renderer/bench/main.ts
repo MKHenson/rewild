@@ -4,9 +4,6 @@
  * Run it from the repo root with `npm run bench`. See `bench/run.mjs` for the
  * options.
  */
-import { parseArgs } from 'node:util';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import {
   buildChunkMesh,
   BuildChunkMeshRequest,
@@ -24,7 +21,6 @@ import { BVH } from '../lib/acceleration/BVH';
 import { Geometry } from '../lib/geometry/Geometry';
 import { Intersection } from '../lib/core/Raycaster';
 import { Ray, Vector3 } from 'rewild-common';
-import { loadRewildWasmSync } from '../lib/wasm/RewildWasm';
 import {
   FAR_MAP_TEXELS,
   FarMapBuilder,
@@ -52,16 +48,19 @@ import {
 } from '../lib/renderers/terrain/WaterEdit';
 import { TERRAIN_METERS_PER_SAMPLE } from '../lib/renderers/terrain/MeshGenerator';
 import { generateSplatMap } from '../lib/renderers/terrain/Splat';
-import { Vector2 } from 'rewild-common';
+import { Box3, Frustum, Matrix4, Vector2 } from 'rewild-common';
+import { ChunkScatter } from '../lib/renderers/terrain/ChunkScatter';
+import { ScatterChunkLayer } from '../lib/renderers/terrain/ScatterChunkLayer';
 import {
-  BenchOptions,
-  CaseResult,
-  createReport,
-  printReport,
-  readReport,
-  runCase,
-  writeReport,
-} from './harness';
+  getScatterGenerationDistance,
+  getScatterLayer,
+  lodTierCount,
+} from '../lib/renderers/terrain/ScatterLayers';
+import { ScatterInstances } from '../lib/renderers/terrain/Scatter';
+import { Transform } from '../lib/core/Transform';
+import { NUM_CASCADES } from '../lib/renderers/shadow/DirectionalShadowRenderer';
+import { shadowConfig } from '../lib/renderers/shadow/ShadowQuality';
+import { runBenchmarks } from './harness';
 
 /** Production chunk size. Mirrors TerrainRenderer.mapChunkSizeLod. */
 const CHUNK_SIZE = 241;
@@ -167,47 +166,121 @@ function texelBox(reach: number) {
   return { i0, j0: i0, width, height: width, count: width * width };
 }
 
+/** Metres a chunk spans. Mirrors TerrainRenderer.chunkSize. */
+const CHUNK_METRES = (CHUNK_SIZE - 1) * TERRAIN_METERS_PER_SAMPLE;
+
+/** Metres a scatter model reaches from its origin, for the cell bounds. */
+const SCATTER_MODEL_REACH = 5;
+
+const IDENTITY_MATRIX = new Float32Array([
+  1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+]);
+
+/**
+ * The draws ChunkScatter.build makes over a chunk's instances: one per layer
+ * tier, the impostor included, each with one primitive. The real build takes
+ * the primitives from GPU models, which the benchmark has none of.
+ */
+function scatterLayers(
+  chunk: Transform,
+  instances: ScatterInstances[]
+): ScatterChunkLayer[] {
+  const layers: ScatterChunkLayer[] = [];
+  for (const list of instances) {
+    if (list.count === 0) continue;
+    const layer = getScatterLayer(list.layer);
+    for (let tier = 0; tier < lodTierCount(layer); tier++) {
+      const transform = new Transform();
+      chunk.addChild(transform);
+      layers.push(
+        new ScatterChunkLayer(
+          transform,
+          new Geometry(),
+          {} as never,
+          IDENTITY_MATRIX,
+          list,
+          layer,
+          tier,
+          0,
+          SCATTER_MODEL_REACH
+        )
+      );
+    }
+  }
+  return layers;
+}
+
+/** A chunk holding scatter, at its world position. */
+interface ScatterChunk {
+  transform: Transform;
+  instances: ScatterInstances[];
+  scatter: ChunkScatter;
+  layers: ScatterChunkLayer[];
+}
+
+/** Every chunk that holds scatter around a viewer at the origin. */
+function scatterWorld(): ScatterChunk[] {
+  const reach = getScatterGenerationDistance();
+  const rings = Math.ceil(reach / CHUNK_METRES) + 1;
+  const root = new Transform();
+  const chunks: ScatterChunk[] = [];
+  for (let cy = -rings; cy <= rings; cy++)
+    for (let cx = -rings; cx <= rings; cx++) {
+      const ex = Math.max(Math.abs(cx * CHUNK_METRES) - CHUNK_METRES / 2, 0);
+      const ez = Math.max(Math.abs(cy * CHUNK_METRES) - CHUNK_METRES / 2, 0);
+      if (Math.hypot(ex, ez) > reach) continue;
+
+      const { scatter: instances } = buildChunkMesh({
+        ...chunkRequest(LODS[LODS.length - 1], 0),
+        position: { x: cx * (CHUNK_SIZE - 1), y: cy * (CHUNK_SIZE - 1) },
+        scatter: true,
+      });
+      const transform = new Transform();
+      transform.position.set(cx * CHUNK_METRES, 0, cy * CHUNK_METRES);
+      root.addChild(transform);
+      const scatter = new ChunkScatter(transform);
+      const layers = scatterLayers(transform, instances);
+      (scatter as unknown as { layers: ScatterChunkLayer[] }).layers = layers;
+      chunks.push({ transform, instances, scatter, layers });
+    }
+  root.updateMatrixWorld(true);
+
+  const draws = chunks.reduce((n, c) => n + c.layers.length, 0);
+  process.stderr.write(
+    `  ${chunks.length} chunks with scatter, ${draws} layer tiers
+`
+  );
+  return chunks;
+}
+
+/** The frustum of a camera at `eye` looking along +x. */
+function viewFrustum(eye: Vector3): Frustum {
+  const camera = new Matrix4()
+    .lookAt(eye, new Vector3(eye.x + 1, eye.y, eye.z), new Vector3(0, 1, 0))
+    .setPosition(eye.x, eye.y, eye.z);
+  const near = 0.1;
+  const halfHeight = near * Math.tan(Math.PI / 6);
+  const halfWidth = halfHeight * (16 / 9);
+  const projection = new Matrix4().makePerspective(
+    -halfWidth,
+    halfWidth,
+    halfHeight,
+    -halfHeight,
+    near,
+    10000
+  );
+  return new Frustum().setFromProjectionMatrix(
+    new Matrix4().multiplyMatrices(projection, camera.clone().invert())
+  );
+}
+
 const timeChunk = (request: BuildChunkMeshRequest) => {
   const timings: ChunkMeshTimings = {};
   buildChunkMesh(request, timings);
   return timings as Record<string, number>;
 };
 
-async function main() {
-  // The bundle runs from bench/build/, which npm run bench builds first.
-  loadRewildWasmSync(
-    readFileSync(
-      fileURLToPath(
-        new URL('../../../rewild-wasm/pkg/rewild_wasm_bg.wasm', import.meta.url)
-      )
-    )
-  );
-
-  const { values } = parseArgs({
-    options: {
-      runs: { type: 'string', default: '15' },
-      warmup: { type: 'string', default: '3' },
-      filter: { type: 'string' },
-      json: { type: 'string' },
-      compare: { type: 'string' },
-    },
-  });
-
-  const options: BenchOptions = {
-    runs: Number(values.runs),
-    warmup: Number(values.warmup),
-    filter: values.filter,
-  };
-  const results: CaseResult[] = [];
-  const bench = (
-    name: string,
-    run: (index: number) => Record<string, number>
-  ) => {
-    if (options.filter && !name.includes(options.filter)) return;
-    process.stderr.write(`${name}...\n`);
-    results.push(runCase(name, options, run));
-  };
-
+await runBenchmarks((bench) => {
   for (const lod of LODS) {
     bench(`terrain lod ${lod}`, (i) => timeChunk(chunkRequest(lod, i)));
   }
@@ -419,6 +492,62 @@ async function main() {
     );
   }
 
+  // Scatter on the main thread. A chunk's draws are built once, when its
+  // instances arrive. Every frame the camera moves, each chunk culls its
+  // layers by distance. The scene pass selects cells from each layer left
+  // whose bounds meet the frustum, as the scene BVH culls them, and every
+  // shadow cascade from each caster within the ultra tier's shadow range. A
+  // caster reaches only some cascades, and the far one draws every other
+  // frame, so the shadow stage is an upper bound.
+  const shadowFar = shadowConfig('ultra').shadowFar;
+  let scatterChunks: ScatterChunk[] | undefined;
+  const scatterFixture = () => (scatterChunks ??= scatterWorld());
+  bench('scatter chunk build', (i) => {
+    const near = scatterFixture().slice(0, POSITIONS.length);
+    const chunk = near[i % near.length];
+    const transform = new Transform();
+    const started = performance.now();
+    scatterLayers(transform, chunk.instances);
+    return { total: performance.now() - started };
+  });
+  bench('scatter cull frame', (i) => {
+    const chunks = scatterFixture();
+    const eye = new Vector3(i * 3, 30, 0);
+    const frustum = viewFrustum(eye);
+    const local = new Vector3();
+    const bounds = new Box3();
+
+    const started = performance.now();
+    for (const chunk of chunks) chunk.scatter.updateVisibility(eye, 0);
+    const culled = performance.now();
+    for (const chunk of chunks) {
+      local.copy(eye).sub(chunk.transform.position);
+      for (const layer of chunk.layers) {
+        if (!layer.visible) continue;
+        bounds.copy(layer.localBounds).translate(chunk.transform.position);
+        if (!frustum.intersectsBox(bounds)) continue;
+        layer.selectInstances(local, frustum);
+      }
+    }
+    const scene = performance.now();
+    for (const chunk of chunks) {
+      local.copy(eye).sub(chunk.transform.position);
+      for (const layer of chunk.layers) {
+        if (!layer.visible || !layer.castShadow) continue;
+        bounds.copy(layer.localBounds).translate(chunk.transform.position);
+        if (bounds.distanceToPoint(eye) > shadowFar) continue;
+        for (let c = 0; c < NUM_CASCADES; c++)
+          layer.selectInstances(local, frustum, true);
+      }
+    }
+    const shadow = performance.now();
+    return {
+      visibility: culled - started,
+      scene: scene - culled,
+      shadow: shadow - scene,
+    };
+  });
+
   // A whole far map rebuild of each HorizonOcean level. In the game it is
   // spread over frames; this is its total.
   const climate = splatClimate;
@@ -479,13 +608,4 @@ async function main() {
       return { total: performance.now() - started };
     });
   }
-
-  const report = createReport(options, results);
-  printReport(report, values.compare ? readReport(values.compare) : undefined);
-  if (values.json) {
-    writeReport(values.json, report);
-    console.log(`wrote ${values.json}`);
-  }
-}
-
-await main();
+});

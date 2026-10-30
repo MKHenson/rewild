@@ -6,6 +6,7 @@
  *     npm run bench -- --runs 30 --warmup 5
  *     npm run bench -- --json bench-results/js.json    # save the results
  *     npm run bench -- --compare bench-results/js.json # speedup against saved results
+ *     npm run bench:game                               # the game's cases (src/bench)
  *
  * Paths are relative to the directory npm runs in, which is the repo root.
  */
@@ -15,17 +16,27 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const outfile = path.join(here, 'build', 'bench.mjs');
+const args = process.argv.slice(2);
+// `--game` runs the game's cases, which build against src/tsconfig.json.
+const game = args.includes('--game');
+const root = path.join(here, '..', '..', '..');
+const outfile = path.join(here, 'build', game ? 'game.mjs' : 'bench.mjs');
 
 await build({
-  entryPoints: [path.join(here, 'main.ts')],
+  entryPoints: [
+    game
+      ? path.join(root, 'src', 'bench', 'main.ts')
+      : path.join(here, 'main.ts'),
+  ],
   bundle: true,
   platform: 'node',
   format: 'esm',
   target: 'node22',
   outfile,
-  tsconfig: path.join(here, '..', 'tsconfig.json'),
-  loader: { '.wgsl': 'text' },
+  tsconfig: game
+    ? path.join(root, 'src', 'tsconfig.json')
+    : path.join(here, '..', 'tsconfig.json'),
+  loader: { '.wgsl': 'text', '.wasm': 'file' },
   logLevel: 'warning',
 });
 
@@ -37,7 +48,7 @@ const result = spawnSync(
     '--expose-gc',
     '--disable-warning=ExperimentalWarning',
     outfile,
-    ...process.argv.slice(2),
+    ...args.filter((arg) => arg !== '--game'),
   ],
   { stdio: 'inherit' }
 );

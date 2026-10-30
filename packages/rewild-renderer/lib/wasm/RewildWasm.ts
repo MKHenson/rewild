@@ -3,7 +3,7 @@
  * thread and in each worker, or each Node process, before calling any function
  * that uses it.
  *
- * Build the module with `npm run build:wasm`. See docs/wasm.md.
+ * Build the module with `npm run build:wasm`. See docs/milestones/rust.md.
  */
 import init, { initSync } from '../../../rewild-wasm/pkg/rewild_wasm';
 

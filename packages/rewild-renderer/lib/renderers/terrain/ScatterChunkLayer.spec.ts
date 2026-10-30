@@ -429,6 +429,13 @@ describe('LOD fade band', () => {
     last.applyLodBias(-2);
     expect(Array.from(last.fadeBand)).toEqual([0, 0, 0, 0]);
   });
+
+  it('follows a cull distance changed under the same bias', () => {
+    const last = tier([0, 200], 1, [100]);
+    (last.layer as { cullDistance: number }).cullDistance = 0;
+    last.applyLodBias(0);
+    expect(last.draws).toBe(false);
+  });
 });
 
 describe('frustum selection', () => {

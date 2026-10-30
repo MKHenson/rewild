@@ -147,7 +147,7 @@ geometry.computeBVHAsync()
   ← BVH.isReady = true
 ```
 
-The worker is a separate esbuild entry point (`bvhWorker.js`) that shares source classes with the main bundle. Both builds use the Rust builder (see [wasm.md](wasm.md)), which writes the tree as flat typed arrays for efficient `postMessage` transfer.
+The worker is a separate esbuild entry point (`bvhWorker.js`) that shares source classes with the main bundle. Both builds use the Rust builder (see [Rust](milestones/rust.md)), which writes the tree as flat typed arrays for efficient `postMessage` transfer.
 
 ## Tree Layout
 
