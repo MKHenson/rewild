@@ -20,6 +20,20 @@ pub fn smoothstep(x: f64, min: f64, max: f64) -> f64 {
     t * t * (3.0 - 2.0 * t)
 }
 
+/// 0 at `min` to 1 at `max`, steepest at `min`, as `easeOut` in
+/// `MathUtils.ts`.
+#[inline(always)]
+pub fn ease_out(x: f64, min: f64, max: f64) -> f64 {
+    if x <= min {
+        return 0.0;
+    }
+    if x >= max {
+        return 1.0;
+    }
+    let t = (x - min) / (max - min);
+    1.0 - (1.0 - t) * (1.0 - t)
+}
+
 /// `x` to `y` by `t`, as `lerp` in `MathUtils.ts`.
 #[inline(always)]
 pub fn lerp(x: f64, y: f64, t: f64) -> f64 {

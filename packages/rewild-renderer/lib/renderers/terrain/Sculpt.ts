@@ -17,6 +17,9 @@
 // |wz - cy*span| <= span/2 — one chunk in the interior, two on an edge,
 // four on a corner.
 
+import { sculptStamp } from '../../../../rewild-wasm/pkg/rewild_wasm';
+import { HeightPatch } from './HeightPatch';
+
 export type SculptBrushType =
   | 'raise'
   | 'lower'
@@ -78,30 +81,19 @@ export interface TouchedChunk {
   heights: Float32Array;
 }
 
-// Smoothstep falloff: 1 at the brush centre, 0 at the radius.
-function falloff(dist: number, radius: number): number {
-  const t = dist / radius;
-  return 1 - t * t * (3 - 2 * t);
-}
-
 /**
  * Applies one brush stamp to every chunk the brush overlaps and returns the
- * chunks whose heights changed. Pure with respect to its inputs: all terrain
- * access goes through `source`, so it is trivially testable and shared by any
- * future runtime sculpting UX.
+ * chunks whose heights changed. All terrain access goes through `source`, and
+ * the stamp itself runs in Rust (`terrain::edit::sculpt`).
  */
 export function applySculptStamp(
   source: SculptHeightSource,
   stamp: SculptStamp
 ): TouchedChunk[] {
-  const chunkSize = source.chunkSize;
-  const span = chunkSize - 1;
-  const half = span / 2;
   const { type } = stamp;
 
   // Work in sample space: 1 unit == 1 sample, chunk span == chunkSize - 1,
-  // independent of world scale. World inputs (brush centre/radius) convert in;
-  // vertical amounts/targets are unaffected by horizontal scale.
+  // independent of world scale.
   const mps = source.metersPerSample ?? 1;
   const centerX = stamp.centerX / mps;
   const centerZ = stamp.centerZ / mps;
@@ -110,239 +102,37 @@ export function applySculptStamp(
   if (radius <= 0 || stamp.amount === 0) return [];
   if (type === 'flatten' && stamp.target === undefined) return [];
 
-  // World-integer sample range covered by the brush, padded by one sample for
-  // smooth (its 3x3 average reads one ring beyond the edited region).
   const x0 = Math.ceil(centerX - radius);
   const x1 = Math.floor(centerX + radius);
   const z0 = Math.ceil(centerZ - radius);
   const z1 = Math.floor(centerZ + radius);
   if (x1 < x0 || z1 < z0) return [];
 
-  // Smooth needs its kernel's worth of samples beyond the edited region so
-  // every averaged neighbourhood exists in the patch.
+  // Smooth averages a kernel's worth of samples beyond the brush.
   const kernel =
     type === 'smooth' ? Math.max(1, Math.floor(stamp.smoothKernel ?? 1)) : 0;
-  const margin = kernel;
-  const gx0 = x0 - margin;
-  const gz0 = z0 - margin;
-  const pw = x1 + margin - gx0 + 1;
-  const ph = z1 + margin - gz0 + 1;
-
-  // Chunk heightfields resolved once per stamp.
-  const chunkCache = new Map<string, Float32Array | null>();
-  const resolve = (cx: number, cy: number): Float32Array | null => {
-    const key = `${cx},${cy}`;
-    let heights = chunkCache.get(key);
-    if (heights === undefined) {
-      heights = source.getHeights(cx, cy);
-      chunkCache.set(key, heights);
-    }
-    return heights;
-  };
-
-  // Gather the brush region into a world-space patch. Reading needs ANY owning
-  // chunk (owners' copies of a shared sample are identical), but a sample is
-  // editable only when EVERY owner resolved — editing one side of a shared
-  // edge while the other owner is unavailable would persist a seam.
-  const patch = new Float32Array(pw * ph);
-  const readable = new Uint8Array(pw * ph);
-  const editable = new Uint8Array(pw * ph);
-  for (let r = 0; r < ph; r++) {
-    const wz = gz0 + r;
-    const cyMin = Math.ceil((wz - half) / span);
-    const cyMax = Math.floor((wz + half) / span);
-    for (let c = 0; c < pw; c++) {
-      const wx = gx0 + c;
-      const cxMin = Math.ceil((wx - half) / span);
-      const cxMax = Math.floor((wx + half) / span);
-      let read = false;
-      let allOwners = true;
-      for (let cy = cyMin; cy <= cyMax; cy++) {
-        for (let cx = cxMin; cx <= cxMax; cx++) {
-          const heights = resolve(cx, cy);
-          if (!heights) {
-            allOwners = false;
-            continue;
-          }
-          if (!read) {
-            const sx = wx - cx * span + half;
-            const sy = cy * span + half - wz;
-            patch[r * pw + c] = heights[sy * chunkSize + sx];
-            read = true;
-          }
-        }
-      }
-      readable[r * pw + c] = read ? 1 : 0;
-      editable[r * pw + c] = read && allOwners ? 1 : 0;
-    }
-  }
-
-  // Every owner's generated copy of a shared sample is the same, so the first
-  // owner's is read.
-  const baselineCache = new Map<string, Float32Array | null>();
-  const baselineAt = (wx: number, wz: number): number => {
-    const cx = Math.ceil((wx - half) / span);
-    const cy = Math.ceil((wz - half) / span);
-    const key = `${cx},${cy}`;
-    let baseline = baselineCache.get(key);
-    if (baseline === undefined) {
-      baseline = source.getBaseline?.(cx, cy) ?? null;
-      baselineCache.set(key, baseline);
-    }
-    if (!baseline) return NaN;
-    const sx = wx - cx * span + half;
-    const sy = cy * span + half - wz;
-    return baseline[sy * chunkSize + sx];
-  };
-
-  // Smooth reads neighbours from the pre-stamp state so the result does not
-  // depend on sample iteration order.
-  const src = type === 'smooth' ? patch.slice() : patch;
-
-  const touched = new Map<string, TouchedChunk>();
-  const radiusSq = radius * radius;
-
-  for (let wz = z0; wz <= z1; wz++) {
-    const r = wz - gz0;
-    for (let wx = x0; wx <= x1; wx++) {
-      const c = wx - gx0;
-      const i = r * pw + c;
-      if (!editable[i]) continue;
-
-      const dx = wx - centerX;
-      const dz = wz - centerZ;
-      const distSq = dx * dx + dz * dz;
-      if (distSq > radiusSq) continue;
-
-      const f = falloff(Math.sqrt(distSq), radius);
-      const v = patch[i];
-      let next = v;
-
-      switch (type) {
-        case 'raise':
-          next = v + stamp.amount * f;
-          break;
-        case 'lower':
-          next = v - stamp.amount * f;
-          break;
-        case 'flatten': {
-          const blend = Math.min(1, Math.max(0, stamp.amount * f));
-          next = v + (stamp.target! - v) * blend;
-          break;
-        }
-        case 'reset': {
-          const generated = baselineAt(wx, wz);
-          if (Number.isNaN(generated)) continue;
-          const blend = Math.min(1, Math.max(0, stamp.amount * f));
-          next = v + (generated - v) * blend;
-          break;
-        }
-        case 'smooth': {
-          // Box average of the valid (2*kernel+1)² neighbourhood (margin
-          // guarantees it exists in the patch; chunk-missing samples are
-          // excluded). Read from the pre-stamp copy so the result is
-          // order-independent.
-          let sum = 0;
-          let count = 0;
-          for (let nr = r - kernel; nr <= r + kernel; nr++) {
-            for (let nc = c - kernel; nc <= c + kernel; nc++) {
-              const ni = nr * pw + nc;
-              if (!readable[ni]) continue;
-              sum += src[ni];
-              count++;
-            }
-          }
-          const blend = Math.min(1, Math.max(0, stamp.amount * f));
-          next = v + (sum / count - v) * blend;
-          break;
-        }
-      }
-
-      if (next === v) continue;
-      patch[i] = next;
-
-      // Scatter to every chunk that owns this sample so shared edge vertices
-      // stay byte-identical across the border.
-      const cxMin = Math.ceil((wx - half) / span);
-      const cxMax = Math.floor((wx + half) / span);
-      const cyMin = Math.ceil((wz - half) / span);
-      const cyMax = Math.floor((wz + half) / span);
-      for (let cy = cyMin; cy <= cyMax; cy++) {
-        for (let cx = cxMin; cx <= cxMax; cx++) {
-          const heights = resolve(cx, cy);
-          if (!heights) continue;
-          const sx = wx - cx * span + half;
-          const sy = cy * span + half - wz;
-          heights[sy * chunkSize + sx] = next;
-          const key = `${cx},${cy}`;
-          if (!touched.has(key)) touched.set(key, { cx, cy, heights });
-        }
-      }
-    }
-  }
-
-  return [...touched.values()];
-}
-
-/**
- * Rewrites each LOD-0 sample in the sample-space box (x0, z0)–(x1, z1) with
- * `edit(wx, wz, height)` and returns the chunks whose heights changed. As in
- * applySculptStamp, a sample is edited only when every chunk that owns it
- * resolves, and is written to each of them.
- */
-export function editSamples(
-  source: SculptHeightSource,
-  x0: number,
-  z0: number,
-  x1: number,
-  z1: number,
-  edit: (wx: number, wz: number, height: number) => number
-): TouchedChunk[] {
-  const chunkSize = source.chunkSize;
-  const span = chunkSize - 1;
-  const half = span / 2;
-
-  const chunkCache = new Map<string, Float32Array | null>();
-  const resolve = (cx: number, cy: number): Float32Array | null => {
-    const key = `${cx},${cy}`;
-    let heights = chunkCache.get(key);
-    if (heights === undefined) {
-      heights = source.getHeights(cx, cy);
-      chunkCache.set(key, heights);
-    }
-    return heights;
-  };
-
-  const touched = new Map<string, TouchedChunk>();
-  for (let wz = z0; wz <= z1; wz++) {
-    const cyMin = Math.ceil((wz - half) / span);
-    const cyMax = Math.floor((wz + half) / span);
-    for (let wx = x0; wx <= x1; wx++) {
-      const cxMin = Math.ceil((wx - half) / span);
-      const cxMax = Math.floor((wx + half) / span);
-      let editable = true;
-      for (let cy = cyMin; cy <= cyMax && editable; cy++)
-        for (let cx = cxMin; cx <= cxMax && editable; cx++)
-          if (!resolve(cx, cy)) editable = false;
-      if (!editable) continue;
-
-      const first = resolve(cxMin, cyMin)!;
-      const v =
-        first[
-          (cyMin * span + half - wz) * chunkSize + (wx - cxMin * span + half)
-        ];
-      const next = edit(wx, wz, v);
-      if (next === v) continue;
-
-      for (let cy = cyMin; cy <= cyMax; cy++)
-        for (let cx = cxMin; cx <= cxMax; cx++) {
-          const heights = resolve(cx, cy)!;
-          heights[(cy * span + half - wz) * chunkSize + (wx - cx * span + half)] =
-            next;
-          const key = `${cx},${cy}`;
-          if (!touched.has(key)) touched.set(key, { cx, cy, heights });
-        }
-    }
-  }
-  return [...touched.values()];
+  const patch = new HeightPatch(
+    source,
+    x0 - kernel,
+    z0 - kernel,
+    x1 + kernel,
+    z1 + kernel
+  );
+  const baseline =
+    type === 'reset'
+      ? patch.plane((cx, cy) => source.getBaseline?.(cx, cy) ?? null)
+      : new Float32Array(0);
+  return patch.commit(
+    sculptStamp(
+      ...patch.args(),
+      baseline,
+      type,
+      stamp.centerX,
+      stamp.centerZ,
+      stamp.radius,
+      stamp.amount,
+      stamp.target ?? NaN,
+      kernel
+    )
+  );
 }

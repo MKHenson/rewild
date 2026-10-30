@@ -604,3 +604,177 @@ impl TerrainGenerator {
         );
     }
 }
+
+/// A patch of LOD-0 heights over world samples from (`x0`, `z0`), `width` a
+/// row, for one brush edit. See `terrain::edit::Patch`.
+#[allow(clippy::too_many_arguments)]
+fn edit_patch<'a>(
+    heights: &'a mut [f32],
+    flags: &'a [u8],
+    x0: i32,
+    z0: i32,
+    width: u32,
+    span: u32,
+    meters_per_sample: f64,
+    planes: &[usize],
+) -> Result<terrain::edit::Patch<'a>, JsError> {
+    let width = width as usize;
+    if !heights.len().is_multiple_of(width) || flags.len() != heights.len() {
+        return Err(JsError::new("Patch heights and flags do not fill whole rows."));
+    }
+    if planes.iter().any(|&len| len != heights.len()) {
+        return Err(JsError::new("Patch planes do not match its heights."));
+    }
+    if span == 0 || !span.is_multiple_of(2) {
+        return Err(JsError::new(&format!("A chunk span of {span} samples is not even.")));
+    }
+    Ok(terrain::edit::Patch { heights, flags, x0, z0, width, span: span as i32, meters_per_sample })
+}
+
+fn texel_grid<T>(values: &[T], i0: i32, j0: i32, width: u32, step: u32) -> Result<terrain::edit::TexelGrid<'_, T>, JsError> {
+    if !values.len().is_multiple_of(width as usize) || step == 0 {
+        return Err(JsError::new("Texel grid values do not fill whole rows."));
+    }
+    Ok(terrain::edit::TexelGrid { values, i0, j0, width: width as usize, step: step as i32 })
+}
+
+/// Applies a sculpt stamp to a patch and returns the (cx, cy) of each chunk it
+/// changed. `brush` is a `SculptBrushType`. `baseline` holds the generated
+/// heights over the patch for `'reset'`, and may be empty otherwise.
+/// `target` is the flatten height and `kernel` the smooth half-width. See
+/// `terrain::edit::sculpt`.
+#[wasm_bindgen(js_name = sculptStamp)]
+#[allow(clippy::too_many_arguments)]
+pub fn sculpt_stamp(
+    heights: &mut [f32],
+    flags: &[u8],
+    x0: i32,
+    z0: i32,
+    width: u32,
+    span: u32,
+    meters_per_sample: f64,
+    baseline: &[f32],
+    brush: &str,
+    centre_x: f64,
+    centre_z: f64,
+    radius: f64,
+    amount: f64,
+    target: f64,
+    kernel: u32,
+) -> Result<Vec<i32>, JsError> {
+    use terrain::edit::Brush;
+    let brush = match brush {
+        "raise" => Brush::Raise,
+        "lower" => Brush::Lower,
+        "smooth" => Brush::Smooth { kernel: kernel as usize },
+        "flatten" => Brush::Flatten { target },
+        "reset" => Brush::Reset,
+        other => return Err(JsError::new(&format!("unknown sculpt brush '{other}'"))),
+    };
+    let planes: &[usize] = if matches!(brush, Brush::Reset) { &[baseline.len()] } else { &[] };
+    let mut patch = edit_patch(heights, flags, x0, z0, width, span, meters_per_sample, planes)?;
+    let stamp = terrain::edit::SculptStamp { brush, centre_x, centre_z, radius, amount };
+    Ok(terrain::edit::sculpt(&mut patch, &stamp, baseline).chunks())
+}
+
+/// Digs a patch toward a water stroke's bed and returns the (cx, cy) of each
+/// chunk it changed. `guard` is the stroke's `WaterGuard` over world texels
+/// from (`guardI0`, `guardJ0`), one every `step` samples, and `texel` a
+/// texel's width in metres. See `terrain::edit::carve`.
+#[wasm_bindgen(js_name = carveStamp)]
+#[allow(clippy::too_many_arguments)]
+pub fn carve_stamp(
+    heights: &mut [f32],
+    flags: &[u8],
+    x0: i32,
+    z0: i32,
+    width: u32,
+    span: u32,
+    meters_per_sample: f64,
+    originals: &[f32],
+    targets: &mut [f32],
+    guard: &[u8],
+    guard_i0: i32,
+    guard_j0: i32,
+    guard_width: u32,
+    step: u32,
+    texel: f64,
+    centre_x: f64,
+    centre_z: f64,
+    radius: f64,
+    level: f64,
+    depth: f64,
+    blend: f64,
+) -> Result<Vec<i32>, JsError> {
+    let planes = [originals.len(), targets.len()];
+    let mut patch = edit_patch(heights, flags, x0, z0, width, span, meters_per_sample, &planes)?;
+    let guard = texel_grid(guard, guard_i0, guard_j0, guard_width, step)?;
+    let carve = terrain::edit::Carve { centre_x, centre_z, radius, level, depth, blend };
+    let shore = terrain::edit::Shore::new(texel);
+    Ok(terrain::edit::carve(&mut patch, &carve, &guard, originals, targets, &shore).chunks())
+}
+
+/// Raises the lip of an add stroke over a patch and returns the (cx, cy) of
+/// each chunk it changed. `wet` and `own` are the planes of its `ShoreGrid`.
+/// See `terrain::edit::lip`.
+#[wasm_bindgen(js_name = waterLip)]
+#[allow(clippy::too_many_arguments)]
+pub fn water_lip(
+    heights: &mut [f32],
+    flags: &[u8],
+    x0: i32,
+    z0: i32,
+    width: u32,
+    span: u32,
+    meters_per_sample: f64,
+    originals: &[f32],
+    discs: &[f64],
+    wet: &[u8],
+    own: &[u8],
+    grid_i0: i32,
+    grid_j0: i32,
+    grid_width: u32,
+    step: u32,
+    texel: f64,
+    level: f64,
+    height: f64,
+) -> Result<Vec<i32>, JsError> {
+    let mut patch = edit_patch(heights, flags, x0, z0, width, span, meters_per_sample, &[originals.len()])?;
+    let wet = texel_grid(wet, grid_i0, grid_j0, grid_width, step)?;
+    let own = texel_grid(own, grid_i0, grid_j0, grid_width, step)?;
+    let shore = terrain::edit::Shore::new(texel);
+    Ok(terrain::edit::lip(&mut patch, discs, &wet, &own, originals, level, height, &shore).chunks())
+}
+
+/// Raises the bank of a remove stroke over a patch and returns the (cx, cy) of
+/// each chunk it changed. `levels` and `covered` are the planes of its
+/// `CutGrid`. See `terrain::edit::cut_bank`.
+#[wasm_bindgen(js_name = cutBank)]
+#[allow(clippy::too_many_arguments)]
+pub fn cut_bank(
+    heights: &mut [f32],
+    flags: &[u8],
+    x0: i32,
+    z0: i32,
+    width: u32,
+    span: u32,
+    meters_per_sample: f64,
+    discs: &[f64],
+    levels: &[f32],
+    covered: &[u8],
+    grid_i0: i32,
+    grid_j0: i32,
+    grid_width: u32,
+    step: u32,
+    texel: f64,
+    height: f64,
+) -> Result<Vec<i32>, JsError> {
+    let mut patch = edit_patch(heights, flags, x0, z0, width, span, meters_per_sample, &[])?;
+    let levels = texel_grid(levels, grid_i0, grid_j0, grid_width, step)?;
+    let covered = texel_grid(covered, grid_i0, grid_j0, grid_width, step)?;
+    if covered.values.len() != levels.values.len() {
+        return Err(JsError::new("Cut grid planes differ in size."));
+    }
+    let shore = terrain::edit::Shore::new(texel);
+    Ok(terrain::edit::cut_bank(&mut patch, discs, &levels, &covered, height, &shore).chunks())
+}

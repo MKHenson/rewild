@@ -1,12 +1,12 @@
-import { easeOut, smoothstep } from 'rewild-common';
-import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
-import { SculptHeightSource, TouchedChunk, editSamples } from './Sculpt';
 import {
-  WATER_EDIT_STEP,
-  WATER_LEVEL_MATCH,
-  WaterGuard,
-  isWaterBlocked,
-} from './WaterEdit';
+  carveStamp,
+  cutBank,
+  waterLip,
+} from '../../../../rewild-wasm/pkg/rewild_wasm';
+import { HeightPatch } from './HeightPatch';
+import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
+import { SculptHeightSource, TouchedChunk } from './Sculpt';
+import { WATER_EDIT_STEP, WATER_LEVEL_MATCH, WaterGuard } from './WaterEdit';
 import { ResolvedWater, waterShowsAt } from './WaterMap';
 
 // The terrain under the water brush. Adding water fills the brush's circle:
@@ -16,7 +16,8 @@ import { ResolvedWater, waterShowsAt } from './WaterMap';
 // back to the generator, and where it cuts water that stays, a bank just
 // inside the circle becomes that water's shore.
 
-// Metres a water map texel spans.
+// Metres a water map texel spans. The shore distances below are mirrored by
+// `terrain::edit::Shore`.
 const TEXEL = WATER_EDIT_STEP * TERRAIN_METERS_PER_SAMPLE;
 
 /**
@@ -57,36 +58,6 @@ export interface CarveStamp {
   targets(cx: number, cy: number): Float32Array | null;
 }
 
-// A per-chunk LOD-0 plane `get` gives, read at world sample (wx, wz) from the
-// first chunk that owns it, so shared edge samples have one home.
-function chunkPlane(
-  chunkSize: number,
-  get: (cx: number, cy: number) => Float32Array | null
-) {
-  const span = chunkSize - 1;
-  const half = span / 2;
-  const cache = new Map<string, Float32Array | null>();
-  let index = 0;
-  return {
-    /** The plane holding (wx, wz), with `index` set to the sample in it. */
-    at(wx: number, wz: number): Float32Array | null {
-      const cx = Math.ceil((wx - half) / span);
-      const cy = Math.ceil((wz - half) / span);
-      const key = `${cx},${cy}`;
-      let plane = cache.get(key);
-      if (plane === undefined) {
-        plane = get(cx, cy);
-        cache.set(key, plane);
-      }
-      index = (cy * span + half - wz) * chunkSize + (wx - cx * span + half);
-      return plane;
-    },
-    get index() {
-      return index;
-    },
-  };
-}
-
 /**
  * Digs the ground toward the stroke's bed. A stamp's shape is a bowl `depth`
  * below the level at the centre, rising to the level at the radius, steepest
@@ -101,53 +72,42 @@ export function applyCarveStamp(
   source: SculptHeightSource,
   stamp: CarveStamp
 ): TouchedChunk[] {
-  const { level, depth, guard, radius } = stamp;
+  const { radius } = stamp;
   const blend = Math.min(1, stamp.amount);
   if (radius <= 0 || blend <= 0) return [];
-  const reach = radius + SHORE_REACH;
 
   const mps = source.metersPerSample ?? 1;
-  const originals = chunkPlane(source.chunkSize, stamp.original);
-  const targets = chunkPlane(source.chunkSize, stamp.targets);
-
   const centerX = stamp.centerX / mps;
   const centerZ = stamp.centerZ / mps;
-  const outer = reach / mps;
-  return editSamples(
+  const outer = (radius + SHORE_REACH) / mps;
+  const patch = new HeightPatch(
     source,
     Math.ceil(centerX - outer),
     Math.ceil(centerZ - outer),
     Math.floor(centerX + outer),
-    Math.floor(centerZ + outer),
-    (wx, wz, v) => {
-      const d = Math.hypot(wx - centerX, wz - centerZ) * mps;
-      if (d >= reach) return v;
-      if (
-        isWaterBlocked(
-          guard,
-          Math.round(wx / WATER_EDIT_STEP),
-          Math.round(wz / WATER_EDIT_STEP)
-        )
-      )
-        return v;
-      let shape: number;
-      if (d < radius) shape = level - depth * (1 - (d / radius) * (d / radius));
-      else {
-        const before = originals.at(wx, wz);
-        const ground = before ? before[originals.index] : v;
-        shape = level + (ground - level) * easeOut(d - radius, 0, SHORE_REACH);
-      }
-      let target = shape;
-      const plane = targets.at(wx, wz);
-      if (plane) {
-        const i = targets.index;
-        if (shape < plane[i]) plane[i] = shape;
-        target = plane[i];
-      }
-      if (target >= v) return v;
-      return v + (target - v) * blend;
-    }
+    Math.floor(centerZ + outer)
   );
+  const targets = patch.plane(stamp.targets);
+  const { guard } = stamp;
+  const changed = carveStamp(
+    ...patch.args(),
+    patch.plane(stamp.original),
+    targets,
+    guard.blocked,
+    guard.i0,
+    guard.j0,
+    guard.width,
+    WATER_EDIT_STEP,
+    TEXEL,
+    stamp.centerX,
+    stamp.centerZ,
+    radius,
+    stamp.level,
+    stamp.depth,
+    blend
+  );
+  patch.writePlane(targets, stamp.targets);
+  return patch.commit(changed);
 }
 
 /**
@@ -214,14 +174,6 @@ export function buildShoreGrid(
   return { i0, j0, width, height, wet, own };
 }
 
-// A plane of `grid` at world texel (i, j), or -1 outside it.
-function gridAt(grid: ShoreGrid, plane: Uint8Array, i: number, j: number) {
-  const x = i - grid.i0;
-  const y = j - grid.j0;
-  if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return -1;
-  return plane[y * grid.width + x];
-}
-
 /**
  * Raises dry ground in the stroke's shore apron into a lip. The stroke's
  * `discs` are its stamps as (x, z, radius) triples in metres, each radius a
@@ -241,54 +193,38 @@ export function applyWaterLip(
   height: number,
   original: (cx: number, cy: number) => Float32Array | null
 ): TouchedChunk[] {
-  const mps = source.metersPerSample ?? 1;
+  const patch = gridPatch(source, grid);
+  return patch.commit(
+    waterLip(
+      ...patch.args(),
+      patch.plane(original),
+      new Float64Array(discs),
+      grid.wet,
+      grid.own,
+      grid.i0,
+      grid.j0,
+      grid.width,
+      WATER_EDIT_STEP,
+      TEXEL,
+      level,
+      height
+    )
+  );
+}
+
+// The LOD-0 samples under a texel grid.
+function gridPatch(
+  source: SculptHeightSource,
+  grid: { i0: number; j0: number; width: number; height: number }
+): HeightPatch {
   const step = WATER_EDIT_STEP;
-  const originals = chunkPlane(source.chunkSize, original);
-  return editSamples(
+  return new HeightPatch(
     source,
     grid.i0 * step,
     grid.j0 * step,
     (grid.i0 + grid.width - 1) * step,
-    (grid.j0 + grid.height - 1) * step,
-    (wx, wz, v) => {
-      const x = wx * mps;
-      const z = wz * mps;
-      // Distance out from the stroke's water.
-      let out = Infinity;
-      for (let k = 0; k + 2 < discs.length; k += 3) {
-        const r = discs[k + 2];
-        const dx = x - discs[k];
-        const dz = z - discs[k + 1];
-        if (Math.abs(dx) - r >= out || Math.abs(dz) - r >= out) continue;
-        const edge = Math.hypot(dx, dz) - r;
-        if (edge < out) out = edge;
-      }
-      if (out <= 0 || out >= SHORE_REACH) return v;
-      const ti = Math.round(wx / step);
-      const tj = Math.round(wz / step);
-      if (gridAt(grid, grid.wet, ti, tj) !== 0) return v;
-      const before = originals.at(wx, wz);
-      const ground = before ? before[originals.index] : v;
-      if (gridAt(grid, grid.own, ti, tj) === 1 && ground < level) return v;
-      const lip = lipProfile(out, level, height, ground);
-      return lip > v ? lip : v;
-    }
+    (grid.j0 + grid.height - 1) * step
   );
-}
-
-// A lip `out` metres from its shoreline: from `level` up to `level + height`
-// over SHORE_RISE, steeply at first, held to SHORE_CREST, then easing to
-// `ground` by SHORE_REACH.
-function lipProfile(
-  out: number,
-  level: number,
-  height: number,
-  ground: number
-): number {
-  const top = level + height;
-  if (out < SHORE_RISE) return level + height * easeOut(out, 0, SHORE_RISE);
-  if (out < SHORE_CREST) return top;
-  return top + (ground - top) * smoothstep(out, SHORE_CREST, SHORE_REACH);
 }
 
 // Metres (x, z) lies inside the union of `discs`, (x, z, radius) triples;
@@ -431,53 +367,19 @@ export function applyCutBank(
   discs: readonly number[],
   height: number
 ): TouchedChunk[] {
-  const mps = source.metersPerSample ?? 1;
-  const step = WATER_EDIT_STEP;
-  const unit = step * mps;
-  const window = Math.ceil(SHORE_REACH / unit);
-  return editSamples(
-    source,
-    grid.i0 * step,
-    grid.j0 * step,
-    (grid.i0 + grid.width - 1) * step,
-    (grid.j0 + grid.height - 1) * step,
-    (wx, wz, v) => {
-      const x = wx * mps;
-      const z = wz * mps;
-      const inside = insideDiscs(discs, x, z);
-      if (inside <= 0 || inside >= SHORE_REACH) return v;
-      const ti = Math.round(wx / step);
-      const tj = Math.round(wz / step);
-      const own = gridIndex(grid, ti, tj);
-      if (own >= 0 && grid.covered[own] && Number.isNaN(grid.level[own]))
-        return v;
-
-      let nearest = Infinity;
-      let level = NaN;
-      for (let j = tj - window; j <= tj + window; j++)
-        for (let i = ti - window; i <= ti + window; i++) {
-          const g = gridIndex(grid, i, j);
-          if (g < 0 || Number.isNaN(grid.level[g])) continue;
-          const d = Math.hypot(i * unit - x, j * unit - z);
-          if (d < nearest) {
-            nearest = d;
-            level = grid.level[g];
-          }
-        }
-      if (nearest >= SHORE_REACH) return v;
-
-      const bank = lipProfile(inside, level, height, v);
-      const target =
-        v + (bank - v) * (1 - smoothstep(nearest, SHORE_CREST, SHORE_REACH));
-      return target > v ? target : v;
-    }
+  const patch = gridPatch(source, grid);
+  return patch.commit(
+    cutBank(
+      ...patch.args(),
+      new Float64Array(discs),
+      grid.level,
+      grid.covered,
+      grid.i0,
+      grid.j0,
+      grid.width,
+      WATER_EDIT_STEP,
+      TEXEL,
+      height
+    )
   );
-}
-
-// The index of world texel (i, j) in `grid`, or -1 outside it.
-function gridIndex(grid: CutGrid, i: number, j: number): number {
-  const x = i - grid.i0;
-  const y = j - grid.j0;
-  if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return -1;
-  return y * grid.width + x;
 }

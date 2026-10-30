@@ -3,6 +3,7 @@
 
 pub mod climate;
 pub mod config;
+pub mod edit;
 pub mod far;
 pub mod heights;
 pub mod lakes;
