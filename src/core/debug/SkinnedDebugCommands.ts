@@ -1,7 +1,10 @@
 import { Quaternion, Vector3 } from 'rewild-common';
 import { ICreatureAnimation } from 'models';
 import { Renderer, SkinnedInstance, Transform } from 'rewild-renderer';
-import { AnimationController } from '../animation/AnimationController';
+import {
+  AnimationController,
+  isLocomotionSet,
+} from '../animation/AnimationController';
 import { SPEED_SMOOTHING } from '../routing/behaviours/Animator';
 
 const SPACING = 2;
@@ -196,6 +199,10 @@ export function registerSkinnedDebugCommands(renderer: Renderer) {
   };
 
   (window as any).skinnedLocomotion = (set: string, fade = 0.25) => {
+    if (!isLocomotionSet(set)) {
+      console.warn(`skinnedLocomotion: no set named "${set}"`);
+      return;
+    }
     for (const controller of animated?.controllers ?? [])
       controller.setLocomotion(set, fade);
   };

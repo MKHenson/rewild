@@ -1,8 +1,7 @@
 import { IResource, PropertyType, PropValue } from 'models';
 import { Quaternion, Vector3 } from 'rewild-common';
-import { SkinnedInstance, Transform } from 'rewild-renderer';
+import { Transform } from 'rewild-renderer';
 import { IAsset, IBehaviour, StateMachine } from 'rewild-routing';
-import { AnimationController } from '../animation/AnimationController';
 
 export class Asset3D implements IAsset<IResource> {
   transform: Transform;
@@ -13,10 +12,6 @@ export class Asset3D implements IAsset<IResource> {
   initialRotation: Quaternion;
   behaviours: IBehaviour[];
   data: IResource;
-  /** Set when the asset is a skinned model. */
-  skinned: SkinnedInstance | null = null;
-  /** The skinned model's animation controller. Behaviours tell it what they want. */
-  animator: AnimationController | null = null;
 
   constructor(transform: Transform) {
     this.transform = transform;
@@ -80,11 +75,6 @@ export class Asset3D implements IAsset<IResource> {
     this.behaviours.forEach((behavior) => {
       behavior.onMount?.(this);
     });
-  }
-
-  dispose(): void {
-    this.skinned?.dispose();
-    this.skinned = null;
   }
 
   add(child: IAsset): IAsset {

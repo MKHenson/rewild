@@ -128,9 +128,10 @@
     {
       "name": "chicken",
       "type": "asset",
-      "clips": { "look": "Idle2" },
+      "preset": "chicken",
+      "clips": { "idle": "Idle2", "eat": "Idle", "rest": "IdleLay" },
+      "locomotion": { "flee": { "run": "RunAngry" } },
       "clipSpeeds": { "walk": 0.6, "run": 2.5 },
-      "idleActions": ["look"],
       "resource": {
         "geometryId": "chicken-01"
       }
