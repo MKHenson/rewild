@@ -235,6 +235,9 @@ declare module 'models' {
 
   export type LocomotionMeaning = 'idle' | 'walk' | 'run';
 
+  /** The locomotion sets a template can define and a behaviour can ask for. */
+  export type LocomotionSetName = 'normal' | 'flee' | 'injured';
+
   /** The clips a locomotion set plays, by meaning. */
   export type ILocomotionSet = { [meaning in LocomotionMeaning]?: string };
 
@@ -244,7 +247,7 @@ declare module 'models' {
     clips?: { [meaning: string]: string };
     /** Named locomotion sets. `normal` is the default, and other sets fall
      *  back to it for a meaning they leave out. */
-    locomotion?: { [set: string]: ILocomotionSet };
+    locomotion?: { [set in LocomotionSetName]?: ILocomotionSet };
     /** Ground speed in m/s that each locomotion meaning's clip carries the
      *  body at, at normal rate. */
     clipSpeeds?: { [meaning: string]: number };
@@ -255,6 +258,8 @@ declare module 'models' {
   export interface ITemplateItemBase extends ICreatureAnimation {
     name: string;
     behaviors?: string[];
+    /** Names a creature preset, which makes a skinned asset move on its own. */
+    preset?: string;
   }
 
   export interface IResource3D {

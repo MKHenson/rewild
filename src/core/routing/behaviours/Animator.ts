@@ -1,5 +1,8 @@
 import { BehaviourState, IAsset, IBehaviour } from 'rewild-routing';
-import { AnimationController } from '../../animation/AnimationController';
+import {
+  AnimationController,
+  isLocomotionSet,
+} from '../../animation/AnimationController';
 import { Asset3D } from '../Asset3D';
 
 /** Seconds the measured ground speed takes to settle, so jitter cannot pop the blend. */
@@ -51,7 +54,7 @@ export class Animator implements IBehaviour {
   }
 
   restore(state: BehaviourState): void {
-    if (typeof state.locomotion === 'string')
+    if (isLocomotionSet(state.locomotion))
       this.controller.setLocomotion(state.locomotion, 0);
   }
 }
