@@ -14,7 +14,10 @@ import { PlayerStart } from './routing/PlayerStart';
 import { GameManager } from './GameManager';
 import { RigidBodyBehaviour } from './routing/behaviours/RigidBodyBehaviour';
 import { Animator } from './routing/behaviours/Animator';
-import { AnimationController } from './animation/AnimationController';
+import { Creature } from './routing/Creature';
+import { SkinnedAsset } from './routing/SkinnedAsset';
+import { CreatureBehaviour } from './routing/behaviours/CreatureBehaviour';
+import { getCreaturePreset } from './creatures/CreaturePresets';
 import { LightAsset } from './routing/LightAsset';
 import { createColliderDesc } from './physics/ColliderShapes';
 import { LevelReader, PortalAsset } from './routing/PortalAsset';
@@ -98,17 +101,28 @@ export class TemplateLoader {
         ).transform;
       }
 
-      toReturn = new Asset3D(transform);
+      if (template.preset && !skinned)
+        throw new Error(
+          `Template ${template.name} names a creature preset but is not skinned.`
+        );
 
       if (skinned) {
-        const asset = toReturn as Asset3D;
-        asset.skinned = skinned;
-        asset.animator = new AnimationController(skinned, template);
-        asset.animator.start();
-        transform.userData.skinned = skinned;
+        const asset = template.preset
+          ? new Creature(
+              skinned,
+              template,
+              getCreaturePreset(template.preset)
+            )
+          : new SkinnedAsset(skinned, template);
         // Behaviours do not run in the editor, so there it plays idle in place.
-        if (gameManager) asset.addBehavior(new Animator(asset.animator));
-      }
+        if (gameManager)
+          asset.addBehavior(
+            asset instanceof Creature
+              ? new CreatureBehaviour(asset, gameManager.renderer.sceneBVH)
+              : new Animator(asset.animator)
+          );
+        toReturn = asset;
+      } else toReturn = new Asset3D(transform);
 
       if (gameManager && template.resource.physics) {
         const R = gameManager.RAPIER;

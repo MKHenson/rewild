@@ -1,4 +1,9 @@
-import { ICreatureAnimation, LocomotionMeaning } from 'models';
+import {
+  ICreatureAnimation,
+  LocomotionMeaning,
+  LocomotionSetName,
+} from 'models';
+import { ICreatureAnimator } from '../creatures/MovementSystem';
 
 /** What the controller drives: one skinned instance's clips. */
 export interface AnimationTarget {
@@ -11,7 +16,12 @@ export interface AnimationTarget {
   clipTime(clip: string): number;
 }
 
-export const DEFAULT_SET = 'normal';
+export const DEFAULT_SET: LocomotionSetName = 'normal';
+const LOCOMOTION_SETS: { [set in LocomotionSetName]: true } = {
+  normal: true,
+  flee: true,
+  injured: true,
+};
 /** Seconds a locomotion set or an action takes to fade in or out. */
 export const DEFAULT_FADE = 0.25;
 /** The most the playback rate moves from 1 to stop foot slide. */
@@ -31,7 +41,7 @@ const MAX_LOCOMOTION_CLIPS = 6;
 
 /** A locomotion set's clips, sorted by natural speed. */
 interface ResolvedSet {
-  name: string;
+  name: LocomotionSetName;
   clips: string[];
   speeds: number[];
   /** Cycling clips share the locomotion phase. Idle keeps its own time. */
@@ -75,7 +85,7 @@ class ActionSlot {
  * Behaviours set `speed`, the locomotion set and actions, and never play
  * locomotion clips.
  */
-export class AnimationController {
+export class AnimationController implements ICreatureAnimator {
   /** Ground speed in m/s. */
   speed = 0;
 
@@ -83,7 +93,7 @@ export class AnimationController {
   private readonly config: ICreatureAnimation;
   private readonly random: () => number;
   private readonly clipByLowerName = new Map<string, string>();
-  private readonly sets = new Map<string, ResolvedSet>();
+  private readonly sets = new Map<LocomotionSetName, ResolvedSet>();
 
   private current: ResolvedSet;
   private previous: ResolvedSet | null = null;
@@ -120,7 +130,7 @@ export class AnimationController {
     this.idleTimer = this.nextIdleDelay();
   }
 
-  get locomotionSet(): string {
+  get locomotionSet(): LocomotionSetName {
     return this.current.name;
   }
 
@@ -146,7 +156,7 @@ export class AnimationController {
   }
 
   /** Crossfades locomotion to a named set. Any set name works on any creature. */
-  setLocomotion(name: string, fade = DEFAULT_FADE): void {
+  setLocomotion(name: LocomotionSetName, fade = DEFAULT_FADE): void {
     if (name === this.current.name) return;
 
     const next = this.resolveSet(name);
@@ -393,12 +403,12 @@ export class AnimationController {
   }
 
   /** The meaning a set plays for a locomotion slot, falling back to `normal`. */
-  private meaningIn(set: string, slot: LocomotionMeaning): string {
+  private meaningIn(set: LocomotionSetName, slot: LocomotionMeaning): string {
     const sets = this.config.locomotion;
     return sets?.[set]?.[slot] ?? sets?.[DEFAULT_SET]?.[slot] ?? slot;
   }
 
-  private resolveSet(name: string): ResolvedSet {
+  private resolveSet(name: LocomotionSetName): ResolvedSet {
     const cached = this.sets.get(name);
     if (cached) return cached;
 
@@ -440,4 +450,12 @@ function copySlot(from: ActionSlot, to: ActionSlot): void {
   to.fade = from.fade;
   to.loop = from.loop;
   to.idle = from.idle;
+}
+
+/** Whether a value read from outside the code, such as a save, names a set. */
+export function isLocomotionSet(value: unknown): value is LocomotionSetName {
+  return (
+    typeof value === 'string' &&
+    LOCOMOTION_SETS[value as LocomotionSetName] === true
+  );
 }

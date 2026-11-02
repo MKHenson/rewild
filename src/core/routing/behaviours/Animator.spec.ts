@@ -44,10 +44,10 @@ describe('Animator', () => {
 
   it('saves and restores the locomotion set', () => {
     const { controller, animator } = setup();
-    controller.setLocomotion('injured', 0);
+    controller.setLocomotion('flee', 0);
     const copy = setup();
     copy.animator.restore(animator.serialize());
 
-    expect(copy.controller.locomotionSet).toBe('injured');
+    expect(copy.controller.locomotionSet).toBe('flee');
   });
 });

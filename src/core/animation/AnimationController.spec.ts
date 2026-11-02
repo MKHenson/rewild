@@ -66,7 +66,7 @@ class Target implements AnimationTarget {
 
 const CHICKEN: ICreatureAnimation = {
   clipSpeeds: { walk: 1.2, run: 4, limp: 0.6 },
-  locomotion: { injured: { walk: 'limp' } },
+  locomotion: { flee: { walk: 'limp' } },
 };
 
 function setup(
@@ -170,9 +170,9 @@ describe('AnimationController', () => {
     expect(weight('run')).toBeCloseTo(1);
   });
 
-  it('swaps walk for limp in the injured set and keeps the normal run', () => {
+  it('swaps walk for limp in the flee set and keeps the normal run', () => {
     const { controller, step, weight } = setup();
-    controller.setLocomotion('injured', 0);
+    controller.setLocomotion('flee', 0);
 
     controller.speed = 0.6;
     step(0.1);
@@ -181,7 +181,7 @@ describe('AnimationController', () => {
     controller.speed = 4;
     step(0.1);
     expect(weight('run')).toBeCloseTo(1);
-    expect(controller.locomotionSet).toBe('injured');
+    expect(controller.locomotionSet).toBe('flee');
   });
 
   it('crossfades between sets', () => {
@@ -189,7 +189,7 @@ describe('AnimationController', () => {
     controller.speed = 1.2;
     step(0.1);
 
-    controller.setLocomotion('injured', 0.4);
+    controller.setLocomotion('flee', 0.4);
     step(0.2);
     expect(weight('walk')).toBeCloseTo(0.5);
     expect(weight('walk') + weight('limp') + weight('run')).toBeCloseTo(1);
@@ -200,7 +200,7 @@ describe('AnimationController', () => {
 
   it('walks normally in a set the creature does not have', () => {
     const { controller, step, weight } = setup();
-    controller.setLocomotion('tired', 0);
+    controller.setLocomotion('injured', 0);
     controller.speed = 1.2;
     step(0.1);
 
