@@ -1,6 +1,7 @@
 import { Icon } from './Icon';
 import { Component, register } from '../Component';
 import { theme } from '../theme';
+import { glassSurface } from './glassStyle';
 import { underlineField } from './fieldStyle';
 
 type OptionType = { value: string; label: string };
@@ -224,7 +225,7 @@ const StyledOption = cssStylesheet(css`
     display: block;
     font-weight: 400;
     font-size: ${theme.colors.fontSizeMedium};
-    background-color: ${theme.colors.surface};
+    background-color: transparent;
     color: ${theme.colors.onField};
     transition: background-color 0.15s;
   }
@@ -266,7 +267,9 @@ const StyledOptions = cssStylesheet(css`
     /* Matches the control it drops out of. */
     border-radius: 4px;
     cursor: pointer;
-    border: 1px solid ${theme.colors.onSurfaceBorder};
+    /* Mostly opaque: a dropdown opens over other text. */
+    ${glassSurface('85%')}
+    border: 1px solid ${theme.colors.glassEdge};
     box-shadow: ${theme.colors.shadowShort2};
     /* A long list scrolls rather than running off the viewport. x stays hidden
        so the first and last options are clipped to the radius. */
@@ -286,7 +289,6 @@ const StyledOptions = cssStylesheet(css`
     inset: auto;
     margin: 0;
     padding: 0;
-    background: none;
   }
 `);
 

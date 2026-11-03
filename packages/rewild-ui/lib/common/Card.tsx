@@ -62,7 +62,16 @@ const StyledCard = cssStylesheet(css`
   :host(.raised):hover {
     box-shadow: ${theme?.colors.shadowShort2};
   }
-  :host(.pushed.raised) {
-    background: color-mix(in srgb, ${theme?.colors.primary400} 6%, transparent);
+  /* Selected: an accent ring and tint. The tint is mixed into the surface, not
+     transparent, so the card stays solid on glass. */
+  :host(.pushed.raised),
+  :host(.pushed.raised):hover {
+    background: color-mix(
+      in srgb,
+      ${theme?.colors.primary400} 14%,
+      ${theme?.colors.surface}
+    );
+    box-shadow: 0 0 0 2px ${theme?.colors.primaryText},
+      ${theme?.colors.shadowShort1};
   }
 `);

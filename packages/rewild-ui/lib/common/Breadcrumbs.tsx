@@ -89,7 +89,7 @@ const StyledBreadcrumbs = cssStylesheet(css`
     border-radius: ${theme.sizes.radius};
     font: inherit;
     font-weight: 400;
-    color: ${theme.colors.primary400};
+    color: ${theme.colors.primaryText};
     cursor: pointer;
   }
 

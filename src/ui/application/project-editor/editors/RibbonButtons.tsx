@@ -163,6 +163,6 @@ const StyledRibbonButtons = cssStylesheet(css`
 
   x-button.sculpt-active,
   x-button.sculpt-active:hover {
-    color: ${theme?.colors.primary400};
+    color: ${theme?.colors.primaryText};
   }
 `);

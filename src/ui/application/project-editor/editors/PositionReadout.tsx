@@ -1,4 +1,4 @@
-import { Component, register, theme, StyledIcon, Button } from 'rewild-ui';
+import { Component, register, theme, StyledIcon, Button, glassSurface } from 'rewild-ui';
 import type { Renderer } from 'rewild-renderer';
 import { Vector3 } from 'rewild-common';
 // Deep imports: the terrain tables only, not the renderer's root index (which
@@ -502,8 +502,8 @@ const StyledPositionReadout = cssStylesheet(css`
 
   .toggle,
   .panel {
-    background: ${theme.colors.surface};
-    border: 1px solid ${theme.colors.onSurfaceBorder};
+    ${glassSurface()}
+    border: 1px solid ${theme.colors.glassEdge};
     border-radius: 5px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   }

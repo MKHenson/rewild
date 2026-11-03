@@ -185,7 +185,7 @@ const StyledButtons = cssStylesheet(css`
     background: color-mix(in srgb, currentColor 14%, transparent);
   }
   :host(.outlined.primary) {
-    color: ${theme?.colors.primary400};
+    color: ${theme?.colors.primaryText};
     border: 1px solid ${theme?.colors.primary400};
   }
   :host(.outlined.secondary) {
@@ -197,7 +197,7 @@ const StyledButtons = cssStylesheet(css`
     border: 1px solid ${theme?.colors.error400};
   }
   :host(.text.primary:hover) {
-    color: ${theme?.colors.primary400};
+    color: ${theme?.colors.primaryText};
   }
   :host(.text.secondary:hover) {
     color: ${theme?.colors.secondary400};
@@ -260,7 +260,7 @@ const StyledButtons = cssStylesheet(css`
   /* Ghost stays unfilled when selected — colour alone carries the state, and
      leaving the background to the rules above keeps the hover wash working. */
   :host([selected].ghost.primary) {
-    color: ${theme?.colors.primary400};
+    color: ${theme?.colors.primaryText};
   }
   :host([selected].ghost.secondary) {
     color: ${theme?.colors.secondary400};

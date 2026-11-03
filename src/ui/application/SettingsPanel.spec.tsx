@@ -30,9 +30,11 @@ describe('SettingsPanel', () => {
     return { panel, onClose };
   }
 
-  /** The selects, in render order: overall tier first, then one per aspect. */
+  /** The Display tab's selects, in render order: overall tier first, then one per aspect. */
   const selectsOf = (panel: SettingsPanel) =>
-    Array.from(panel.shadow!.querySelectorAll('x-select')) as Select[];
+    Array.from(
+      panel.shadow!.querySelector('x-tab')!.querySelectorAll('x-select')
+    ) as Select[];
 
   /** Modal renders its own buttons into its shadow root, not the panel's. */
   const buttonLabelled = (panel: SettingsPanel, label: string) => {
@@ -194,7 +196,11 @@ describe('SettingsPanel', () => {
       const { panel } = createPanel();
 
       const tabs = Array.from(panel.shadow!.querySelectorAll('x-tab')) as Tab[];
-      expect(tabs.map((tab) => tab.props.label)).toEqual(['Display', 'Audio']);
+      expect(tabs.map((tab) => tab.props.label)).toEqual([
+        'Display',
+        'Audio',
+        'Interface',
+      ]);
     });
 
     it('renders a slider per volume, at the current setting', () => {
@@ -224,6 +230,32 @@ describe('SettingsPanel', () => {
 
       expect(audioSettings.muteInBackground).toBe(false);
       expect(storedAudio().muteInBackground).toBe(false);
+    });
+  });
+
+  describe('Interface tab', () => {
+    afterEach(() => delete document.documentElement.dataset.theme);
+
+    const themeSelectOf = (panel: SettingsPanel) => {
+      const tabs = Array.from(panel.shadow!.querySelectorAll('x-tab'));
+      const tab = tabs.find((t) => (t as Tab).props.label === 'Interface')!;
+      return tab.querySelector('x-select') as Select;
+    };
+
+    it('shows light when no theme is stored', () => {
+      const { panel } = createPanel();
+
+      expect(themeSelectOf(panel).props.value).toBe('light');
+    });
+
+    it('applies and stores a theme as it changes, without Apply', async () => {
+      const { panel } = createPanel();
+
+      await change(themeSelectOf(panel), 'dark');
+
+      expect(document.documentElement.dataset.theme).toBe('dark');
+      expect(localStorage.getItem('rewild.ui.theme')).toBe('dark');
+      expect(themeSelectOf(panel).props.value).toBe('dark');
     });
   });
 });

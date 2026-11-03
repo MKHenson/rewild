@@ -575,7 +575,7 @@ export class Auth extends Component<Props> {
 
       .switch-view {
         cursor: pointer;
-        color: ${theme.colors.primary400};
+        color: ${theme.colors.primaryText};
         font-size: ${theme.colors.fontSizeSmall};
         text-align: center;
         text-decoration: underline;

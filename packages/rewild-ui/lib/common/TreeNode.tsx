@@ -267,7 +267,7 @@ const StyledTreeNode = cssStylesheet(css`
     margin: 0 4px 0 0;
   }
   .tree-content.selected-treenode x-typography {
-    color: ${theme?.colors.primary400};
+    color: ${theme?.colors.primaryText};
     font-weight: 500;
   }
   .tree-content.active-treenode .treenode-drop-area {

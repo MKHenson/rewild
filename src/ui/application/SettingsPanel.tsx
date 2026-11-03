@@ -23,6 +23,7 @@ import { getQualitySettings } from '../utils/getQualitySettings';
 import { VOLUME_SETTINGS, VolumeSetting } from 'rewild-audio';
 import { audioSettings } from '../../core/audio/audio';
 import { OutputDeviceField } from './OutputDeviceField';
+import { getUiTheme, setUiTheme, UiTheme } from '../utils/uiTheme';
 
 type Props = {
   /** Leave the settings, discarding anything not applied. */
@@ -33,6 +34,12 @@ const qualityOptions = RENDER_QUALITIES.map((quality) => ({
   value: quality,
   label: quality.charAt(0).toUpperCase() + quality.slice(1),
 }));
+
+const themeOptions: { value: UiTheme; label: string }[] = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'Match system' },
+];
 
 /** What each subsystem costs, in the terms a player picking a tier cares about. */
 const ASPECTS: Record<QualityAspect, { label: string; description: string }> = {
@@ -142,6 +149,12 @@ export class SettingsPanel extends Component<Props> {
       ...settings.overrides,
     });
     const [tabIndex, setTabIndex] = this.useState(0);
+    const [uiTheme, setUiThemeState] = this.useState<UiTheme>(getUiTheme());
+
+    const onThemeChange = (value: string) => {
+      setUiTheme(value as UiTheme);
+      setUiThemeState(value as UiTheme);
+    };
 
     const onLevelChange = (value: string) => {
       setLevel(value as RenderQuality, false);
@@ -237,6 +250,25 @@ export class SettingsPanel extends Component<Props> {
 
               <InfoBox variant="info" title="">
                 Audio changes apply straight away, without Apply.
+              </InfoBox>
+            </Tab>
+            <Tab label="Interface">
+              <div class="section">
+                <Field label="Theme">
+                  <Select
+                    value={uiTheme()}
+                    options={themeOptions}
+                    onChange={onThemeChange}
+                  />
+                </Field>
+                <Typography variant="light">
+                  Colours for menus and the editor. Match system follows your
+                  operating system's light or dark setting.
+                </Typography>
+              </div>
+
+              <InfoBox variant="info" title="">
+                The theme changes straight away, without Apply.
               </InfoBox>
             </Tab>
           </Tabs>

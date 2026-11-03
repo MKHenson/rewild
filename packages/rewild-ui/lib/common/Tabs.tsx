@@ -257,7 +257,7 @@ const StyledTabs = cssStylesheet(css`
   }
 
   .tab-button.active {
-    color: ${theme.colors.primary400};
+    color: ${theme.colors.primaryText};
     border-color: ${theme.colors.primary400};
   }
 

@@ -106,6 +106,5 @@ const MainMenuOverrides = css`
     top: 10%;
     /* Popup centres the box vertically; anchor it to top instead. */
     transform: translate(-50%, 0);
-    background-color: rgba(255, 255, 255, 0.9);
   }
 `;

@@ -29,11 +29,11 @@ export class InfoBox extends Component<Props> {
       const getIconColor = (): string => {
         switch (variant) {
           case 'info':
-            return theme.colors.onPrimary600;
+            return theme.colors.primaryText;
           case 'error':
-            return theme.colors.onError600;
+            return theme.colors.error400;
           case 'warning':
-            return theme.colors.warning600;
+            return theme.colors.warning400;
         }
       };
 
@@ -70,29 +70,30 @@ const StyledInfoBox = cssStylesheet(css`
     overflow-wrap: anywhere;
   }
 
+  /* A neutral panel with the variant's colour as a bar down the left edge. */
+  :host > div {
+    display: flex;
+    padding: 0.5rem 0.75rem;
+    color: ${theme!.colors.onSurface};
+    background: ${theme!.colors.subtle400};
+    border-left: 4px solid;
+  }
+
   .info {
-    color: ${theme!.colors.onPrimary600};
-    background: ${theme!.colors.primary400};
+    border-left-color: ${theme!.colors.primary400};
   }
 
   .error {
-    color: ${theme!.colors.onError600};
-    background: ${theme!.colors.error400};
+    border-left-color: ${theme!.colors.error400};
   }
 
   .warning {
-    color: ${theme!.colors.onWarning600};
-    background: ${theme!.colors.warning400};
-  }
-
-  :host > div {
-    display: flex;
-    padding: 1rem;
+    border-left-color: ${theme!.colors.warning400};
   }
 
   .icon {
     flex: 0 1 content;
-    padding: 0 1rem 0 0;
+    padding: 0 0.75rem 0 0;
   }
 
   .content {

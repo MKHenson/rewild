@@ -1,5 +1,6 @@
 import { Component, register } from '../Component';
 import { theme } from '../theme';
+import { glassSurface } from './glassStyle';
 
 export interface PopupProps {
   open: boolean;
@@ -45,6 +46,14 @@ export class Popup extends Component<PopupProps> {
         }
       };
 
+      // Move the rim light to the cursor.
+      const handlePointerMove = (e: PointerEvent) => {
+        const modal = e.currentTarget as HTMLElement;
+        const rect = modal.getBoundingClientRect();
+        modal.style.setProperty('--mx', `${e.clientX - rect.left}px`);
+        modal.style.setProperty('--my', `${e.clientY - rect.top}px`);
+      };
+
       this.toggleAttribute('open', this.props.open);
       this._syncPopover();
 
@@ -54,7 +63,7 @@ export class Popup extends Component<PopupProps> {
             this.props.withBackground ? 'withBackground' : ''
           }`}
           onclick={handleClick}>
-          <div class="modal">
+          <div class="modal" onpointermove={handlePointerMove}>
             <slot></slot>
           </div>
         </div>
@@ -144,16 +153,50 @@ const StyledPopup = cssStylesheet(css`
     transition: visibility 0s linear 0s, opacity 0.25s 0s, transform 0.25s;
   }
 
+  /* Frosted glass: the scene behind shows through, blurred. */
   .modal {
     pointer-events: all;
     padding: 1rem;
-    background-color: ${theme?.colors.surface};
+    ${glassSurface()}
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    border-radius: 5px;
+    border-radius: 14px;
     min-width: 300px;
-    box-shadow: 2px 2px 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  /* The rim: a faint 1px edge, brightest nearest the cursor (--mx, --my).
+     The mask cuts out the middle. */
+  .modal::before,
+  .modal::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .modal::before {
+    padding: 1px;
+    background: radial-gradient(
+        240px circle at var(--mx, 50%) var(--my, 0%),
+        rgba(255, 255, 255, 0.95),
+        transparent 70%
+      ),
+      linear-gradient(${theme?.colors.glassEdge}, ${theme?.colors.glassEdge});
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+  /* A soft sheen across the glass, around the cursor. It sits under the
+     content: .modal is a stacking context, because of its transform. */
+  .modal::after {
+    z-index: -1;
+    background: radial-gradient(
+      500px circle at var(--mx, 50%) var(--my, 0%),
+      rgba(255, 255, 255, 0.09),
+      transparent 60%
+    );
   }
 `);

@@ -1,4 +1,5 @@
 import {
+  glassSurface,
   Component,
   register,
   theme,
@@ -131,9 +132,9 @@ const StyledSculptToolbar = cssStylesheet(css`
   }
 
   .panel {
-    background: ${theme.colors.surface};
+    ${glassSurface()}
     color: ${theme.colors.onSurface};
-    border: 1px solid ${theme.colors.onSurfaceBorder};
+    border: 1px solid ${theme.colors.glassEdge};
     border-radius: 5px;
     padding: 0.6rem;
     min-width: 240px;
