@@ -63,6 +63,12 @@ import {
   saveCameraState,
 } from './utils/CameraPersistence';
 import {
+  EDGE_WALK_DWELL_MS,
+  EdgeDirection,
+  EdgeWalkController,
+  EdgeWalkPhase,
+} from './utils/EdgeWalkController';
+import {
   applyConformPolicy,
   resolvePlacement,
   writeBackPlacement,
@@ -105,6 +111,7 @@ export class EditorViewport extends Component<Props> {
   biomePaintController: TerrainBiomePaintController | null = null;
   scatterPaintController: TerrainScatterPaintController | null = null;
   waterBrushController: TerrainWaterBrushController | null = null;
+  edgeWalkController: EdgeWalkController | null = null;
   selectedTransform: Transform | null = null;
   private didDrag = false;
   private mouseDownPos = { x: 0, y: 0 };
@@ -541,6 +548,12 @@ export class EditorViewport extends Component<Props> {
         this.viewportCanvas.addEventListener('wheel', this.scheduleCameraSave, {
           passive: true,
         });
+        this.edgeWalkController = new EdgeWalkController(
+          this.viewportCanvas,
+          this.orbitController,
+          this.scheduleCameraSave,
+          onEdgeWalkPhase
+        );
 
         // If the project loaded before the canvas was ready, the earlier
         // loading-completed restore was a no-op — apply the saved camera now.
@@ -1027,9 +1040,23 @@ export class EditorViewport extends Component<Props> {
     const errorBox = (
       <InfoBox variant="error" title="Could not open the level" />
     ) as InfoBox;
+    const edgeGlow = (
+      <div class="edge-glow">
+        <div class="edge top" />
+        <div class="edge bottom" />
+        <div class="edge left" />
+        <div class="edge right" />
+      </div>
+    ) as HTMLDivElement;
+    const onEdgeWalkPhase = (phase: EdgeWalkPhase, dir: EdgeDirection) => {
+      edgeGlow.dataset.phase = phase;
+      edgeGlow.dataset.forward = String(dir.forward);
+      edgeGlow.dataset.right = String(dir.right);
+    };
     const container = (
       <div class="viewport-container">
         {pane3D}
+        {edgeGlow}
         <PositionReadout renderer={this.renderer} />
       </div>
     ) as HTMLDivElement;
@@ -1225,6 +1252,7 @@ export class EditorViewport extends Component<Props> {
     }
     this.removeCameraObserver();
     this.placementSync?.stop();
+    this.edgeWalkController?.dispose();
     this.orbitController?.dispose();
     this.gizmo?.dispose();
     this.sculptController?.dispose();
@@ -1248,6 +1276,75 @@ const StyledContainer = cssStylesheet(css`
     height: 100%;
     width: 100%;
     position: relative;
+  }
+
+  .edge-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    --edge-glow-color: color-mix(
+      in srgb,
+      ${theme.colors.primary400} 55%,
+      transparent
+    );
+  }
+
+  .edge-glow .edge {
+    position: absolute;
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+  }
+
+  .edge-glow .top,
+  .edge-glow .bottom {
+    left: 0;
+    right: 0;
+    height: 48px;
+  }
+
+  .edge-glow .left,
+  .edge-glow .right {
+    top: 0;
+    bottom: 0;
+    width: 48px;
+  }
+
+  .edge-glow .top {
+    top: 0;
+    background: linear-gradient(to bottom, var(--edge-glow-color), transparent);
+  }
+  .edge-glow .bottom {
+    bottom: 0;
+    background: linear-gradient(to top, var(--edge-glow-color), transparent);
+  }
+  .edge-glow .left {
+    left: 0;
+    background: linear-gradient(to right, var(--edge-glow-color), transparent);
+  }
+  .edge-glow .right {
+    right: 0;
+    background: linear-gradient(to left, var(--edge-glow-color), transparent);
+  }
+
+  .edge-glow[data-phase='dwell'][data-forward='1'] .top,
+  .edge-glow[data-phase='dwell'][data-forward='-1'] .bottom,
+  .edge-glow[data-phase='dwell'][data-right='-1'] .left,
+  .edge-glow[data-phase='dwell'][data-right='1'] .right {
+    opacity: 0.5;
+    transition: opacity ${EDGE_WALK_DWELL_MS}ms ease-in;
+  }
+
+  .edge-glow[data-phase='walking'][data-forward='1'] .top,
+  .edge-glow[data-phase='walking'][data-forward='-1'] .bottom,
+  .edge-glow[data-phase='walking'][data-right='-1'] .left,
+  .edge-glow[data-phase='walking'][data-right='1'] .right {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .edge-glow .edge {
+      transition: none !important;
+    }
   }
 
   x-info-box {
