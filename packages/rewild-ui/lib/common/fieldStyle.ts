@@ -1,8 +1,8 @@
 import { theme } from '../theme';
 
 /**
- * The look every text field, number field and dropdown shares: no box, a
- * bottom line that darkens on hover and turns a thicker blue while the field
+ * The look every text field, number field and dropdown shares: a solid
+ * surface fill with rounded top corners, a bottom line that darkens on hover and turns a thicker blue while the field
  * has the interaction, dashed and dimmed when disabled. `box` is the element
  * drawn as the field; `active` its focused or open state; `disabled` its
  * disabled state. The thicker line is an inset shadow, so it adds no height.
@@ -21,7 +21,7 @@ export function underlineField(
       font-size: ${theme.colors.fontSizeMedium};
       font-weight: 400;
       color: ${theme.colors.onField};
-      background: transparent;
+      background: ${theme.colors.fieldFill};
       border: none;
       border-bottom: 1px solid ${theme.colors.onSurfaceBorder};
       border-radius: 0;
@@ -41,6 +41,7 @@ export function underlineField(
 
     ${disabled}, ${disabled}:hover {
       cursor: default;
+      background: ${theme.colors.fieldFill};
       opacity: 0.5;
       border-bottom-style: dashed;
       border-bottom-color: ${theme.colors.onSurfaceBorder};

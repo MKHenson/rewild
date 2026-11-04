@@ -157,7 +157,7 @@ const StyledPopup = cssStylesheet(css`
   .modal {
     pointer-events: all;
     padding: 1rem;
-    ${glassSurface()}
+    ${glassSurface(theme.colors.modalGlass)}
     position: absolute;
     top: 50%;
     left: 50%;

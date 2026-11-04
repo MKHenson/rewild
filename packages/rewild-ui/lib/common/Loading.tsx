@@ -95,13 +95,15 @@ const StyledLoading = cssStylesheet(css`
     justify-content: center;
     width: 100%;
     height: 100%;
-    color: ${theme.colors.subtle600};
+    color: ${theme.colors.onSurfaceLight};
   }
 
+  /* The backdrop is dark in both themes, so the shell stays light. */
   :host([overlay]) {
     position: absolute;
     inset: 0;
     z-index: 20;
+    color: #e2e6eb;
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(2px);
   }

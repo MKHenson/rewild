@@ -14,6 +14,9 @@
   --surface: #fff;
   /* The 1px edge of a glass modal: dark on light glass, light on dark glass. */
   --glass-edge: rgba(0, 0, 0, 0.18);
+  /* How much surface covers a glass modal. Light glass needs more, or bright
+     scenery behind it washes out the text. */
+  --modal-glass: 60%;
 
   --error-400: #972222;
   --error-500: #811a1a;
@@ -51,6 +54,8 @@
      label (--on-surface) and its caption (--on-surface-light) so a form reads
      label first, value second. */
   --on-field: #555;
+  /* Solid fill behind a form field, so it stands out on glass. */
+  --field-fill: var(--surface);
 
   --on-error-400: #fff;
   --on-error-500: #fff;
@@ -101,6 +106,7 @@
   --background: #14181d;
   --surface: #1c2127;
   --glass-edge: rgba(255, 255, 255, 0.12);
+  --modal-glass: 60%;
 
   --error-400: #d05252;
   --error-500: #b03d3d;

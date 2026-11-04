@@ -11,6 +11,7 @@ import {
   Tab,
   Tabs,
   Typography,
+  theme,
 } from 'rewild-ui';
 import {
   QUALITY_ASPECTS,
@@ -293,7 +294,8 @@ const StyledSettingsPanel = cssStylesheet(css`
     margin: 0 0 1.25rem 0;
   }
   .section x-typography {
-    margin: 6px 0 0 0;
+    display: block;
+    margin: ${theme.space.s} 0 0 0;
   }
 
   .divider {

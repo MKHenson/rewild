@@ -161,6 +161,7 @@ const StyledPropValue = cssStylesheet(css`
   /* Read-only values read as plain text: no line to suggest they can be edited. */
   .input-val[readonly],
   .input-val[readonly]:hover {
+    background: transparent;
     border-bottom-color: transparent;
     box-shadow: none;
   }

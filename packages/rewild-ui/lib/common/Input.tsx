@@ -90,7 +90,9 @@ const StyledInput = cssStylesheet(css`
     opacity: 1;
   }
 
-  input[readonly] {
+  input[readonly],
+  input[readonly]:hover {
+    background: transparent;
     border-bottom-color: transparent;
     box-shadow: none;
   }
