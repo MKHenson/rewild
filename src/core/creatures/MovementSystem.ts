@@ -3,7 +3,7 @@ import { Quaternion, Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
 import { BehaviourState } from 'rewild-routing';
 import { MovementSettings } from './CreaturePresets';
-import { CreatureWorld, Habitat } from './Habitat';
+import { CreatureWorld, Habitat, HeightRange } from './Habitat';
 
 /** The parts of the animation controller movement modes use. */
 export interface ICreatureAnimator {
@@ -31,13 +31,25 @@ export const ARRIVE_DISTANCE = 0.3;
 export const DETOUR_ANGLES = [Math.PI / 4, Math.PI / 2];
 /** The stable id movement modes save in place of the player. */
 export const PLAYER_ID = 'player';
+/** m/s². */
+export const GRAVITY = 9.8;
+/** Metres above the ground a walking creature still counts as on it. */
+export const SNAP_DISTANCE = 0.5;
+/** Points checked along the path for rising ground. */
+const LOOK_AHEAD_SAMPLES = 2;
+/** m/s of height change for each metre from the target height. */
+const HEIGHT_RESPONSE = 1;
+/** Seconds a roll takes to settle. */
+const ROLL_SMOOTHING = 0.4;
 
 const TWO_PI = Math.PI * 2;
 const _forward = new Vector3();
+const _range: HeightRange = { min: 0, max: 0 };
 
 /**
  * Moves one creature kinematically. Modes set a goal; the system turns toward
  * it at the turn rate, eases its speed, and keeps each step inside the habitat.
+ * A creature in the wrong medium falls to the ground and stays still.
  */
 export class MovementSystem {
   x = 0;
@@ -53,6 +65,14 @@ export class MovementSystem {
   blocked = false;
   /** The creature is at its goal. */
   arrived = true;
+  /** m/s up. */
+  verticalSpeed = 0;
+  /** Radians about the creature's forward axis. */
+  roll = 0;
+  /** Where in its height range it aims, 0 lowest to 1 highest. */
+  goalLevel = 0.5;
+  /** It is in the wrong medium. */
+  stranded = false;
 
   readonly settings: MovementSettings;
   readonly habitat: Habitat;
@@ -87,6 +107,11 @@ export class MovementSystem {
     return this.active?.name ?? null;
   }
 
+  /** m/s a flying creature is climbing. */
+  get climb(): number {
+    return this.habitat.flies ? Math.max(0, this.verticalSpeed) : 0;
+  }
+
   /** Puts the creature at rest at a point, which becomes its home. */
   place(x: number, y: number, z: number, heading: number): void {
     this.x = this.homeX = x;
@@ -94,7 +119,10 @@ export class MovementSystem {
     this.z = this.homeZ = z;
     this.heading = heading;
     this.speed = 0;
+    this.verticalSpeed = 0;
+    this.roll = 0;
     this.blocked = false;
+    this.stranded = false;
     this.active = null;
     this.halt();
   }
@@ -128,15 +156,24 @@ export class MovementSystem {
   }
 
   update(dt: number): void {
-    this.arbitrate();
-    if (this.active) this.active.update(dt, this);
-    else this.halt();
+    this.stranded = this.habitat.stranded?.(this.x, this.z) ?? false;
+    if (this.stranded) this.release();
+    else {
+      this.arbitrate();
+      if (this.active) this.active.update(dt, this);
+      else this.halt();
+    }
     this.step(dt);
   }
 
   applyTo(transform: Transform): void {
     transform.position.set(this.x, this.y, this.z);
-    transform.rotation.set(0, this.heading, 0, transform.rotation.order);
+    transform.rotation.set(
+      0,
+      this.heading,
+      this.roll,
+      transform.rotation.order
+    );
   }
 
   serialize(): BehaviourState {
@@ -190,14 +227,25 @@ export class MovementSystem {
     best?.enter(this);
   }
 
+  private release(): void {
+    this.active?.exit(this);
+    this.active = null;
+    this.speed = 0;
+    this.halt();
+  }
+
   private step(dt: number): void {
     const { settings } = this;
+    const before = this.heading;
+    const cruise = this.stranded ? 0 : settings.cruiseSpeed ?? 0;
     const dx = this.goalX - this.x;
     const dz = this.goalZ - this.z;
     const distance = Math.hypot(dx, dz);
+    // A creature that cannot slow down can only reach what is outside its turn.
+    const arrive = Math.max(ARRIVE_DISTANCE, cruise / settings.turnRate);
 
     let target = 0;
-    if (distance > ARRIVE_DISTANCE && this.goalSpeed > 0) {
+    if (distance > arrive && this.goalSpeed > 0) {
       const desired = Math.atan2(dx, dz);
       this.heading = turnToward(this.heading, desired, settings.turnRate * dt);
       const facing = Math.cos(wrapAngle(desired - this.heading));
@@ -206,6 +254,7 @@ export class MovementSystem {
         Math.sqrt(2 * settings.acceleration * distance)
       );
     } else if (this.goalSpeed > 0) this.arrived = true;
+    target = Math.max(target, cruise);
 
     const change = settings.acceleration * dt;
     this.speed =
@@ -215,8 +264,76 @@ export class MovementSystem {
 
     if (this.speed > 0) this.move(this.speed * dt, dt);
 
+    this.updateRoll(before, dt);
+    this.updateHeight(dt);
+  }
+
+  private updateRoll(before: number, dt: number): void {
+    const { bank, turnRate } = this.settings;
+    if (!bank) return;
+    const turn = wrapAngle(this.heading - before) / (turnRate * dt);
+    const target = -bank * Math.max(-1, Math.min(1, turn));
+    this.roll += (target - this.roll) * (1 - Math.exp(-dt / ROLL_SMOOTHING));
+  }
+
+  private updateHeight(dt: number): void {
+    const { habitat, settings } = this;
     const ground = this.world.sampleHeight(this.x, this.z);
-    if (ground !== null) this.y = ground;
+    if (ground === null) {
+      this.verticalSpeed = 0;
+      return;
+    }
+
+    let min = ground;
+    let max = ground;
+    if (!this.stranded && habitat.heightRange?.(this.x, this.z, _range)) {
+      min = _range.min;
+      max = _range.max;
+      const reach = this.speed * (habitat.lookAhead ?? 0);
+      for (let i = 1; reach > 0 && i <= LOOK_AHEAD_SAMPLES; i++) {
+        const ahead = (reach * i) / LOOK_AHEAD_SAMPLES;
+        const x = this.x + Math.sin(this.heading) * ahead;
+        const z = this.z + Math.cos(this.heading) * ahead;
+        if (!habitat.heightRange(x, z, _range) || _range.min <= min) continue;
+        min = _range.min;
+        max = Math.max(max, _range.max);
+      }
+    }
+
+    const climb = settings.climbSpeed ?? 0;
+    const snap = climb > 0 ? 0 : SNAP_DISTANCE;
+    if (!habitat.flies && this.y > max + snap) {
+      this.verticalSpeed = Math.min(this.verticalSpeed, 0) - GRAVITY * dt;
+      this.y = Math.max(max, this.y + this.verticalSpeed * dt);
+      return;
+    }
+
+    const target = min + this.goalLevel * (max - min);
+    if (climb <= 0) {
+      this.y = target;
+      this.verticalSpeed = 0;
+      return;
+    }
+
+    const desired = Math.max(
+      -climb,
+      Math.min(climb, (target - this.y) * HEIGHT_RESPONSE)
+    );
+    const change = settings.acceleration * dt;
+    this.verticalSpeed =
+      this.verticalSpeed < desired
+        ? Math.min(desired, this.verticalSpeed + change)
+        : Math.max(desired, this.verticalSpeed - change);
+    this.y += this.verticalSpeed * dt;
+
+    if (this.y < ground) {
+      this.y = ground;
+      this.verticalSpeed = Math.max(this.verticalSpeed, 0);
+    }
+    if (!habitat.flies && this.y > max) {
+      this.y = max;
+      this.verticalSpeed = Math.min(this.verticalSpeed, 0);
+    }
   }
 
   /** Steps along the heading, or the nearest detour inside the habitat. */

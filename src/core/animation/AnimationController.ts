@@ -88,6 +88,8 @@ class ActionSlot {
 export class AnimationController implements ICreatureAnimator {
   /** Ground speed in m/s. */
   speed = 0;
+  /** m/s a flying creature is climbing. Blends as extra speed, so it flaps. */
+  climb = 0;
 
   private readonly target: AnimationTarget;
   private readonly config: ICreatureAnimation;
@@ -146,6 +148,7 @@ export class AnimationController implements ICreatureAnimator {
 
   /** Snaps to the current set at rest, idle at a random point in its loop. */
   start(): void {
+    this.phase = this.random();
     this.update(0);
     const idle = this.resolveClip(this.meaningIn(this.current.name, 'idle'));
     if (idle)
@@ -234,7 +237,7 @@ export class AnimationController implements ICreatureAnimator {
     const n = clips.length;
     if (n === 0) return 0;
 
-    const speed = this.speed;
+    const speed = this.speed + this.climb;
     let lower = 0;
     let upperWeight = 0;
     if (speed >= speeds[n - 1]) lower = n - 1;
@@ -416,12 +419,16 @@ export class AnimationController implements ICreatureAnimator {
     for (const slot of MEANINGS) {
       const meaning = this.meaningIn(name, slot);
       const clip = this.resolveClip(meaning);
-      if (!clip || entries.some((e) => e.clip === clip)) continue;
-      entries.push({
-        clip,
-        speed: slot === 'idle' ? 0 : this.clipSpeed(meaning, slot),
-        synced: slot !== 'idle',
-      });
+      if (!clip) continue;
+      const speed = slot === 'idle' ? 0 : this.clipSpeed(meaning, slot);
+      const synced = slot !== 'idle';
+      const existing = entries.find((e) => e.clip === clip);
+      if (!existing) entries.push({ clip, speed, synced });
+      // A clip that fills idle and a moving slot plays as the moving one.
+      else if (!existing.synced) {
+        existing.speed = speed;
+        existing.synced = synced;
+      }
     }
     entries.sort((a, b) => a.speed - b.speed);
 

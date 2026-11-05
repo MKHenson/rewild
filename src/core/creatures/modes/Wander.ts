@@ -6,6 +6,10 @@ import { IMovementMode, MovementSystem } from '../MovementSystem';
 export const PICK_ATTEMPTS = 8;
 /** Metres a new point must be from where the creature stands. */
 export const MIN_WANDER_STEP = 1;
+/** Radians round home between circling points, at the least. */
+const CIRCLE_STEP = Math.PI / 4;
+/** Nearest a circling point is to home, as a share of the radius. */
+const CIRCLE_INNER = 0.7;
 
 type Phase = 'pick' | 'walk' | 'wait';
 
@@ -15,12 +19,16 @@ export class Wander implements IMovementMode {
   phase: Phase = 'pick';
   targetX = 0;
   targetZ = 0;
+  /** Where in its height range it aims. Only some habitats have a range. */
+  targetLevel = 0.5;
   timer = 0;
   /** The action playing in this wait. */
   action: string | null = null;
 
   private readonly settings: WanderSettings;
   private readonly radius: number;
+  /** The way round home it circles. Picked on the first point. */
+  private circleSign = 0;
 
   constructor(settings: WanderSettings, radius = settings.radius) {
     this.settings = settings;
@@ -43,14 +51,13 @@ export class Wander implements IMovementMode {
     if (this.phase === 'walk') {
       if (system.blocked) this.phase = 'pick';
       else if (system.arrived) this.startWait(system);
-      else
-        system.steerTo(this.targetX, this.targetZ, system.settings.walkSpeed);
+      else this.steer(system);
     }
 
     if (this.phase === 'pick') {
       if (this.pickTarget(system)) {
         this.phase = 'walk';
-        system.steerTo(this.targetX, this.targetZ, system.settings.walkSpeed);
+        this.steer(system);
       } else this.startWait(system, false);
     }
 
@@ -69,6 +76,7 @@ export class Wander implements IMovementMode {
       phase: this.phase,
       targetX: this.targetX,
       targetZ: this.targetZ,
+      targetLevel: this.targetLevel,
       timer: this.timer,
     };
   }
@@ -82,20 +90,37 @@ export class Wander implements IMovementMode {
       this.phase = state.phase;
     if (typeof state.targetX === 'number') this.targetX = state.targetX;
     if (typeof state.targetZ === 'number') this.targetZ = state.targetZ;
+    if (typeof state.targetLevel === 'number')
+      this.targetLevel = state.targetLevel;
     if (typeof state.timer === 'number') this.timer = state.timer;
+  }
+
+  private steer(system: MovementSystem): void {
+    system.goalLevel = this.targetLevel;
+    system.steerTo(this.targetX, this.targetZ, system.settings.walkSpeed);
   }
 
   private pickTarget(system: MovementSystem): boolean {
     const { random } = system;
+    const circle = this.settings.circle;
+    if (circle && this.circleSign === 0)
+      this.circleSign = random() < 0.5 ? -1 : 1;
+
     for (let i = 0; i < PICK_ATTEMPTS; i++) {
-      const angle = random() * Math.PI * 2;
-      const distance = this.radius * Math.sqrt(random());
+      const angle = circle
+        ? Math.atan2(system.x - system.homeX, system.z - system.homeZ) +
+          this.circleSign * CIRCLE_STEP * (1 + random())
+        : random() * Math.PI * 2;
+      const distance = circle
+        ? this.radius * (CIRCLE_INNER + (1 - CIRCLE_INNER) * random())
+        : this.radius * Math.sqrt(random());
       const x = system.homeX + Math.sin(angle) * distance;
       const z = system.homeZ + Math.cos(angle) * distance;
       if (Math.hypot(x - system.x, z - system.z) < MIN_WANDER_STEP) continue;
       if (!system.habitat.canBe(x, z)) continue;
       this.targetX = x;
       this.targetZ = z;
+      this.targetLevel = random();
       return true;
     }
     return false;

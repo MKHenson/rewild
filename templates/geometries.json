@@ -201,5 +201,13 @@
   "chicken-01": {
     "type": "gltf",
     "url": "models/chicken-01.glb"
+  },
+  "tuna": {
+    "type": "gltf",
+    "url": "models/tuna.glb"
+  },
+  "crow": {
+    "type": "gltf",
+    "url": "models/crow.glb"
   }
 }

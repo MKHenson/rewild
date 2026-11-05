@@ -125,6 +125,45 @@ describe('AnimationController', () => {
     expect(weight('idle')).toBe(0);
   });
 
+  it('blends toward the faster clip while climbing', () => {
+    const { controller, step, weight } = setup();
+    controller.start();
+    controller.speed = 1.2;
+    step(0.1);
+    expect(weight('run')).toBe(0);
+
+    controller.climb = 1.4;
+    step(0.1);
+    expect(weight('walk')).toBeCloseTo(0.5);
+    expect(weight('run')).toBeCloseTo(0.5);
+  });
+
+  it('plays a clip that fills idle and walk at the walk speed', () => {
+    const { controller, step, weight } = setup({
+      clips: { idle: 'walk', glide: 'walk', flap: 'run' },
+      locomotion: { normal: { walk: 'glide', run: 'flap' } },
+      clipSpeeds: { glide: 6, flap: 9 },
+    });
+    controller.start();
+    controller.speed = 6;
+    step(0.1);
+    expect(weight('walk')).toBeCloseTo(1);
+    expect(weight('run')).toBe(0);
+
+    controller.speed = 7.5;
+    step(0.1);
+    expect(weight('walk')).toBeCloseTo(0.5);
+    expect(weight('run')).toBeCloseTo(0.5);
+  });
+
+  it('starts its cycle at a random point', () => {
+    const { controller, step, time } = setup(CHICKEN, undefined, () => 0.25);
+    controller.start();
+    controller.speed = 1.2;
+    step(0);
+    expect(time('walk')).toBeCloseTo(0.25);
+  });
+
   it('keeps walk and run on one cycle', () => {
     const { controller, step, time } = setup();
     controller.speed = 2;
