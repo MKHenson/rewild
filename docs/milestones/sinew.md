@@ -52,7 +52,8 @@ The loaded model keeps one skeleton and its clips. Many instances use them.
 
 ### Blender conventions
 
-- One armature for each creature. Apply scale and rotation before export.
+- One armature for each creature.
+- Size a creature by scaling its armature object in Object Mode, without applying the scale. Applying it moves the bones of a rig that came in with a scale. First delete any scale keys on the object itself, or the action overwrites the new scale on export.
 - Name clips by meaning, not by look: `idle`, `walk`, `run`, `eat`. A clip with a shared name needs no entry in the clip map.
 - Start every walk and run loop on the same foot contact, for example the left foot down. The speed blend keeps cycles in step by this.
 - Name the bones that procedural layers use: `head`, `neck_*` and the leg chains. The template names them, so the names do not have to match exactly.
