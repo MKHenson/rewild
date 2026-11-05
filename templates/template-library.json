@@ -137,6 +137,26 @@
       }
     },
     {
+      "name": "tuna",
+      "type": "asset",
+      "preset": "tuna",
+      "clips": { "idle": "Swim" },
+      "resource": {
+        "geometryId": "tuna"
+      }
+    },
+    {
+      "name": "crow",
+      "type": "asset",
+      "preset": "crow",
+      "clips": { "idle": "Float", "glide": "Float", "flap": "Fly" },
+      "locomotion": { "normal": { "walk": "glide", "run": "flap" } },
+      "clipSpeeds": { "glide": 6, "flap": 9 },
+      "resource": {
+        "geometryId": "crow"
+      }
+    },
+    {
       "name": "point-light",
       "type": "light",
       "resource": {

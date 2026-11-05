@@ -106,5 +106,74 @@ describe('Wander', () => {
     expect(copy.phase).toBe(wander.phase);
     expect(copy.targetX).toBe(wander.targetX);
     expect(copy.targetZ).toBe(wander.targetZ);
+    expect(copy.targetLevel).toBe(wander.targetLevel);
+  });
+
+  it('aims for a height it picks with each point', () => {
+    const { wander, system } = setup();
+    system.update(0.05);
+    expect(system.goalLevel).toBe(wander.targetLevel);
+    expect(wander.targetLevel).toBeGreaterThanOrEqual(0);
+    expect(wander.targetLevel).toBeLessThanOrEqual(1);
+  });
+
+  describe('circling', () => {
+    const CIRCLE: WanderSettings = {
+      radius: 30,
+      wait: [0, 0],
+      actions: [],
+      circle: true,
+    };
+
+    it('keeps going one way round home, near the radius', () => {
+      const wander = new Wander(CIRCLE);
+      const system = new MovementSystem(
+        { ...SETTINGS, turnRate: 1, cruiseSpeed: 5, walkSpeed: 6 },
+        { canBe: () => true },
+        new TestWorld(),
+        [wander],
+        null,
+        rolls(1)
+      );
+      system.place(0, 0, 0, 0);
+
+      let travelled = 0;
+      let last = Math.atan2(system.x, system.z);
+      for (let t = 0; t < 120; t += 0.05) {
+        system.update(0.05);
+        const distance = Math.hypot(wander.targetX, wander.targetZ);
+        expect(distance).toBeGreaterThanOrEqual(30 * 0.7);
+        expect(distance).toBeLessThanOrEqual(30);
+
+        if (Math.hypot(system.x, system.z) > 10) {
+          const angle = Math.atan2(system.x, system.z);
+          let step = angle - last;
+          if (step > Math.PI) step -= Math.PI * 2;
+          if (step < -Math.PI) step += Math.PI * 2;
+          travelled += step;
+          last = angle;
+        } else last = Math.atan2(system.x, system.z);
+      }
+
+      expect(Math.abs(travelled)).toBeGreaterThan(Math.PI * 2);
+    });
+
+    it('never stops to wait', () => {
+      const wander = new Wander(CIRCLE);
+      const system = new MovementSystem(
+        { ...SETTINGS, turnRate: 1, cruiseSpeed: 5, walkSpeed: 6 },
+        { canBe: () => true },
+        new TestWorld(),
+        [wander],
+        null,
+        rolls(1)
+      );
+      system.place(0, 0, 0, 0);
+      for (let t = 0; t < 3; t += 0.05) system.update(0.05);
+      for (let t = 0; t < 60; t += 0.05) {
+        system.update(0.05);
+        expect(system.speed).toBeGreaterThanOrEqual(5);
+      }
+    });
   });
 });
