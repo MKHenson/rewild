@@ -150,6 +150,7 @@ export class Gizmo {
     opacity: number = 1.0
   ): GizmoPass {
     const material = new GizmoPass();
+    material.alwaysOnTop = true;
     material.gizmoUniforms.color = new Color(r, g, b);
     material.gizmoUniforms.opacity = opacity;
     return material;

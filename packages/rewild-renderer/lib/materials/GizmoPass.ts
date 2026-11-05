@@ -19,6 +19,7 @@ export class GizmoPass implements IMaterialPass {
   sharedUniformsTracker: SharedUniformsTracker;
   gizmoUniforms: GizmoUniforms;
   side: GPUFrontFace;
+  private _alwaysOnTop = false;
 
   constructor() {
     this.side = 'ccw';
@@ -30,6 +31,17 @@ export class GizmoPass implements IMaterialPass {
     this.perMeshTracker = new PerMeshTracker(this, () => [
       new ProjModelView(projectionIndex),
     ]);
+  }
+
+  /** Draws over anything in front of it rather than being hidden by it. */
+  get alwaysOnTop(): boolean {
+    return this._alwaysOnTop;
+  }
+
+  set alwaysOnTop(onTop: boolean) {
+    if (this._alwaysOnTop === onTop) return;
+    this._alwaysOnTop = onTop;
+    this.requiresRebuild = true;
   }
 
   init(renderer: Renderer): void {
@@ -100,8 +112,8 @@ export class GizmoPass implements IMaterialPass {
         frontFace: this.side,
       },
       depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
+        depthWriteEnabled: !this._alwaysOnTop,
+        depthCompare: this._alwaysOnTop ? 'always' : 'less',
         format: 'depth24plus',
       },
     });
