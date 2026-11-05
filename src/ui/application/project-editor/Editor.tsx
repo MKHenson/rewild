@@ -1,5 +1,6 @@
 import { Component, register } from 'rewild-ui';
 import { projectStore } from '../../stores/ProjectStore';
+import { sceneGraphStore } from '../../stores/SceneGraphStore';
 // import { gameManager } from 'src/core/GameManager';
 import { PaneManager } from './PaneManager';
 
@@ -21,6 +22,8 @@ export class Editor extends Component<Props> {
     };
 
     this.onCleanup = () => {
+      sceneGraphStore.setActiveContainer(null);
+      sceneGraphStore.setSelectedNode(null);
       (paneManager as PaneManager).dispose();
     };
 
