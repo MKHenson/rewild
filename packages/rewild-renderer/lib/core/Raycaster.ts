@@ -14,6 +14,8 @@ export class Raycaster implements IRaycaster {
   far: f32;
   camera: ICameraController | null;
   layers: Layers;
+  /** Also hits skinned meshes, by their bounds. For picking, not for surfaces. */
+  hitsSkinned = false;
 
   constructor(
     origin: Vector3 = new Vector3(),

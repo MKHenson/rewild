@@ -1,8 +1,9 @@
-import { Box3 } from 'rewild-common';
+import { Box3, Vector3 } from 'rewild-common';
 import { Renderer } from '../Renderer';
 import { Geometry } from '../geometry/Geometry';
 import { PoseStore } from '../renderers/skinning/PoseStore';
 import { isVisualComponent } from '../typeGuards';
+import { Intersection, Raycaster } from './Raycaster';
 import { SkinnedInstance } from './SkinnedInstance';
 import { SkinnedMesh } from './SkinnedMesh';
 import { Transform } from './Transform';
@@ -39,6 +40,53 @@ function fakeRenderer(model: ReturnType<typeof fakeModel>) {
   } as unknown as Renderer;
   return { renderer, released };
 }
+
+describe('SkinnedMesh raycast', () => {
+  function setup() {
+    const model = fakeModel(1);
+    model.localBounds.min.set(-1, -1, -1);
+    model.localBounds.max.set(1, 1, 1);
+    const chicken = new SkinnedInstance(
+      fakeRenderer(model).renderer,
+      'chicken'
+    );
+    chicken.transform.position.set(10, 0, 0);
+    chicken.transform.updateWorldMatrix(false, false);
+    const raycaster = new Raycaster(
+      new Vector3(10, 0, -5),
+      new Vector3(0, 0, 1)
+    );
+    return { mesh: chicken.meshes[0], chicken, raycaster };
+  }
+
+  it('is not hit by default, so surface probes pass through it', () => {
+    const { mesh, raycaster } = setup();
+    const hits: Intersection[] = [];
+    mesh.raycast(raycaster, hits);
+    expect(hits).toHaveLength(0);
+  });
+
+  it('hits its bounds where it stands when asked', () => {
+    const { mesh, chicken, raycaster } = setup();
+    raycaster.hitsSkinned = true;
+    const hits: Intersection[] = [];
+    mesh.raycast(raycaster, hits);
+
+    expect(hits).toHaveLength(1);
+    expect(hits[0].object).toBe(chicken.transform);
+    expect(hits[0].distance).toBeCloseTo(4);
+    expect(hits[0].point.x).toBeCloseTo(10);
+  });
+
+  it('misses a ray that passes beside it', () => {
+    const { mesh, raycaster } = setup();
+    raycaster.hitsSkinned = true;
+    raycaster.ray.origin.set(0, 0, -5);
+    const hits: Intersection[] = [];
+    mesh.raycast(raycaster, hits);
+    expect(hits).toHaveLength(0);
+  });
+});
 
 describe('SkinnedInstance', () => {
   it('puts a single primitive on its own transform as a visual component', () => {

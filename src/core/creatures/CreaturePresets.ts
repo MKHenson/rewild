@@ -127,17 +127,17 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
   tuna: {
     driver: 'clips',
     movement: {
-      walkSpeed: 0.8,
-      runSpeed: 1.6,
-      turnRate: 2,
+      walkSpeed: 1.6,
+      runSpeed: 3.2,
+      turnRate: 1.2,
       acceleration: 1.5,
-      cruiseSpeed: 0.5,
-      climbSpeed: 0.4,
+      cruiseSpeed: 1,
+      climbSpeed: 0.6,
       modes: {
-        wander: { radius: 8, wait: [0, 0], actions: [] },
+        wander: { radius: 15, wait: [0, 0], actions: [] },
       },
     },
-    habitat: [{ type: 'water', bedMargin: 0.2, surfaceMargin: 0.4 }],
+    habitat: [{ type: 'water', bedMargin: 0.4, surfaceMargin: 1 }],
   },
   crow: {
     driver: 'clips',
