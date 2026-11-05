@@ -12,6 +12,7 @@ import {
   Mesh,
   Renderer,
   SkinnedInstance,
+  SkinnedMesh,
   Sprite3D,
   Transform,
   loadActivity,
@@ -589,6 +590,7 @@ export class EditorViewport extends Component<Props> {
       if (
         intersection &&
         (intersection.object.component instanceof Mesh ||
+          intersection.object.component instanceof SkinnedMesh ||
           intersection.object.component instanceof Sprite3D)
       ) {
         let current: Transform | null = intersection.object;
@@ -917,6 +919,7 @@ export class EditorViewport extends Component<Props> {
 
     const get3DCoords = (clientX: i32, clientY: i32, targets?: Transform[]) => {
       const raycaster = createRaycaster(clientX, clientY);
+      raycaster.hitsSkinned = true;
       const intersects = raycaster.intersectObjects(
         targets ?? [this.renderer.scene],
         true
