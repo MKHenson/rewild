@@ -1,6 +1,11 @@
 import { Vector3 } from 'rewild-common';
 import { ICreatureAnimation } from 'models';
-import { SkinnedInstance, WaterQuerySample } from 'rewild-renderer';
+import {
+  SkinnedInstance,
+  WaterQuerySample,
+  getWaterTypeIndex,
+  resolveClimatePreset,
+} from 'rewild-renderer';
 import { StateMachine } from 'rewild-routing';
 import { CreaturePreset } from '../creatures/CreaturePresets';
 import { CreatureWorld, createHabitat } from '../creatures/Habitat';
@@ -45,6 +50,8 @@ export class Creature extends SkinnedAsset {
       sampleHeight: (x, z) => terrain.sampleHeight(x, z),
       sampleWater: (x, z, out: WaterQuerySample) =>
         terrain.waterQuery.sample(x, z, out),
+      waterTypeIndex: (name) =>
+        getWaterTypeIndex(resolveClimatePreset(terrain.climatePreset), name),
       playerPosition: (out: Vector3) => {
         if (!player?.asset) return false;
         out.copy(player.asset.transform.position);

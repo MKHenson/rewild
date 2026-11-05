@@ -25,9 +25,10 @@ Rows marked **Proposed** need a yes from Mat before work starts.
 | A creature is a template | A creature template names its model, its behaviours, its clip map and its locomotion sets. Placed and spawned creatures use the same template, so a chicken is a chicken in both cases                             |
 | Behaviours               | Each asset gets its own behaviour instances on load. A behaviour owns its state, for example Wander's target and timer. Each behaviour can save and restore its state as plain data                                |
 | Movement                 | Kinematic. The creature's habitat decides where it may be (see Habitats)                                                                                                                                           |
-| Habitat                  | Each template names its habitat: land, under water, water surface or air. The field is a list, but Sinew accepts one entry                                                                                         |
-| Air                      | Airborne only. Birds stay inside a height band and roll into turns. Take-off, landing and perching come later                                                                                                      |
-| Medium transitions       | Out of scope. A land animal that swims, a bird that lands, a duck that walks into a pond: these are one problem, solved later for all of them                                                                      |
+| Habitat                  | Each template names its habitat: land, water or air. The field is a list, but Sinew accepts one entry                                                                                                              |
+| Air                      | Birds always fly, wherever they are placed. They stay inside a height band and roll into turns. Take-off, landing and perching come later                                                                          |
+| Wrong medium             | A land or water creature in the wrong medium falls to the ground, plays `idle` and stays still                                                                                                                     |
+| Medium transitions       | Out of scope. A land animal that swims, a bird that lands, a fish that flops, a duck that walks into a pond: these are one problem, solved later for all of them (see Next: medium transitions)                    |
 | Basic behaviours         | Wander, Chase and Flee. Flee is Chase reversed                                                                                                                                                                     |
 | Movement and actions     | Behaviours set movement (a target, a speed and a turn rate) and the locomotion set. They never play locomotion clips. They play and stop action clips by meaning, for example `eat`                                |
 | Clip names               | Clips are named by meaning: `idle`, `walk`, `run`, `eat`. A template maps a meaning to a clip only where the names differ                                                                                          |
@@ -186,30 +187,38 @@ One check answers "can this creature be at this point?". Three things use it:
 - **Wander.** Is this a valid target?
 - **Each step.** Is the next position still valid? A deer stops at the shore and does not walk into the lake.
 
-| Habitat       | Rules                                                                                                | Data                                                    |
-| ------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Land          | Dry ground, or water no deeper than a wade depth. Slope under a limit                                | The heightfield, `WaterQuery` depth                     |
-| Under water   | A depth range. A margin above the bed and below the surface. Allowed water types (lake, ocean, tarn) | `WaterQuery`: `ground`, `level`, `depth`, `typeWeights` |
-| Water surface | Sits on the surface. Allowed water types                                                             | `WaterQuery`: `level`, and waves for near creatures     |
-| Air           | A height band above the ground or the water. Look ahead along the path and climb before a hill       | The heightfield, `WaterQuery` level                     |
+Water and air habitats also give the heights a creature may be at over a point. Wander picks a level inside that range with each target.
+
+| Habitat | Rules                                                                                          | Data                                                    |
+| ------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Land    | Dry ground, or water no deeper than a wade depth. Slope under a limit                          | The heightfield, `WaterQuery` depth                     |
+| Water   | A margin above the bed and below the surface. Allowed water types (lake, ocean)                | `WaterQuery`: `ground`, `level`, `typeWeights`          |
+| Air     | A height band above the ground or the water. Look ahead along the path and climb before a hill | The heightfield, `WaterQuery` level                     |
+
+### Gravity and the wrong medium
+
+- Land and water creatures fall. A chicken placed above the ground falls to it, and a fish placed above a lake falls into it.
+- A creature in the wrong medium is stranded: a land creature in deep water, or a fish on land or in water too shallow for its margins. It falls to the ground, plays `idle` and does not move until the medium under it changes.
+- A land creature on a slope past its limit is not stranded. It walks freely until it is back in its habitat.
+- Birds never fall and are never stranded.
 
 ### Water
 
 - `WaterQuery` has the map data now, with no delay.
-- Wave height comes from the GPU probe. It has 32 points (`PROBE_POINTS`) and reports a few frames late. Surface creatures use the rest level. Only the closest few get a probe point for real wave bob.
+- A fish keeps moving at its `cruiseSpeed`, and turns back at the shore.
 - The test fish in Sinew moves with a swim clip. Its body motion becomes procedural in Shoal, and its habitat rules stay the same.
 
 ### Air
 
-- A bird flies at a height inside its band. Wander picks targets in three dimensions.
-- A bird's locomotion set has `glide` and `flap`. The controller blends them from the climb rate and the speed.
+- A bird flies at a height inside its band, and rises to it if placed below it. Wander picks each point further round home, so the bird circles.
+- A bird's locomotion set has `glide` and `flap` in its walk and run slots. Climbing adds to the speed the controller blends by, so the bird flaps as it climbs. `glide` can also fill `idle`, and then plays at its glide speed.
 - The root rolls into turns from the turn rate. This is a root transform, not a procedural layer.
 
 ---
 
 ## Placement and spawning
 
-- **Placed.** The creator places a creature like any asset. Its placement is its home. The editor warns when the home is outside the habitat, for example a deer placed in a lake. Placements save with the level today, so this needs no new storage.
+- **Placed.** The creator places a creature like any asset, anywhere. Its placement is its home. Placements save with the level today, so this needs no new storage.
 - **Spawned.** A spawn rule says which creatures appear in which biome, and how many. Like scatter, the seed and the chunk decide each spawn, so the same chunk gives the same chickens every time. A spawn point must pass the habitat check. Air creatures spawn inside their band. Creatures spawn inside a radius of the player and despawn outside it.
 
 A spawned creature gets a stable id from its chunk and its index. A later save can find it again by that id.
@@ -259,7 +268,7 @@ Go in this order, and move to the next step only when scene stats show the need:
 - AI: needs, memory, perception past a radius, path finding round obstacles.
 - Procedural locomotion (see Next: procedural locomotion).
 - Group steering: herds, flocks and fish schools that steer as one. Herds can spawn as a group (see Herd spawning).
-- Medium transitions: take-off, landing and perching, land animals that swim, and creatures with more than one habitat.
+- Medium transitions: take-off, landing and perching, land animals that swim, fish that flop, and creatures with more than one habitat (see Next: medium transitions).
 - Ragdoll, blend trees, root motion.
 - Actions on part of the body only (bone masks), and additive clips.
 - Saving runtime state (see Saving).
@@ -302,13 +311,26 @@ Other motions sit on top of the wave:
 ### Also later
 
 - **Fish collectives.** Fish move as schools, and swimming gets more work than Sinew gives it.
-- **Medium transitions.** Birds take off, land and perch. Land animals swim. Ducks and frogs use more than one habitat. Each needs an approach check, a blend between heights and a clip change, so one system serves all of them. Sinew's `habitat` list leaves room for this.
+
+---
+
+## Next: medium transitions
+
+A later milestone replaces the stranded state with real behaviour in each medium. Each needs an approach check, a blend between heights and a clip change, so one system serves all of them. Sinew's `habitat` list leaves room for this.
+
+| Case                    | Direction                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------- |
+| Land creatures on water | Float on the surface with a `swim` set. A flag lets some dive under it. Near ones bob on real waves |
+| Birds on land           | Land, walk and perch. Take off again                                                              |
+| Birds on water          | Land on the surface, float with a `swim` set, and take off. This also gives us ducks              |
+| Fish on land            | Flop with a `flop` set                                                                            |
+| Moving between media    | Creatures choose to cross a shore. Ducks and frogs use more than one habitat                      |
 
 ---
 
 ## Answered questions
 
-- **Test assets.** Mat makes them in Blender: a chicken, a quadruped, a bird and a fish, with clips.
+- **Test assets.** Mat provides them: a chicken, a quadruped, a bird and a fish, with clips. The fish is `tuna.glb` and the bird is `crow.glb`.
 - **Spawn caps.** Spawn rules work like scatter rules today. There is no cap for each project.
 
 ---
@@ -349,8 +371,8 @@ Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect
 
 - [ ] **7. Water and air habitats**
 
-  - Scope: the under water, water surface and air habitats. Probe points for the closest surface creatures. Wander in three dimensions for air and water. Root roll into turns. The editor warning for a home outside the habitat.
-  - Expect: a fish stays in its lake between the bed and the surface. A bird circles inside its band and climbs before a hill. A surface creature bobs on waves near the player.
+  - Scope: the water and air habitats. Gravity for land and water creatures, and the stranded state. Wander in three dimensions for air and water. Root roll into turns.
+  - Expect: a fish stays in its lake between the bed and the surface. A fish on land falls to the ground, plays `idle` and stays still. A bird circles inside its band and climbs before a hill, wherever it is placed.
 
 - [ ] **8. Look-at layer**
 

@@ -94,6 +94,14 @@
         {
           "name": "Chicken",
           "templateId": "chicken"
+        },
+        {
+          "name": "Tuna",
+          "templateId": "tuna"
+        },
+        {
+          "name": "Crow",
+          "templateId": "crow"
         }
       ]
     },
