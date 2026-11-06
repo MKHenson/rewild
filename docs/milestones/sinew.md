@@ -99,6 +99,9 @@ Each layer has a weight from 0 to 1. A weight of 0 skips the layer and costs not
 - Limit yaw and pitch. Out of range, the creature looks forward again.
 - Smooth the change, so the head turns and does not snap.
 
+**Code.** `LookAtLayer` is the renderer's half. Each model has one, with one chain from the template's `bones.lookAt`, parent first. The last bone takes half the turn and the others split the rest evenly. Each slot keeps its yaw, pitch and weight in a flat array beside its pose, and they move with it on swap-remove. The layer turns the chain on top of the clips in model space, where forward is +Z, so a pecking chicken still pecks. A slot with no clip playing is skipped, since nothing rewrites its pose.
+
+`HeadLook` is the game's half. It reads the player's position, applies the preset's `lookAt` radius and limits, and eases the angles and the weight. The aim starts from the head's rest position, so a clip that moves the head does not move the aim. In game, `CreatureBehaviour` updates it each frame after movement. A creature whose template or preset leaves out look-at follows its clips only.
 ### Foot IK
 
 - Two-bone analytic IK for each leg.
@@ -119,7 +122,7 @@ A creature template adds to the asset template:
 - `locomotion`: named sets of locomotion clips. `normal` is the default. A missing entry in another set falls back to `normal`.
 - `clipSpeeds`: the natural ground speed of each locomotion clip, in m/s, keyed by meaning. A set's clip falls back to the speed of the slot it fills, for example `limp` to `walk`, then to 1 m/s for walk and 3 m/s for run.
 - `idleActions`: the meanings idle variety picks from.
-- `bones`: the bone names for look-at and IK.
+- `bones`: the bone names for look-at and IK. `bones.lookAt` lists the neck bones then the head, parent first.
 - `driver`: the locomotion driver. Sinew has only `clips`.
 - `movement`: top speed and turn rate.
 - `habitat`: a list with one entry in Sinew, and that habitat's limits (see Habitats).
@@ -326,6 +329,18 @@ A later milestone replaces the stranded state with real behaviour in each medium
 | Birds on water          | Land on the surface, float with a `swim` set, and take off. This also gives us ducks              |
 | Fish on land            | Flop with a `flop` set                                                                            |
 | Moving between media    | Creatures choose to cross a shore. Ducks and frogs use more than one habitat                      |
+
+---
+
+## Next: interest
+
+A later milestone gives a creature one interest: what it is paying attention to. It can be a point, the player, a butterfly, prey or a boulder. Sinew's look-at only knows the player.
+
+- **Choosing.** Something weighs the candidates and decides when the creature gets bored. This belongs with perception in the mind milestone.
+- **Sharing.** The head and movement use the same interest, so a fox's eyes and legs agree on its prey. `Seek` reads the player directly today.
+- **Moving targets.** An interest holds a stable handle and copes with its target despawning. It saves as a stable id.
+
+`HeadLook` and `Seek` then read the interest in place of the player. `LookAtLayer` does not change, since it only takes angles.
 
 ---
 

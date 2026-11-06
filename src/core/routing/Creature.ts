@@ -9,6 +9,7 @@ import {
 import { StateMachine } from 'rewild-routing';
 import { CreaturePreset } from '../creatures/CreaturePresets';
 import { CreatureWorld, createHabitat } from '../creatures/Habitat';
+import { HeadLook } from '../creatures/HeadLook';
 import { IMovementMode, MovementSystem } from '../creatures/MovementSystem';
 import { Seek } from '../creatures/modes/Seek';
 import { Wander } from '../creatures/modes/Wander';
@@ -23,6 +24,9 @@ import { StateMachineData } from './Types';
 export class Creature extends SkinnedAsset {
   readonly preset: CreaturePreset;
   movement: MovementSystem | null = null;
+  headLook: HeadLook | null = null;
+
+  private readonly hasLookChain: boolean;
 
   constructor(
     skinned: SkinnedInstance,
@@ -31,6 +35,10 @@ export class Creature extends SkinnedAsset {
   ) {
     super(skinned, animation);
     this.preset = preset;
+
+    const chain = animation.bones?.lookAt;
+    this.hasLookChain = !!chain && !!preset.lookAt;
+    if (chain && preset.lookAt) skinned.setLookChain(chain);
   }
 
   mount(): void {
@@ -39,14 +47,24 @@ export class Creature extends SkinnedAsset {
     const data = sm?.data;
     if (!data?.gameManager) return;
 
-    if (!this.movement) this.movement = this.createMovement(data);
+    if (!this.movement) {
+      const world = this.createWorld(data);
+      this.movement = this.createMovement(world);
+      if (this.hasLookChain)
+        this.headLook = new HeadLook(
+          this.preset.lookAt!,
+          this.skinned,
+          this.transform,
+          world
+        );
+    }
     this.movement.placeAt(this.initialPosition, this.initialRotation);
   }
 
-  private createMovement(data: StateMachineData): MovementSystem {
+  private createWorld(data: StateMachineData): CreatureWorld {
     const terrain = data.renderer.terrainRenderer;
     const player = data.player;
-    const world: CreatureWorld = {
+    return {
       sampleHeight: (x, z) => terrain.sampleHeight(x, z),
       sampleWater: (x, z, out: WaterQuerySample) =>
         terrain.waterQuery.sample(x, z, out),
@@ -58,7 +76,9 @@ export class Creature extends SkinnedAsset {
         return true;
       },
     };
+  }
 
+  private createMovement(world: CreatureWorld): MovementSystem {
     const { movement, habitat } = this.preset;
     const radius = this.buildObjectFromProperties()?.radius;
     const modes: IMovementMode[] = [];

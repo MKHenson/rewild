@@ -253,6 +253,11 @@ declare module 'models' {
     clipSpeeds?: { [meaning: string]: number };
     /** Meanings played now and then while the creature stands still. */
     idleActions?: string[];
+    /** Bone names for procedural layers. */
+    bones?: {
+      /** The neck bones then the head, parent first. */
+      lookAt?: string[];
+    };
   }
 
   export interface ITemplateItemBase extends ICreatureAnimation {

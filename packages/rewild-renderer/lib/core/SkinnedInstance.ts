@@ -1,3 +1,4 @@
+import { Vector3 } from 'rewild-common';
 import { Renderer } from '../Renderer';
 import { SkinnedModel } from '../renderers/skinning/SkinnedModel';
 import { SkinnedMesh } from './SkinnedMesh';
@@ -95,6 +96,24 @@ export class SkinnedInstance {
 
   clipWeight(clip: string): number {
     return this.model.player.weightOf(this.handle, clip);
+  }
+
+  /** Names the bones look-at turns, parent first. One chain per model. */
+  setLookChain(bones: string[]): void {
+    this.model.lookAt.setChain(bones);
+  }
+
+  /** The chain's last bone in the rest pose, in model space. Do not change. */
+  get lookOrigin(): Vector3 {
+    return this.model.lookAt.origin;
+  }
+
+  /**
+   * Turns the look-at chain over the clips, in radians from model forward.
+   * Positive yaw turns toward +X and positive pitch turns up. Weight 0 skips it.
+   */
+  setLook(yaw: number, pitch: number, weight: number): void {
+    this.model.lookAt.set(this.slot, yaw, pitch, weight);
   }
 
   get visible(): boolean {

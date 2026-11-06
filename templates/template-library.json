@@ -132,6 +132,14 @@
       "clips": { "idle": "Idle2", "eat": "Idle", "rest": "IdleLay" },
       "locomotion": { "flee": { "run": "RunAngry" } },
       "clipSpeeds": { "walk": 0.6, "run": 2.5 },
+      "bones": {
+        "lookAt": [
+          "CHICKEN_-Neck",
+          "CHICKEN_-Neck1",
+          "CHICKEN_-Neck2",
+          "CHICKEN_-Head"
+        ]
+      },
       "resource": {
         "geometryId": "chicken-01"
       }

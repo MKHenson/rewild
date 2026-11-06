@@ -5,6 +5,7 @@ import { Geometry } from '../../geometry/Geometry';
 import { SkinnedInstancedPass } from '../../materials/SkinnedInstancedPass';
 import { createStandardPass } from '../../managers/MaterialManager';
 import { ClipPlayer } from './ClipPlayer';
+import { LookAtLayer } from './LookAtLayer';
 import { PoseStore } from './PoseStore';
 
 const MATRIX_BYTES = 64;
@@ -24,6 +25,7 @@ export interface SkinnedPrimitive {
 export class SkinnedModel {
   readonly poses: PoseStore;
   readonly player: ClipPlayer;
+  readonly lookAt: LookAtLayer;
   readonly primitives: SkinnedPrimitive[] = [];
   /** Local bounds that hold the model however its joints bend: a cube of the
    *  bind pose's radius about the origin. */
@@ -44,6 +46,7 @@ export class SkinnedModel {
 
     this.poses = new PoseStore(model.skeleton);
     this.player = new ClipPlayer(this.poses, model.clips);
+    this.lookAt = new LookAtLayer(this.poses, this.player);
 
     const r = reach(skinned);
     this.localBounds.min.set(-r, -r, -r);
@@ -54,6 +57,12 @@ export class SkinnedModel {
         geometry: primitive.geometry,
         pass: skinnedPass(renderer, primitive, this),
       });
+  }
+
+  /** Builds every working pose: clips first, then procedural layers. */
+  update(dt: number): void {
+    this.player.update(dt);
+    this.lookAt.apply();
   }
 
   /** Rebuilds changed joint matrices and uploads them. False while empty. */
