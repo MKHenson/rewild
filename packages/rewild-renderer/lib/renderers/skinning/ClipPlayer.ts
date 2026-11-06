@@ -114,6 +114,14 @@ export class ClipPlayer implements PoseSlotData {
     return layer < 0 ? 0 : this.weight[layer];
   }
 
+  /** Whether the slot has a clip, so `update` rewrites its pose each frame. */
+  isPlaying(slot: number): boolean {
+    const base = slot * MAX_LAYERS;
+    for (let i = base; i < base + MAX_LAYERS; i++)
+      if (this.clip[i] !== NO_CLIP) return true;
+    return false;
+  }
+
   /** Advances every layer by `dt` seconds and writes the blended poses. */
   update(dt: number): void {
     const { poses, clip, time, rate, weight, target, fadeSpeed } = this;
