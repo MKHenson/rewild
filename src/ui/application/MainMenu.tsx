@@ -39,12 +39,12 @@ export class MainMenu extends Component<Props> {
           }>
           <div class="tag-line">
             <Typography variant="light">
-              Welcome to rewild. A game about exploration, natural history and
-              saving the planet
+              Welcome to rewild. A game about exploration, natural history
             </Typography>
-            <InfoBox variant="warning" title="Attention">
-              New Game plays Story Mode. You can also build your own experience
-              in the editor and play it from there
+            <InfoBox variant="warning" title="Getting started">
+              Rewild is still being built, so expect things to change and
+              sometimes break. Start a New Game to play Story Mode or a game
+              you've made, or open the Editor to build your own.
             </InfoBox>
           </div>
           {authStore.loading ? (
@@ -54,18 +54,19 @@ export class MainMenu extends Component<Props> {
           ) : (
             <div class="styled-buttons">
               <Button onClick={props.onStart} fullWidth>
+                <Icon size="s" icon="play" />
                 <span>New Game</span>
               </Button>
-              <Button onClick={props.onOptions} fullWidth>
+              <Button variant="glass" onClick={props.onOptions} fullWidth>
                 <Icon size="s" icon="settings" />
                 <span>Options</span>
               </Button>
-              <Button onClick={props.onEditor} fullWidth>
+              <Button variant="glass" onClick={props.onEditor} fullWidth>
                 <Icon size="s" icon="wrench" />
                 <span>Editor</span>
               </Button>
               {authStore.isSuperAdmin ? (
-                <Button onClick={props.onAdmin} fullWidth>
+                <Button variant="glass" onClick={props.onAdmin} fullWidth>
                   <Icon size="s" icon="shield" />
                   <span>Administration</span>
                 </Button>
@@ -79,8 +80,28 @@ export class MainMenu extends Component<Props> {
 
   getStyle() {
     return css`
-      .styled-buttons x-button {
+      .styled-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
         margin: 1rem 0 0 0;
+      }
+
+      /* Menu buttons lift and brighten under the cursor. The press still lands
+         instantly, so transitions stop while it is held. */
+      .styled-buttons x-button {
+        transition: background-color 0.15s ease, box-shadow 0.15s ease,
+          color 0.15s ease, border-color 0.15s ease, transform 0.15s ease,
+          filter 0.15s ease;
+      }
+      .styled-buttons x-button:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.08);
+      }
+      .styled-buttons x-button:active {
+        transform: translateY(1px);
+        filter: none;
+        transition-duration: 0s;
       }
 
       x-icon {

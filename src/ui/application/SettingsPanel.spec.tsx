@@ -242,20 +242,20 @@ describe('SettingsPanel', () => {
       return tab.querySelector('x-select') as Select;
     };
 
-    it('shows light when no theme is stored', () => {
+    it('shows dark when no theme is stored', () => {
       const { panel } = createPanel();
 
-      expect(themeSelectOf(panel).props.value).toBe('light');
+      expect(themeSelectOf(panel).props.value).toBe('dark');
     });
 
     it('applies and stores a theme as it changes, without Apply', async () => {
       const { panel } = createPanel();
 
-      await change(themeSelectOf(panel), 'dark');
+      await change(themeSelectOf(panel), 'light');
 
-      expect(document.documentElement.dataset.theme).toBe('dark');
-      expect(localStorage.getItem('rewild.ui.theme')).toBe('dark');
-      expect(themeSelectOf(panel).props.value).toBe('dark');
+      expect(document.documentElement.dataset.theme).toBe('light');
+      expect(localStorage.getItem('rewild.ui.theme')).toBe('light');
+      expect(themeSelectOf(panel).props.value).toBe('light');
     });
   });
 });

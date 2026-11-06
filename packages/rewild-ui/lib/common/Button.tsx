@@ -1,7 +1,12 @@
 import { Component, register } from '../Component';
 import { theme } from '../theme';
 
-export type ButtonVariant = 'contained' | 'outlined' | 'text' | 'ghost';
+export type ButtonVariant =
+  | 'contained'
+  | 'outlined'
+  | 'text'
+  | 'ghost'
+  | 'glass';
 export type ButtonColor = 'primary' | 'secondary' | 'error';
 export type ButtonSize = 's' | 'm';
 
@@ -123,16 +128,20 @@ const StyledButtons = cssStylesheet(css`
   }
   /* Two soft layers offset straight down — a contact shadow plus a wider
      ambient one. The old single 2px/2px offset shadow fell to the right, which
-     reads as a sticker rather than as height. */
+     reads as a sticker rather than as height. The inset line is light catching
+     the top edge, the same as on a glass modal. */
   :host(.contained) {
-    box-shadow: 0 1px 2px rgb(0 0 0 / 12%), 0 1px 3px rgb(0 0 0 / 8%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%),
+      0 1px 2px rgb(0 0 0 / 12%), 0 1px 3px rgb(0 0 0 / 8%);
   }
   :host(.contained):hover {
-    box-shadow: 0 2px 4px rgb(0 0 0 / 14%), 0 4px 8px rgb(0 0 0 / 8%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 22%),
+      0 2px 4px rgb(0 0 0 / 14%), 0 4px 8px rgb(0 0 0 / 8%);
   }
   /* Pressed sits back down on the surface. */
   :host(.contained):active {
-    box-shadow: 0 1px 2px rgb(0 0 0 / 14%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%),
+      0 1px 2px rgb(0 0 0 / 14%);
   }
   :host(.contained.primary) {
     background: ${theme?.colors.primary400};
@@ -221,6 +230,22 @@ const StyledButtons = cssStylesheet(css`
   }
   :host(.ghost:active) {
     background: color-mix(in srgb, currentColor 14%, transparent);
+  }
+
+  /* Glass — a translucent tint with the glass edge, for secondary actions on a
+     glass surface. The tint is the text colour, so it lightens dark glass and
+     darkens light glass. */
+  :host(.glass) {
+    background: color-mix(in srgb, ${theme?.colors.onSurface} 8%, transparent);
+    border-color: ${theme?.colors.glassEdge};
+    color: ${theme?.colors.onSurface};
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 8%);
+  }
+  :host(.glass:hover) {
+    background: color-mix(in srgb, ${theme?.colors.onSurface} 14%, transparent);
+  }
+  :host(.glass:active) {
+    background: color-mix(in srgb, ${theme?.colors.onSurface} 20%, transparent);
   }
 
   /* Selected (toggle) — last so it wins over the hover rules above at equal

@@ -5,15 +5,16 @@ export const UI_THEMES: UiTheme[] = ['light', 'dark', 'system'];
 
 const STORAGE_KEY = 'rewild.ui.theme';
 // Null where matchMedia is missing (jsdom), so `system` resolves to light there.
+const DEFAULT_THEME: UiTheme = 'dark';
 const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)') ?? null;
 
-/** The stored choice, or `light` when nothing is stored. */
+/** The stored choice, or dark when nothing is stored. */
 export function getUiTheme(): UiTheme {
   try {
     const value = localStorage.getItem(STORAGE_KEY);
-    return UI_THEMES.includes(value as UiTheme) ? (value as UiTheme) : 'light';
+    return UI_THEMES.includes(value as UiTheme) ? (value as UiTheme) : DEFAULT_THEME;
   } catch {
-    return 'light';
+    return DEFAULT_THEME;
   }
 }
 
