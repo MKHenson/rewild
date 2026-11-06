@@ -87,10 +87,24 @@ export interface MovementSettings {
   };
 }
 
+/** How a creature's head follows the player. */
+export interface LookAtSettings {
+  /** Metres from the player at which it looks. */
+  radius: number;
+  /** Radians left or right of forward. Past this it looks forward again. */
+  yawLimit: number;
+  /** Radians above or below forward. Past this it looks forward again. */
+  pitchLimit: number;
+  /** Seconds the head takes to settle on a new direction. */
+  smoothing: number;
+}
+
 /** A creature's settings. A template names one with `preset`. */
 export interface CreaturePreset {
   driver: 'clips';
   movement: MovementSettings;
+  /** Needs the template's `bones.lookAt`. Left out, the head follows clips. */
+  lookAt?: LookAtSettings;
   /** One entry in Sinew. */
   habitat: HabitatSettings[];
 }
@@ -116,6 +130,7 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
         evade: { radius: 5, release: 8, locomotion: 'flee' },
       },
     },
+    lookAt: { radius: 12, yawLimit: 1.75, pitchLimit: 0.9, smoothing: 0.18 },
     habitat: [
       {
         type: 'land',

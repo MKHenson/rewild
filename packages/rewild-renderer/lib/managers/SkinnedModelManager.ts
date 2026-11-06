@@ -28,9 +28,9 @@ export class SkinnedModelManager {
     this.models.delete(modelId);
   }
 
-  /** Advances every model's clips by `dt` seconds. */
+  /** Builds every model's working poses, `dt` seconds on. */
   update(dt: number): void {
-    for (const model of this.models.values()) model.player.update(dt);
+    for (const model of this.models.values()) model.update(dt);
   }
 
   get(modelId: string): SkinnedModel | undefined {
