@@ -257,6 +257,9 @@ declare module 'models' {
     bones?: {
       /** The neck bones then the head, parent first. */
       lookAt?: string[];
+      /** Each leg for foot IK, parent first: the upper and lower bones it
+       *  bends, the bone they carry, then optionally down to the foot. */
+      legs?: string[][];
     };
   }
 

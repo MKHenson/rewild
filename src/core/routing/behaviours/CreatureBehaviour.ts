@@ -32,6 +32,7 @@ export class CreatureBehaviour implements IBehaviour {
       creature.transform.updateWorldMatrix(false, false);
       creature.animator.climb = movement.climb;
       creature.headLook?.update(delta);
+      creature.footPlant?.update(delta);
 
       if (sceneBVH) {
         const meshes = creature.skinned.meshes;

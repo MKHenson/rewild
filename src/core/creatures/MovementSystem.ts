@@ -29,6 +29,8 @@ export interface IMovementMode {
 export const ARRIVE_DISTANCE = 0.3;
 /** Turns tried, in radians, when the step ahead leaves the habitat. */
 export const DETOUR_ANGLES = [Math.PI / 4, Math.PI / 2];
+/** Metres ahead checked for leaving the habitat, at the least. */
+const PROBE_DISTANCE = 0.5;
 /** The stable id movement modes save in place of the player. */
 export const PLAYER_ID = 'player';
 /** m/s². */
@@ -245,8 +247,13 @@ export class MovementSystem {
     const arrive = Math.max(ARRIVE_DISTANCE, cruise / settings.turnRate);
 
     let target = 0;
+    let desired = this.heading;
+    this.blocked = false;
     if (distance > arrive && this.goalSpeed > 0) {
-      const desired = Math.atan2(dx, dz);
+      desired = this.clearDirection(
+        Math.atan2(dx, dz),
+        Math.max(this.speed * dt, PROBE_DISTANCE)
+      );
       this.heading = turnToward(this.heading, desired, settings.turnRate * dt);
       const facing = Math.cos(wrapAngle(desired - this.heading));
       target = Math.min(
@@ -262,7 +269,8 @@ export class MovementSystem {
         ? Math.min(target, this.speed + change)
         : Math.max(target, this.speed - change);
 
-    if (this.speed > 0) this.move(this.speed * dt, dt);
+    if (this.blocked) this.speed = 0;
+    else if (this.speed > 0) this.move(this.speed * dt, desired);
 
     this.updateRoll(before, dt);
     this.updateHeight(dt);
@@ -336,42 +344,56 @@ export class MovementSystem {
     }
   }
 
-  /** Steps along the heading, or the nearest detour inside the habitat. */
-  private move(distance: number, dt: number): void {
-    this.blocked = false;
-
+  /**
+   * The direction to the goal, or the nearest detour from it whose step stays
+   * inside the habitat. A moving creature takes no detour that turns it back,
+   * since that only paces at the point nearest the goal. Sets `blocked` and
+   * keeps the heading when nothing is left.
+   */
+  private clearDirection(toGoal: number, probe: number): number {
     // A creature outside its habitat walks freely, so it can find its way back.
+    if (!this.habitat.canBe(this.x, this.z)) return toGoal;
+    if (this.canStep(toGoal, probe)) return toGoal;
+
+    const moving = this.speed > 0;
+    for (let i = 0; i < DETOUR_ANGLES.length; i++)
+      for (let side = 0; side < 2; side++) {
+        const sign = side === 0 ? this.detourSign : -this.detourSign;
+        const direction = toGoal + DETOUR_ANGLES[i] * sign;
+        if (moving && Math.cos(direction - this.heading) < 0) continue;
+        if (!this.canStep(direction, probe)) continue;
+        this.detourSign = sign;
+        return direction;
+      }
+
+    this.blocked = true;
+    return this.heading;
+  }
+
+  /** Steps along the heading, or along `desired` while still turning to it. */
+  private move(distance: number, desired: number): void {
     if (!this.habitat.canBe(this.x, this.z)) {
       this.x += Math.sin(this.heading) * distance;
       this.z += Math.cos(this.heading) * distance;
       return;
     }
     if (this.tryStep(this.heading, distance)) return;
-
-    for (let i = 0; i < DETOUR_ANGLES.length; i++)
-      for (let side = 0; side < 2; side++) {
-        const sign = side === 0 ? this.detourSign : -this.detourSign;
-        const direction = this.heading + DETOUR_ANGLES[i] * sign;
-        if (!this.tryStep(direction, distance)) continue;
-        this.detourSign = sign;
-        this.heading = turnToward(
-          this.heading,
-          direction,
-          this.settings.turnRate * dt
-        );
-        return;
-      }
-
+    if (this.tryStep(desired, distance)) return;
     this.speed = 0;
     this.blocked = true;
   }
 
+  private canStep(direction: number, distance: number): boolean {
+    return this.habitat.canBe(
+      this.x + Math.sin(direction) * distance,
+      this.z + Math.cos(direction) * distance
+    );
+  }
+
   private tryStep(direction: number, distance: number): boolean {
-    const x = this.x + Math.sin(direction) * distance;
-    const z = this.z + Math.cos(direction) * distance;
-    if (!this.habitat.canBe(x, z)) return false;
-    this.x = x;
-    this.z = z;
+    if (!this.canStep(direction, distance)) return false;
+    this.x += Math.sin(direction) * distance;
+    this.z += Math.cos(direction) * distance;
     return true;
   }
 }

@@ -165,6 +165,44 @@
       }
     },
     {
+      "name": "lioness",
+      "type": "asset",
+      "preset": "lioness",
+      "clips": {
+        "idle": "Idle_Breathing",
+        "walk": "WalkMedium_F",
+        "run": "RunFast_F"
+      },
+      "clipSpeeds": { "walk": 0.78, "run": 11.5 },
+      "bones": {
+        "lookAt": ["Neck1", "Neck2", "Neck3", "Head"]
+      },
+      "resource": {
+        "geometryId": "lioness"
+      }
+    },
+    {
+      "name": "trex",
+      "type": "asset",
+      "preset": "trex",
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "run": "walk"
+      },
+      "clipSpeeds": { "walk": 6.6 },
+      "bones": {
+        "lookAt": ["Spine-4", "Spine-5", "Head"],
+        "legs": [
+          ["Femur.L", "Tibia.L", "Metatarsal.L", "Foot.L"],
+          ["Femur.R", "Tibia.R", "Metatarsal.R", "Foot.R"]
+        ]
+      },
+      "resource": {
+        "geometryId": "trex"
+      }
+    },
+    {
       "name": "point-light",
       "type": "light",
       "resource": {

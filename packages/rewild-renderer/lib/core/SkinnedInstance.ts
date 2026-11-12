@@ -116,6 +116,46 @@ export class SkinnedInstance {
     this.model.lookAt.set(this.slot, yaw, pitch, weight);
   }
 
+  /**
+   * Names each leg's bones for foot IK, parent first: upper, lower, the bone
+   * they carry, then optionally down to the foot. One set per model.
+   */
+  setLegs(legs: string[][]): void {
+    this.model.footIK.setLegs(legs);
+  }
+
+  get footCount(): number {
+    return this.model.footIK.legCount;
+  }
+
+  /** A leg's upper plus lower bone length at rest, in model space. */
+  legReach(leg: number): number {
+    return this.model.footIK.legReach(leg);
+  }
+
+  /** The clip's foot position in model space before IK, as of the last frame IK ran. */
+  footPosition(leg: number, out: Vector3): Vector3 {
+    return this.model.footIK.footPosition(this.slot, leg, out);
+  }
+
+  /** Moves a foot up, or down when negative, in model space. */
+  setFootOffset(leg: number, offset: number): void {
+    this.model.footIK.setOffset(this.slot, leg, offset);
+  }
+
+  /** Scales every foot offset. Weight 0 skips foot IK. */
+  setFootWeight(weight: number): void {
+    this.model.footIK.setWeight(this.slot, weight);
+  }
+
+  /**
+   * Part of the slope through the feet the body follows, along it and across
+   * it, from 0 to 1. Only used with three or more legs.
+   */
+  setBodyTilt(pitch: number, roll: number): void {
+    this.model.footIK.setTilt(this.slot, pitch, roll);
+  }
+
   get visible(): boolean {
     return this.meshes[0].visible;
   }

@@ -8,6 +8,7 @@ import {
 } from 'rewild-renderer';
 import { StateMachine } from 'rewild-routing';
 import { CreaturePreset } from '../creatures/CreaturePresets';
+import { FootPlant } from '../creatures/FootPlant';
 import { CreatureWorld, createHabitat } from '../creatures/Habitat';
 import { HeadLook } from '../creatures/HeadLook';
 import { IMovementMode, MovementSystem } from '../creatures/MovementSystem';
@@ -25,8 +26,10 @@ export class Creature extends SkinnedAsset {
   readonly preset: CreaturePreset;
   movement: MovementSystem | null = null;
   headLook: HeadLook | null = null;
+  footPlant: FootPlant | null = null;
 
   private readonly hasLookChain: boolean;
+  private readonly hasLegs: boolean;
 
   constructor(
     skinned: SkinnedInstance,
@@ -39,6 +42,10 @@ export class Creature extends SkinnedAsset {
     const chain = animation.bones?.lookAt;
     this.hasLookChain = !!chain && !!preset.lookAt;
     if (chain && preset.lookAt) skinned.setLookChain(chain);
+
+    const legs = animation.bones?.legs;
+    this.hasLegs = !!legs && !!preset.footIK;
+    if (legs && preset.footIK) skinned.setLegs(legs);
   }
 
   mount(): void {
@@ -53,6 +60,13 @@ export class Creature extends SkinnedAsset {
       if (this.hasLookChain)
         this.headLook = new HeadLook(
           this.preset.lookAt!,
+          this.skinned,
+          this.transform,
+          world
+        );
+      if (this.hasLegs)
+        this.footPlant = new FootPlant(
+          this.preset.footIK!,
           this.skinned,
           this.transform,
           world

@@ -97,17 +97,36 @@ describe('MovementSystem', () => {
     expect(system.y).toBeCloseTo(system.x * 0.5);
   });
 
-  it('turns along the shore instead of walking into the water', () => {
+  it('turns to walk along the shore instead of into the water', () => {
     const shore: Habitat = { canBe: (_x, z) => z < 5 };
     const { system, modes, run } = setup(shore);
+    modes[0].goalX = 8;
+    modes[0].goalZ = 20;
+    modes[0].speed = 3;
+    run(3);
+
+    expect(system.z).toBeLessThan(5);
+    expect(system.x).toBeGreaterThan(3);
+    expect(Math.sin(system.heading)).toBeGreaterThan(0.9);
+    expect(system.blocked).toBe(false);
+  });
+
+  it('stops at the point nearest a goal it cannot reach instead of pacing', () => {
+    const shore: Habitat = { canBe: (_x, z) => z < 5 };
+    const { system, modes } = setup(shore);
     modes[0].goalX = 2;
     modes[0].goalZ = 20;
     modes[0].speed = 3;
-    run(6);
 
-    expect(system.z).toBeLessThan(5);
-    expect(Math.abs(system.x)).toBeGreaterThan(1);
-    expect(system.blocked).toBe(false);
+    let stoppedAt = -1;
+    for (let t = 0; t < 6 && stoppedAt < 0; t += 0.05) {
+      system.update(0.05);
+      if (system.blocked) stoppedAt = system.x;
+    }
+
+    expect(system.speed).toBe(0);
+    expect(stoppedAt).toBeGreaterThan(1.5);
+    expect(stoppedAt).toBeLessThan(3.5);
   });
 
   it('stops and reports blocked when no direction is inside the habitat', () => {

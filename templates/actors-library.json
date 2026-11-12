@@ -74,6 +74,10 @@
         {
           "name": "Damaged Helmet",
           "templateId": "damaged-helmet"
+        },
+        {
+          "name": "Trex",
+          "templateId": "trex"
         }
       ]
     },
@@ -102,6 +106,10 @@
         {
           "name": "Crow",
           "templateId": "crow"
+        },
+        {
+          "name": "Lioness",
+          "templateId": "lioness"
         }
       ]
     },
