@@ -99,12 +99,26 @@ export interface LookAtSettings {
   smoothing: number;
 }
 
+/** How a creature's feet follow the terrain. */
+export interface FootIKSettings {
+  /** Seconds a foot takes to settle on a new height. */
+  smoothing: number;
+  /** Part of a leg's reach a foot may move up or down. */
+  maxStep: number;
+  /** Part of the slope along the body it pitches to, 0 to 1. Three or more legs only. */
+  pitch?: number;
+  /** Part of the slope across the body it rolls to, 0 to 1. Three or more legs only. */
+  roll?: number;
+}
+
 /** A creature's settings. A template names one with `preset`. */
 export interface CreaturePreset {
   driver: 'clips';
   movement: MovementSettings;
   /** Needs the template's `bones.lookAt`. Left out, the head follows clips. */
   lookAt?: LookAtSettings;
+  /** Needs the template's `bones.legs`. Left out, the feet follow clips. */
+  footIK?: FootIKSettings;
   /** One entry in Sinew. */
   habitat: HabitatSettings[];
 }
@@ -169,6 +183,48 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
       },
     },
     habitat: [{ type: 'air', band: [15, 30], lookAhead: 3 }],
+  },
+  lioness: {
+    driver: 'clips',
+    movement: {
+      walkSpeed: 0.78,
+      runSpeed: 11.5,
+      turnRate: 2.5,
+      acceleration: 8,
+      modes: {
+        wander: { radius: 15, wait: [4, 10], actions: [] },
+        evade: { radius: 10, release: 18 },
+      },
+    },
+    lookAt: { radius: 18, yawLimit: 1.4, pitchLimit: 0.6, smoothing: 0.25 },
+    habitat: [
+      {
+        type: 'land',
+        slope: { from: 40, to: 35 },
+        waterDepth: { from: 0.5, to: 0.4 },
+      },
+    ],
+  },
+  trex: {
+    driver: 'clips',
+    movement: {
+      walkSpeed: 6.6,
+      runSpeed: 7.5,
+      turnRate: 0.8,
+      acceleration: 2,
+      modes: {
+        wander: { radius: 40, wait: [6, 15], actions: [] },
+      },
+    },
+    lookAt: { radius: 80, yawLimit: 1.3, pitchLimit: 1.1, smoothing: 0.5 },
+    footIK: { smoothing: 0.15, maxStep: 0.35 },
+    habitat: [
+      {
+        type: 'land',
+        slope: { from: 30, to: 25 },
+        waterDepth: { from: 2, to: 1.5 },
+      },
+    ],
   },
 };
 

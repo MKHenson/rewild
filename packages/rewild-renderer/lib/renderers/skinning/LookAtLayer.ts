@@ -1,5 +1,6 @@
 import { Matrix4, Quaternion, Vector3 } from 'rewild-common';
 import { ClipPlayer } from './ClipPlayer';
+import { aboutAxis, conjugate, multiply } from './poseMath';
 import { POSE_STRIDE, PoseSlotData, PoseStore } from './PoseStore';
 
 /** Part of the turn the last bone of a chain takes. The rest split evenly. */
@@ -154,19 +155,16 @@ export class LookAtLayer implements PoseSlotData {
         const nextPitch = pitch * reached;
 
         // E = D(parent)⁻¹ D(bone), with D = Ry(yaw) Rx(−pitch).
-        aboutX(_turn, donePitch);
-        aboutY(_a, nextYaw - doneYaw);
-        multiply(_turn, _turn, _a);
-        aboutX(_a, -nextPitch);
-        multiply(_turn, _turn, _a);
+        aboutAxis(_turn, 1, 0, 0, donePitch);
+        aboutAxis(_a, 0, 1, 0, nextYaw - doneYaw);
+        multiply(_turn, 0, _turn, 0, _a, 0);
+        aboutAxis(_a, 1, 0, 0, -nextPitch);
+        multiply(_turn, 0, _turn, 0, _a, 0);
 
-        multiply(_turn, _turn, _world);
-        _a[0] = -_world[0];
-        _a[1] = -_world[1];
-        _a[2] = -_world[2];
-        _a[3] = _world[3];
-        multiply(_turn, _a, _turn);
-        multiply(_b, _turn, _local);
+        multiply(_turn, 0, _turn, 0, _world, 0);
+        conjugate(_a, 0, _world, 0);
+        multiply(_turn, 0, _a, 0, _turn, 0);
+        multiply(_b, 0, _turn, 0, _local, 0);
 
         pose[p] = _b[0];
         pose[p + 1] = _b[1];
@@ -177,7 +175,7 @@ export class LookAtLayer implements PoseSlotData {
         donePitch = nextPitch;
       }
 
-      multiply(_world, _world, _local);
+      multiply(_world, 0, _world, 0, _local, 0);
     }
   }
 
@@ -209,34 +207,4 @@ export class LookAtLayer implements PoseSlotData {
     const m = matrix.elements;
     this.origin.set(m[12], m[13], m[14]);
   }
-}
-
-function aboutX(out: Float32Array, angle: number): void {
-  out[0] = Math.sin(angle * 0.5);
-  out[1] = 0;
-  out[2] = 0;
-  out[3] = Math.cos(angle * 0.5);
-}
-
-function aboutY(out: Float32Array, angle: number): void {
-  out[0] = 0;
-  out[1] = Math.sin(angle * 0.5);
-  out[2] = 0;
-  out[3] = Math.cos(angle * 0.5);
-}
-
-/** Quaternion `a * b` into `out`, which may be either input. */
-function multiply(out: Float32Array, a: Float32Array, b: Float32Array): void {
-  const ax = a[0];
-  const ay = a[1];
-  const az = a[2];
-  const aw = a[3];
-  const bx = b[0];
-  const by = b[1];
-  const bz = b[2];
-  const bw = b[3];
-  out[0] = aw * bx + ax * bw + ay * bz - az * by;
-  out[1] = aw * by - ax * bz + ay * bw + az * bx;
-  out[2] = aw * bz + ax * by - ay * bx + az * bw;
-  out[3] = aw * bw - ax * bx - ay * by - az * bz;
 }

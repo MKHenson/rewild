@@ -198,6 +198,10 @@
     "type": "gltf",
     "url": "nature/plants/reed/reed-01.glb"
   },
+  "trex": {
+    "type": "gltf",
+    "url": "models/trex.glb"
+  },
   "chicken-01": {
     "type": "gltf",
     "url": "models/chicken-01.glb"
@@ -209,5 +213,9 @@
   "crow": {
     "type": "gltf",
     "url": "models/crow.glb"
+  },
+  "lioness": {
+    "type": "gltf",
+    "url": "models/lioness.glb"
   }
 }

@@ -6,6 +6,10 @@ import { IMovementMode, MovementSystem } from '../MovementSystem';
 export const PICK_ATTEMPTS = 8;
 /** Metres a new point must be from where the creature stands. */
 export const MIN_WANDER_STEP = 1;
+/** Seconds of moving without getting `STALL_PROGRESS` closer before a point is given up. */
+export const STALL_TIME = 3;
+/** Metres closer to its point a creature must get to count as making progress. */
+const STALL_PROGRESS = 0.5;
 /** Radians round home between circling points, at the least. */
 const CIRCLE_STEP = Math.PI / 4;
 /** Nearest a circling point is to home, as a share of the radius. */
@@ -29,6 +33,9 @@ export class Wander implements IMovementMode {
   private readonly radius: number;
   /** The way round home it circles. Picked on the first point. */
   private circleSign = 0;
+  /** Nearest it has been to the point, and seconds moving since it got nearer. */
+  private closest = Infinity;
+  private stalled = 0;
 
   constructor(settings: WanderSettings, radius = settings.radius) {
     this.settings = settings;
@@ -49,8 +56,9 @@ export class Wander implements IMovementMode {
 
   update(dt: number, system: MovementSystem): void {
     if (this.phase === 'walk') {
-      if (system.blocked) this.phase = 'pick';
-      else if (system.arrived) this.startWait(system);
+      if (system.arrived) this.startWait(system);
+      else if (system.blocked || this.stall(dt, system))
+        this.startWait(system, false);
       else this.steer(system);
     }
 
@@ -95,6 +103,19 @@ export class Wander implements IMovementMode {
     if (typeof state.timer === 'number') this.timer = state.timer;
   }
 
+  /** Whether the point has been out of reach for too long. Turning on the spot does not count. */
+  private stall(dt: number, system: MovementSystem): boolean {
+    const distance = Math.hypot(
+      this.targetX - system.x,
+      this.targetZ - system.z
+    );
+    if (distance < this.closest - STALL_PROGRESS) {
+      this.closest = distance;
+      this.stalled = 0;
+    } else if (system.speed > 0) this.stalled += dt;
+    return this.stalled > STALL_TIME;
+  }
+
   private steer(system: MovementSystem): void {
     system.goalLevel = this.targetLevel;
     system.steerTo(this.targetX, this.targetZ, system.settings.walkSpeed);
@@ -121,6 +142,8 @@ export class Wander implements IMovementMode {
       this.targetX = x;
       this.targetZ = z;
       this.targetLevel = random();
+      this.closest = Infinity;
+      this.stalled = 0;
       return true;
     }
     return false;

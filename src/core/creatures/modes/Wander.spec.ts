@@ -2,7 +2,7 @@ import { MovementSettings, WanderSettings } from '../CreaturePresets';
 import { Habitat } from '../Habitat';
 import { MovementSystem } from '../MovementSystem';
 import { TestAnimator, TestWorld } from '../testWorld';
-import { Wander } from './Wander';
+import { STALL_TIME, Wander } from './Wander';
 
 const WANDER: WanderSettings = {
   radius: 5,
@@ -78,15 +78,61 @@ describe('Wander', () => {
     expect(animator.calls).toEqual([]);
   });
 
-  it('picks a new point when blocked', () => {
-    const { wander, system } = setup();
+  it('waits without an action when blocked, then picks a new point', () => {
+    const { animator, wander, system } = setup();
     system.update(0.05);
     const first = wander.targetX;
     system.blocked = true;
     wander.update(0.05, system);
+    expect(wander.phase).toBe('wait');
+    expect(animator.calls).toEqual([]);
 
+    for (let i = 0; i < 30 && wander.phase === 'wait'; i++)
+      wander.update(0.05, system);
+    wander.update(0.05, system);
     expect(wander.phase).toBe('walk');
     expect(wander.targetX).not.toBe(first);
+  });
+
+  it('gives up a point it moves without getting closer to', () => {
+    const { wander, system } = setup();
+    system.update(0.05);
+    for (let t = 0; t < STALL_TIME - 0.2; t += 0.05) {
+      system.speed = 1;
+      wander.update(0.05, system);
+    }
+    expect(wander.phase).toBe('walk');
+
+    for (let t = 0; t < 0.5; t += 0.05) {
+      system.speed = 1;
+      wander.update(0.05, system);
+    }
+    expect(wander.phase).toBe('wait');
+  });
+
+  it('does not give up while turning on the spot', () => {
+    const { wander, system } = setup();
+    system.update(0.05);
+    for (let t = 0; t < STALL_TIME * 2; t += 0.05) {
+      system.speed = 0;
+      wander.update(0.05, system);
+    }
+    expect(wander.phase).toBe('walk');
+  });
+
+  it('stays out of a moat between it and its point', () => {
+    const moat: Habitat = { canBe: (x) => x < 11 || x > 12 };
+    const { wander, system } = setup(() => 0.25, moat);
+    system.update(0.05);
+    expect(wander.targetX).toBeCloseTo(12.5);
+
+    let waited = false;
+    for (let t = 0; t < STALL_TIME + 5 && !waited; t += 0.05) {
+      system.update(0.05);
+      waited = wander.phase === 'wait';
+      expect(system.x).toBeLessThan(11);
+    }
+    expect(waited).toBe(true);
   });
 
   it('waits when no point near home is inside the habitat', () => {

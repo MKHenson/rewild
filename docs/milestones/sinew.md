@@ -109,6 +109,10 @@ Each layer has a weight from 0 to 1. A weight of 0 skips the layer and costs not
 - Lower the pelvis by the largest foot drop, so a leg is never stretched.
 - Quadrupeds also tilt the body to the slope from the front and back feet.
 
+**Code.** `FootIKLayer` is the renderer's half. Each model has one, with the legs from the template's `bones.legs`. A leg lists its upper and lower bones, the bone they carry, then optionally the bones down to the foot. IK bends only the upper and lower bones. The carried bone keeps its clip rotation in model space, so a leg with three segments (thigh, shin, metatarsus) keeps the clip's angle on the lowest one, and the foot moves without bending. Each slot keeps a weight, a pitch and roll share, and a vertical offset for each foot in model space, in a flat array beside its pose. With three or more legs, the layer fits a plane through the feet's offsets and turns the legs' nearest shared parent bone by the shares of its slope, about the point between the feet. Then that bone moves up or down so no leg stretches, and each leg reaches the rest. With two legs nothing turns, and the shared bone moves by the lowest offset. The layer also reports each foot's clip position before IK.
+
+`FootPlant` is the game's half. It reads each foot's clip position, samples the terrain under it, and sets the offset to that height less the pivot's, capped at the preset's `footIK.maxStep` part of the leg's reach. It passes on the preset's `footIK.pitch` and `footIK.roll` shares, which are 0 when left out. It eases the offsets, and fades the weight out while the creature is off the ground. In game, `CreatureBehaviour` updates it each frame after look-at. A creature whose template or preset leaves out foot IK follows its clips only.
+
 ---
 
 ## Creatures
@@ -122,7 +126,7 @@ A creature template adds to the asset template:
 - `locomotion`: named sets of locomotion clips. `normal` is the default. A missing entry in another set falls back to `normal`.
 - `clipSpeeds`: the natural ground speed of each locomotion clip, in m/s, keyed by meaning. A set's clip falls back to the speed of the slot it fills, for example `limp` to `walk`, then to 1 m/s for walk and 3 m/s for run.
 - `idleActions`: the meanings idle variety picks from.
-- `bones`: the bone names for look-at and IK. `bones.lookAt` lists the neck bones then the head, parent first.
+- `bones`: the bone names for look-at and IK. `bones.lookAt` lists the neck bones then the head, parent first. `bones.legs` lists each leg, parent first (see Foot IK).
 - `driver`: the locomotion driver. Sinew has only `clips`.
 - `movement`: top speed and turn rate.
 - `habitat`: a list with one entry in Sinew, and that habitat's limits (see Habitats).
@@ -190,6 +194,8 @@ One check answers "can this creature be at this point?". Three things use it:
 - **Spawning.** Is this a valid spawn point?
 - **Wander.** Is this a valid target?
 - **Each step.** Is the next position still valid? A deer stops at the shore and does not walk into the lake.
+
+When the way to the goal leaves the habitat, the creature turns to the nearest detour, 45° then 90° either side, and walks along the edge facing where it goes. A moving creature takes no detour that turns it back, so it stops at the point nearest a goal it cannot reach instead of pacing there. Wander waits when stopped, and gives up a point it has not got closer to after a few seconds of walking.
 
 Water and air habitats also give the heights a creature may be at over a point. Wander picks a level inside that range with each target.
 
