@@ -418,17 +418,9 @@ export const PLAIN: BiomeParams = {
       underwater: true,
     },
   ],
-  // Flocks of hens in the sward, and a pride that wanders the plain together.
+  // Flocks of hens in the sward.
   creatures: [
     { creature: 'chicken', density: 0.3, group: [2, 5], spread: 5 },
-    {
-      creature: 'lioness',
-      density: 0.03,
-      group: [3, 5],
-      spread: 8,
-      drift: 0.4,
-      roam: 60,
-    },
     TUNA,
   ],
 };
@@ -856,6 +848,17 @@ export const DESERT: BiomeParams = {
       layer: 'sandstone_04',
       density: 0.04,
       slope: { from: 40, to: 15 },
+    },
+  ],
+  // A pride that wanders the palms together.
+  creatures: [
+    {
+      creature: 'lioness',
+      density: 0.03,
+      group: [3, 5],
+      spread: 8,
+      drift: 0.4,
+      roam: 60,
     },
   ],
 };
