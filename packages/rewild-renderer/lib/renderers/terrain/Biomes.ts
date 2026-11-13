@@ -206,6 +206,18 @@ export interface Erosion {
   strength: number;
 }
 
+// Creatures a biome spawns near the player. Each chunk plans its spawns from the
+// seed, so it spawns the same creatures each time it loads. A spawn point must
+// pass the biome's weight there and the creature's habitat.
+export interface BiomeCreatures {
+  creature: string; // creature template name
+  density: number; // groups per hectare
+  group?: [number, number]; // animals per group, inclusive. Omitted ⇒ one
+  spread?: number; // metres from the group's home its animals spawn
+  drift?: number; // m/s the group's home drifts. Omitted ⇒ it stays put
+  roam?: number; // metres from where it spawned the home may drift
+}
+
 export interface BiomeParams {
   name: string;
   /** Shapes the ground. Never reads `layers`, and vice versa. */
@@ -216,7 +228,17 @@ export interface BiomeParams {
   erosion?: Erosion;
   // What grows on the shape. Omitted ⇒ bare ground.
   scatter?: BiomeScatter[];
+  // What lives on it. Omitted ⇒ no creatures spawn.
+  creatures?: BiomeCreatures[];
 }
+
+// Fish in any lake or sea the biome holds; the habitat keeps them to water.
+const TUNA: BiomeCreatures = {
+  creature: 'tuna',
+  density: 0.4,
+  group: [1, 3],
+  spread: 6,
+};
 
 // One climate dimension (temperature or moisture): a low-frequency noise field
 // over world position, split into bands by `cuts`. Which biome a sample gets is
@@ -396,6 +418,19 @@ export const PLAIN: BiomeParams = {
       underwater: true,
     },
   ],
+  // Flocks of hens in the sward, and a pride that wanders the plain together.
+  creatures: [
+    { creature: 'chicken', density: 0.3, group: [2, 5], spread: 5 },
+    {
+      creature: 'lioness',
+      density: 0.03,
+      group: [3, 5],
+      spread: 8,
+      drift: 0.4,
+      roam: 60,
+    },
+    TUNA,
+  ],
 };
 
 // Wooded ground — the plain's wet counterpart, taller and busier over a tighter
@@ -478,6 +513,7 @@ export const FOREST: BiomeParams = {
     },
     REEDS,
   ],
+  creatures: [{ creature: 'crow', density: 0.1, group: [1, 3] }, TUNA],
 };
 
 export const MOUNTAIN: BiomeParams = {
@@ -647,6 +683,7 @@ export const MOUNTAIN: BiomeParams = {
       slope: { from: 42, to: 20 },
     },
   ],
+  creatures: [{ creature: 'crow', density: 0.05, group: [1, 2] }, TUNA],
 };
 
 // The arid answer to MOUNTAIN: different rock, and sand drifting *up* against

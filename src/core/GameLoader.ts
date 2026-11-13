@@ -5,6 +5,7 @@ import { DEFAULT_CLIMATE_PRESET, Renderer } from 'rewild-renderer';
 import { Player } from './routing/Player';
 import { TemplateLoader } from './TemplateLoader';
 import { ContainerWithState } from './routing/ContainerWithState';
+import { CreatureSpawner } from './routing/CreatureSpawner';
 import { StateMachineData } from './routing/Types';
 import { GameManager } from './GameManager';
 import { setTerrainProviders } from './TerrainProviders';
@@ -79,6 +80,11 @@ export async function loadInitialLevels(
       containerRouter.addAsset(object);
     }
   }
+
+  if (renderer.terrainRenderer.enabled)
+    levelRouter.addChild(
+      new CreatureSpawner(templateLoader, levelRouter.parentObject3D)
+    );
 
   return stateMachine;
 }

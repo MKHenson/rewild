@@ -15,6 +15,7 @@ import { registerWaterDebugCommands } from './WaterDebugCommands';
 import { registerWaterEditDevCommands } from './WaterEditDevCommands';
 import { registerPlayerDebugCommands } from './PlayerDebugCommands';
 import { registerTerrainDebugCommands } from './TerrainDebugCommands';
+import { registerCreatureDebugCommands } from './CreatureDebugCommands';
 import {
   registerScatterDebugCommands,
   registerWindDebugCommands,
@@ -42,4 +43,5 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerChunkSnapshotDevCommands(renderer, project);
   registerTerrainDebugCommands(renderer);
   registerPlayerDebugCommands();
+  registerCreatureDebugCommands();
 }
