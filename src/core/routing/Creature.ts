@@ -17,6 +17,24 @@ import { Wander } from '../creatures/modes/Wander';
 import { SkinnedAsset } from './SkinnedAsset';
 import { StateMachineData } from './Types';
 
+/** The world as creatures read it in game. */
+export function createCreatureWorld(data: StateMachineData): CreatureWorld {
+  const terrain = data.renderer.terrainRenderer;
+  const player = data.player;
+  return {
+    sampleHeight: (x, z) => terrain.sampleHeight(x, z),
+    sampleWater: (x, z, out: WaterQuerySample) =>
+      terrain.waterQuery.sample(x, z, out),
+    waterTypeIndex: (name) =>
+      getWaterTypeIndex(resolveClimatePreset(terrain.climatePreset), name),
+    playerPosition: (out: Vector3) => {
+      if (!player?.asset) return false;
+      out.copy(player.asset.transform.position);
+      return true;
+    },
+  };
+}
+
 /**
  * A skinned asset that moves on its own. In game it reads the world from the
  * state machine on mount and builds its movement system. In the editor it
@@ -55,7 +73,7 @@ export class Creature extends SkinnedAsset {
     if (!data?.gameManager) return;
 
     if (!this.movement) {
-      const world = this.createWorld(data);
+      const world = createCreatureWorld(data);
       this.movement = this.createMovement(world);
       if (this.hasLookChain)
         this.headLook = new HeadLook(
@@ -73,23 +91,6 @@ export class Creature extends SkinnedAsset {
         );
     }
     this.movement.placeAt(this.initialPosition, this.initialRotation);
-  }
-
-  private createWorld(data: StateMachineData): CreatureWorld {
-    const terrain = data.renderer.terrainRenderer;
-    const player = data.player;
-    return {
-      sampleHeight: (x, z) => terrain.sampleHeight(x, z),
-      sampleWater: (x, z, out: WaterQuerySample) =>
-        terrain.waterQuery.sample(x, z, out),
-      waterTypeIndex: (name) =>
-        getWaterTypeIndex(resolveClimatePreset(terrain.climatePreset), name),
-      playerPosition: (out: Vector3) => {
-        if (!player?.asset) return false;
-        out.copy(player.asset.transform.position);
-        return true;
-      },
-    };
   }
 
   private createMovement(world: CreatureWorld): MovementSystem {

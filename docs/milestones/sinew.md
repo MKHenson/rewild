@@ -233,6 +233,10 @@ Water and air habitats also give the heights a creature may be at over a point. 
 
 A spawned creature gets a stable id from its chunk and its index. A later save can find it again by that id.
 
+**Code.** A biome lists its spawn rules in `creatures`, beside `scatter`. A rule names a creature template, a density in groups for each hectare, and optionally the group size, the spread of a group round its home, and the home's `drift` speed and `roam` distance. `planChunkSpawns` plans a terrain chunk's groups once its heights load. Each rule draws from its own stream seeded by the world seed, the chunk and the rule, so adding a rule leaves the others in place. A group's home passes when a roll falls under the biome's weight there and the creature's habitat accepts it. Each animal then finds a place inside the habitat within the spread, at a random level of its height range if the habitat has one. Ids are `spawn:cx,cy:index`.
+
+`CreatureSpawner` is a container in the level. Twice a second it plans the chunks near the player, spawns a group when its origin is within 120 m (`SPAWN_RADIUS`) and despawns it past 150 m (`DESPAWN_RADIUS`). It stops spawning at 100 live creatures. Each group's animals share a `HerdHome`. A drifting home moves on a wandering heading, stays in the habitat and turns back at its roam distance. Each frame the spawner writes the home into its animals' movement, so Wander keeps them round it.
+
 ---
 
 ## Saving

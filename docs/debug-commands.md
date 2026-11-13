@@ -385,6 +385,24 @@ crossfade should show no pop, and the instances should stay out of step with eac
 `animateSkinned` takes a template's animation fields as its config. Between the walk and run
 speeds the feet should keep in step with no slide.
 
+Spawning is registered in `CreatureDebugCommands.ts` and works in game only.
+
+```js
+showCreatureSpawns(); // the spawner's state, biome weights at the player, and the nearest 20 planned groups
+showCreatureSpawns(100); // more groups
+goToCreature(); // moves the player 4m from the nearest live creature, facing it along +Z
+goToCreature(3); // the fourth nearest
+goToCreature(0, 'lioness'); // the nearest of one creature template
+```
+
+The live creature table gives each creature's position against the ground under it, whether it is
+visible and its movement mode. A land creature's `y` should match `ground`. The group table gives
+each group's `drift` speed and how far its home has `drifted` from where it spawned.
+
+A chunk is planned once its heights load. No groups in a loaded chunk means the biome weights or the
+habitats rejected every home. A group stays `idle` until its home is within 120m, `loading` while
+its creatures build, and `failed` when building them threw.
+
 See [Sinew](./milestones/sinew.md).
 
 ---
