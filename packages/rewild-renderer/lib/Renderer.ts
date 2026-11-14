@@ -942,9 +942,9 @@ export class Renderer {
   }
 
   /**
-   * PNG of the next fully rendered frame, exactly as written to the swapchain.
-   * The snapshot is taken at the end of render(), before the frame is
-   * presented, because a WebGPU canvas has no readable contents afterwards.
+   * PNG of the next rendered frame without overlays, UI or debug viewers.
+   * toBlob copies the canvas as of the work submitted so far, so it is called
+   * after the scene passes and before the overlay and GUI passes are submitted.
    */
   captureScreenshot(): Promise<Blob | null> {
     return new Promise((resolve) => this.pendingScreenshots.push(resolve));
@@ -1311,6 +1311,8 @@ export class Renderer {
       // particles are visible against both terrain and sky (not gated through fog alpha).
       this.sky.postRender(this);
 
+      this.flushScreenshots();
+
       // Overlay pass: renders on top of scene + sky with depth cleared
       if (overlayRenderList.length > 0) {
         const overlayEncoder = device.createCommandEncoder({
@@ -1436,8 +1438,6 @@ export class Renderer {
       this.sky.skyRenderer.cubeDebugRenderer.render(this);
 
       this.ambientOcclusion.renderDebug(this);
-
-      this.flushScreenshots();
     }
 
     metrics.end('cpu.encode');
