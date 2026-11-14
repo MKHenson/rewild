@@ -9,7 +9,11 @@ const MIN_WEIGHT = 0.001;
 /** Metres above the ground at which a creature counts as off it. */
 const GROUNDED_SLACK = 0.05;
 
+/** Past this many metres from the player, feet ease back to the clip's. */
+export const FOOT_IK_RANGE = 30;
+
 const _foot = new Vector3();
+const _player = new Vector3();
 
 /** What FootPlant places. SkinnedInstance is one. */
 export interface FootTarget {
@@ -24,8 +28,8 @@ export interface FootTarget {
 
 /**
  * Sets each foot of a standing creature to the terrain under it, measured
- * from the ground at the creature's pivot. Off the ground it eases back to
- * the clip's feet.
+ * from the ground at the creature's pivot. Off the ground, or past
+ * FOOT_IK_RANGE from the player, it eases back to the clip's feet.
  */
 export class FootPlant {
   weight = 0;
@@ -59,7 +63,9 @@ export class FootPlant {
     const matrix = this.transform.matrixWorld;
     const m = matrix.elements;
     const pivot = m[13];
-    const ground = world.sampleHeight(m[12], m[14]);
+    const ground = this.inRange(m)
+      ? world.sampleHeight(m[12], m[14])
+      : null;
     const grounded = ground !== null && pivot <= ground + GROUNDED_SLACK;
     const scale = Math.hypot(m[4], m[5], m[6]);
 
@@ -80,5 +86,14 @@ export class FootPlant {
     this.weight += ((grounded ? 1 : 0) - this.weight) * t;
     if (!grounded && this.weight < MIN_WEIGHT) this.weight = 0;
     target.setFootWeight(this.weight);
+  }
+
+  /** True near the player, or when there is none. */
+  private inRange(m: ArrayLike<number>): boolean {
+    if (!this.world.playerPosition(_player)) return true;
+    const dx = _player.x - m[12];
+    const dy = _player.y - m[13];
+    const dz = _player.z - m[14];
+    return dx * dx + dy * dy + dz * dz <= FOOT_IK_RANGE * FOOT_IK_RANGE;
   }
 }

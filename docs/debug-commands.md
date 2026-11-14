@@ -536,8 +536,9 @@ reading anything into the rest.
 
 **Sections.** `frame` is the wall clock and the CPU total. `gpu · scene`,
 `gpu · sky` and `gpu · post` are the render passes, each with its own subtotal.
-`cpu · render()` splits the JavaScript side into scene graph, cull, organize and
-encode. `counts` holds draw groups, visible solids and shadow casters.
+`cpu · render()` splits the JavaScript side into scene graph, cull, organize,
+encode and creature poses. `counts` holds draw groups, visible solids, shadow
+casters, live creatures and the creatures that built a pose this frame.
 
 **Every row carries a second number.** Normally it is `max`, the highest single
 sample in the two-second window. Read it. A mean hides exactly the spike you are

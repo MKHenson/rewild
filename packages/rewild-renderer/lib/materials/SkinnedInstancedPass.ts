@@ -25,17 +25,22 @@ const UNIFORM_FLOATS = 16 * 2 + 4;
 
 /**
  * Packs a SkinnedMesh's world matrix and pose slot as instance `index` of
- * `data`, with `slots` a Uint32Array view over the same buffer.
+ * `data`, with `slots` a Uint32Array view over the same buffer, and reports
+ * the slot as drawn to the model's pose schedule.
  */
 export function writeSkinnedInstance(
+  model: SkinnedModel,
   mesh: IVisualComponent,
   data: Float32Array,
   slots: Uint32Array,
   index: number
 ): void {
   const o = index * SKINNED_INSTANCE_FLOATS;
-  data.set(mesh.transform.matrixWorld.elements, o);
-  slots[o + 16] = (mesh as SkinnedMesh).instance.slot;
+  const m = mesh.transform.matrixWorld.elements;
+  const slot = (mesh as SkinnedMesh).instance.slot;
+  data.set(m, o);
+  slots[o + 16] = slot;
+  model.schedule.seen(slot, m[12], m[13], m[14]);
 }
 
 /**
@@ -186,7 +191,13 @@ export class SkinnedInstancedPass extends StandardPassBase {
     const { device } = renderer;
     this.ensureInstanceCapacity(renderer, count);
     for (let i = 0; i < count; i++)
-      writeSkinnedInstance(meshes[i], this.instanceData, this.instanceSlots, i);
+      writeSkinnedInstance(
+        model,
+        meshes[i],
+        this.instanceData,
+        this.instanceSlots,
+        i
+      );
     device.queue.writeBuffer(
       this.instanceBuffer!,
       0,

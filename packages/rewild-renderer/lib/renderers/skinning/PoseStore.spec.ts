@@ -125,6 +125,26 @@ describe('PoseStore', () => {
     expect(poses.update()).toBe(false);
   });
 
+  it('rebuilds only the slots marked changed, and spans them for upload', () => {
+    const poses = new PoseStore(skeleton());
+    const handles = [0, 1, 2, 3].map(() => poses.add());
+    poses.update();
+    poses.clearJointsChanged();
+
+    poses.pose[poses.poseOffset(handles[1]) + 1] = 3;
+    poses.pose[poses.poseOffset(handles[2]) + 1] = 3;
+    poses.pose[poses.poseOffset(handles[3]) + 1] = 3;
+    poses.markPoseChanged(1);
+    poses.markPoseChanged(2);
+    poses.update();
+
+    expectMatrix(jointMatrix(poses, 1, 0), translation(0, 2, 0));
+    expectMatrix(jointMatrix(poses, 2, 0), translation(0, 2, 0));
+    expectMatrix(jointMatrix(poses, 3, 0), IDENTITY);
+    expect(poses.changedFrom).toBe(1);
+    expect(poses.changedTo).toBe(3);
+  });
+
   it('flags the joint matrices for upload when a removal moves a slot', () => {
     const poses = new PoseStore(skeleton());
     const a = poses.add();

@@ -32,8 +32,13 @@ export class PoseStore {
   jointMatrices = new Float32Array(0);
   /** Joint matrices changed since the owner last uploaded them. */
   jointsChanged = false;
+  /** Slots `changedFrom` to `changedTo − 1` hold every changed joint matrix. */
+  changedFrom = 0;
+  changedTo = 0;
 
   private posesDirty = false;
+  /** Slots whose working pose changed since their joint matrices were built. */
+  private dirty = new Uint8Array(0);
   private handleBySlot = new Int32Array(0);
   private readonly slotByHandle = new Map<number, number>();
   private nextHandle = 1;
@@ -77,7 +82,7 @@ export class PoseStore {
     this.pose.set(this.restPose, slot * this.restPose.length);
     for (const data of this.slotData) data.clearSlot(slot);
 
-    this.posesDirty = true;
+    this.markPoseChanged(slot);
     return handle;
   }
 
@@ -93,8 +98,10 @@ export class PoseStore {
       const moved = this.handleBySlot[last];
       this.handleBySlot[slot] = moved;
       this.slotByHandle.set(moved, slot);
-      this.jointsChanged = true;
+      this.dirty[slot] = this.dirty[last];
+      this.markJointsChanged(slot);
     }
+    this.dirty[last] = 0;
 
     this.slotByHandle.delete(handle);
     this.count--;
@@ -115,21 +122,33 @@ export class PoseStore {
     return this.slotOf(handle) * this.jointCount * POSE_STRIDE;
   }
 
-  /** Call after writing into `pose`. */
-  markPoseChanged(): void {
+  /** Call after writing into `pose`, with the slot written, or none for all. */
+  markPoseChanged(slot = -1): void {
     this.posesDirty = true;
+    if (slot < 0) this.dirty.fill(1, 0, this.count);
+    else this.dirty[slot] = 1;
   }
 
-  /** Rebuilds every joint matrix from the working pose. False if nothing changed. */
+  /** Call once the changed joint matrices are uploaded. */
+  clearJointsChanged(): void {
+    this.jointsChanged = false;
+    this.changedFrom = 0;
+    this.changedTo = 0;
+  }
+
+  /** Rebuilds the joint matrices of changed slots. False if nothing changed. */
   update(): boolean {
     if (!this.posesDirty) return false;
     this.posesDirty = false;
-    this.jointsChanged = true;
 
     const { parents, inverseBindMatrices, rootMatrix } = this.skeleton;
-    const { pose, world, local, jointMatrices, jointCount } = this;
+    const { pose, world, local, jointMatrices, jointCount, dirty } = this;
 
     for (let slot = 0; slot < this.count; slot++) {
+      if (dirty[slot] === 0) continue;
+      dirty[slot] = 0;
+      this.markJointsChanged(slot);
+
       const poseBase = slot * jointCount * POSE_STRIDE;
       const outBase = slot * jointCount * MATRIX;
 
@@ -154,6 +173,17 @@ export class PoseStore {
     return true;
   }
 
+  private markJointsChanged(slot: number): void {
+    if (!this.jointsChanged) {
+      this.jointsChanged = true;
+      this.changedFrom = slot;
+      this.changedTo = slot + 1;
+      return;
+    }
+    if (slot < this.changedFrom) this.changedFrom = slot;
+    if (slot >= this.changedTo) this.changedTo = slot + 1;
+  }
+
   private moveSlot(from: number, to: number): void {
     const poseSize = this.jointCount * POSE_STRIDE;
     const jointSize = this.jointCount * MATRIX;
@@ -171,6 +201,10 @@ export class PoseStore {
       this.jointMatrices,
       capacity * this.jointCount * MATRIX
     );
+
+    const dirty = new Uint8Array(capacity);
+    dirty.set(this.dirty);
+    this.dirty = dirty;
 
     const handles = new Int32Array(capacity);
     handles.set(this.handleBySlot);

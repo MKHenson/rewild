@@ -304,4 +304,26 @@ describe('ClipPlayer', () => {
     expect(hipX(poses, handle)).toBe(5);
     expect(poses.update()).toBe(false);
   });
+
+  it('writes only the slots due, and keeps time on the rest', () => {
+    const { poses, player } = setup();
+    const a = poses.add();
+    const b = poses.add();
+    player.play(a, 'walk');
+    player.play(b, 'walk');
+    const due = new Uint8Array([1, 0]);
+
+    expect(player.update(0.25, due)).toBe(1);
+
+    expect(hipX(poses, a)).toBeCloseTo(0.5);
+    expect(hipX(poses, b)).toBe(0);
+    expect(player.posed(0)).toBe(true);
+    expect(player.posed(1)).toBe(false);
+    expect(player.timeOf(b, 'walk')).toBeCloseTo(0.25);
+
+    due[1] = 1;
+    player.update(0.25, due);
+
+    expect(hipX(poses, b)).toBeCloseTo(1);
+  });
 });

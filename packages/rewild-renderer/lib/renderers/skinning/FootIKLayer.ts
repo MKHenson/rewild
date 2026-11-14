@@ -55,8 +55,8 @@ interface Leg {
  * Each slot sets a vertical offset per foot in model space. With three or more
  * legs, the legs' nearest shared parent first turns by a share of the slope
  * through the offsets, so the body tilts with the ground. It then moves up or
- * down so no leg stretches, and each leg reaches the rest. A slot with no clip
- * playing or no weight is skipped.
+ * down so no leg stretches, and each leg reaches the rest. A slot the clips did
+ * not rewrite this frame, or with no weight, is skipped.
  */
 export class FootIKLayer implements PoseSlotData {
   private readonly poses: PoseStore;
@@ -204,11 +204,10 @@ export class FootIKLayer implements PoseSlotData {
     if (legs.length === 0) return;
 
     const poseSize = poses.jointCount * POSE_STRIDE;
-    let changed = false;
     for (let slot = 0; slot < poses.count; slot++) {
       const v = slot * stride;
       const weight = values[v];
-      if (weight <= 0 || !player.isPlaying(slot)) continue;
+      if (weight <= 0 || !player.posed(slot)) continue;
 
       const offset = slot * poseSize;
       let low = Infinity;
@@ -250,10 +249,7 @@ export class FootIKLayer implements PoseSlotData {
 
       this.shiftPelvis(offset, drop);
       for (let i = 0; i < legs.length; i++) this.solve(legs[i], offset, drop);
-      changed = true;
     }
-
-    if (changed) poses.markPoseChanged();
   }
 
   grow(capacity: number): void {
