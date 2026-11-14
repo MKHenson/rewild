@@ -1,164 +1,139 @@
-# Sinew
+![Water](../images/sinew.webp)
 
-Working doc. It is for planning this work, not a milestone write up. When the work ships, rewrite it as a guide, the same as Pelagic.
+# Creatures (Sinew)
 
-## Goal
+Rewild's world has animals in it. Chickens peck in the meadows, lions wander the desert, crows
+circle overhead and tuna swim in the seas. They walk, run, look at the player, run away from
+them, and keep their feet on the ground on a slope. You can place a creature in the editor, or let
+the world spawn them in each biome. This page explains what the creature system does and how to
+use it.
 
-The world gets creatures that move. A creator places a chicken in the editor, or the world spawns chickens in a meadow. In both cases the chicken walks, pecks, looks at the player and runs away. Its feet touch the ground on a slope. Birds circle overhead, and a fish keeps to the lake.
-
-Sinew is the body: skeletons, clip animation, procedural corrections on top of clips (look-at, foot IK) and simple movement. Procedural locomotion, where code makes the motion and no clip plays, is the next milestone (see Next: procedural locomotion). The mind (needs, memory, groups, real AI) is a later milestone.
-
----
-
-## Decisions
-
-Rows marked **Proposed** need a yes from Mat before work starts.
-
-| Topic                    | Decision                                                                                                                                                                                                           |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Source format            | Blender exports glTF (`.glb`). Skins, joints, weights and animation clips come from the glTF. There is no custom format                                                                                            |
-| Skinning                 | GPU skinning in the vertex shader, always instanced. One draw for each model, the same as scatter. Up to 4 joints for each vertex. The CPU writes each instance's joint matrices and parameters to storage buffers |
-| Pose order               | Each frame: sample clips, blend, procedural layers, IK, joint matrices, GPU. Look-at and IK are layers in this order, never patches on clips. Later procedural layers use the same slot                            |
-| Shared data              | Instances of one model share the skeleton, the clips and the geometry. Each instance owns only its pose and its behaviour state                                                                                    |
-| Scale                    | A herd is up to 20 animals. Up to 100 creatures are alive at once. Every creature builds a full pose on the CPU                                                                                                    |
-| Pose data                | One shared buffer for each model. Each creature owns a fixed slot in it, not an array of its own. See Pose buffers                                                                                                 |
-| A creature is a template | A creature template names its model, its behaviours, its clip map and its locomotion sets. Placed and spawned creatures use the same template, so a chicken is a chicken in both cases                             |
-| Behaviours               | Each asset gets its own behaviour instances on load. A behaviour owns its state, for example Wander's target and timer. Each behaviour can save and restore its state as plain data                                |
-| Movement                 | Kinematic. The creature's habitat decides where it may be (see Habitats)                                                                                                                                           |
-| Habitat                  | Each template names its habitat: land, water or air. The field is a list, but Sinew accepts one entry                                                                                                              |
-| Air                      | Birds always fly, wherever they are placed. They stay inside a height band and roll into turns. Take-off, landing and perching come later                                                                          |
-| Wrong medium             | A land or water creature in the wrong medium falls to the ground, plays `idle` and stays still                                                                                                                     |
-| Medium transitions       | Out of scope. A land animal that swims, a bird that lands, a fish that flops, a duck that walks into a pond: these are one problem, solved later for all of them (see Next: medium transitions)                    |
-| Basic behaviours         | Wander, Chase and Flee. Flee is Chase reversed                                                                                                                                                                     |
-| Movement and actions     | Behaviours set movement (a target, a speed and a turn rate) and the locomotion set. They never play locomotion clips. They play and stop action clips by meaning, for example `eat`                                |
-| Clip names               | Clips are named by meaning: `idle`, `walk`, `run`, `eat`. A template maps a meaning to a clip only where the names differ                                                                                          |
-| Speed blend              | Locomotion clips blend by the creature's ground speed, with their cycles in step. A clip never plays fast or slow to match a speed, beyond a small rate correction that stops foot slide                            |
-| Locomotion driver        | Sinew has one driver: the animation controller's locomotion part, which blends clips. Procedural locomotion adds other drivers, for example a swim controller, with no change to behaviours                        |
-| Procedural locomotion    | Out of scope. Fish, snakes, tails and spring bones are the next milestone                                                                                                                                          |
-| Saving                   | **Proposed.** Sinew saves only authored data. Runtime state (where a creature walked, if it died) resets on each load. See Saving                                                                                  |
-| Player body              | **Proposed.** Out of scope. The game stays first person. The skeleton system must not assume an AI drives it, so a player body can use it later                                                                    |
+> **Where the name comes from.** _Sinew_ is the tissue that ties muscle to bone. Sinew was the
+> milestone that gave creatures a body: a skeleton, animation and simple movement. That work is
+> complete. This page is now the plain-English guide to what it gives you.
 
 ---
 
-## Import
+## The short version
 
-`GltfLoader` reads static node trees today. It must also read:
-
-- `skins`: the joint nodes and the inverse bind matrices.
-- The `JOINTS_0` and `WEIGHTS_0` vertex attributes.
-- `animations`: each clip's channels (translation, rotation, scale) with their samplers. Support linear and step. Cubic spline can wait.
-
-The loaded model keeps one skeleton and its clips. Many instances use them.
-
-### Blender conventions
-
-- One armature for each creature.
-- Size a creature by scaling its armature object in Object Mode, without applying the scale. Applying it moves the bones of a rig that came in with a scale. First delete any scale keys on the object itself, or the action overwrites the new scale on export.
-- Name clips by meaning, not by look: `idle`, `walk`, `run`, `eat`. A clip with a shared name needs no entry in the clip map.
-- Start every walk and run loop on the same foot contact, for example the left foot down. The speed blend keeps cycles in step by this.
-- Name the bones that procedural layers use: `head`, `neck_*` and the leg chains. The template names them, so the names do not have to match exactly.
-
----
-
-## Herds and instancing
-
-A herd is up to 20 animals, and up to 100 creatures are alive at once. At that scale every creature can build its full pose on the CPU, look-at and IK included. A creature is a `SkinnedInstance`: a pose, and a `SkinnedMesh` per material on its transform, placed like any `Mesh`. Each creature is culled on its own, and every visible creature of one model is one instanced draw per material. The CPU writes every pose's joint matrices to a storage buffer, and the shader reads them by each drawn creature's slot.
-
-### Pose buffers
-
-- Each model has one shared `Float32Array` for pose data. Each creature owns a fixed slot in it: a range of the array, found by its slot index. No creature has a separate array, and no bone is an object.
-- There are two buffers for each model. The working pose (position, rotation and scale for each bone) is the input. The joint matrices are the output. Only the output matches the GPU layout.
-- The output upload is one `writeBuffer` for each model each frame. Each draw also writes a short list of the visible creatures' world matrices and slots, and the shader finds a creature's joint matrices at `slot × joint count`.
-- Live creatures fill slots 0 to N−1. When a creature despawns, the last creature moves into its slot (swap-remove), so the buffer stays packed.
-- A moved creature's slot index changes. Other code refers to a creature by a stable handle that maps to its slot, and never keeps a slot index.
-- This layout lets a worker take the whole job with one buffer. It also lets WASM build every pose in one call over its own memory, with JS reading the result through views. Many small calls or copies for each creature would lose the gain.
-
-### If counts grow
-
-If a later game needs hundreds of animals, add baked clips. Each clip is sampled into joint matrices at load and stored in a GPU texture. Far instances then sample the bake on the GPU, and only near ones build a CPU pose. The instanced shader already reads joint matrices from a buffer, so a baked source does not change the draw. This is a recorded option, not Sinew work.
-
-### Herd spawning
-
-A spawn rule can spawn a group: some animals round one shared home. The home drifts slowly, and each animal wanders near it, so the group moves together without steering AI. Real herd steering (cohesion, a leader, the herd running as one) belongs to the mind milestone.
+- **Creatures come from Blender** as glTF files, with a skeleton and animation clips.
+- **A creature is a template plus a preset.** The template says which model and clips it uses.
+  The preset says how it moves and where it may live.
+- **Clips are named by meaning**, such as `idle`, `walk`, `run` and `eat`, so code never needs to
+  know a model's own clip names.
+- **Walking and running blend by speed.** A chicken speeding up moves smoothly from walk to run,
+  and its feet do not slide.
+- **Creatures move on their own.** They wander near home, run from the player or run at them.
+- **Each creature has a habitat**: land, water or air. A deer stops at the shore, a fish stays in
+  its lake, and a bird stays in the sky.
+- **Heads and feet react to the world.** A head turns to look at the player, and feet reach down
+  to the ground on a slope.
+- **Biomes spawn creatures**, alone or in groups. The same place always has the same animals.
+- **Up to 100 creatures** are alive at once. Far ones animate less often, to save time.
 
 ---
 
-## Pose pipeline
+## How a creature is made
 
-1. **Sample.** Sample the active clips at their times.
-2. **Blend.** Mix the active clips by their weights: the speed blend, actions and crossfades. A creature has up to 6 active clips, so its slot size is fixed. Six covers a speed blend crossfading between two locomotion sets while an action fades out. Each model's `ClipPlayer` keeps every creature's clips (clip, time, rate, weight and fade) in flat arrays beside its pose slot, and they move with it on swap-remove. If the weights sum to less than 1, the rest pose fills the remainder, so a clip that fades out alone settles into the rest pose. Weights over 1 are normalised. Rotations blend as a weighted sum on one hemisphere, then normalise.
-3. **Procedural layers.** Look-at. The next milestone adds chains and spring bones here.
-4. **IK.** Foot placement.
-5. **Joint matrices.** Multiply by the inverse bind matrices and write the result to the storage buffer.
+A creature has three parts:
 
-Each layer has a weight from 0 to 1. A weight of 0 skips the layer and costs nothing.
+| Part         | What it is                                                                  | Where it lives                    |
+| ------------ | --------------------------------------------------------------------------- | --------------------------------- |
+| **Model**    | The `.glb` file: the mesh, the skeleton and the animation clips.            | `templates/geometries.json`       |
+| **Template** | The asset you place. It names the model, the preset and how clips map.      | `templates/template-library.json` |
+| **Preset**   | How it moves, how fast, where it may live, and whether it looks and plants. | `CreaturePresets.ts`              |
 
-### Look-at
+Many templates can share one preset, and every chicken shares one model. Each creature only owns
+its own pose and its own movement.
 
-- Spread the rotation across the neck bones and the head. The head takes the largest share.
-- Limit yaw and pitch. Out of range, the creature looks forward again.
-- Smooth the change, so the head turns and does not snap.
+### Adding a new creature
 
-**Code.** `LookAtLayer` is the renderer's half. Each model has one, with one chain from the template's `bones.lookAt`, parent first. The last bone takes half the turn and the others split the rest evenly. Each slot keeps its yaw, pitch and weight in a flat array beside its pose, and they move with it on swap-remove. The layer turns the chain on top of the clips in model space, where forward is +Z, so a pecking chicken still pecks. A slot with no clip playing is skipped, since nothing rewrites its pose.
+1. Export the model from Blender as a `.glb` (see [Blender conventions](#blender-conventions)).
+2. Add it to `templates/geometries.json`:
 
-`HeadLook` is the game's half. It reads the player's position, applies the preset's `lookAt` radius and limits, and eases the angles and the weight. The aim starts from the head's rest position, so a clip that moves the head does not move the aim. In game, `CreatureBehaviour` updates it each frame after movement. A creature whose template or preset leaves out look-at follows its clips only.
-### Foot IK
+   ```json
+   "goat": { "type": "gltf", "url": "models/goat.glb" }
+   ```
 
-- Two-bone analytic IK for each leg.
-- Ground height comes from the terrain heightfield, not from a raycast.
-- Lower the pelvis by the largest foot drop, so a leg is never stretched.
-- Quadrupeds also tilt the body to the slope from the front and back feet.
+3. Add a preset for it to `CREATURE_PRESETS` in `CreaturePresets.ts` (see [Presets](#presets)).
+4. Add a template to `templates/template-library.json` that names the model and the preset:
 
-**Code.** `FootIKLayer` is the renderer's half. Each model has one, with the legs from the template's `bones.legs`. A leg lists its upper and lower bones, the bone they carry, then optionally the bones down to the foot. IK bends only the upper and lower bones. The carried bone keeps its clip rotation in model space, so a leg with three segments (thigh, shin, metatarsus) keeps the clip's angle on the lowest one, and the foot moves without bending. Each slot keeps a weight, a pitch and roll share, and a vertical offset for each foot in model space, in a flat array beside its pose. With three or more legs, the layer fits a plane through the feet's offsets and turns the legs' nearest shared parent bone by the shares of its slope, about the point between the feet. Then that bone moves up or down so no leg stretches, and each leg reaches the rest. With two legs nothing turns, and the shared bone moves by the lowest offset. The layer also reports each foot's clip position before IK.
+   ```json
+   {
+     "name": "goat",
+     "type": "asset",
+     "preset": "goat",
+     "clips": { "idle": "Idle_Breathing", "eat": "Graze" },
+     "clipSpeeds": { "walk": 0.9, "run": 6 },
+     "bones": { "lookAt": ["Neck1", "Neck2", "Head"] },
+     "resource": { "geometryId": "goat" }
+   }
+   ```
 
-`FootPlant` is the game's half. It reads each foot's clip position, samples the terrain under it, and sets the offset to that height less the pivot's, capped at the preset's `footIK.maxStep` part of the leg's reach. It passes on the preset's `footIK.pitch` and `footIK.roll` shares, which are 0 when left out. It eases the offsets, and fades the weight out while the creature is off the ground. In game, `CreatureBehaviour` updates it each frame after look-at. A creature whose template or preset leaves out foot IK follows its clips only.
+5. Place it in the editor, or add a spawn rule to a biome (see [Spawning](#spawning)).
+
+A template with a `preset` must use a skinned model, or it fails to load. A skinned model with no
+preset still animates, but stays where you put it.
 
 ---
 
-## Creatures
+## Blender conventions
 
-### Templates
+- **One armature for each creature.**
+- **Size it by scaling the armature object** in Object Mode. Do not apply the scale. Delete any
+  scale keys on the object first, or the clip puts the old scale back on export.
+- **Name clips by meaning** if you can: `idle`, `walk`, `run`, `eat`. Then the template needs no
+  clip map.
+- **Start every walk and run loop on the same foot**, for example the left foot down. This keeps
+  the feet in step when walk and run blend.
+- **Name the neck, head and leg bones** clearly. The template lists them, so the names do not need
+  to match a pattern.
 
-A creature template adds to the asset template:
+---
 
-- `behaviors`: for example `["wander", "flee"]`. The field exists today.
-- `clips`: maps a meaning to a clip name, only where the names differ. A missing entry falls back to the clip with the same name, matched without case if no exact one exists, so `idle` finds `Idle`.
-- `locomotion`: named sets of locomotion clips. `normal` is the default. A missing entry in another set falls back to `normal`.
-- `clipSpeeds`: the natural ground speed of each locomotion clip, in m/s, keyed by meaning. A set's clip falls back to the speed of the slot it fills, for example `limp` to `walk`, then to 1 m/s for walk and 3 m/s for run.
-- `idleActions`: the meanings idle variety picks from.
-- `bones`: the bone names for look-at and IK. `bones.lookAt` lists the neck bones then the head, parent first. `bones.legs` lists each leg, parent first (see Foot IK).
-- `driver`: the locomotion driver. Sinew has only `clips`.
-- `movement`: top speed and turn rate.
-- `habitat`: a list with one entry in Sinew, and that habitat's limits (see Habitats).
+## Templates
 
-### Behaviours
+A creature template is a normal asset template with these extra fields:
 
-- `BehaviourManager` is a registry that maps a behaviour name to a factory. `register(name, factory)` adds one. `spin` is registered by default.
-- `TemplateLoader` creates new behaviour instances for each asset on load, through `createAll(template.behaviors)`. An unknown name throws.
-- Each instance owns its state. Wander keeps its target and its timer. Chase keeps its target.
-- `IBehaviour` has `serialize()` and `restore()`. They write and read the state as plain data (`BehaviourState`, JSON values only), so a later save layer can store it. `restore()` keeps the current value of any field the state leaves out.
-- At runtime a behaviour can hold direct references, for example Chase holds its target. `serialize()` writes the target's stable id, not the object.
+| Field         | What it does                                                                         |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `preset`      | The name of the creature's preset. Makes the asset move on its own.                  |
+| `clips`       | Maps a meaning to a clip name, only where they differ.                               |
+| `locomotion`  | Named sets of walking clips. See [Locomotion sets](#locomotion-sets).                |
+| `clipSpeeds`  | The ground speed, in m/s, each walking clip moves the body at.                       |
+| `idleActions` | Meanings it plays now and then while it stands still, such as `look` or `scratch`.   |
+| `bones`       | `lookAt`: the neck bones then the head. `legs`: each leg's bones, for foot planting. |
 
-### Movement
+**Clip names.** When code asks for `idle`, the template's `clips` map is checked first. If it has no
+entry, the clip called `idle` is used, and then `Idle` if no exact match exists. So a model whose
+clips already have meaning names needs no map.
 
-- Wander picks a point near the creature's home, walks to it, waits, then picks again.
-- Chase and Flee react to the player inside a radius.
-- Each behaviour sets movement: a target, a speed and a turn rate. It does not move the creature or play a locomotion clip.
-- A behaviour can set the locomotion set, and play or stop action clips.
+**Clip speeds.** A walk clip moves the feet at some real speed, for example 0.6 m/s for a chicken.
+Set it in `clipSpeeds` so the blend can match it. Left out, walk is 1 m/s and run is 3 m/s.
 
-### Animation controller
+---
 
-Each creature has an animation controller. It makes all animation decisions. Behaviours tell it what they want.
+## Animation
 
-**Locomotion.** The controller reads the creature's ground speed and blends the clips of the active locomotion set: `idle`, `walk`, `run`.
+Each creature has an **animation controller**. It makes every animation choice. Movement code
+tells it what it wants, and the controller decides which clips play and how much.
 
-- Each clip has a natural speed: the speed its feet carry the body at normal rate. For example, a chicken's `walk` is 1.2 m/s and its `run` is 4 m/s.
-- At 2.6 m/s, the controller plays about half `walk` and half `run`. The clips share one cycle, so the feet stay in step.
-- Walk and run share one phase. Each frame it advances by the blended cycle rate, and each cycling clip's time is that phase times its length. Idle keeps its own time.
-- The playback rate changes only a little, to remove the last foot slide: at most 15% (`RATE_CORRECTION`). Inside the blend the rate is 1, since the blended natural speed equals the ground speed.
-- At zero speed, locomotion is all `idle`.
+### Walking and running
 
-**Locomotion sets.** A set is a version of locomotion. A behaviour or a health state picks it, and the controller crossfades to it.
+The controller reads how fast the creature is moving over the ground, and blends `idle`, `walk`
+and `run` to match.
+
+- A chicken's walk is 0.6 m/s and its run is 2.5 m/s. Moving at 1.5 m/s, it plays about half walk
+  and half run.
+- Walk and run share one cycle, so the feet stay in step while they blend.
+- A clip never plays much faster or slower to match the speed. The rate moves by at most 15%, only
+  to stop the feet sliding.
+- Standing still, it plays `idle`.
+
+### Locomotion sets
+
+A **locomotion set** is a different way of walking. There are three: `normal`, `flee` and
+`injured`.
 
 ```json
 "locomotion": {
@@ -167,261 +142,306 @@ Each creature has an animation controller. It makes all animation decisions. Beh
 }
 ```
 
-The injured deer has no `run` of its own, so it uses the normal `run`. If an injured deer must not run, its behaviour caps the speed. A creature with no `injured` set walks normally, so a behaviour can ask for any set on any creature.
+A set only lists what it changes. The `injured` set above has no `run`, so it uses the normal one.
+A creature with no `injured` set walks normally when asked for it, so code can ask any creature for
+any set. Changing set crossfades over a quarter of a second.
 
-**Actions.** A behaviour plays an action clip by meaning: `animator.play('eat')`, `animator.stop('eat')`. The controller fades it in over locomotion and fades it out when it ends or stops. The behaviour decides the rest. Wander stops moving while the chicken eats. Flee stops the `eat` action before it runs.
+### Actions
 
-**Idle variety.** While a creature stands still, the controller plays a random idle action now and then, for example `look`, `scratch` or `shake`, every 4 to 10 seconds. Moving fades it out.
+An **action** is a clip played over walking, such as `eat`. It fades in, plays, and fades out when
+it ends or is stopped.
 
-**Weights.** The controller sets every clip's weight each frame. Actions take their share first, and locomotion fills the rest, so the total stays 1. Two locomotion sets crossfading, each with two clips, plus an action and one fading out, fill the 6 clip slots.
+### Idle variety
 
-**Code.** `AnimationController` drives a `SkinnedInstance` through the `AnimationTarget` interface. `TemplateLoader` gives every skinned asset one as `asset.animator`. In game, the `Animator` behaviour measures ground speed from how far the asset moved and updates the controller each frame.
+While a creature stands still, every 4 to 10 seconds it plays one of its `idleActions`. Moving
+fades it out.
 
-**The seam.** Behaviours never play locomotion clips, so Shoal can swap the locomotion part for a swim controller with no change to behaviours.
+### Using the controller from code
 
-### In the editor
+Every skinned asset has one as `asset.animator`:
 
-Behaviours do not run in the editor. A placed creature plays its `idle` clip in place, so the creator sees that it is alive.
+```ts
+animator.play('eat'); // fade in an action, once
+animator.play('eat', true); // loop it
+animator.stop('eat'); // fade it out
+animator.isPlaying('eat');
+animator.setLocomotion('flee'); // crossfade to a locomotion set
+animator.resolveClip('idle'); // the model's clip name for a meaning, or null
+```
+
+Never play `walk` or `run` as an action. Change the creature's speed, and the controller blends
+them for you.
+
+**Files to look at:** `AnimationController.ts`, `Animator.ts` (measures ground speed each frame).
+
+---
+
+## Movement
+
+A creature moves by itself. It turns toward a goal at its turn rate and speeds up and slows down
+smoothly. It does not use physics.
+
+### Movement modes
+
+A creature has one or more **modes**. Each frame, every mode says how much it wants control, and
+the one that wants it most takes over.
+
+| Mode       | What it does                                                                                                                     |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Wander** | Walks to a point near home, waits there, then picks another. While it waits, it plays an action chosen by weight, such as `eat`. |
+| **Evade**  | When the player comes inside `radius`, it runs away. Past `release`, it calms down and wanders again.                            |
+| **Seek**   | When the player comes inside `radius`, it runs at them. Past `release`, it gives up.                                             |
+
+Evade and Seek take control from Wander, so a chicken stops eating and runs. Each can switch to a
+locomotion set while it is in control, for example `flee`.
+
+A creature's **home** is where it was placed or spawned. A placed creature's `radius` property
+changes how far it wanders.
+
+### Writing a new mode
+
+A mode implements `IMovementMode`:
+
+```ts
+score(system); // how much it wants control this frame; 0 never takes it
+enter(system); // it just took control
+exit(system); // it just lost control
+update(dt, system); // set the goal: system.steerTo(x, z, speed) or system.halt()
+serialize() / restore(state); // its state as plain JSON
+```
+
+A mode only sets a goal. It never moves the creature or plays walk clips itself. It can use
+`system.animator` to play actions and change locomotion set.
+
+**Files to look at:** `MovementSystem.ts`, `modes/Wander.ts`, `modes/Seek.ts`.
 
 ---
 
 ## Habitats
 
-A habitat says where a creature may be. The locomotion driver says how its body moves. They are separate, so a fish's habitat rules do not change when Shoal gives it a swim controller.
+A **habitat** says where a creature may be. One question, "can it be here?", is asked when it
+spawns, when Wander picks a point, and before every step.
 
-One check answers "can this creature be at this point?". Three things use it:
+| Habitat   | Where it may be                                                       |
+| --------- | --------------------------------------------------------------------- |
+| **Land**  | On the ground, below a slope limit, in water no deeper than it wades. |
+| **Water** | Under the surface and above the bed, by a margin, in chosen waters.   |
+| **Air**   | In a height band above the ground or the water.                       |
 
-- **Spawning.** Is this a valid spawn point?
-- **Wander.** Is this a valid target?
-- **Each step.** Is the next position still valid? A deer stops at the shore and does not walk into the lake.
+- **At the edge.** When the way ahead leaves the habitat, the creature tries turning 45° then 90°
+  to either side, and walks along the edge. If no way works, it stops at the nearest point.
+- **Heights.** Water and air creatures pick a height inside their range with each Wander point.
+  Birds look ahead and climb before a hill.
+- **Falling.** Land and water creatures fall. A chicken placed in the air drops to the ground, and
+  a fish placed above a lake drops into it. Birds never fall.
+- **The wrong place.** A land creature in deep water, or a fish on land, is **stranded**. It drops
+  to the ground, plays `idle` and stays still until the world under it changes.
+- **Too steep.** A land creature on a slope past its limit is not stranded. It keeps walking until
+  it is back on good ground.
 
-When the way to the goal leaves the habitat, the creature turns to the nearest detour, 45° then 90° either side, and walks along the edge facing where it goes. A moving creature takes no detour that turns it back, so it stops at the point nearest a goal it cannot reach instead of pacing there. Wander waits when stopped, and gives up a point it has not got closer to after a few seconds of walking.
+### Birds
 
-Water and air habitats also give the heights a creature may be at over a point. Wander picks a level inside that range with each target.
+A bird always flies. Its locomotion set puts `glide` and `flap` in the walk and run slots, so it
+glides at cruise speed and flaps when it goes faster or climbs. It rolls into turns. With
+`circle: true` on Wander, each point is further round home, so the bird circles.
 
-| Habitat | Rules                                                                                          | Data                                                    |
-| ------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Land    | Dry ground, or water no deeper than a wade depth. Slope under a limit                          | The heightfield, `WaterQuery` depth                     |
-| Water   | A margin above the bed and below the surface. Allowed water types (lake, ocean)                | `WaterQuery`: `ground`, `level`, `typeWeights`          |
-| Air     | A height band above the ground or the water. Look ahead along the path and climb before a hill | The heightfield, `WaterQuery` level                     |
-
-### Gravity and the wrong medium
-
-- Land and water creatures fall. A chicken placed above the ground falls to it, and a fish placed above a lake falls into it.
-- A creature in the wrong medium is stranded: a land creature in deep water, or a fish on land or in water too shallow for its margins. It falls to the ground, plays `idle` and does not move until the medium under it changes.
-- A land creature on a slope past its limit is not stranded. It walks freely until it is back in its habitat.
-- Birds never fall and are never stranded.
-
-### Water
-
-- `WaterQuery` has the map data now, with no delay.
-- A fish keeps moving at its `cruiseSpeed`, and turns back at the shore.
-- The test fish in Sinew moves with a swim clip. Its body motion becomes procedural in Shoal, and its habitat rules stay the same.
-
-### Air
-
-- A bird flies at a height inside its band, and rises to it if placed below it. Wander picks each point further round home, so the bird circles.
-- A bird's locomotion set has `glide` and `flap` in its walk and run slots. Climbing adds to the speed the controller blends by, so the bird flaps as it climbs. `glide` can also fill `idle`, and then plays at its glide speed.
-- The root rolls into turns from the turn rate. This is a root transform, not a procedural layer.
+**Files to look at:** `Habitat.ts`.
 
 ---
 
-## Placement and spawning
+## Presets
 
-- **Placed.** The creator places a creature like any asset, anywhere. Its placement is its home. Placements save with the level today, so this needs no new storage.
-- **Spawned.** A spawn rule says which creatures appear in which biome, and how many. Like scatter, the seed and the chunk decide each spawn, so the same chunk gives the same chickens every time. A spawn point must pass the habitat check. Air creatures spawn inside their band. Creatures spawn inside a radius of the player and despawn outside it.
+A preset is a plain object in `CREATURE_PRESETS` in `CreaturePresets.ts`. This is the chicken:
 
-A spawned creature gets a stable id from its chunk and its index. A later save can find it again by that id.
+```ts
+chicken: {
+  driver: 'clips',
+  movement: {
+    walkSpeed: 0.6,     // m/s
+    runSpeed: 2.5,      // m/s
+    turnRate: 4,        // radians per second
+    acceleration: 6,    // m/s²
+    modes: {
+      wander: {
+        radius: 6,      // metres from home
+        wait: [2, 6],   // seconds at each point
+        actions: [
+          { meaning: 'eat', weight: 3 },
+          { meaning: null, weight: 2 },  // just stand
+          { meaning: 'rest', weight: 3 },
+        ],
+      },
+      evade: { radius: 5, release: 8, locomotion: 'flee' },
+    },
+  },
+  lookAt: { radius: 12, yawLimit: 1.75, pitchLimit: 0.9, smoothing: 0.18 },
+  habitat: [
+    { type: 'land', slope: { from: 35, to: 30 }, waterDepth: { from: 0.3, to: 0.2 } },
+  ],
+},
+```
 
-**Code.** A biome lists its spawn rules in `creatures`, beside `scatter`. A rule names a creature template, a density in groups for each hectare, and optionally the group size, the spread of a group round its home, and the home's `drift` speed and `roam` distance. `planChunkSpawns` plans a terrain chunk's groups once its heights load. Each rule draws from its own stream seeded by the world seed, the chunk and the rule, so adding a rule leaves the others in place. A group's home passes when a roll falls under the biome's weight there and the creature's habitat accepts it. Each animal then finds a place inside the habitat within the spread, at a random level of its height range if the habitat has one. Ids are `spawn:cx,cy:index`.
+### Movement settings
 
-`CreatureSpawner` is a container in the level. Twice a second it plans the chunks near the player, spawns a group when its origin is within 120 m (`SPAWN_RADIUS`) and despawns it past 150 m (`DESPAWN_RADIUS`). It stops spawning at 100 live creatures. Each group's animals share a `HerdHome`. A drifting home moves on a wandering heading, stays in the habitat and turns back at its roam distance. Each frame the spawner writes the home into its animals' movement, so Wander keeps them round it.
+| Setting        | What it does                                                          |
+| -------------- | --------------------------------------------------------------------- |
+| `walkSpeed`    | The speed it wanders at.                                              |
+| `runSpeed`     | The speed it evades or seeks at.                                      |
+| `turnRate`     | How fast it can turn, in radians a second.                            |
+| `acceleration` | How fast it speeds up and slows down.                                 |
+| `cruiseSpeed`  | It never slows below this. Use it for fish and birds that never stop. |
+| `climbSpeed`   | How fast it changes height. Leave it out for creatures that walk.     |
+| `bank`         | How far a bird rolls at its full turn rate, in radians.               |
+| `modes`        | Which of `wander`, `evade` and `seek` it uses, and their settings.    |
+
+### Habitat settings
+
+Choose one entry for `habitat`:
+
+```ts
+{ type: 'land', slope: { from: 35, to: 30 }, waterDepth: { from: 0.3, to: 0.2 } }
+{ type: 'water', bedMargin: 0.4, surfaceMargin: 1, waterTypes: ['lake'] }
+{ type: 'air', band: [15, 30], lookAhead: 3 }
+```
+
+Land limits use the same `{ from, to }` bands as biome scatter rules. `slope: { from: 35, to: 30 }`
+means "fine below 30°, not allowed past 35°". Land can also limit `height`, in world metres.
+Water's `waterTypes` is optional; left out, any water will do.
+
+---
+
+## Looking and foot planting
+
+These two corrections play on top of the clips, so a pecking chicken still pecks while it looks
+at you.
+
+### Look-at
+
+The head and neck turn to look at the player when they come close. The head turns most and the
+neck bones share the rest. If the player goes past the yaw or pitch limit, for example behind the
+creature, it looks forward again. The turn is smoothed, so the head never snaps.
+
+**How to use it.** List the neck bones then the head in the template's `bones.lookAt`, parent
+first. Add `lookAt` to the preset: `radius` (metres), `yawLimit` and `pitchLimit` (radians) and
+`smoothing` (seconds).
+
+### Foot planting
+
+Each foot reaches up or down to the ground under it, so feet touch the slope and no leg floats or
+stretches. The body drops a little to keep every leg in reach. A creature with three or more legs
+can also tilt its body with the slope.
+
+**How to use it.** List each leg in the template's `bones.legs`, parent first. The first two
+bones bend, the third is carried, and any more lead down to the foot:
+
+```json
+"legs": [
+  ["Femur.L", "Tibia.L", "Metatarsal.L", "Foot.L"],
+  ["Femur.R", "Tibia.R", "Metatarsal.R", "Foot.R"]
+]
+```
+
+Add `footIK` to the preset: `smoothing` (seconds), `maxStep` (how far a foot may move, as a part
+of the leg's reach), and optionally `pitch` and `roll` (how much the body tilts with the slope,
+0 to 1).
+
+Leave `lookAt` or `footIK` out of the preset, and the head or feet just follow the clips.
+
+**Files to look at:** `HeadLook.ts`, `FootPlant.ts`, and the renderer's `LookAtLayer.ts` and
+`FootIKLayer.ts`.
+
+---
+
+## Placing and spawning
+
+### Placing in the editor
+
+Place a creature like any other asset. Where you put it is its home. In the editor it plays
+`idle` in place, so you can see it is alive. It only moves in the game.
+
+### Spawning
+
+A biome lists the creatures that live in it in `creatures`, next to `scatter`, in `Biomes.ts`:
+
+```ts
+creatures: [
+  { creature: 'chicken', density: 0.3, group: [2, 5], spread: 5 },
+  { creature: 'lioness', density: 0.03, group: [3, 5], spread: 8, drift: 0.4, roam: 60 },
+],
+```
+
+| Field      | What it does                                                      |
+| ---------- | ----------------------------------------------------------------- |
+| `creature` | The creature's template name.                                     |
+| `density`  | Groups for each hectare.                                          |
+| `group`    | How many animals in a group, smallest and largest. Left out, one. |
+| `spread`   | How far from the group's home, in metres, each animal starts.     |
+| `drift`    | How fast the group's home moves, in m/s. Left out, it stays put.  |
+| `roam`     | How far the home may drift from where it started, in metres.      |
+
+- **The same every time.** The world seed and the chunk decide each group, so a meadow always has
+  the same chickens.
+- **Habitats apply.** A group only spawns where its creature may live, so you can put fish in any
+  biome and they only appear in its water. Birds spawn in their height band.
+- **Groups move together.** The animals in a group share one home. When the home drifts, they
+  wander after it, so a pride moves across the desert as one.
+- **Near the player only.** A group spawns when the player is within 120 m and despawns past
+  150 m. No more than 100 spawned creatures are alive at once.
+
+**Files to look at:** `SpawnPlanner.ts`, `CreatureSpawner.ts`, `HerdHome.ts`.
 
 ---
 
 ## Saving
 
-There are three kinds of creature data:
-
-| Data                | Example                          | Saved today?                          |
-| ------------------- | -------------------------------- | ------------------------------------- |
-| Authored placements | The creator puts a chicken here  | Yes, with the level                   |
-| Spawned creatures   | The meadow has chickens          | Not needed. The seed makes them again |
-| Runtime state       | The chicken walked 30 m, or died | No                                    |
-
-Runtime state is a player change to the world. Project Promotion already decided where player changes go: a separate layer on top of the authored level, with a project setting for its scope. Saving runtime state is that layer's work, not Sinew's.
-
-**Proposed:** Sinew does not save runtime state. It keeps two rules so the layer can save it later:
-
-- Every creature has a stable id, placed or spawned.
-- Each behaviour can write its state as plain data, with stable ids in place of live objects.
+| What                     | Saved?                                     |
+| ------------------------ | ------------------------------------------ |
+| Creatures you place      | Yes, with the level, like any asset.       |
+| Creatures a biome spawns | Not needed. The seed makes them again.     |
+| Where a creature walked  | No. Every creature starts at home on load. |
 
 ---
 
-## Performance
+## Quality and performance
 
-- Distant creatures update their pose at a lower rate, for example 15 Hz.
-- Look-at and IK stop past a range.
-- Creatures outside the main camera and every shadow camera still move, but do not build a pose.
-- Shadows use the same instance data, so they match the main pass.
-- Add creature counts and pose time to scene stats.
+- **Far creatures animate less often.** Within 20 m they update every frame, within 40 m at
+  30 times a second, and further away at 15.
+- **Hidden creatures still move** but do not animate, unless a shadow can see them.
+- **Look-at stops** past its radius, and **foot planting** stops past 30 m.
+- **One draw for each model.** Every visible chicken draws in one go, and shadows use the same
+  data.
 
-**Code.** `PoseSchedule` picks the slots that build a pose each frame. Each model has one, with a flag, a world position and the time since the last build for each slot, in flat arrays beside its pose. The main pass and the shadow casters report every slot they draw and where. The next frame, `SkinnedModel.update` builds only the reported slots, by their distance from the camera: every frame within 20 m (`FULL_RATE_DISTANCE`), at 30 Hz within 40 m (`NEAR_RATE_DISTANCE`), then at 15 Hz. A slot no draw reported keeps its pose and builds once a draw reports it again. A slot back from a long wait takes a phase of its own, so a herd that comes into view does not build on one frame. `ClipPlayer` still advances every clip's time and fade each frame, and look-at and foot IK only turn the slots it posed. `PoseStore` rebuilds only the changed slots' joint matrices, and the upload covers the range from the first changed slot to the last.
-
-Look-at stops past the preset's `lookAt` radius. `FootPlant` eases foot IK out past 30 m (`FOOT_IK_RANGE`) from the player, and stops sampling the terrain there.
-
-Scene stats show `creature poses` under `cpu`: the schedule, clips, layers and joint matrices. Under `counts`, `creatures` is the live count and `creatures posed` is how many built a pose this frame.
-
-### If pose time grows
-
-Go in this order, and move to the next step only when scene stats show the need:
-
-1. **Plain TypeScript on flat arrays.** This is the Sinew work.
-2. **A Web Worker.** Pose work leaves the main thread, the same pattern as `TerrainWorkerPool`. The pose arrives one frame late, so footstep events and bone positions lag by a frame. The worker needs the clips, the skeletons, the movement values and the terrain heights. Shared memory needs cross-origin isolation headers.
-3. **WASM.** With SIMD, often 2 to 3 times faster than typed-array JS for this math. It adds a second language and a build step. At the counts that need it, baked clips (see If counts grow) can be the better choice.
+The perf panel shows the time spent on poses as `creature poses` under `cpu`. Under `counts`,
+`creatures` is how many are alive and `creatures posed` is how many animated this frame. See
+[Debugger & Console Commands](../debug-commands.md#perf-panel).
 
 ---
 
-## Out of scope
+## Debugger / console functions
 
-- A player body and a third-person camera.
-- AI: needs, memory, perception past a radius, path finding round obstacles.
-- Procedural locomotion (see Next: procedural locomotion).
-- Group steering: herds, flocks and fish schools that steer as one. Herds can spawn as a group (see Herd spawning).
-- Medium transitions: take-off, landing and perching, land animals that swim, fish that flop, and creatures with more than one habitat (see Next: medium transitions).
-- Ragdoll, blend trees, root motion.
-- Actions on part of the body only (bone masks), and additive clips.
-- Saving runtime state (see Saving).
+Type these in the browser console.
 
----
+| Command                                            | What it does                                                       |
+| -------------------------------------------------- | ------------------------------------------------------------------ |
+| `showSkinnedInstances('chicken', 20)`              | Shows a grid of a skinned model in front of the camera.            |
+| `playSkinnedClip('Walk')`, `stopSkinnedClips()`    | Plays a clip on every shown instance, or fades back.               |
+| `animateSkinned(1.5, {...})`                       | Runs the animation controller at a ground speed.                   |
+| `skinnedLocomotion('injured')`                     | Crossfades the shown instances to a locomotion set.                |
+| `skinnedAction('Idle2')`                           | Plays an action over walking.                                      |
+| `skinnedInstancesInfo()`, `hideSkinnedInstances()` | Reports what the shown instances drew, or removes them.            |
+| `showCreatureSpawns()`                             | The spawner's state, and the nearest planned groups and creatures. |
+| `goToCreature(0, 'lioness')`                       | Moves the player next to the nearest live creature.                |
 
-## Next: procedural locomotion
-
-A later milestone, possibly named Shoal. Fish lead it. These notes keep the thinking from the Sinew planning.
-
-### How fish swim
-
-A fish swims with a travelling wave down the body, not a plain sine:
-
-- **Amplitude envelope.** The head hardly moves and the tail moves most. Eels bend along the whole body, trout along the rear half, tuna only at the tail.
-- **The wave travels** from head to tail a little faster than the fish swims.
-- **Speed changes the frequency.** The amplitude stays near 0.2 of the body length at the tail.
-
-Other motions sit on top of the wave:
-
-| Motion          | What it looks like                                                                 |
-| --------------- | ---------------------------------------------------------------------------------- |
-| Hover           | Body almost still. Pectoral fins scull. Small tail corrections. Gills move         |
-| Cruise          | A steady travelling wave                                                           |
-| Burst and coast | A few strong tail beats, then a glide with a straight body. The most lifelike gait |
-| Turn            | The whole spine curves into the turn. A bend, not an oscillation                   |
-| Escape          | The body snaps into a C, then springs out, in about 50 ms                          |
-| Brake           | Pectoral fins flare and the body pitches                                           |
-
-### Design direction
-
-- **Swim controller.** A locomotion driver. It reads the movement values, picks the gait, and outputs wave values: frequency, amplitude, envelope, spine curve and fin motion.
-- **Accumulate the phase** each frame (`phase += frequency * dt`). Phase from `frequency * time` jumps when the speed changes.
-- **Two ways to apply the values**, from one controller:
-  - Hero fish use bones. A chain layer in the procedural slot applies the wave and the curve. Clips can add the escape and fin flicks.
-  - School fish use the vertex shader with per-instance parameters. Masks painted in Blender give each vertex its weight along the spine and mark the fins. ABZÛ used this approach (GDC talk on the fish of ABZÛ).
-- **Burst and coast is the default cruise.**
-- The same chain layer serves tails and snakes. Spring bones serve ears and wattles.
-
-### Also later
-
-- **Fish collectives.** Fish move as schools, and swimming gets more work than Sinew gives it.
+The commands are registered in `SkinnedDebugCommands.ts` and `CreatureDebugCommands.ts`. See
+[Debugger & Console Commands](../debug-commands.md#creatures).
 
 ---
 
-## Next: medium transitions
+## Related docs
 
-A later milestone replaces the stranded state with real behaviour in each medium. Each needs an approach check, a blend between heights and a clip change, so one system serves all of them. Sinew's `habitat` list leaves room for this.
-
-| Case                    | Direction                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------------- |
-| Land creatures on water | Float on the surface with a `swim` set. A flag lets some dive under it. Near ones bob on real waves |
-| Birds on land           | Land, walk and perch. Take off again                                                              |
-| Birds on water          | Land on the surface, float with a `swim` set, and take off. This also gives us ducks              |
-| Fish on land            | Flop with a `flop` set                                                                            |
-| Moving between media    | Creatures choose to cross a shore. Ducks and frogs use more than one habitat                      |
-
----
-
-## Next: interest
-
-A later milestone gives a creature one interest: what it is paying attention to. It can be a point, the player, a butterfly, prey or a boulder. Sinew's look-at only knows the player.
-
-- **Choosing.** Something weighs the candidates and decides when the creature gets bored. This belongs with perception in the mind milestone.
-- **Sharing.** The head and movement use the same interest, so a fox's eyes and legs agree on its prey. `Seek` reads the player directly today.
-- **Moving targets.** An interest holds a stable handle and copes with its target despawning. It saves as a stable id.
-
-`HeadLook` and `Seek` then read the interest in place of the player. `LookAtLayer` does not change, since it only takes angles.
-
----
-
-## Answered questions
-
-- **Test assets.** Mat provides them: a chicken, a quadruped, a bird and a fish, with clips. The fish is `tuna.glb` and the bird is `crow.glb`.
-- **Spawn caps.** Spawn rules work like scatter rules today. There is no cap for each project.
-
----
-
-## TODOs
-
-Each TODO becomes one GitHub ticket. The order follows the dependencies. "Expect" is what is true when the ticket is done.
-
-- [ ] **1. Skinned glTF import**
-
-  - Scope: read skins, inverse bind matrices, `JOINTS_0`, `WEIGHTS_0` and animation clips in `GltfLoader`. The model keeps one skeleton and its clips.
-  - Expect: loader specs cover a skinned model with two clips. Static models load as before.
-
-- [ ] **2. Instanced GPU skinning**
-
-  - Scope: an instanced skinned variant of the standard pass and the shadow pass. Per-instance joint matrices and parameters in storage buffers. Stable creature handles that map to slots, with swap-remove.
-  - Expect: 20 copies of a skinned model render in their bind pose in one draw, with correct shadows. Removing a creature moves the last one into its slot, and its handle still finds it.
-
-- [ ] **3. Clip playback and crossfade**
-
-  - Scope: sample and blend steps of the pose pipeline on the CPU, on flat pose arrays. Up to 6 weighted clips for each instance. Play, stop, crossfade and rate.
-  - Expect: 20 instances each play their own clip at their own time, and crossfade from `idle` to `walk` with no pop.
-
-- [ ] **4. Behaviour instances for each asset**
-
-  - Scope: `BehaviourManager` becomes a registry of factories. `TemplateLoader` creates behaviour instances for each asset. Add `serialize()` and `restore()` to `IBehaviour`. `Spin` keeps working.
-  - Expect: two assets with one stateful behaviour keep separate state. A behaviour's state survives `serialize()` then `restore()`.
-
-- [ ] **5. Animation controller**
-
-  - Scope: the speed blend with cycles in step, locomotion sets with fallback to `normal`, actions with play and stop, idle variety. The `clips` map with fallback to shared names.
-  - Expect: a test creature speeds up from `idle` to `run` with no foot slide and no pop. An `injured` set swaps `walk` for `limp`. An action fades in over locomotion and out again. The editor plays `idle` on placed creatures.
-
-- [ ] **6. Creature templates and movement**
-
-  - Scope: the creature template fields. The habitat check with the land habitat. Wander, Chase and Flee set movement. The locomotion driver moves the creature on the heightfield.
-  - Expect: a placed chicken wanders near its home, eats, and runs from the player. Flee stops the `eat` action. It stops at the shore. No behaviour plays a locomotion clip.
-
-- [ ] **7. Water and air habitats**
-
-  - Scope: the water and air habitats. Gravity for land and water creatures, and the stranded state. Wander in three dimensions for air and water. Root roll into turns.
-  - Expect: a fish stays in its lake between the bed and the surface. A fish on land falls to the ground, plays `idle` and stays still. A bird circles inside its band and climbs before a hill, wherever it is placed.
-
-- [ ] **8. Look-at layer**
-
-  - Scope: the procedural layer step, and look-at across the neck and the head with limits and smoothing.
-  - Expect: the chicken turns its head to the player inside a radius, and looks forward when the player is behind it.
-
-- [ ] **9. Foot IK**
-
-  - Scope: two-bone IK for each leg, pelvis drop, body tilt for quadrupeds.
-  - Expect: on a slope, feet touch the ground and no leg stretches. A quadruped tilts with the slope.
-
-- [ ] **10. Spawn rules**
-
-  - Scope: spawn rules for each biome, seeded for each chunk, spawn and despawn by distance, stable ids. Group spawns with a drifting home.
-  - Expect: a meadow has the same chickens each time it loads. A plain has a herd that moves together. Fish spawn only in water, birds only in the air.
-
-- [ ] **11. Animation LOD and stats**
-
-  - Scope: pose update rate by distance, look-at and IK range, no pose off screen. Scene stats for creatures and pose time.
-  - Expect: 100 live creatures fit the frame budget, and scene stats show their pose time.
+- [Terrain (Strata)](./strata.md): the biomes creatures spawn in.
+- [Objects, Scatter & Foliage (Understory)](./understory.md): how models load, and the scatter
+  rules spawn rules sit next to.
+- [Water (Pelagic)](./pelagic.md): the lakes and seas fish live in.
+- [Renderer](../renderer.md): how the render passes fit together.
+- [Debugger & Console Commands](../debug-commands.md): all the other console commands.
