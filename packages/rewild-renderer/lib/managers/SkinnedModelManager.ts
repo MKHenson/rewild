@@ -6,6 +6,9 @@ import { SkinnedModel } from '../renderers/skinning/SkinnedModel';
  * that model asks for it and freed when the last one is gone.
  */
 export class SkinnedModelManager {
+  /** Poses built in the last `update`. */
+  posed = 0;
+
   private readonly models = new Map<string, SkinnedModel>();
 
   acquire(renderer: Renderer, modelId: string): SkinnedModel {
@@ -28,9 +31,22 @@ export class SkinnedModelManager {
     this.models.delete(modelId);
   }
 
-  /** Builds every model's working poses, `dt` seconds on. */
-  update(dt: number): void {
-    for (const model of this.models.values()) model.update(dt);
+  /** Live instances over every model. */
+  get instanceCount(): number {
+    let count = 0;
+    for (const model of this.models.values()) count += model.poses.count;
+    return count;
+  }
+
+  /**
+   * Builds every model's poses due this frame, `dt` seconds on, with the
+   * camera at `x, y, z`.
+   */
+  update(dt: number, x: number, y: number, z: number): void {
+    let posed = 0;
+    for (const model of this.models.values())
+      posed += model.update(dt, x, y, z);
+    this.posed = posed;
   }
 
   get(modelId: string): SkinnedModel | undefined {

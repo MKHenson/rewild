@@ -1,7 +1,7 @@
 import { Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
 import { FootIKSettings } from './CreaturePresets';
-import { FootPlant, FootTarget } from './FootPlant';
+import { FOOT_IK_RANGE, FootPlant, FootTarget } from './FootPlant';
 import { TestWorld } from './testWorld';
 
 const SETTINGS: FootIKSettings = { smoothing: 0.05, maxStep: 0.4 };
@@ -116,5 +116,19 @@ describe('FootPlant', () => {
     run(1);
 
     expect(set.offsets[0]).toBe(0);
+  });
+
+  it('fades out past its range from the player', () => {
+    const { world, set, run } = setup();
+    world.height = (x) => x * 0.3;
+    world.player = new Vector3(FOOT_IK_RANGE - 1, 0, 0);
+    run(1);
+    expect(set.weight).toBeCloseTo(1, 3);
+
+    world.player.set(FOOT_IK_RANGE + 1, 0, 0);
+    run(1);
+
+    expect(set.weight).toBe(0);
+    expect(set.offsets[0]).toBeCloseTo(0, 3);
   });
 });

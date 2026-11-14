@@ -266,6 +266,12 @@ Runtime state is a player change to the world. Project Promotion already decided
 - Shadows use the same instance data, so they match the main pass.
 - Add creature counts and pose time to scene stats.
 
+**Code.** `PoseSchedule` picks the slots that build a pose each frame. Each model has one, with a flag, a world position and the time since the last build for each slot, in flat arrays beside its pose. The main pass and the shadow casters report every slot they draw and where. The next frame, `SkinnedModel.update` builds only the reported slots, by their distance from the camera: every frame within 20 m (`FULL_RATE_DISTANCE`), at 30 Hz within 40 m (`NEAR_RATE_DISTANCE`), then at 15 Hz. A slot no draw reported keeps its pose and builds once a draw reports it again. A slot back from a long wait takes a phase of its own, so a herd that comes into view does not build on one frame. `ClipPlayer` still advances every clip's time and fade each frame, and look-at and foot IK only turn the slots it posed. `PoseStore` rebuilds only the changed slots' joint matrices, and the upload covers the range from the first changed slot to the last.
+
+Look-at stops past the preset's `lookAt` radius. `FootPlant` eases foot IK out past 30 m (`FOOT_IK_RANGE`) from the player, and stops sampling the terrain there.
+
+Scene stats show `creature poses` under `cpu`: the schedule, clips, layers and joint matrices. Under `counts`, `creatures` is the live count and `creatures posed` is how many built a pose this frame.
+
 ### If pose time grows
 
 Go in this order, and move to the next step only when scene stats show the need:

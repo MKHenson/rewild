@@ -7,6 +7,7 @@ import { createStandardPass } from '../../managers/MaterialManager';
 import { ClipPlayer } from './ClipPlayer';
 import { FootIKLayer } from './FootIKLayer';
 import { LookAtLayer } from './LookAtLayer';
+import { PoseSchedule } from './PoseSchedule';
 import { PoseStore } from './PoseStore';
 
 const MATRIX_BYTES = 64;
@@ -28,6 +29,7 @@ export class SkinnedModel {
   readonly player: ClipPlayer;
   readonly lookAt: LookAtLayer;
   readonly footIK: FootIKLayer;
+  readonly schedule: PoseSchedule;
   readonly primitives: SkinnedPrimitive[] = [];
   /** Local bounds that hold the model however its joints bend: a cube of the
    *  bind pose's radius about the origin. */
@@ -47,6 +49,7 @@ export class SkinnedModel {
       throw new Error('Skinned model has no skinned primitives.');
 
     this.poses = new PoseStore(model.skeleton);
+    this.schedule = new PoseSchedule(this.poses);
     this.player = new ClipPlayer(this.poses, model.clips);
     this.lookAt = new LookAtLayer(this.poses, this.player);
     this.footIK = new FootIKLayer(this.poses, this.player);
@@ -62,11 +65,17 @@ export class SkinnedModel {
       });
   }
 
-  /** Builds every working pose: clips, then procedural layers, then IK. */
-  update(dt: number): void {
-    this.player.update(dt);
+  /**
+   * Builds the poses due this frame: clips, then procedural layers, then IK,
+   * then joint matrices. The camera at `x, y, z` sets how often each builds.
+   * Returns how many were built.
+   */
+  update(dt: number, x: number, y: number, z: number): number {
+    const posed = this.player.update(dt, this.schedule.plan(dt, x, y, z));
     this.lookAt.apply();
     this.footIK.apply();
+    this.poses.update();
+    return posed;
   }
 
   /** Rebuilds changed joint matrices and uploads them. False while empty. */
@@ -78,14 +87,18 @@ export class SkinnedModel {
     poses.update();
 
     if (poses.jointsChanged || grew) {
-      renderer.device.queue.writeBuffer(
-        this.jointBuffer!,
-        0,
-        poses.jointMatrices,
-        0,
-        poses.count * poses.jointCount * 16
-      );
-      poses.jointsChanged = false;
+      const from = grew ? 0 : poses.changedFrom;
+      const to = grew ? poses.count : Math.min(poses.changedTo, poses.count);
+      const size = poses.jointCount * 16;
+      if (to > from)
+        renderer.device.queue.writeBuffer(
+          this.jointBuffer!,
+          from * size * 4,
+          poses.jointMatrices,
+          from * size,
+          (to - from) * size
+        );
+      poses.clearJointsChanged();
     }
 
     return true;

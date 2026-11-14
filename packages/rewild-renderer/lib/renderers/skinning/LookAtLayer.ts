@@ -17,9 +17,9 @@ const _b = new Float32Array(4);
 
 /**
  * Turns a bone chain of every instance of one skinned model, on top of the
- * clips. It runs after ClipPlayer.update, which rewrites each playing slot, so
- * the turn never builds up from frame to frame. A slot with no clip playing or
- * no weight is skipped.
+ * clips. It runs after ClipPlayer.update, which rewrites each slot it poses, so
+ * the turn never builds up from frame to frame. A slot the clips did not
+ * rewrite this frame, or with no weight, is skipped.
  *
  * Angles are in model space, where forward is +Z and up is +Y.
  */
@@ -105,7 +105,7 @@ export class LookAtLayer implements PoseSlotData {
     for (let slot = 0; slot < poses.count; slot++) {
       const v = slot * VALUES;
       const weight = values[v + 2];
-      if (weight <= 0 || !player.isPlaying(slot)) continue;
+      if (weight <= 0 || !player.posed(slot)) continue;
       this.applySlot(
         slot * poseSize,
         values[v] * weight,

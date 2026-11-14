@@ -69,6 +69,7 @@ export class SkinnedShadowCasters {
         for (let c = 0; c < CASCADES; c++)
           if (mask & (1 << c))
             writeSkinnedInstance(
+              model,
               meshes[m],
               batch.data[c],
               batch.slots[c],

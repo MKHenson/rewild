@@ -30,6 +30,8 @@ export class ClipPlayer implements PoseSlotData {
   /** Weight change per second towards `target`. */
   private fadeSpeed = new Float32Array(0);
   private flags = new Uint8Array(0);
+  /** Per slot: 1 if the last `update` wrote its pose. */
+  private wrote = new Uint8Array(0);
 
   constructor(poses: PoseStore, clips: GltfClip[]) {
     this.poses = poses;
@@ -114,7 +116,7 @@ export class ClipPlayer implements PoseSlotData {
     return layer < 0 ? 0 : this.weight[layer];
   }
 
-  /** Whether the slot has a clip, so `update` rewrites its pose each frame. */
+  /** Whether the slot has a clip, so `update` can rewrite its pose. */
   isPlaying(slot: number): boolean {
     const base = slot * MAX_LAYERS;
     for (let i = base; i < base + MAX_LAYERS; i++)
@@ -122,14 +124,24 @@ export class ClipPlayer implements PoseSlotData {
     return false;
   }
 
-  /** Advances every layer by `dt` seconds and writes the blended poses. */
-  update(dt: number): void {
-    const { poses, clip, time, rate, weight, target, fadeSpeed } = this;
+  /** Whether the last `update` rewrote the slot's pose. */
+  posed(slot: number): boolean {
+    return this.wrote[slot] === 1;
+  }
+
+  /**
+   * Advances every layer by `dt` seconds and writes the blended poses. With
+   * `due`, only slots marked 1 in it are written; the rest keep their pose.
+   * Returns how many poses were written.
+   */
+  update(dt: number, due: Uint8Array | null = null): number {
+    const { poses, clip, time, rate, weight, target, fadeSpeed, wrote } = this;
     const { pose, restPose, jointCount } = poses;
     const poseSize = jointCount * POSE_STRIDE;
-    let changed = false;
+    let posed = 0;
 
     for (let slot = 0; slot < poses.count; slot++) {
+      wrote[slot] = 0;
       const base = slot * MAX_LAYERS;
       let active = false;
       let total = 0;
@@ -153,8 +165,10 @@ export class ClipPlayer implements PoseSlotData {
         total += weight[i];
       }
 
-      if (!active) continue;
-      changed = true;
+      if (!active || (due !== null && due[slot] === 0)) continue;
+      wrote[slot] = 1;
+      posed++;
+      poses.markPoseChanged(slot);
 
       const offset = slot * poseSize;
       pose.set(restPose, offset);
@@ -173,7 +187,7 @@ export class ClipPlayer implements PoseSlotData {
         normalizeQuat(pose, offset + j * POSE_STRIDE + 3);
     }
 
-    if (changed) poses.markPoseChanged();
+    return posed;
   }
 
   grow(capacity: number): void {
@@ -189,6 +203,9 @@ export class ClipPlayer implements PoseSlotData {
     const flags = new Uint8Array(size);
     flags.set(this.flags);
     this.flags = flags;
+    const wrote = new Uint8Array(capacity);
+    wrote.set(this.wrote);
+    this.wrote = wrote;
   }
 
   moveSlot(from: number, to: number): void {
@@ -202,11 +219,13 @@ export class ClipPlayer implements PoseSlotData {
     this.target.copyWithin(dest, start, end);
     this.fadeSpeed.copyWithin(dest, start, end);
     this.flags.copyWithin(dest, start, end);
+    this.wrote[to] = this.wrote[from];
   }
 
   clearSlot(slot: number): void {
     const base = slot * MAX_LAYERS;
     this.clip.fill(NO_CLIP, base, base + MAX_LAYERS);
+    this.wrote[slot] = 0;
   }
 
   /** The clip's layer in the slot, added at weight 0 if it is not playing. */

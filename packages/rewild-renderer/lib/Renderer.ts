@@ -842,6 +842,11 @@ export class Renderer {
       group: 'cpu',
       order: 6,
     });
+    m.declare('cpu.pose', {
+      label: 'creature poses',
+      group: 'cpu',
+      order: 7,
+    });
 
     const count = 'count' as const;
     m.declare('counts.drawgroups', {
@@ -885,6 +890,18 @@ export class Renderer {
       group: 'counts',
       kind: count,
       order: 2,
+    });
+    m.declare('counts.creatures', {
+      label: 'creatures',
+      group: 'counts',
+      kind: count,
+      order: 7,
+    });
+    m.declare('counts.posed', {
+      label: 'creatures posed',
+      group: 'counts',
+      kind: count,
+      order: 8,
     });
   }
 
@@ -957,11 +974,18 @@ export class Renderer {
     metrics.beginFrame();
     metrics.record('frame.wall', deltaTime);
     metrics.begin('frame.cpu');
-    metrics.begin('cpu.scenegraph');
-
     const pCamera = this.camera;
 
-    this.skinnedModels.update(deltaTime / 1000);
+    metrics.begin('cpu.pose');
+    const eye = pCamera.camera.transform.matrixWorld.elements;
+    this.skinnedModels.update(deltaTime / 1000, eye[12], eye[13], eye[14]);
+    metrics.end('cpu.pose');
+    if (metrics.enabled) {
+      metrics.record('counts.creatures', this.skinnedModels.instanceCount);
+      metrics.record('counts.posed', this.skinnedModels.posed);
+    }
+
+    metrics.begin('cpu.scenegraph');
 
     // update scene graph
     this.scene.updateMatrixWorld();
