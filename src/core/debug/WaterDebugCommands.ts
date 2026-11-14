@@ -43,6 +43,17 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     );
   };
 
+  (window as any).setWaterReflections = (enabled = true) => {
+    renderer.terrainRenderer.waterReflections = enabled;
+    console.log(
+      `setWaterReflections(${enabled}) — water ${
+        enabled
+          ? 'reflects the opaque scene on screen, the sky where that misses'
+          : 'reflects the sky alone'
+      }. Low water quality turns it off too.`
+    );
+  };
+
   (window as any).setWaterShoreWaves = (strength = 1) => {
     renderer.terrainRenderer.waterShoreWaves = strength;
     console.log(

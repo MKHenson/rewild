@@ -91,6 +91,12 @@ const ASPECTS: Record<QualityAspect, { label: string; description: string }> = {
       'trees and inside canopies. Off on Low; higher tiers reach further ' +
       'and take more samples.',
   },
+  heatShimmer: {
+    label: 'Heat Shimmer',
+    description:
+      'The haze that wavers over hot ground in the distance, in hot ' +
+      'weather only. Off on Low; Medium uses a simpler ripple.',
+  },
 };
 
 const VOLUMES: Record<VolumeSetting, { label: string; description: string }> = {

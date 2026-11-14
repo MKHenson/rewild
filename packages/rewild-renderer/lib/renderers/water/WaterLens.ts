@@ -9,6 +9,7 @@ import { GpuPassTimer } from '../../metrics/GpuPassTimer';
 import { waterLensQuality } from './WaterQuality';
 import { gustField, gustShare } from '../sky/GustField';
 import { rainShare } from '../sky/RainWetness';
+import { FrameCopy } from '../../post-processes/FrameCopy';
 
 /** How water on the lens blurs the view. */
 export interface LensBlurSettings {
@@ -149,7 +150,7 @@ export class WaterLens {
   private gust = 0;
   private sinceSurfacing = Infinity;
 
-  private frame: GPUTexture | null = null;
+  private readonly frame = new FrameCopy('water lens frame', FRAME_MIPS);
   private params: GPUBuffer | null = null;
   private dropBuffer: GPUBuffer | null = null;
   private data = new Float32Array(PARAMS_FLOATS);
@@ -231,14 +232,11 @@ export class WaterLens {
     this.prepare(renderer, scene);
 
     const encoder = device.createCommandEncoder({ label: 'water lens copy' });
-    encoder.copyTextureToTexture({ texture: scene }, { texture: this.frame! }, [
-      scene.width,
-      scene.height,
-    ]);
+    this.frame.copy(encoder, scene);
     device.queue.submit([encoder.finish()]);
     renderer.mipmapGenerator.generateMips(
       device,
-      this.frame!,
+      this.frame.texture!,
       0,
       timer?.writes('lens-frame')
     );
@@ -298,10 +296,9 @@ export class WaterLens {
   }
 
   dispose(): void {
-    this.frame?.destroy();
+    this.frame.dispose();
     this.params?.destroy();
     this.dropBuffer?.destroy();
-    this.frame = null;
     this.params = null;
     this.dropBuffer = null;
     this.lensGroup = null;
@@ -325,27 +322,8 @@ export class WaterLens {
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
     }
-    if (
-      this.frame &&
-      this.frame.width === scene.width &&
-      this.frame.height === scene.height
-    )
-      return;
-    this.frame?.destroy();
-    this.frame = device.createTexture({
-      label: 'water lens frame',
-      size: [scene.width, scene.height],
-      format: scene.format,
-      mipLevelCount: Math.min(
-        FRAME_MIPS,
-        Math.floor(Math.log2(Math.max(scene.width, scene.height))) + 1
-      ),
-      usage:
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-    const frameView = this.frame.createView();
+    if (!this.frame.prepare(device, scene)) return;
+    const frameView = this.frame.view!;
     const sampler = renderer.samplerManager.get('linear-clamped');
     const underWater = renderer.terrainRenderer.underWater.buffer(device);
     this.lensGroup = device.createBindGroup({

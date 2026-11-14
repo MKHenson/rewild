@@ -173,6 +173,18 @@ Converts the `LightningStrike` path arrays into billboard triangle strips and re
 
 ---
 
+## Heat Shimmer
+
+Hot air over the ground bends the view behind it. `HeatShimmer` is a frame effect: it copies the composited frame (`FrameCopy`, as the portal and water lenses do) and redraws it with each pixel read from a little off where it lies, by noise that rises up the screen (`heat-shimmer.wgsl`).
+
+- **When.** It follows the weather's `temperature`, fading in from 0.85 to full at 1. Temperature rises with the sun and falls with cloud and rain, so an arid noon under a clear sky gets all of it, a tropical noon a trace, and every night none.
+- **Where.** Only along rays near level, from 8 m out to full at 250 m, so the far ground and the horizon waver and the ground at your feet does not. A sample that would come from something much nearer is not read, so the foreground does not smear.
+- **Cost.** Nothing in cool weather or under water. The `heatShimmer` quality aspect takes two noise octaves on high and ultra, one on medium, and turns it off on low.
+
+`setHeatShimmer(strength, heat)` tunes it in the console; `setHeatShimmer(1, 1)` shows it whatever the weather.
+
+---
+
 ## Render Pipeline Order
 
 ```

@@ -43,7 +43,8 @@ export type QualityAspect =
   | 'bloom'
   | 'terrain'
   | 'water'
-  | 'ao';
+  | 'ao'
+  | 'heatShimmer';
 
 /** Every aspect. Useful for iterating a settings form or a stored override map. */
 export const QUALITY_ASPECTS: readonly QualityAspect[] = [
@@ -55,6 +56,7 @@ export const QUALITY_ASPECTS: readonly QualityAspect[] = [
   'terrain',
   'water',
   'ao',
+  'heatShimmer',
 ];
 
 /** Narrows an untrusted key — stored settings — to an aspect. */

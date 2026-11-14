@@ -571,6 +571,129 @@ fn farPlane() -> f32 {
   return uniforms.projMatrix[3][2] / (uniforms.projMatrix[2][2] + 1.0);
 }
 
+// The opaque scene the surface reflects, found by marching the reflected ray
+// across the refraction capture in even steps on screen (waves.grid.w of
+// them, 0 off), then refining the first one that passes behind the scene. A
+// ray that leaves the screen, meets the sky or runs out misses, and the sky
+// cube shows instead. The confidence fades out toward the screen's edges, on
+// rays turned back at the camera and on rough water, so the two blend without
+// a seam.
+const SSR_REACH: f32 = 1000.0;
+// Metres in front of the camera a ray turned toward it is cut at.
+const SSR_NEAR: f32 = 0.05;
+const SSR_REFINE_STEPS: i32 = 4;
+// How far behind the scene a step may land and still count as meeting it:
+// SSR_THICKNESS metres, and SSR_THICKNESS_PER_METRE more per metre away.
+const SSR_THICKNESS: f32 = 0.5;
+const SSR_THICKNESS_PER_METRE: f32 = 0.02;
+// Share of the screen at each edge over which a hit fades out.
+const SSR_EDGE_FADE: f32 = 0.08;
+// Perceptual roughness over which the reflection gives way to the cube,
+// whose blur suits a rough surface better than one sharp sample.
+const SSR_ROUGHNESS_FULL: f32 = 0.2;
+const SSR_ROUGHNESS_NONE: f32 = 0.45;
+// View-space z of the reflected ray over which it fades out as it turns back
+// toward the camera, where the scene it meets is mostly out of view.
+const SSR_FACING_FULL: f32 = 0.3;
+const SSR_FACING_NONE: f32 = 0.7;
+
+struct Reflection {
+  colour : vec3f,
+  confidence : f32,
+}
+
+fn capturePixel(ndc: vec2f, size: vec2f) -> vec2f {
+  return vec2f(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * size;
+}
+
+// The share of the way from `start` to `stop` that stays on a screen `size`
+// pixels across.
+fn onScreenShare(start: vec2f, stop: vec2f, size: vec2f) -> f32 {
+  let delta = stop - start;
+  var share = 1.0;
+  for (var axis = 0; axis < 2; axis++) {
+    if (stop[axis] > size[axis]) {
+      share = min(share, (size[axis] - start[axis]) / delta[axis]);
+    } else if (stop[axis] < 0.0) {
+      share = min(share, -start[axis] / delta[axis]);
+    }
+  }
+  return max(share, 0.0);
+}
+
+fn screenReflection(viewPosition: vec3f, N: vec3f, fragCoord: vec2f, roughness: f32) -> Reflection {
+  var out = Reflection(vec3f(0.0), 0.0);
+  let steps = i32(waves.grid.w);
+  let roughFade = 1.0 - smoothstep(SSR_ROUGHNESS_FULL, SSR_ROUGHNESS_NONE, roughness);
+  let R = reflect(normalize(viewPosition), N);
+  let facingFade = 1.0 - smoothstep(SSR_FACING_FULL, SSR_FACING_NONE, R.z);
+  if (steps <= 0 || roughFade <= 0.0 || facingFade <= 0.0) {
+    return out;
+  }
+
+  var reach = SSR_REACH;
+  if (R.z > 0.0) {
+    reach = min(reach, (-SSR_NEAR - viewPosition.z) / R.z);
+  }
+  if (reach <= 0.0) {
+    return out;
+  }
+
+  // Clip w is the view depth, so its reciprocal interpolates linearly on
+  // screen and the depth along the ray is one over it.
+  let size = vec2f(textureDimensions(refraction));
+  let h0 = uniforms.projMatrix * vec4f(viewPosition, 1.0);
+  let h1 = uniforms.projMatrix * vec4f(viewPosition + R * reach, 1.0);
+  let k0 = 1.0 / h0.w;
+  let k1 = 1.0 / h1.w;
+  let s0 = capturePixel(h0.xy * k0, size);
+  let s1 = capturePixel(h1.xy * k1, size);
+  let end = onScreenShare(s0, s1, size);
+  let skyDepth = farPlane() * 0.999;
+  let last = vec2i(size) - 1;
+
+  let jitter = fadePattern(fragCoord);
+  var before = 0.0;
+  var beforeDepth = -viewPosition.z;
+  var at = 0.0;
+  var hit = false;
+  for (var i = 0; i < steps; i++) {
+    at = end * (f32(i) + jitter) / f32(steps);
+    let depth = 1.0 / mix(k0, k1, at);
+    let scene = textureLoad(refraction, clamp(vec2i(mix(s0, s1, at)), vec2i(0), last), 0).a;
+    let thickness = max(depth - beforeDepth, SSR_THICKNESS + SSR_THICKNESS_PER_METRE * depth);
+    if (depth > scene && depth - scene < thickness && scene < skyDepth) {
+      hit = true;
+      break;
+    }
+    before = at;
+    beforeDepth = depth;
+  }
+  if (!hit) {
+    return out;
+  }
+
+  var lo = before;
+  var hi = at;
+  for (var j = 0; j < SSR_REFINE_STEPS; j++) {
+    let mid = 0.5 * (lo + hi);
+    let depth = 1.0 / mix(k0, k1, mid);
+    let scene = textureLoad(refraction, clamp(vec2i(mix(s0, s1, mid)), vec2i(0), last), 0).a;
+    if (depth > scene) {
+      hi = mid;
+    } else {
+      lo = mid;
+    }
+  }
+
+  let pixel = clamp(vec2i(mix(s0, s1, hi)), vec2i(0), last);
+  let uv = (vec2f(pixel) + 0.5) / size;
+  let edge = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
+  out.colour = textureLoad(refraction, pixel, 0).rgb;
+  out.confidence = smoothstep(0.0, SSR_EDGE_FADE, edge) * roughFade * facingFade;
+  return out;
+}
+
 // A view ray meeting the surface from below, whose normal there is N (up,
 // view space): where it leaves into the air through Snell's window, zero
 // outside it, and the share the surface reflects back into the water.
@@ -737,7 +860,7 @@ fn fs_light(input: VertexOutput, @builtin(front_facing) front: bool) -> @locatio
              + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadowFactor;
   // A trough sees less sky than a crest.
   let skySeen = mix(1.0, TROUGH_SKY, trough);
-  let indirect = evaluateIbl(surface, roughness) * skySeen;
+  let ibl = evaluateIblTerms(surface, roughness);
   // Only deep water glows: where the bed shows, the light passes through.
   let glow = crestGlow(input.height, normal, V, water.scatter) * sunShadow
            * (1.0 - waterFresnel(NoV)) * (1.0 - foam) * (vec3f(1.0) - transmittance);
@@ -758,6 +881,10 @@ fn fs_light(input: VertexOutput, @builtin(front_facing) front: bool) -> @locatio
   if (!front) {
     return vec4f(lightFromBelow(input, normal, foam) * water.coverage, 1.0);
   }
+  // What the surface mirrors of the opaque scene takes the cube's place.
+  let reflection = screenReflection(viewPosition, normal, input.Position.xy, roughness);
+  let specular = mix(ibl.specular, reflection.colour * ibl.reflectance, reflection.confidence);
+  let indirect = (ibl.diffuse + specular) * skySeen;
   return vec4f((direct + indirect + glow) * water.coverage, 1.0);
 }
 

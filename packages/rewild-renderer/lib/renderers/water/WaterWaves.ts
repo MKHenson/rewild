@@ -50,6 +50,9 @@ export interface WaveFrame {
   crestGlow: number;
   /** Strength of the trough darkening; 1 is the default. */
   troughDarkening: number;
+  /** Steps the reflected ray marches across the screen; 0 reflects the sky
+   *  alone. */
+  reflectionSteps: number;
   /** The viewer's world xz, where chunk LODs were chosen. */
   eyeX: number;
   eyeZ: number;
@@ -117,7 +120,8 @@ export class WaterWaves {
   /**
    * Writes the Waves uniform: the view (detail bias, normals on, viewer from
    * the origin), the origin, the ocean's wind speed and the foam debug view,
-   * the LOD bands (see waterGridBands), finest spacing, crest glow and trough darkening, then per cascade
+   * the LOD bands (see waterGridBands), finest spacing, crest glow, trough
+   * darkening and reflection steps, then per cascade
    * its tile size, RMS height and where the origin falls in its tile, per cascade
    * each palette type's weight, then the shore trains' angular frequencies and
    * phases, their breaker height and where the shore field lies, then the
@@ -147,7 +151,7 @@ export class WaterWaves {
     out[GRID_OFFSET] = frame.finestSpacing;
     out[GRID_OFFSET + 1] = frame.crestGlow;
     out[GRID_OFFSET + 2] = frame.troughDarkening;
-    out[GRID_OFFSET + 3] = 0;
+    out[GRID_OFFSET + 3] = frame.reflectionSteps;
     for (let c = 0; c < CASCADE_COUNT; c++) {
       const size = CASCADE_SIZES[c];
       const o = CASCADE_OFFSET + c * 4;

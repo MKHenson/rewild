@@ -103,6 +103,9 @@ fn evaluateIbl(surface: PbrSurface, perceptualRoughness: f32) -> vec3f {
 struct IblTerms {
   diffuse: vec3f,
   specular: vec3f,
+  // What the specular scales the prefiltered radiance by, so a caller with a
+  // better radiance along the reflection can use it in place of the cube's.
+  reflectance: vec3f,
 }
 
 // evaluateIbl's two lobes apart, for a caller that treats them differently.
@@ -168,5 +171,9 @@ fn evaluateIblTerms(surface: PbrSurface, perceptualRoughness: f32) -> IblTerms {
   let specular = prefiltered * FssEss * horizon;
   let diffuse = (FmsEms + kD) * irradiance;
 
-  return IblTerms(diffuse * iblParams.intensity, specular * iblParams.intensity);
+  return IblTerms(
+    diffuse * iblParams.intensity,
+    specular * iblParams.intensity,
+    FssEss * horizon * iblParams.intensity
+  );
 }

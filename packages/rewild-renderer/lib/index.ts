@@ -21,6 +21,8 @@ export * from './materials/uniforms/StandardMaterial';
 export * from './materials/SpritePass';
 export * from './materials/PortalPass';
 export * from './post-processes/IFrameEffect';
+export * from './post-processes/FrameCopy';
+export * from './post-processes/HeatShimmer';
 export * from './textures/PortalViewCube';
 export * from './input';
 export * from './core/GltfLoader';

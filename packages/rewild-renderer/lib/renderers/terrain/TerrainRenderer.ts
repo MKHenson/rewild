@@ -37,7 +37,11 @@ import {
   chunkMaskIndex,
 } from '../water/HorizonOcean';
 import { WaterWaveBuffer } from '../water/WaterWaves';
-import { underWaterQuality, waterDetailBias } from '../water/WaterQuality';
+import {
+  underWaterQuality,
+  waterDetailBias,
+  waterReflectionSteps,
+} from '../water/WaterQuality';
 import { OceanFFT } from '../water/OceanFFT';
 import { SeaSpray } from '../water/SeaSpray';
 import { WaterProbe } from '../water/WaterProbe';
@@ -275,6 +279,9 @@ export class TerrainRenderer implements WaterQuerySource {
   );
   /** Strength of the trough darkening; 1 is the default. */
   waterTroughDarkening = 1;
+  /** Whether the water reflects the opaque scene on screen. Off reflects the
+   *  sky alone; the water quality tier sets the cost. */
+  waterReflections = true;
   /** Scale on the shore waves' height; 1 is the default. */
   waterShoreWaves = 1;
   /** Paints the shore field on the water instead of shading it. */
@@ -1249,6 +1256,9 @@ export class TerrainRenderer implements WaterQuerySource {
       refractionDebug: this.waterRefractionDebug,
       crestGlow: this.waterCrestGlow,
       troughDarkening: this.waterTroughDarkening,
+      reflectionSteps: this.waterReflections
+        ? waterReflectionSteps(renderer.quality.aspect('water'))
+        : 0,
       eyeX: lodEye.x,
       eyeZ: lodEye.z,
       finestSpacing: finest,

@@ -143,6 +143,22 @@ export function registerSkyDebugCommands(renderer: Renderer) {
     );
   };
 
+  (window as any).setHeatShimmer = (
+    strength = 1,
+    heat: number | null = null
+  ) => {
+    const shimmer = renderer.heatShimmer;
+    shimmer.strength = strength;
+    shimmer.heat = heat;
+    console.log(
+      `setHeatShimmer(${strength}, ${heat}) — heat haze at ${strength} strength, ${
+        heat === null
+          ? 'following the weather (from a temperature of 0.85, full at 1)'
+          : `held at a temperature of ${heat}`
+      }. setHeatShimmer(1, 1) shows it whatever the weather; low heatShimmer quality turns it off.`
+    );
+  };
+
   (window as any).holdRainWetness = (value: number | null = 1) => {
     renderer.sky.skyRenderer.rainWetness.override = value;
     console.log(

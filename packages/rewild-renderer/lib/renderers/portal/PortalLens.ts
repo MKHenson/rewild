@@ -1,6 +1,7 @@
 import { Camera } from '../../core/Camera';
 import type { PortalPass } from '../../materials/PortalPass';
 import { Renderer } from '../../Renderer';
+import { FrameCopy } from '../../post-processes/FrameCopy';
 import { IFrameEffect } from '../../post-processes/IFrameEffect';
 import shader from '../../shaders/portal-lens.wgsl';
 import vertexScreenQuadShader from '../../shaders/utils/vertexScreenQuad.wgsl';
@@ -16,7 +17,7 @@ const PARAMS_FLOATS = GLOWS_OFFSET + MAX_PORTALS * 4;
  */
 export class PortalLens implements IFrameEffect {
   private data = new Float32Array(PARAMS_FLOATS);
-  private frame: GPUTexture | null = null;
+  private readonly frame = new FrameCopy('portal lens frame');
   private params: GPUBuffer | null = null;
   private pipeline: GPURenderPipeline | null = null;
   private group: GPUBindGroup | null = null;
@@ -30,13 +31,6 @@ export class PortalLens implements IFrameEffect {
     label: 'portal lens',
     colorAttachments: [this.colorAttachment],
   };
-  private readonly copySource: GPUImageCopyTexture = {
-    texture: null as unknown as GPUTexture,
-  };
-  private readonly copyDestination: GPUImageCopyTexture = {
-    texture: null as unknown as GPUTexture,
-  };
-  private readonly copySize = [0, 0];
   private readonly submissions: GPUCommandBuffer[] = [];
 
   /** `portals` is the renderer's list, read each frame. */
@@ -64,18 +58,10 @@ export class PortalLens implements IFrameEffect {
     d[35] = camera.exposure;
     device.queue.writeBuffer(this.params!, 0, d);
 
-    this.copySource.texture = scene;
-    this.copyDestination.texture = this.frame!;
-    this.copySize[0] = scene.width;
-    this.copySize[1] = scene.height;
     this.colorAttachment.view = sceneView;
 
     const encoder = device.createCommandEncoder();
-    encoder.copyTextureToTexture(
-      this.copySource,
-      this.copyDestination,
-      this.copySize
-    );
+    this.frame.copy(encoder, scene);
     const pass = encoder.beginRenderPass(this.passDescriptor);
     pass.setPipeline(this.pipeline!);
     pass.setBindGroup(0, this.group!);
@@ -113,9 +99,8 @@ export class PortalLens implements IFrameEffect {
   }
 
   dispose(): void {
-    this.frame?.destroy();
+    this.frame.dispose();
     this.params?.destroy();
-    this.frame = null;
     this.params = null;
     this.pipeline = null;
     this.group = null;
@@ -150,19 +135,8 @@ export class PortalLens implements IFrameEffect {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 
-    const sized =
-      this.frame?.width === scene.width && this.frame?.height === scene.height;
-    if (sized && this.boundDepth === renderer.depthTexture) return;
-
-    if (!sized) {
-      this.frame?.destroy();
-      this.frame = device.createTexture({
-        label: 'portal lens frame',
-        size: [scene.width, scene.height],
-        format: scene.format,
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-      });
-    }
+    const resized = this.frame.prepare(device, scene);
+    if (!resized && this.boundDepth === renderer.depthTexture) return;
 
     this.boundDepth = renderer.depthTexture;
     this.group = device.createBindGroup({
@@ -170,7 +144,7 @@ export class PortalLens implements IFrameEffect {
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.params } },
-        { binding: 1, resource: this.frame!.createView() },
+        { binding: 1, resource: this.frame.view! },
         {
           binding: 2,
           resource: renderer.samplerManager.get('linear-clamped'),

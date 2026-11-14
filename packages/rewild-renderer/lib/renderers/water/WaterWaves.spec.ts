@@ -25,6 +25,7 @@ function frame(overrides: Partial<WaveFrame> = {}): WaveFrame {
     shoreDebug: false,
     crestGlow: 1.5,
     troughDarkening: 0.5,
+    reflectionSteps: 32,
     eyeX: 0,
     eyeZ: 0,
     finestSpacing: 2,
@@ -86,7 +87,7 @@ describe('WaterWaves', () => {
     expect(Array.from(out.subarray(4, 7))).toEqual([-19456, 26624, 7]);
     expect(Array.from(out.subarray(8, 11))).toEqual([200, 400, 0]);
     expect(Array.from(out.subarray(16, 19))).toEqual([4, 8, 0]);
-    expect(Array.from(out.subarray(24, 27))).toEqual([2, 1.5, 0.5]);
+    expect(Array.from(out.subarray(24, 28))).toEqual([2, 1.5, 0.5, 32]);
     for (let c = 0; c < CASCADE_COUNT; c++) {
       const size = CASCADE_SIZES[c];
       expect(out[28 + c * 4]).toBe(Math.fround(size));

@@ -77,7 +77,7 @@ resolution rather than 0.7x, which is roughly twice the cloud pixels.
 
 Individual subsystems can sit on their own tier — `clouds` (which covers the
 bilateral that cleans them up), `cloudShadows`, `godRays`, `bloom`, `terrain`,
-`water` and `ao`. They are read through `renderer.quality.aspect('clouds')` rather than
+`water`, `ao` and `heatShimmer`. They are read through `renderer.quality.aspect('clouds')` rather than
 `.level`, and stored separately under `rewild.render.quality.overrides`.
 
 `terrain` is the one that moves the frame most on an open view, because terrain
@@ -210,6 +210,18 @@ where it is.
 
 The moon trails the sun along its path by the phase, so `setTimeOfDay(200)`
 with `phase: 0.5` puts a full moon just over the horizon.
+
+### Heat shimmer
+
+Registered in `SkyDebugCommands.ts`.
+
+```js
+setHeatShimmer(0.5); // Scale on the haze; 1 the default, 0 off
+setHeatShimmer(1, 1); // Hold the temperature at 1, as on an arid noon, whatever the weather
+setHeatShimmer(); // Back to the default, following the weather
+```
+
+See [Weather System](./weather.md#heat-shimmer).
 
 ---
 

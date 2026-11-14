@@ -238,6 +238,7 @@ export class PositionReadout extends Component<Props> {
 
     const refresh = () => {
       const renderer = this.props.renderer;
+      if (!renderer.isInitialized) return;
       const terrain = renderer.terrainRenderer;
       renderer.camera.camera.transform.getWorldPosition(position);
       xValue.textContent = position.x.toFixed(1);

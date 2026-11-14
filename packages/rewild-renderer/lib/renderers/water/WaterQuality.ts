@@ -14,6 +14,10 @@ import { RenderQuality } from '../../utils/RenderQuality';
  * Under water, the light shafts and marine snow are the extras: medium keeps
  * half the snow, and low turns both off. Raindrops rippling wet surfaces and
  * water take two layers, one on medium and none on low.
+ *
+ * The surface's reflection of the opaque scene (water.wgsl screenReflection)
+ * marches a ray across the screen: fewer steps miss thin objects, and low
+ * reflects the sky alone.
  */
 interface WaterQualityTier {
   /** Mip bias on the ocean slopes: lower is sharper. A uniform. */
@@ -31,6 +35,8 @@ interface WaterQualityTier {
   snowShare: number;
   /** Layers of raindrops rippling wet surfaces and water; 0 is none. */
   rainLayers: number;
+  /** Steps the reflected ray marches across the screen; 0 is off. */
+  reflectionSteps: number;
 }
 
 const TIERS: Record<RenderQuality, WaterQualityTier> = {
@@ -42,6 +48,7 @@ const TIERS: Record<RenderQuality, WaterQualityTier> = {
     shafts: true,
     snowShare: 1,
     rainLayers: 2,
+    reflectionSteps: 48,
   },
   high: {
     detailBias: 0,
@@ -51,6 +58,7 @@ const TIERS: Record<RenderQuality, WaterQualityTier> = {
     shafts: true,
     snowShare: 1,
     rainLayers: 2,
+    reflectionSteps: 32,
   },
   medium: {
     detailBias: 0.5,
@@ -60,6 +68,7 @@ const TIERS: Record<RenderQuality, WaterQualityTier> = {
     shafts: true,
     snowShare: 0.5,
     rainLayers: 1,
+    reflectionSteps: 16,
   },
   low: {
     detailBias: 1,
@@ -69,6 +78,7 @@ const TIERS: Record<RenderQuality, WaterQualityTier> = {
     shafts: false,
     snowShare: 0,
     rainLayers: 0,
+    reflectionSteps: 0,
   },
 };
 
@@ -94,4 +104,9 @@ export function underWaterQuality(
 /** Layers of raindrops rippling wet surfaces and water at a tier. */
 export function rainPatterLayers(quality: RenderQuality): number {
   return TIERS[quality].rainLayers;
+}
+
+/** Steps the water's reflected ray marches across the screen at a tier. */
+export function waterReflectionSteps(quality: RenderQuality): number {
+  return TIERS[quality].reflectionSteps;
 }

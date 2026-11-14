@@ -3,6 +3,7 @@ import {
   underWaterQuality,
   waterDetailBias,
   waterLensQuality,
+  waterReflectionSteps,
 } from './WaterQuality';
 
 describe('water quality tiers', () => {
@@ -42,5 +43,12 @@ describe('water quality tiers', () => {
     expect(rainPatterLayers('high')).toBe(2);
     expect(rainPatterLayers('medium')).toBe(1);
     expect(rainPatterLayers('low')).toBe(0);
+  });
+
+  it('marches the reflection in fewer steps down the tiers, and not on low', () => {
+    expect(waterReflectionSteps('ultra')).toBeGreaterThan(waterReflectionSteps('high'));
+    expect(waterReflectionSteps('high')).toBeGreaterThan(waterReflectionSteps('medium'));
+    expect(waterReflectionSteps('medium')).toBeGreaterThan(0);
+    expect(waterReflectionSteps('low')).toBe(0);
   });
 });

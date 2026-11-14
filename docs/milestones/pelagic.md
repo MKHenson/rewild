@@ -124,6 +124,10 @@ The surface has:
 - **Waves from a real sea model.** An FFT ocean, in four layers from long swells to small ripples,
   driven by the weather's wind. Lakes use only the smaller layers, so they stay calmer.
 - **Sky reflection** and **sun glint**. The glint is hidden in shadow.
+- **Scene reflection.** The surface mirrors the terrain, trees and creatures on screen: the
+  reflected ray is marched across the refraction capture, and the sky shows where it misses. It
+  fades out at the screen's edges and on rough water. Water and transparent things are drawn
+  after the capture, so they are not reflected.
 - **Refraction.** You see the bed through the water, bent by the waves.
 - **Depth colour.** Shallow water is clear and deep water is dark. Each palette entry sets its own
   colour.
@@ -336,8 +340,9 @@ Water edits save in the same way as terrain edits:
 - Far water uses fewer vertices and fewer wave layers.
 - The ocean is one GPU compute pass a frame.
 - Under-water effects only run when the camera can be under water.
-- The **water** quality setting changes how sharp the ripples are, and how many lens drops and
-  blur samples the lens uses. Light shafts and marine snow turn off on low quality.
+- The **water** quality setting changes how sharp the ripples are, how many steps the scene
+  reflection marches, and how many lens drops and blur samples the lens uses. Light shafts, marine
+  snow and the scene reflection turn off on low quality.
 
 The perf panel shows the water's GPU time under `gpu/water`. See
 [Debugger & Console Commands](../debug-commands.md#perf-panel).
@@ -358,6 +363,7 @@ normal look.
 | `setOceanSeaState({...})`, `setOceanFoam(...)`                         | Override the sea and its foam.                     |
 | `setWaterShoreWaves`, `setWaterSwash`, `setWaterWetBand`               | Scale the shore waves, swash and wet sand.         |
 | `setWaterCrestGlow`, `setWaterTroughDarkening`, `setWaterHorizonSlope` | Scale parts of the surface's look.                 |
+| `setWaterReflections(enabled)`                                         | Turn the scene reflection on or off.               |
 | `setSeaSpray({...})`                                                   | Tune the sea spray.                                |
 | `setWaterCaustics({...})`, `setWaterShafts`, `setMarineSnow({...})`    | Tune the light under water.                        |
 | `setWaterLens({...})`                                                  | Tune the lens blur.                                |

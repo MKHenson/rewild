@@ -21,7 +21,8 @@ struct Waves {
   lodDistance : array<vec4f, 2>,
   lodSpacing : array<vec4f, 2>,
   // x: the finest grid's spacing, used nearer than the first distance. y:
-  // the crest glow's strength. z: the trough darkening's strength.
+  // the crest glow's strength. z: the trough darkening's strength. w: steps
+  // the reflection marches across the screen, 0 off.
   grid : vec4f,
   // Per cascade: x tile size in metres, y RMS height in metres of the sea it
   // holds, zw where the origin falls in the tile.

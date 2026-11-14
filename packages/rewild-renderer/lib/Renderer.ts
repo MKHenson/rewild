@@ -37,6 +37,7 @@ import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowR
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
 import { FrameCompositor } from './post-processes/FrameCompositor';
 import { RefractionCapture } from './renderers/water/RefractionCapture';
+import { HeatShimmer } from './post-processes/HeatShimmer';
 import { PortalLens } from './renderers/portal/PortalLens';
 import { PortalSparks } from './renderers/portal/PortalSparks';
 import type { PortalPass } from './materials/PortalPass';
@@ -140,6 +141,8 @@ export class Renderer {
   /** Portals updated every frame, in view or not. */
   private readonly portals: PortalPass[] = [];
 
+  /** Heat haze in hot weather; one of the frame effects. */
+  readonly heatShimmer = new HeatShimmer();
   /** Drawn over the composited frame each frame, in this order. */
   readonly frameEffects: IFrameEffect[];
 
@@ -206,6 +209,11 @@ export class Renderer {
   private _shadowGroups: IRenderGroup[] = [];
 
   /** Returns the cloud shadow map texture, or null if not yet initialized. */
+  /** True once init() has loaded WASM and the GPU device. */
+  get isInitialized(): boolean {
+    return this.initialized;
+  }
+
   get cloudShadowMap(): GPUTexture | null {
     return this.sky?.skyRenderer?.cloudShadowRenderer?.shadowMap ?? null;
   }
@@ -323,6 +331,7 @@ export class Renderer {
     this.frameCompositor = new FrameCompositor();
     // The lightning draws after the lens, so the lens does not smear it.
     this.frameEffects = [
+      this.heatShimmer,
       new PortalLens(this.portals),
       new PortalSparks(this.portals),
     ];
