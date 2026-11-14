@@ -56,6 +56,21 @@ describe('Moon', () => {
     expect(moon.intensity).toBeLessThan(full);
   });
 
+  it('glows by its phase and not once set', () => {
+    const moon = new Moon();
+    moon.phase = 0.5;
+    moon.update(270, 180);
+    expect(moon.glow).toBeCloseTo(moon.glowRadiance);
+
+    moon.phase = 0.25;
+    moon.update(225, 180);
+    expect(moon.glow).toBeGreaterThan(0);
+    expect(moon.glow).toBeLessThan(moon.glowRadiance);
+
+    moon.update(300, 180);
+    expect(moon.glow).toBe(0);
+  });
+
   it('moves through a month in daysPerCycle days', () => {
     const moon = new Moon();
     moon.phase = 0.5;

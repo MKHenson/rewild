@@ -87,11 +87,12 @@ export function starCaptureLod(
  */
 const STAR_LOD_INDEX = 37;
 
-/** Float indices of `ObjectStruct.moonNightRadiance` and `moonDayRadiance`,
- *  zeroed so the capture has no moon disc: the moon already lights the scene
- *  as the key light, and a disc here would add it twice. */
+/** Float indices of `ObjectStruct.moonNightRadiance`, `moonDayRadiance` and
+ *  `moonGlow`, zeroed so the capture has no moon: it already lights the scene
+ *  as the key light, and drawing it here would add it twice. */
 export const MOON_NIGHT_RADIANCE_INDEX = 56;
 export const MOON_DAY_RADIANCE_INDEX = 57;
+export const MOON_GLOW_INDEX = 59;
 
 /**
  * Per-face replacements for `ObjectStruct.invViewProjectionMatrix`.
@@ -344,6 +345,7 @@ export class SkyCubeCapture {
       faceData[STAR_LOD_INDEX] = this.starLod;
       faceData[MOON_NIGHT_RADIANCE_INDEX] = 0;
       faceData[MOON_DAY_RADIANCE_INDEX] = 0;
+      faceData[MOON_GLOW_INDEX] = 0;
       device.queue.writeBuffer(
         this.uniformBuffer,
         face * this.stride,

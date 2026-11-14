@@ -311,6 +311,7 @@ export class SkyRenderer {
         4 + // moonNightRadiance
         4 + // moonDayRadiance
         4 + // moonLod
+        4 + // moonGlow
         0;
 
       // Align the buffer size to the next multiple of 256
@@ -554,6 +555,7 @@ export class SkyRenderer {
     uniformData[56] = moon.nightRadiance;
     uniformData[57] = moon.dayRadiance;
     uniformData[58] = Math.max(0, Math.log2(this.moonTextureSize / moonPixels));
+    uniformData[59] = moon.glow;
 
     // Extract XZ camera forward from the world matrix (-Z column)
     const m = camera.transform.matrixWorld.elements;

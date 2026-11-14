@@ -53,6 +53,8 @@ struct ObjectStruct {
     moonNightRadiance: f32,   // byte 224
     moonDayRadiance: f32,     // byte 228
     moonLod: f32,             // byte 232, mip of the moon image for its size on screen
+    // Radiance of the glow at the disc's rim. 0 in the IBL capture.
+    moonGlow: f32,            // byte 236
 };
 
 struct OutputStruct {

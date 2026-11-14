@@ -43,6 +43,8 @@ export class Moon {
   nightRadiance = 10;
   /** Sky radiance of the lit disc in daylight, faint against the blue. */
   dayRadiance = 2.5;
+  /** Sky radiance of the glow at the rim of a full moon. */
+  glowRadiance = 4;
 
   /** Day/night cycles from one new moon to the next. */
   daysPerCycle = 8;
@@ -51,6 +53,8 @@ export class Moon {
   readonly direction = new Vector3();
   /** The moon's light now, before cloud. */
   intensity = 0;
+  /** Radiance of the glow around the disc now, before the day fades it. */
+  glow = 0;
 
   /** Moves the phase on as the sun travels `sunDegrees` along its path. */
   advance(sunDegrees: number): void {
@@ -89,6 +93,7 @@ export class Moon {
 
     this.intensity =
       this.baseIntensity * illumination * illumination * night * risen;
+    this.glow = this.glowRadiance * illumination * illumination * risen;
   }
 
   /** Whether the moon, not the sun, should be the key light. */

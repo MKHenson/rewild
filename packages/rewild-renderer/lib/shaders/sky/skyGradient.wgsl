@@ -93,6 +93,24 @@ fn moonDisc(dir: vec3f, sunDirection: vec3f) -> vec4f {
     return vec4f(albedo * (lit + EARTHSHINE * night) * radiance * coverage, coverage);
 }
 
+// Glow falloff beyond the rim, in moon radii: a tight aureole and a wide halo.
+const MOON_GLOW_CORE: f32 = 1.0;
+const MOON_GLOW_HALO: f32 = 6.0;
+const MOON_GLOW_HALO_SHARE: f32 = 0.35;
+const MOON_GLOW_COLOR: vec3f = vec3f(0.78, 0.86, 1.0);
+
+// Moonlight scattered by the air around the disc, faded out by day.
+fn moonGlow(dir: vec3f) -> vec3f {
+    if (object.moonGlow <= 0.0) {
+        return vec3f(0.0);
+    }
+    let angle = acos(clamp(dot(dir, object.moonDirection), -1.0, 1.0));
+    let t = max(angle - object.moonRadius, 0.0) / object.moonRadius;
+    let falloff = mix(exp(-t / MOON_GLOW_CORE), exp(-t / MOON_GLOW_HALO), MOON_GLOW_HALO_SHARE);
+    let night = 1.0 - smoothstep(NIGHT_FADE_END, NIGHT_FADE_START, sunDotUp);
+    return MOON_GLOW_COLOR * object.moonGlow * falloff * night;
+}
+
 @fragment
 fn fs( 
     @builtin(position) fragCoord: vec4<f32>,
@@ -133,7 +151,7 @@ fn fs(
         let downFade = smoothstep(-0.1, 0.1, viewVertical);
         let cloudinessFade = 1.0 - shadingCloudiness();
         let adjustedNightSky = nightSky * downFade * cloudinessFade;
-        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, adjustedNightSky, moon.rgb );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, adjustedNightSky, moon.rgb + moonGlow(direction) );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
     }
@@ -191,7 +209,7 @@ fn fs(
     if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
         let moon = moonDisc(direction, vSunDirection);
         let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a) * (1.0 - shadingCloudiness());
-        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky, moon.rgb );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky, moon.rgb + moonGlow(direction) );
         output.color = vec4f( mix( horizonFog, atmosphereColor, hemisphereMask), 1.0 );
         return output;
     }
@@ -204,7 +222,7 @@ fn fs(
     else {
         let moon = moonDisc(direction, vSunDirection);
         let nightSky: vec3f = nightSkyBehindMoon(direction, moon.a) * (1.0 - shadingCloudiness());
-        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky, moon.rgb );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky, moon.rgb + moonGlow(direction) );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
     } 
