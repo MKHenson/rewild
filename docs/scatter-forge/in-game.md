@@ -70,6 +70,7 @@ rectangles or the bark turns inside out.
 | `collider` | `true` | Stop the player at the trunk. Trees and crowns with a stem have a capsule measured off the trunk; clumps, pebbles and stemless crowns never have one. Set `false` on a plant low enough to walk through, such as heather: a waist-high bush that stops the player reads as a wall. Rocks stop the player at their own hull and do not read this key. |
 | `footprint` | `0` (clump `0.7`) | The clear space in metres that the engine keeps round each model. `0` lets the tool choose. See [Density](#density). |
 | `yOffset` | `0` | Metres added to the height the engine places the model at. Negative sinks it into the ground. Most types are already sunk a little by the tool; this adds to that. See [Sinking](#sinking). |
+| `alignToNormal` | tree `0`, clump `0.6`, rock `1`, pebble `1`; crown `0` with a stem, `0.6` without | How far each copy is laid onto the slope, `0` to `1`. `0` stands upright; `1` lies flush with the ground. Set `1` on a clump patch more than about a metre across: at `0.6` it only tilts part of the way, so its downhill side floats. See [Slopes](#slopes). |
 | `scaleMin`, `scaleMax` | `0.8`, `1.25` | The range of random sizes for each copy. Rocks use `0.6` to `1.6`, so one model can be a stone or a boulder. |
 | `impostor` | see [Impostors](#impostors) | The flat picture that the engine draws at far distances. |
 | `lods` | `[]` | Simpler versions of the model. See [LOD tiers](#lod-tiers). |
@@ -91,10 +92,21 @@ the type:
 clump patch and a pebble cluster are placed from one ground height and slope, so the far side can
 float. Sinking it hides that gap. A rock is sunk so it sits in the slope instead of on top of it.
 
-On a slope, the engine also sinks each copy so the downhill side of an upright trunk meets the
-ground. It takes the base radius as 1.5 × the collider's radius, or a tenth of `footprint` with no
-collider, and sinks by `radius × gradient × scale × (1 − alignToNormal)`. Flat ground is not
-changed, and a model laid fully onto the slope is not sunk. Nothing needs to be set for this; to
+### Slopes
+
+`alignToNormal` tilts each copy from upright towards the ground's slope. Trees stand upright,
+because a leaning trunk looks damaged. Rocks and pebbles lie flush with the ground. Clumps tilt
+part of the way (`0.6`), so a hillside of grass does not look combed in one direction.
+
+A copy that tilts only part of the way is still at an angle to the ground. The error at the edge
+is `radius × tan(slope × (1 − alignToNormal))`, so wide models show it most. A clump patch with a
+`patchRadius` of 2.2m at `0.6` on a 25° slope floats about 0.2m on its downhill side. Set
+`alignToNormal` to `1` on wide patches.
+
+The engine also sinks each copy so the downhill side of an upright trunk meets the ground. It
+takes the base radius as 1.5 × the collider's radius, or a tenth of `footprint` with no collider,
+and sinks by `radius × gradient × scale × (1 − alignToNormal)`. Flat ground is not changed, and a
+model laid fully onto the slope is not sunk. This is sized for a trunk, not for a wide patch. To
 sink a model further on every slope, use `yOffset`.
 
 ### Wind

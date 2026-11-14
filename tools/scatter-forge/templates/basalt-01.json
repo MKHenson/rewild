@@ -1,6 +1,7 @@
 {
   "type": "rock",
   "name": "basalt-01",
+  "alignToNormal": 1,
   "seed": 5310,
   "height": 1.8,
   "width": 3,

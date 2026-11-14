@@ -113,9 +113,10 @@ export function colliderFor(params: Params, skeleton: Skeleton): PhysicsShape {
  * texels under itself, and the shadow pass would draw every card of every
  * patch to get it.
  *
- * **Laid partly onto the slope.** A tree stands upright whatever the ground
- * does. Grass does not: it grows from the surface, so it leans with it, but
- * not the whole way, or a hillside reads as combed.
+ * **Laid partly onto the slope, unless asked.** A tree stands upright whatever
+ * the ground does. Grass does not: it grows from the surface, so it leans with
+ * it, but not the whole way, or a hillside reads as combed. A metres-wide patch
+ * sets `alignToNormal` 1, or its downhill rim floats.
  */
 export function clumpLayer(params: Params, metrics: ClumpMetrics): ScatterLayer {
   return {
@@ -128,7 +129,7 @@ export function clumpLayer(params: Params, metrics: ClumpMetrics): ScatterLayer 
       yaw: { from: 0, to: 360 },
       tilt: clumpTilt(metrics),
     },
-    alignToNormal: 0.6,
+    alignToNormal: params.alignToNormal,
     yOffset: round(clumpOffset(metrics) + params.yOffset, 3),
     footprint: params.footprint > 0 ? params.footprint : clumpFootprint(metrics),
     wind: {
@@ -204,9 +205,7 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     cullDistance: params.cullDistance,
     impostor: { ...(params.impostor ?? IMPOSTOR_DEFAULT), fromDistance: impostorDistance(params) },
     jitter: { scale: { from: params.scaleMin, to: params.scaleMax }, yaw: { from: 0, to: 360 }, tilt: 3 },
-    // Trees stand up whatever the slope does. A tilted trunk reads as damage,
-    // not as terrain.
-    alignToNormal: 0,
+    alignToNormal: params.alignToNormal,
     ...(params.yOffset ? { yOffset: params.yOffset } : {}),
     footprint,
     ...(params.collider ? { collider: colliderFor(params, skeleton) } : {}),
@@ -264,7 +263,7 @@ export function rockLayer(params: Params, rock: Rock): ScatterLayer {
     cullDistance: params.cullDistance,
     ...(params.impostor ? { impostor: { ...params.impostor, fromDistance: impostorDistance(params) } } : {}),
     jitter: { scale: { from: params.scaleMin, to: params.scaleMax }, yaw: { from: 0, to: 360 }, tilt: 8 },
-    alignToNormal: 1,
+    alignToNormal: params.alignToNormal,
     yOffset: round(params.yOffset - metrics.height * ROCK_SINK),
     footprint: params.footprint > 0 ? params.footprint : round(Math.max(0.3, span * 0.8), 1),
     collider: { type: 'hull', points: metrics.hull },
@@ -324,7 +323,7 @@ export function pebbleLayer(params: Params, metrics: ClusterMetrics): ScatterLay
       yaw: { from: 0, to: 360 },
       tilt: Math.max(2, Math.min(12, tilt)),
     },
-    alignToNormal: 1,
+    alignToNormal: params.alignToNormal,
     // Each pebble already beds into the mesh by its own share of its height.
     // This is the rest: a cluster is posed off one height sample and one slope
     // sample, so its far side sits above or below the ground it covers, and

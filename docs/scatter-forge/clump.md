@@ -175,6 +175,7 @@ These keys work on more than one type. The defaults here are the ones for `clump
 | [`foliage`](in-game.md#layer-keys) | `true` | Light the cutout piece as leaves. Set `false` for a cutout that is not a leaf. |
 | [`foliageNormalMap`](in-game.md#layer-keys) | `false` | With `foliage`, also use the normal map. For large plants seen up close. |
 | [`footprint`](in-game.md#density) | `0.7` | The clear space in metres round each model. `0` lets the tool choose. |
+| [`alignToNormal`](in-game.md#slopes) | `0.6` | How far each copy is laid onto the slope, `0` to `1`. Set `1` on a patch more than about a metre across, or its downhill side floats. |
 | [`scaleMin`](in-game.md#layer-keys) | `0.75` | The smallest random size of a copy. |
 | [`scaleMax`](in-game.md#layer-keys) | `1.3` | The largest random size of a copy. |
 | [`impostor`](in-game.md#impostors) | none unless set | The flat pictures drawn at far distances. |

@@ -42,6 +42,7 @@
   "stain": 0.1,
   "snow": 0,
   "cullDistance": 120,
+  "alignToNormal": 1,
   "scaleMin": 1,
   "scaleMax": 1.2,
   "subdivisions": 3,

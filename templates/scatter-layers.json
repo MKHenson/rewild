@@ -196,7 +196,7 @@
       },
       "tilt": 2
     },
-    "alignToNormal": 0.6,
+    "alignToNormal": 1,
     "yOffset": -0.132,
     "footprint": 1.6,
     "wind": {
@@ -228,7 +228,7 @@
       },
       "tilt": 2
     },
-    "alignToNormal": 0.6,
+    "alignToNormal": 1,
     "yOffset": -0.132,
     "footprint": 1.6,
     "wind": {
@@ -434,7 +434,7 @@
       "tilt": 3
     },
     "yOffset": -0.084,
-    "alignToNormal": 0.6,
+    "alignToNormal": 1,
     "footprint": 1.6,
     "wind": {
       "amplitude": 4.18,
@@ -541,7 +541,7 @@
       },
       "tilt": 4
     },
-    "alignToNormal": 0.6,
+    "alignToNormal": 1,
     "yOffset": -0.036,
     "footprint": 2.37,
     "wind": {
@@ -573,7 +573,7 @@
       },
       "tilt": 4
     },
-    "alignToNormal": 0.6,
+    "alignToNormal": 1,
     "yOffset": -0.038,
     "footprint": 2.1,
     "wind": {

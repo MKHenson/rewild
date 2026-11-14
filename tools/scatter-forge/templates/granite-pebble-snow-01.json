@@ -39,6 +39,7 @@
   "topOpacity": 0.25,
   "topTint": "#2a2d28",
   "cullDistance": 120,
+  "alignToNormal": 1,
   "scaleMin": 1,
   "scaleMax": 1.2,
   "subdivisions": 3,

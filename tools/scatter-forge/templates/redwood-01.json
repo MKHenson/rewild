@@ -52,6 +52,7 @@
   "windFrequency": 0.3,
   "windFlutter": 0.2,
   "cullDistance": 900,
+  "alignToNormal": 0,
   "castShadow": true,
   "impostor": { "fromDistance": 320 },
   "footprint": 0,

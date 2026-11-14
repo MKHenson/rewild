@@ -8,6 +8,7 @@
   "seed": 90210,
   "height": 1.8,
   "tuftsPerModel": 44,
+  "alignToNormal": 1,
   "patchRadius": 2.2,
   "cardsPerTuft": 2,
   "cardSegments": 3,

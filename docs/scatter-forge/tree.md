@@ -530,6 +530,7 @@ These keys work on more than one type. The defaults here are the ones for `tree`
 | [`foliageNormalMap`](in-game.md#layer-keys) | `false` | With `foliage`, also use the normal map. For large plants seen up close. |
 | [`collider`](in-game.md#layer-keys) | `true` | Stop the player at the trunk. Set `false` for a plant low enough to walk through. |
 | [`footprint`](in-game.md#density) | `0` | The clear space in metres round each model. `0` lets the tool choose. |
+| [`alignToNormal`](in-game.md#slopes) | `0` | How far each copy is laid onto the slope, `0` to `1`. A leaning trunk looks damaged. |
 | [`scaleMin`](in-game.md#layer-keys) | `0.8` | The smallest random size of a copy. |
 | [`scaleMax`](in-game.md#layer-keys) | `1.25` | The largest random size of a copy. |
 | [`impostor`](in-game.md#impostors) | from 60% of `cullDistance` | The flat pictures drawn at far distances. |

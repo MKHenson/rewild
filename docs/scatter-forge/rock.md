@@ -828,6 +828,7 @@ These keys work on more than one type. The defaults here are the ones for `rock`
 | [`cullDistance`](in-game.md#layer-keys) | `800` | The distance in metres past which the engine does not draw the model. |
 | [`castShadow`](in-game.md#layer-keys) | `true` | Whether the model casts a shadow. |
 | [`footprint`](in-game.md#density) | `0` | The clear space in metres round each model. `0` lets the tool choose. |
+| [`alignToNormal`](in-game.md#slopes) | `1` | How far each copy is laid onto the slope, `0` to `1`. |
 | [`scaleMin`](in-game.md#layer-keys) | `0.6` | The smallest random size of a copy. |
 | [`scaleMax`](in-game.md#layer-keys) | `1.6` | The largest random size of a copy. |
 | [`impostor`](in-game.md#impostors) | from 120m | The flat pictures drawn at far distances. |

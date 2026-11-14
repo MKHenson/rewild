@@ -1,6 +1,7 @@
 {
   "type": "rock",
   "name": "sandstone-01",
+  "alignToNormal": 1,
   "seed": 41207,
   "height": 2.2,
   "width": 4.6,

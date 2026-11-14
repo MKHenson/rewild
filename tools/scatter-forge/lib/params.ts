@@ -40,6 +40,9 @@ interface ParamSpec {
   readonly insteadFor?: Partial<Record<ForgeType, string>>;
 }
 
+/** How far grass leans with the slope: with it, but not so far a hillside reads as combed. */
+const CLUMP_ALIGN_TO_NORMAL = 0.6;
+
 const TREE = ['tree'] as const;
 const CLUMP = ['clump'] as const;
 const CROWN = ['crown'] as const;
@@ -372,6 +375,7 @@ export const PARAM_SPEC = {
   impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null, pebble: null, rock: { fromDistance: 120, views: 8, tileSize: 128 } }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint in metres. 0 derives it from the model. The most expensive number here: candidates go as 1/footprint squared.', byType: { clump: 0.7 } },
   yOffset: { type: 'number', default: 0, help: 'Metres added to the ScatterLayer yOffset, on top of any sink the model derives. Negative sinks the model into the ground.' },
+  alignToNormal: { type: 'number', default: 0, byType: { clump: CLUMP_ALIGN_TO_NORMAL, crown: null, rock: 1, pebble: 1 }, help: 'ScatterLayer alignToNormal, 0..1: how far each copy is laid onto the slope. 0 stands upright, 1 lies flush with the ground. A crown with a stem stands upright and one without takes the clump default. A wide clump patch wants 1, or its downhill rim floats.' },
   scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75, rock: 0.6, pebble: 0.7 }, help: 'Lower bound of the emitted scale jitter.' },
   scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3, rock: 1.6, pebble: 1.4 } },
 
@@ -747,6 +751,7 @@ export function resolveParams(raw: RawConfig): Params {
   // itself and which culls instead.
   const stemmed = modelType === 'crown' && Number(params.stemHeight) > 0;
   params.castShadow ??= stemmed;
+  params.alignToNormal ??= stemmed ? 0 : CLUMP_ALIGN_TO_NORMAL;
   if (stemmed) params.impostor ??= { ...IMPOSTOR_DEFAULT };
 
   const resolved = { ...params, ...LOOK } as Params;
@@ -870,6 +875,9 @@ function validate(params: Params): void {
     throw new Error('foliageNormalMap needs foliage: the standard surface already reads the normal map.');
 
   if (params.impostor) validateImpostor(params.impostor, params.cullDistance);
+
+  if (!(params.alignToNormal >= 0 && params.alignToNormal <= 1))
+    throw new Error(`alignToNormal must be within 0..1, got ${params.alignToNormal}.`);
 }
 
 /**

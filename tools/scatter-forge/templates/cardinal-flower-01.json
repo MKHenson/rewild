@@ -22,6 +22,7 @@
   "windFrequency": 1.1,
   "windFlutter": 0.4,
   "cullDistance": 220,
+  "alignToNormal": 0.6,
   "castShadow": false,
   "footprint": 0,
   "scaleMin": 0.8,

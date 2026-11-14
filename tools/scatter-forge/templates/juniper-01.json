@@ -36,6 +36,7 @@
   "leafAngle": 25,
   "leafFrom": 0.1,
   "cullDistance": 450,
+  "alignToNormal": 0,
   "castShadow": true,
   "impostor": { "fromDistance": 320 },
   "lods": [

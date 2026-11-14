@@ -1,6 +1,7 @@
 {
   "type": "rock",
   "name": "granite-02",
+  "alignToNormal": 1,
   "seed": 3,
   "height": 4.4,
   "scoops": 12,

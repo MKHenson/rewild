@@ -24,6 +24,7 @@
   "windFrequency": 0.8,
   "windFlutter": 0.7,
   "cullDistance": 420,
+  "alignToNormal": 0.6,
   "castShadow": false,
   "impostor": { "fromDistance": 110, "views": 2, "tileSize": 32 },
   "footprint": 1.6,

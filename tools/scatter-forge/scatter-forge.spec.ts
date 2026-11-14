@@ -1737,6 +1737,14 @@ describe('clump', () => {
     expect(hasImpostor(clumpParams())).toBe(false);
   });
 
+  it('takes alignToNormal from the file over the type default', () => {
+    const { metrics } = build();
+
+    expect(clumpLayer(clumpParams(), metrics).alignToNormal).toBe(0.6);
+    expect(clumpLayer(clumpParams({ alignToNormal: 1 }), metrics).alignToNormal).toBe(1);
+    expect(() => clumpParams({ alignToNormal: 1.5 })).toThrow(/alignToNormal must be within 0\.\.1/);
+  });
+
   it('writes no _disp map and so no materials.json material', () => {
     expect(heightPieces('clump')).toEqual([]);
     expect(heightPieces('tree')).toEqual(['bark', 'leaf']);

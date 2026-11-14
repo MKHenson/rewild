@@ -43,6 +43,7 @@
   "windFrequency": 0.5,
   "windFlutter": 0.6,
   "cullDistance": 140,
+  "alignToNormal": 0,
   "castShadow": false,
   "collider": false,
   "footprint": 0,
