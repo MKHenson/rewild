@@ -1,9 +1,9 @@
 import { PoseSlotData, PoseStore } from './PoseStore';
 
 /** Within this many metres of the camera, a pose builds every frame. */
-export const FULL_RATE_DISTANCE = 20;
+export const FULL_RATE_DISTANCE = 60;
 /** Within this many metres, a pose builds every NEAR_POSE_INTERVAL. Past it, every FAR_POSE_INTERVAL. */
-export const NEAR_RATE_DISTANCE = 40;
+export const NEAR_RATE_DISTANCE = 120;
 export const NEAR_POSE_INTERVAL = 1 / 30;
 export const FAR_POSE_INTERVAL = 1 / 15;
 
@@ -72,8 +72,7 @@ export class PoseSchedule implements PoseSlotData {
 
       due[slot] = 1;
       const rest = e - interval;
-      elapsed[slot] =
-        rest < interval ? rest : interval * ((slot * GOLDEN) % 1);
+      elapsed[slot] = rest < interval ? rest : interval * ((slot * GOLDEN) % 1);
     }
 
     return due;
