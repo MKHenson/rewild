@@ -4,8 +4,9 @@ import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 import { MAX_WATER_TYPES, WaterType } from '../../renderers/terrain/Water';
+import { TerrainPatchPlacement } from '../../renderers/terrain/TerrainPatch';
 
-// TerrainParams layout (624 bytes, std140-compatible) — must match the struct
+// TerrainParams layout (672 bytes, std140-compatible) — must match the struct
 // in terrain.wgsl:
 //   detailFadeStart  f32             offset 0   (4 bytes)
 //   detailFadeEnd    f32             offset 4   (4 bytes)
@@ -16,6 +17,9 @@ import { MAX_WATER_TYPES, WaterType } from '../../renderers/terrain/Water';
 //   layers           array<vec4f,32> offset 32  (512 bytes)
 //   water            vec4f           offset 544 (16 bytes)
 //   waterExtinction  array<vec4f,4>  offset 560 (64 bytes)
+//   patchRect        vec4f           offset 624 (16 bytes)
+//   patchGrid        vec4f           offset 640 (16 bytes)
+//   patchView        vec4f           offset 656 (16 bytes)
 //
 // `layers` starts at 32 because a uniform array of vec4f needs 16-byte
 // alignment, and the six scalars above spill into a second row. Four vec4f
@@ -28,12 +32,21 @@ import { MAX_WATER_TYPES, WaterType } from '../../renderers/terrain/Water';
 // `water` is (base level, texels per side, centre x, centre z); texels 0 means
 // the chunk has no water map. `waterExtinction` is per water palette entry:
 // rgb absorption and a turbidity, per metre.
+//
+// The patch block places the displaced patch (TerrainPatchPlacement) in the
+// chunk's object space: `patchRect` the whole patch as (minX, minZ, maxX, maxZ),
+// empty when there is none; `patchGrid` this chunk's part as (gridX, gridZ,
+// spacing, metres per sample); `patchView` the eye's xz and the displacement's
+// fade radii.
 const LAYERS_OFFSET_FLOATS = 32 / 4;
 const FLOATS_PER_LAYER = 16;
 const WATER_OFFSET_FLOATS =
   LAYERS_OFFSET_FLOATS + MAX_SPLAT_LAYERS * FLOATS_PER_LAYER;
 const WATER_EXTINCTION_OFFSET_FLOATS = WATER_OFFSET_FLOATS + 4;
-const PARAMS_SIZE = (WATER_EXTINCTION_OFFSET_FLOATS + MAX_WATER_TYPES * 4) * 4;
+const PATCH_OFFSET_FLOATS =
+  WATER_EXTINCTION_OFFSET_FLOATS + MAX_WATER_TYPES * 4;
+const PATCH_FLOATS = 12;
+const PARAMS_SIZE = (PATCH_OFFSET_FLOATS + PATCH_FLOATS) * 4;
 
 /** A chunk's water map as its terrain reads it. */
 export interface TerrainWater {
@@ -146,6 +159,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   private _paramsBuffer: GPUBuffer;
   private _paramsData: Float32Array = new Float32Array(PARAMS_SIZE / 4);
   private _water: TerrainWater | null = null;
+  private _patchSurface: GPUBuffer | null = null;
 
   constructor(group: number) {
     this.group = group;
@@ -230,6 +244,9 @@ export class TerrainUniforms implements ISharedUniformBuffer {
           },
         },
         { binding: 13, resource: shoreField.swashTexture.createView() },
+        ...(this._patchSurface
+          ? [{ binding: 14, resource: { buffer: this._patchSurface } }]
+          : []),
       ],
     });
 
@@ -313,6 +330,77 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       5,
       1
     );
+  }
+
+  /**
+   * Writes where the displaced patch sits on this chunk, straight to the GPU
+   * once the params exist. Null clears it.
+   */
+  setPatch(
+    device: GPUDevice,
+    placement: TerrainPatchPlacement | null,
+    metresPerSample: number
+  ): void {
+    const data = this._paramsData;
+    const o = PATCH_OFFSET_FLOATS;
+    if (placement && placement.active) {
+      data[o] = placement.minX;
+      data[o + 1] = placement.minZ;
+      data[o + 2] = placement.maxX;
+      data[o + 3] = placement.maxZ;
+      data[o + 4] = placement.gridX;
+      data[o + 5] = placement.gridZ;
+      data[o + 6] = placement.spacing;
+      data[o + 7] = metresPerSample;
+      data[o + 8] = placement.eyeX;
+      data[o + 9] = placement.eyeZ;
+      data[o + 10] = placement.fadeStart;
+      data[o + 11] = placement.fadeEnd;
+    } else {
+      data.fill(0, o, o + PATCH_FLOATS);
+    }
+    if (!this._paramsBuffer) return;
+    device.queue.writeBuffer(
+      this._paramsBuffer,
+      o * 4,
+      data as ArrayBufferView<ArrayBuffer>,
+      o,
+      PATCH_FLOATS
+    );
+  }
+
+  /**
+   * Takes everything the source binds, so a patch pass shades exactly as the
+   * chunk it belongs to does. The patch block is left alone.
+   */
+  copyFrom(source: TerrainUniforms): void {
+    this.detailFadeStart = source.detailFadeStart;
+    this.detailFadeEnd = source.detailFadeEnd;
+    this.noiseScale = source.noiseScale;
+    this.heightBlendDepth = source.heightBlendDepth;
+    this.uvPerMetre = source.uvPerMetre;
+    this._fade = source._fade;
+    this.layers = source.layers;
+    this._albedoView = source._albedoView;
+    this._normalView = source._normalView;
+    this._armView = source._armView;
+    this._heightView = source._heightView;
+    this._splatTexture = source._splatTexture;
+    this._splatTextureExt = source._splatTextureExt;
+    this._noiseTexture = source._noiseTexture;
+    this._splatSampler = source._splatSampler;
+    this._seamlessSampler = source._seamlessSampler;
+    this._water = source._water;
+    this.requiresBuild = true;
+  }
+
+  /**
+   * The chunk's LOD-0 surface, one vec4f (height, normal) per sample, for the
+   * patch's vertex shader. Only a patch pass binds one.
+   */
+  set patchSurface(buffer: GPUBuffer | null) {
+    this._patchSurface = buffer;
+    this.requiresBuild = true;
   }
 
   /** The chunk's water map, or null for a chunk with none. */

@@ -62,6 +62,17 @@ interface TerrainQualityTier {
    */
   detailFadeStart: number;
   detailFadeEnd: number;
+  /**
+   * Width in metres of the displaced patch around the camera, 0 for none.
+   * Inside it relief is real geometry rather than the parallax march.
+   */
+  patchSize: number;
+  /**
+   * Metres between the patch's vertices. Must divide the 2m terrain sample
+   * spacing so the patch lattice stays fixed to the world as it follows the
+   * camera.
+   */
+  patchSpacing: number;
 }
 
 const TIERS: Record<RenderQuality, TerrainQualityTier> = {
@@ -73,6 +84,8 @@ const TIERS: Record<RenderQuality, TerrainQualityTier> = {
     parallax: true,
     detailFadeStart: 200,
     detailFadeEnd: 280,
+    patchSize: 80,
+    patchSpacing: 0.1,
   },
   high: {
     noTileBlend: true,
@@ -82,6 +95,8 @@ const TIERS: Record<RenderQuality, TerrainQualityTier> = {
     parallax: true,
     detailFadeStart: 150,
     detailFadeEnd: 200,
+    patchSize: 64,
+    patchSpacing: 0.125,
   },
   medium: {
     // Worth 0.14ms here, because the splat loop skips any layer under
@@ -94,6 +109,8 @@ const TIERS: Record<RenderQuality, TerrainQualityTier> = {
     parallax: true,
     detailFadeStart: 90,
     detailFadeEnd: 130,
+    patchSize: 48,
+    patchSpacing: 0.2,
   },
   low: {
     noTileBlend: false,
@@ -103,6 +120,8 @@ const TIERS: Record<RenderQuality, TerrainQualityTier> = {
     parallax: false,
     detailFadeStart: 45,
     detailFadeEnd: 70,
+    patchSize: 0,
+    patchSpacing: 0.1,
   },
 };
 
@@ -141,4 +160,18 @@ export function terrainDetailFade(quality: RenderQuality): {
 } {
   const tier = TIERS[quality];
   return { start: tier.detailFadeStart, end: tier.detailFadeEnd };
+}
+
+/**
+ * The displaced patch's width and vertex spacing in metres, or null for a tier
+ * that draws none.
+ *
+ *     terrainPatch('high'); // { size: 32, spacing: 0.08 }
+ */
+export function terrainPatch(
+  quality: RenderQuality
+): { size: number; spacing: number } | null {
+  const tier = TIERS[quality];
+  if (tier.patchSize <= 0) return null;
+  return { size: tier.patchSize, spacing: tier.patchSpacing };
 }

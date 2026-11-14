@@ -69,7 +69,7 @@ export interface TerrainMaterial {
 
 // Matches the shader's current `fragUV * 25.0`, so the detail tiling of the
 // existing single-material terrain carries over unchanged.
-const DETAIL_UV_SCALE = 140;
+const DETAIL_UV_SCALE = 60;
 
 // Much coarser than the detail scale: features spanning metres rather than
 // centimetres, which is what survives mipping at distance.
@@ -142,7 +142,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     armUrl: 'terrain/snow-02/snow_02_arm_1k.webp',
     heightUrl: 'terrain/snow-02/snow_02_disp_1k.webp',
     macroUvScale: MACRO_UV_SCALE,
-    heightScale: HEIGHT_SCALE * 0.5,
+    heightScale: HEIGHT_SCALE,
     uvScale: DETAIL_UV_SCALE * 0.25,
     roughness: ROUGHNESS * 0.55,
     normalConvention: 'opengl',
@@ -153,7 +153,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     normalUrl: 'terrain/snow-field-aerial/snow_field_aerial_nor_gl_1k.webp',
     armUrl: 'terrain/snow-field-aerial/snow_field_aerial_arm_1k.webp',
     heightUrl: 'terrain/snow-field-aerial/snow_field_aerial_height_1k.webp',
-    heightScale: HEIGHT_SCALE * 0.5,
+    heightScale: HEIGHT_SCALE,
     macroUvScale: MACRO_UV_SCALE * 2.0,
     macroStrength: 2.5,
     uvScale: DETAIL_UV_SCALE,
@@ -287,7 +287,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     normalUrl: 'terrain/aerial-beach-02/aerial_beach_02_nor_gl_1k.webp',
     armUrl: 'terrain/aerial-beach-02/aerial_beach_02_arm_1k.webp',
     heightUrl: 'terrain/aerial-beach-02/aerial_beach_02_disp_1k.webp',
-    heightScale: HEIGHT_SCALE * 5,
+    heightScale: HEIGHT_SCALE * 2,
     macroUvScale: MACRO_UV_SCALE * 0.5,
     uvScale: DETAIL_UV_SCALE,
     roughness: ROUGHNESS * 0.95,
@@ -301,7 +301,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     armUrl: 'terrain/cliff-side/cliff_side_arm_1k.webp',
     heightUrl: 'terrain/cliff-side/cliff_side_disp_1k.webp',
     macroNormalFrom: 'marble_cliff_05',
-    heightScale: HEIGHT_SCALE * 4,
+    heightScale: HEIGHT_SCALE * 2,
     macroUvScale: MACRO_UV_SCALE * 0.75,
     uvScale: DETAIL_UV_SCALE,
     roughness: ROUGHNESS * 0.91,

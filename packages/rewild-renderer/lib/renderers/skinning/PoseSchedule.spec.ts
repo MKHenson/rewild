@@ -79,9 +79,10 @@ describe('PoseSchedule', () => {
       return dueFrames(schedule, 0, distance, 60);
     };
 
-    expect(builds(5)).toBe(60);
-    expect(builds(30)).toBe(30);
-    expect(builds(80)).toBe(15);
+    const near = (FULL_RATE_DISTANCE + NEAR_RATE_DISTANCE) / 2;
+    expect(builds(FULL_RATE_DISTANCE / 2)).toBe(60);
+    expect(builds(near)).toBe(30);
+    expect(builds(NEAR_RATE_DISTANCE * 2)).toBe(15);
   });
 
   it('spreads slots that come into view together over the frames', () => {
@@ -92,7 +93,8 @@ describe('PoseSchedule', () => {
 
     const perFrame: number[] = [];
     for (let f = 0; f < 8; f++) {
-      for (let slot = 0; slot < 8; slot++) schedule.seen(slot, 80, 0, 0);
+      for (let slot = 0; slot < 8; slot++)
+        schedule.seen(slot, NEAR_RATE_DISTANCE * 2, 0, 0);
       const due = schedule.plan(DT, 0, 0, 0);
       perFrame.push(due.slice(0, 8).reduce((sum, d) => sum + d, 0));
     }

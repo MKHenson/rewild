@@ -131,7 +131,7 @@ export class WorldSound {
     );
     this._aloft.update();
     this._duck();
-    if (renderer.terrainRenderer) {
+    if (renderer.terrainRenderer && renderer.isInitialized) {
       this._water.attach(renderer.terrainRenderer);
       this._surf.update(this._water, sky.wind.vec[2], seconds);
       this._openSea.update(this._water, sky.wind.vec[2], seconds);

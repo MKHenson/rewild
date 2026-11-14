@@ -29,6 +29,8 @@ import { ScatterInstances, ScatterPick, pickScatterInstance } from './Scatter';
 import { generateSplatMap, sampleSplatMap } from './Splat';
 import { TERRAIN_MATERIALS } from './TerrainMaterials';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
+import { terrainPatch } from './TerrainQuality';
+import type { TerrainPass } from '../../materials/TerrainPass';
 import { GroundSampler, createGroundSampler, sampleGround } from './Noise';
 import { ScatterModels } from './ScatterModels';
 import {
@@ -1188,9 +1190,46 @@ export class TerrainRenderer implements WaterQuerySource {
     }
     this.updateFarOnly(camera);
     this.updateVisibility(renderer, camera);
+    this.updatePatch(renderer, camera);
     this.updateChunkFades(renderer);
     this.updateHorizonOcean(renderer);
     this.updateWaterWaves(renderer, camera);
+  }
+
+  /**
+   * Places the displaced patch around the eye on every LOD-0 chunk it reaches.
+   * Off where the tier has none, or the eye is too high above the ground for
+   * its relief to read.
+   */
+  private updatePatch(renderer: Renderer, camera: Camera) {
+    const patch = terrainPatch(renderer.quality.aspect('terrain'));
+    const eye = camera.transform.position;
+    let on = patch !== null && !this._farOnly;
+    if (on) {
+      const ground = this.sampleHeight(eye.x, eye.z);
+      on = ground !== null && eye.y - ground < patch!.size;
+    }
+
+    const device = renderer.device;
+    const half = this.chunkSize / 2;
+    const chunks = this.terrainChunksVisibleLastUpdate;
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const pass = chunk.lodMesh[0]?.mesh?.material as TerrainPass | undefined;
+      if (!pass) continue;
+      if (on)
+        pass.updatePatch(
+          device,
+          eye.x,
+          eye.z,
+          patch!.size,
+          patch!.spacing,
+          chunk.transform.position.x,
+          chunk.transform.position.z,
+          half
+        );
+      else pass.clearPatch(device);
+    }
   }
 
   private updateWaterWaves(renderer: Renderer, camera: Camera) {

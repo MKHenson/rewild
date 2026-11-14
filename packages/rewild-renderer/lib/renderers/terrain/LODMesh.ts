@@ -345,6 +345,10 @@ export class LODMesh {
         }
 
         const terrainPass = new TerrainPass();
+        if (this.lod === 0) {
+          terrainPass.patchSamples = this.chunkSize;
+          terrainPass.patchMetresPerSample = TERRAIN_METERS_PER_SAMPLE;
+        }
         const uniforms = terrainPass.terrainUniforms;
         uniforms.splatSampler = renderer.samplerManager.get('linear-clamped');
         uniforms.splatTexture = this.chunk.splatTexture!.gpuTexture;

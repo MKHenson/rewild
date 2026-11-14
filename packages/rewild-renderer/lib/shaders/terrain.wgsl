@@ -120,6 +120,14 @@ struct TerrainParams {
   water           : vec4f,
   // Per water palette entry: rgb absorption and a turbidity, per metre.
   waterExtinction : array<vec4f, 4>,
+  // The displaced patch around the eye, in the chunk's space: the whole patch
+  // as (minX, minZ, maxX, maxZ), empty when there is none.
+  patchRect       : vec4f,
+  // This chunk's part of the patch grid: (x, z) of its first vertex, metres
+  // between vertices, and metres between terrain samples.
+  patchGrid       : vec4f,
+  // The eye's xz and the radii over which displacement fades out.
+  patchView       : vec4f,
 }
 
 struct VertexInput {
@@ -138,6 +146,13 @@ struct VertexOutput {
   // world normal to choose a side plane, and world height for its vertical axis.
   @location(3) objectNormal : vec3f,
   @location(4) objectHeight : f32,
+  // Metres the patch's geometry already sits carved below the base surface, 0
+  // off the patch. The march starts its ray that deep, so it adds only the
+  // relief finer than the patch's vertices.
+  @location(5) reliefDepth : f32,
+  // View-space displacement from the surface `viewPosition` sits on. Shadows
+  // look up from the undisplaced surface, which is what the shadow map holds.
+  @location(6) surfaceOffset : vec3f,
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -275,7 +290,8 @@ fn sampleDepth(uv: vec2f, arrayIndex: i32, ddx: vec2f, ddy: vec2f) -> f32 {
 //
 // `viewTS` is the tangent-space surface→eye direction; `amplitude` is the
 // volume's depth in this layer's tile UV (heightScale, already faded by
-// distance). Called once per no-tile tap, so the marched depth tracks the
+// distance); `startDepth` is how far into the volume, 0 to 1, the surface the
+// ray enters through already lies. Called once per no-tile tap, so the marched depth tracks the
 // texture region actually shown at this fragment.
 //
 // Returns vec3f: the displaced UV in .xy, and the surface *height* (1 = peak) at
@@ -287,7 +303,8 @@ fn parallaxOcclusion(
   ddx: vec2f,
   ddy: vec2f,
   viewTS: vec3f,
-  amplitude: f32
+  amplitude: f32,
+  startDepth: f32
 ) -> vec3f {
   // Distant fragments (detailFade → 0) carry no relief — skip the whole march,
   // but still report the height at the undisplaced UV for the blend. The tier
@@ -314,7 +331,7 @@ fn parallaxOcclusion(
   let deltaUV = (viewTS.xy / viewZ) * amplitude * layerDepth;
 
   var currentUV = startUV;
-  var currentLayerDepth = 0.0;
+  var currentLayerDepth = startDepth;
   var currentDepth = sampleDepth(currentUV, arrayIndex, ddx, ddy);
 
   // Linear march down the ray until the sampled surface is above the ray depth.
@@ -484,10 +501,26 @@ fn terrainWater(uv: vec2f, height: f32, rise: f32, distance: f32) -> TerrainWate
   return out;
 }
 
+// Metres a base vertex under the patch drops, so the patch's carved surface
+// shows above it. Must exceed the deepest relief any material carves.
+const PATCH_SINK: f32 = 4.0;
+
+// Strictly inside the patch: its edge vertices stay put, so the base triangles
+// sloping down from them stay below the patch's undisplaced border.
+fn underPatch(p: vec3f) -> bool {
+  let r = terrainParams.patchRect;
+  let e = 0.01;
+  return r.z > r.x && p.x > r.x + e && p.x < r.z - e && p.z > r.y + e && p.z < r.w - e;
+}
+
 @vertex
 fn vs(input: VertexInput) -> VertexOutput {
   var output : VertexOutput;
-  var mvPosition = vec4<f32>(input.position.xyz, 1.0);
+  var position = input.position.xyz;
+  if (underPatch(position)) {
+    position.y -= PATCH_SINK;
+  }
+  var mvPosition = vec4<f32>(position, 1.0);
   mvPosition = uniforms.modelViewMatrix * mvPosition;
   output.Position = uniforms.projMatrix * mvPosition;
   output.viewPosition = mvPosition.xyz;
@@ -495,8 +528,12 @@ fn vs(input: VertexInput) -> VertexOutput {
   output.normal = uniforms.normalMatrix * input.normal;
   output.objectNormal = input.normal;
   output.objectHeight = input.position.y;
+  output.reliefDepth = 0.0;
+  output.surfaceOffset = vec3f(0.0);
   return output;
 }
+
+#include "./shader-lib/terrain-patch.vert.wgsl"
 
 @fragment
 fn fs(
@@ -505,6 +542,8 @@ fn fs(
   @location(2) viewPosition: vec3f,
   @location(3) objectNormal: vec3f,
   @location(4) objectHeight: f32,
+  @location(5) reliefDepth: f32,
+  @location(6) surfaceOffset: vec3f,
   @builtin(position) fragCoord: vec4f
 ) -> SceneFragment {
   // The horizon ring draws the pixels a fading chunk leaves.
@@ -583,7 +622,8 @@ fn fs(
   let parallaxB = cross(parallaxN, parallaxT);
   // View-space eye is the origin, so the surface→eye direction is -viewPosition.
   // (Named distinctly from the lighting include's own `viewDir` below.)
-  let parallaxViewDir = -normalize(viewPosition);
+  let surfaceViewPosition = viewPosition + surfaceOffset;
+  let parallaxViewDir = -normalize(surfaceViewPosition);
   let viewTS = vec3f(
     dot(parallaxViewDir, parallaxT),
     dot(parallaxViewDir, parallaxB),
@@ -745,6 +785,13 @@ fn fs(
     // result is about to be mixed away, so this is where the second projection
     // pays for itself: `parallaxOcclusion` skips the whole loop under 1e-4.
     let amplitude = layer.heightScale * detailFade * (1.0 - sideWeight);
+    // The patch's geometry is already carved this far into the volume.
+    let volumeMetres = amplitude / max(layer.uvScale * terrainParams.uvPerMetre, 1e-6);
+    let startDepth = select(
+      0.0,
+      clamp(reliefDepth / volumeMetres, 0.0, 1.0),
+      volumeMetres > 1e-6
+    );
 
     // Where the side projection has taken over completely, the planar tap is
     // mixed away whatever it holds, so its second no-tile sample is bought and
@@ -753,7 +800,7 @@ fn fs(
     // march already off above, a vertical face now costs *less* than it did
     // before this projection existed.
     let wantsNoTile = HAS_TERRAIN_NO_TILE && sideWeight < 1.0;
-    let resA = parallaxOcclusion(scaledUV + offa, arrayIndex, ddx, ddy, viewTS, amplitude);
+    let resA = parallaxOcclusion(scaledUV + offa, arrayIndex, ddx, ddy, viewTS, amplitude, startDepth);
     let sa = resA.xy;
     // Seeded from A so a single tap makes every mix below a no-op, whatever
     // blendFactor is.
@@ -772,7 +819,7 @@ fn fs(
     var colb = cola;
     var blendFactor = 0.0;
     if (wantsNoTile) {
-      let resB = parallaxOcclusion(scaledUV + offb, arrayIndex, ddx, ddy, viewTS, amplitude);
+      let resB = parallaxOcclusion(scaledUV + offb, arrayIndex, ddx, ddy, viewTS, amplitude, startDepth);
       sb = resB.xy;
       colb = textureSampleGrad(albedoArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
       blendFactor = smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0)));
@@ -1157,7 +1204,7 @@ fn fs(
   // parallaxN is the mesh normal before any map tilts it — the surface the
   // triangle actually has, which is what horizon occlusion needs.
   surface.geometricNormal = parallaxN;
-  surface.viewPosition = viewPosition;
+  surface.viewPosition = surfaceViewPosition;
   // Metallic is pinned at 0: every material in the palette is a dielectric, so
   // the diffuse colour is the albedo and F0 is glTF's fixed 4%. If a metallic
   // terrain material ever exists, this is where the ARM map's B channel goes.

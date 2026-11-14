@@ -16,10 +16,20 @@ import { RenderQuality } from '../utils/RenderQuality';
 import { composeShader } from '../utils/shaderDefines';
 import { Lighting } from './uniforms/Lighting';
 import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
+import {
+  placeTerrainPatch,
+  TerrainPatchPlacement,
+} from '../renderers/terrain/TerrainPatch';
 
 const sharedBindgroupIndex = 1;
 const lightingGroupIndex = 2;
 const environmentGroupIndex = 3;
+
+/**
+ * `chunk` draws a chunk's mesh; `patch` draws the displaced grid around the
+ * eye over a chunk pass's bindings, with no vertex buffers.
+ */
+export type TerrainPassMode = 'chunk' | 'patch';
 
 export class TerrainPass implements IMaterialPass {
   profileCategory: SceneCategory = 'terrain';
@@ -33,7 +43,24 @@ export class TerrainPass implements IMaterialPass {
   lightingUniforms: Lighting;
   environmentUniforms: EnvironmentUniforms;
 
-  constructor() {
+  readonly mode: TerrainPassMode;
+
+  /**
+   * Samples per side of the chunk mesh this pass draws, when it is a LOD-0
+   * mesh and so can carry the displaced patch; 0 otherwise.
+   */
+  patchSamples = 0;
+  patchMetresPerSample = 0;
+
+  readonly patchPlacement = new TerrainPatchPlacement();
+  private patch: TerrainPass | null = null;
+  private patchSurface: GPUBuffer | null = null;
+  private patchCopiedFrom: GPUBindGroup | null = null;
+  private patchTracked = false;
+  private patchWritten = false;
+
+  constructor(mode: TerrainPassMode = 'chunk') {
+    this.mode = mode;
     this.side = 'ccw';
     this.requiresRebuild = true;
     this.terrainUniforms = new TerrainUniforms(sharedBindgroupIndex);
@@ -56,6 +83,61 @@ export class TerrainPass implements IMaterialPass {
   dispose(): void {
     this.sharedUniformsTracker.dispose();
     this.perMeshTracker.dispose();
+    this.patch?.dispose();
+    this.patch = null;
+    this.patchSurface?.destroy();
+    this.patchSurface = null;
+  }
+
+  /**
+   * Places the displaced patch around the eye on this chunk, or clears it
+   * where it misses. A no-op on a pass with no LOD-0 surface to displace.
+   *
+   *     pass.updatePatch(device, eye.x, eye.z, 32, 0.08, chunk.x, chunk.z, 240);
+   */
+  updatePatch(
+    device: GPUDevice,
+    eyeX: number,
+    eyeZ: number,
+    size: number,
+    spacing: number,
+    chunkX: number,
+    chunkZ: number,
+    chunkHalf: number
+  ): void {
+    if (this.patchSamples <= 0) return;
+    const placement = this.patchPlacement;
+    if (
+      !placeTerrainPatch(
+        eyeX,
+        eyeZ,
+        size,
+        spacing,
+        chunkX,
+        chunkZ,
+        chunkHalf,
+        placement
+      )
+    ) {
+      this.clearPatch(device);
+      return;
+    }
+    if (!this.patch) this.patch = new TerrainPass('patch');
+    const metres = this.patchMetresPerSample;
+    this.terrainUniforms.setPatch(device, placement, metres);
+    this.patch.terrainUniforms.setPatch(device, placement, metres);
+    this.patch.patchPlacement.cellsX = placement.cellsX;
+    this.patch.patchPlacement.cellsZ = placement.cellsZ;
+    this.patchWritten = true;
+  }
+
+  /** Takes the displaced patch off this chunk. */
+  clearPatch(device: GPUDevice): void {
+    this.patchPlacement.active = false;
+    if (!this.patchWritten) return;
+    this.patchWritten = false;
+    this.terrainUniforms.setPatch(device, null, 0);
+    this.patch?.terrainUniforms.setPatch(device, null, 0);
   }
 
   /** Tier the current pipeline was built against. Compared each draw so a
@@ -96,20 +178,21 @@ export class TerrainPass implements IMaterialPass {
     this.terrainUniforms.detailFadeStart = fade.start;
     this.terrainUniforms.detailFadeEnd = fade.end;
 
+    const isPatch = this.mode === 'patch';
     const module = device.createShaderModule({
       code: composeShader([shader], {
         ...terrainShaderDefines(quality),
-        HAS_TERRAIN_FADE: this.builtFade,
+        HAS_TERRAIN_FADE: this.builtFade && !isPatch,
       }),
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'terrain render pipeline',
+      label: isPatch ? 'terrain patch pipeline' : 'terrain render pipeline',
       layout: 'auto',
       vertex: {
-        entryPoint: 'vs',
+        entryPoint: isPatch ? 'vsPatch' : 'vs',
         module,
-        buffers: [
+        buffers: isPatch ? [] : [
           {
             arrayStride: 4 * 3,
             attributes: [
@@ -159,7 +242,7 @@ export class TerrainPass implements IMaterialPass {
         count: renderer.sampleCount,
       },
       primitive: {
-        topology: 'triangle-list',
+        topology: isPatch ? 'triangle-strip' : 'triangle-list',
 
         // Backface culling since the cube is solid piece of geometry.
         // Faces pointing away from the camera will be occluded by faces
@@ -230,5 +313,94 @@ export class TerrainPass implements IMaterialPass {
       tracker.prepareMeshUniforms(mesh, renderer, pass, camera);
       pass.drawIndexed(numIndices);
     }
+
+    // Drawn after the chunk so it is bound last; a fading chunk's discard
+    // would leave holes the patch does not share, so it waits for the fade.
+    const patch = this.patch;
+    if (patch && this.patchPlacement.active && this.terrainUniforms.fade >= 1)
+      for (const mesh of meshes)
+        patch.renderPatch(renderer, pass, camera, mesh, geometry, this);
   }
+
+  /** Draws this patch pass's grid over `chunk`'s mesh and bindings. */
+  private renderPatch(
+    renderer: Renderer,
+    pass: GPURenderPassEncoder,
+    camera: Camera,
+    mesh: Mesh,
+    geometry: Geometry,
+    chunk: TerrainPass
+  ): void {
+    if (
+      this.requiresRebuild ||
+      renderer.quality.aspect('terrain') !== this.builtQuality
+    ) {
+      this.invalidatePipeline();
+      this.init(renderer);
+    }
+
+    if (!this.patchSurface) {
+      this.patchSurface = buildPatchSurface(
+        renderer.device,
+        geometry,
+        chunk.patchSamples
+      );
+      this.terrainUniforms.patchSurface = this.patchSurface;
+    }
+
+    const source = chunk.terrainUniforms;
+    if (this.patchCopiedFrom !== source.bindGroup) {
+      this.terrainUniforms.copyFrom(source);
+      this.patchCopiedFrom = source.bindGroup;
+    }
+
+    if (!this.patchTracked) {
+      this.sharedUniformsTracker.onAssignedToMesh(mesh);
+      this.perMeshTracker.onAssignedToMesh(mesh);
+      this.patchTracked = true;
+    }
+
+    pass.setPipeline(this.pipeline);
+    if (
+      !this.sharedUniformsTracker.prepareMeshUniforms(
+        renderer,
+        pass,
+        camera,
+        this.sharedUniformsTracker.meshes
+      )
+    )
+      return;
+    this.perMeshTracker.prepareMeshUniforms(mesh, renderer, pass, camera);
+
+    const placement = this.patchPlacement;
+    pass.draw(2 * (placement.cellsX + 1), placement.cellsZ);
+  }
+}
+
+/**
+ * The chunk mesh's surface vertices as one vec4f (height, normal) each, which
+ * is what the patch's vertex shader interpolates its base from.
+ */
+function buildPatchSurface(
+  device: GPUDevice,
+  geometry: Geometry,
+  samples: number
+): GPUBuffer {
+  const count = samples * samples;
+  const vertices = geometry.vertices!;
+  const normals = geometry.normals!;
+  const data = new Float32Array(count * 4);
+  for (let i = 0; i < count; i++) {
+    data[i * 4] = vertices[i * 3 + 1];
+    data[i * 4 + 1] = normals[i * 3];
+    data[i * 4 + 2] = normals[i * 3 + 1];
+    data[i * 4 + 3] = normals[i * 3 + 2];
+  }
+  const buffer = device.createBuffer({
+    label: 'terrain patch surface',
+    size: data.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(buffer, 0, data);
+  return buffer;
 }
