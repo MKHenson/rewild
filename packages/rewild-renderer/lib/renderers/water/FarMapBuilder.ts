@@ -8,7 +8,9 @@ import { terrainGenerator } from '../terrain/TerrainGenerator';
 // shader draws a smooth coast from a bilinear sample of it. The height is the
 // generator's before erosion and lake carving, which only shape detail far finer
 // than a texel. The weights follow the chunks' splat rules, read off the slope
-// across a texel rather than a sample. Built in Rust (crates/terrain/src/far.rs).
+// across a texel rather than a sample. A map built with sprites also places the
+// far sprite layers' instances over it. Built in Rust
+// (crates/terrain/src/far.rs).
 
 export const FAR_MAP_TEXELS = 128;
 // Near level: follows the camera closely and reaches past the far plane. Finer
@@ -27,7 +29,10 @@ export const WIDE_FAR_MAP_SPAN = 131072;
  * `ground` is rg16float: the ground height in metres, then the continent value.
  * `weights` is the palette weights as two rgba8 planes laid out like a chunk's
  * splat map (generateSplatMap), channel i weighting getClimatePalette()[i].
- * Both are there once `build` returns true.
+ * Both are there once `build` returns true, and with `sprites`:
+ * `sprites`, every far sprite layer's instances in turn as world x, world z,
+ * scale and a roll from 0 to 1; `spriteCounts`, the instances per layer; and
+ * `spriteSlots`, each one's scatter layer slot.
  *
  * Built a few rows at a time, so a rebuild can be spread over frames: every
  * row's ground first, then every row's weights, which need the slope across
@@ -36,6 +41,9 @@ export const WIDE_FAR_MAP_SPAN = 131072;
 export class FarMapBuilder {
   ground: Uint16Array = new Uint16Array(0);
   weights: Uint8Array = new Uint8Array(0);
+  sprites: Float32Array = new Float32Array(0);
+  spriteCounts: Uint32Array = new Uint32Array(0);
+  spriteSlots: Uint32Array = new Uint32Array(0);
   readonly centreX: number;
   readonly centreZ: number;
   readonly span: number;
@@ -52,7 +60,8 @@ export class FarMapBuilder {
     centreZ: number,
     span: number,
     texels: number = FAR_MAP_TEXELS,
-    seaLevel: number = 0
+    seaLevel: number = 0,
+    sprites = false
   ) {
     validateClimateLayers(climate);
     this.seed = seed;
@@ -62,7 +71,7 @@ export class FarMapBuilder {
     this.centreZ = centreZ;
     this.span = span;
     this.texels = texels;
-    this.map = new FarMapBuild(centreX, centreZ, span, texels);
+    this.map = new FarMapBuild(centreX, centreZ, span, texels, sprites);
   }
 
   get done(): boolean {
@@ -74,9 +83,12 @@ export class FarMapBuilder {
     const map = this.map;
     if (!map) return true;
     const generator = terrainGenerator(this.seed, this.climate, this.seaLevel);
-    if (!map.build(generator, Math.min(rows, this.texels * 2))) return false;
+    if (!map.build(generator, Math.min(rows, this.texels * 3))) return false;
     this.ground = map.takeGround();
     this.weights = map.takeWeights();
+    this.spriteSlots = map.spriteSlots();
+    this.spriteCounts = map.spriteCounts();
+    this.sprites = map.takeSprites();
     map.free();
     this.map = null;
     return true;

@@ -17,13 +17,14 @@ import {
 } from '../terrain/TerrainMaterials';
 import { OCEAN_WATER, getWaterTypeIndex } from '../terrain/Water';
 import { WATER_INTERACTION_LAYER } from './ChunkWater';
+import { FarSprites } from '../terrain/FarSprites';
 import {
   FAR_MAP_TEXELS,
   FarMapBuilder,
   NEAR_FAR_MAP_SPAN,
   NEAR_FAR_MAP_TEXELS,
   WIDE_FAR_MAP_SPAN,
-} from './HorizonCoverage';
+} from './FarMapBuilder';
 
 // Spokes around the ring: fine enough that a far peak keeps its shape.
 const RING_SEGMENTS = 1024;
@@ -164,13 +165,16 @@ class FarMapLevel {
   centreZ = 0;
   private seaLevel = 0;
   private pending: FarMapBuilder | null = null;
+  /** Called with each map as it lands. */
+  onCommit: ((built: FarMapBuilder) => void) | null = null;
 
   constructor(
     renderer: Renderer,
     label: string,
     readonly span: number,
     private readonly texels: number,
-    private readonly rebuildDistance: number
+    private readonly rebuildDistance: number,
+    private readonly sprites = false
   ) {
     this.weights = renderer.device.createTexture({
       label: `${label}-weights`,
@@ -244,7 +248,8 @@ class FarMapLevel {
       Math.round(z / texel) * texel,
       this.span,
       this.texels,
-      seaLevel
+      seaLevel,
+      this.sprites
     );
   }
 
@@ -265,6 +270,7 @@ class FarMapLevel {
     );
     this.centreX = built.centreX;
     this.centreZ = built.centreZ;
+    this.onCommit?.(built);
     this.pending = null;
   }
 
@@ -302,6 +308,7 @@ export class HorizonOcean {
   private readonly near: FarMapLevel;
   private readonly wide: FarMapLevel;
   private readonly chunkMask: GPUTexture;
+  private readonly farSprites: FarSprites;
   private readonly uploadedMask = new Uint8Array(
     CHUNK_MASK_SIZE * CHUNK_MASK_SIZE
   );
@@ -325,8 +332,12 @@ export class HorizonOcean {
       'far-map-near',
       NEAR_FAR_MAP_SPAN,
       NEAR_FAR_MAP_TEXELS,
-      NEAR_FAR_MAP_SPAN / 8
+      NEAR_FAR_MAP_SPAN / 8,
+      true
     );
+    this.farSprites = new FarSprites(renderer);
+    this.near.onCommit = (built) =>
+      this.farSprites.setInstances(renderer, built);
     this.wide = new FarMapLevel(
       renderer,
       'far-map-wide',
@@ -361,6 +372,7 @@ export class HorizonOcean {
 
   hide() {
     this.mesh.visible = false;
+    this.farSprites.hide();
   }
 
   update(renderer: Renderer, state: HorizonOceanState) {
@@ -371,7 +383,7 @@ export class HorizonOcean {
     const normal = textures.get(TERRAIN_NORMAL_ARRAY);
     const arm = textures.get(TERRAIN_ARM_ARRAY);
     if (!albedo || !normal || !arm) {
-      this.mesh.visible = false;
+      this.hide();
       return;
     }
     this.pass.horizonUniforms.setMaterials(
@@ -446,6 +458,14 @@ export class HorizonOcean {
       detailStrength: DETAIL_STRENGTH,
     };
     this.mesh.visible = true;
+    this.farSprites.update(
+      renderer,
+      this.pass.horizonUniforms.params,
+      this.chunkMask,
+      this.near.ground,
+      this.wide.ground,
+      atmosphere
+    );
   }
 
   private uploadMask(renderer: Renderer, mask: Uint8Array) {
@@ -466,6 +486,7 @@ export class HorizonOcean {
 
   dispose() {
     this.mesh.transform.removeFromParent();
+    this.farSprites.dispose();
     this.pass.dispose();
     this.chunkMask.destroy();
     this.mesh.geometry.dispose();

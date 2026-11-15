@@ -126,6 +126,20 @@ export interface ScatterLayer {
   castShadow?: boolean;
 }
 
+/** The farthest any terrain chunk reaches: the last detail level's distance
+ *  (TerrainRenderer.maxViewDst) plus a chunk's diagonal. */
+export const FAR_SPRITE_CULL = 3500;
+
+/**
+ * Whether the layer carries on past the chunks as far sprites (FarSprites): a
+ * layer with an impostor that draws out to where the chunks stop. Its
+ * instances then hand over to sprites standing on the far ground, so pulling
+ * its cull in short of the chunks' reach turns its far sprites off.
+ */
+export function drawsFarSprites(layer: ScatterLayer): boolean {
+  return !!layer.impostor && layer.cullDistance >= FAR_SPRITE_CULL;
+}
+
 // Rows are data — adding something the world can grow is an entry in
 // templates/scatter-layers.json plus a density rule in the biome that grows
 // it. scatter-forge writes the entry for a model it builds. Bundled at build

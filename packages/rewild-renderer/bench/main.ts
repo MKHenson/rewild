@@ -27,7 +27,7 @@ import {
   NEAR_FAR_MAP_SPAN,
   NEAR_FAR_MAP_TEXELS,
   WIDE_FAR_MAP_SPAN,
-} from '../lib/renderers/water/HorizonCoverage';
+} from '../lib/renderers/water/FarMapBuilder';
 import {
   applySculptStamp,
   SculptBrushType,

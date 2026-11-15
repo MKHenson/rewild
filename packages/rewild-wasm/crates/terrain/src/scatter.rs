@@ -12,7 +12,7 @@ use std::f64::consts::PI;
 
 use serde::Deserialize;
 
-use crate::climate::{ClimateField, ClimateGrid};
+use crate::climate::{ocean_coverage, resolve_biomes, ClimateField, ClimateGrid, ClimateSample};
 use crate::config::{Band, ClimateConfig, CoastConfig, ScatterRule};
 use crate::lakes::field_origin;
 use crate::paint::{ActiveBiomes, PaintMask};
@@ -45,6 +45,9 @@ pub struct ScatterLayer {
     pub y_offset: Option<f64>,
     /// Read for its radius alone, which stands in for the trunk's.
     pub collider: Option<Collider>,
+    /// Drawn as sprites over the far ground, past the chunks.
+    #[serde(default)]
+    pub far_sprites: bool,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -267,6 +270,98 @@ impl ScatterGenerator {
             sea_level,
             meters_per_sample,
         })
+    }
+
+    /// The slots of the layers drawn as far sprites, in slot order.
+    pub fn far_sprite_slots(&self) -> Vec<usize> {
+        (0..self.layers.len()).filter(|&s| self.layers[s].far_sprites && self.rules[s].any).collect()
+    }
+
+    /// Layer `slot`'s density at lake space (`u`, `v`) seen from past the
+    /// chunks: the rules placement resolves, over the far map's climate,
+    /// height and slope. Rules that grow by water stay out, as lakes are finer
+    /// than the far map.
+    pub fn far_density(&self, slot: usize, values: &ClimateSample, u: f64, v: f64, height: f64, slope: f64) -> f64 {
+        let climate = &self.climate;
+        let rules = &self.rules[slot];
+        let above_sea = height - self.sea_level;
+        let nearness = climate.continent.as_ref().map_or(0.0, |c| ocean_coverage(c, values.continent));
+        if above_sea < 0.0 && nearness > 0.0 {
+            return 0.0;
+        }
+        let beach = match &climate.coast {
+            Some(c) if nearness > 0.0 && above_sea < c.beach_height + c.blend => coast_weights(c, above_sea, slope, nearness).0,
+            _ => 0.0,
+        };
+        let blend = resolve_biomes(climate, values);
+        let mut density = 0.0;
+        for b in 0..blend.count {
+            let biome = blend.biomes[b];
+            let Some(r) = rules.rule[biome] else {
+                continue;
+            };
+            let rule = &climate.biomes[biome].scatter[r];
+            if rule.underwater || rule.water_depth.is_some() || rule.water_type.is_some() {
+                continue;
+            }
+            let noise = match (self.noise[biome][r], &rule.noise) {
+                (Some((ox, oy)), Some(n)) => (self.simplex.noise((u + ox) / n.scale, (v - oy) / n.scale) + 1.0) * 0.5,
+                _ => 0.0,
+            };
+            density += blend.weights[b] * rule_density(rule, height, slope, noise);
+        }
+        density * (1.0 - beach)
+    }
+
+    /// Far sprites of layer `slot` whose candidates land in lake space
+    /// [`u0`, `u1`) × [`v0`, `v1`), on the same jittered grid placement uses.
+    /// `at` gives the climate, height and slope at a lake-space point. Each is
+    /// pushed onto `out` as world x, world z, scale and a roll, 0 to 1.
+    #[allow(clippy::too_many_arguments)]
+    pub fn far_sprites(
+        &self,
+        slot: usize,
+        u0: f64,
+        u1: f64,
+        v0: f64,
+        v1: f64,
+        at: impl Fn(f64, f64) -> (ClimateSample, f64, f64),
+        out: &mut Vec<f32>,
+    ) {
+        let layer = &self.layers[slot];
+        let rules = &self.rules[slot];
+        if !rules.any {
+            return;
+        }
+        let mps = self.meters_per_sample;
+        let cell_size = 2.0 * layer.footprint / mps;
+        let ceiling = rules.max_density * (1.0 + 1e-9);
+        let cell = |v: f64| (v / cell_size).floor() as i64;
+        for cell_y in cell(v0)..=cell(v1) {
+            for cell_x in cell(u0)..=cell(u1) {
+                let hash = cell_hash(cell_x, cell_y, slot, self.seed);
+                let roll = hash01(hash, 2);
+                if roll >= ceiling {
+                    continue;
+                }
+                let u = (cell_x as f64 + hash01(hash, 0)) * cell_size;
+                let v = (cell_y as f64 + hash01(hash, 1)) * cell_size;
+                if u < u0 || u >= u1 || v < v0 || v >= v1 {
+                    continue;
+                }
+                let (values, height, slope) = at(u, v);
+                if roll >= self.far_density(slot, &values, u, v, height, slope) {
+                    continue;
+                }
+                let scale = lerp(layer.jitter.scale.from, layer.jitter.scale.to, hash01(hash, 3));
+                out.extend_from_slice(&[
+                    ((u + 0.5) * mps) as f32,
+                    (-(v + 0.5) * mps) as f32,
+                    scale as f32,
+                    hash01(hash, 4) as f32,
+                ]);
+            }
+        }
     }
 
     /// Every instance a `size` × `size` chunk at chunk offset (`offset_x`,

@@ -1074,6 +1074,7 @@ mod scatter {
             align_to_normal: Some(align),
             y_offset: Some(0.25),
             collider: None,
+            far_sprites: false,
         }
     }
 
@@ -1370,6 +1371,85 @@ mod scatter {
         c.biomes[0].scatter.push(rule("missing", 1.0));
         assert!(ScatterGenerator::new(c, library(), 9001.0, 0.0, 2.0).is_err());
     }
+
+    mod far_sprites {
+        use super::*;
+        use crate::climate::ClimateSample;
+
+        /// Inland everywhere, with trees at `density` in both biomes on ground
+        /// below 50 m.
+        fn forest(density: f64) -> (HeightGenerator, ScatterGenerator) {
+            let mut c = scatter_climate();
+            c.continent = None;
+            c.coast = None;
+            for biome in c.biomes.iter_mut() {
+                biome.scatter.push(ScatterRule {
+                    height: Some(Selector::One(Band { from: 60.0, to: 50.0 })),
+                    ..rule("tree", density)
+                });
+            }
+            let mut library = library();
+            library.push(ScatterLayer { far_sprites: true, ..layer("tree", 5.0, 0.0) });
+            (ground(c.clone()), ScatterGenerator::new(c, library, 9001.0, 0.0, 2.0).unwrap())
+        }
+
+        fn flat(height: f64) -> impl Fn(f64, f64) -> (ClimateSample, f64, f64) + Copy {
+            move |_, _| (ClimateSample::default(), height, 0.0)
+        }
+
+        #[test]
+        fn lists_only_the_layers_drawn_as_far_sprites() {
+            let (_, s) = forest(0.5);
+            assert_eq!(s.far_sprite_slots(), vec![3]);
+            assert!(world().scatter.far_sprite_slots().is_empty());
+        }
+
+        #[test]
+        fn resolves_the_rules_placement_does() {
+            let (_, s) = forest(0.5);
+            let values = ClimateSample::default();
+            assert!((s.far_density(3, &values, 10.0, 20.0, 0.0, 0.0) - 0.5).abs() < 1e-9);
+            assert_eq!(s.far_density(3, &values, 10.0, 20.0, 80.0, 0.0), 0.0);
+        }
+
+        #[test]
+        fn places_sprites_at_the_density_the_footprint_allows_within_the_box() {
+            let (_, s) = forest(0.5);
+            let mut out = Vec::new();
+            s.far_sprites(3, 0.0, 1000.0, -1000.0, 0.0, flat(10.0), &mut out);
+            // 5 m footprints at 2 m samples: cells 5 samples across.
+            let expected = 0.5 * 1000.0 * 1000.0 / 25.0;
+            let count = out.len() as f64 / 4.0;
+            assert!((count - expected).abs() < expected * 0.05, "{count} not near {expected}");
+            for sprite in out.chunks(4) {
+                let (u, v) = (sprite[0] as f64 / 2.0 - 0.5, -sprite[1] as f64 / 2.0 - 0.5);
+                assert!((0.0..1000.0).contains(&u) && (-1000.0..0.0).contains(&v));
+                assert!((0.8..=1.2).contains(&sprite[2]) && (0.0..1.0).contains(&sprite[3]));
+            }
+
+            let mut none = Vec::new();
+            s.far_sprites(3, 0.0, 1000.0, -1000.0, 0.0, flat(80.0), &mut none);
+            assert!(none.is_empty());
+        }
+
+        #[test]
+        fn splits_a_box_into_bands_without_losing_or_repeating_a_sprite() {
+            let (_, s) = forest(0.5);
+            let mut whole = Vec::new();
+            s.far_sprites(3, 0.0, 400.0, 0.0, 400.0, flat(10.0), &mut whole);
+            let mut banded = Vec::new();
+            for band in 0..7 {
+                let (v0, v1) = (band as f64 * 400.0 / 7.0, (band + 1) as f64 * 400.0 / 7.0);
+                s.far_sprites(3, 0.0, 400.0, v0, v1, flat(10.0), &mut banded);
+            }
+            let sorted = |d: &[f32]| {
+                let mut v: Vec<[u32; 4]> = d.chunks(4).map(|c| [c[0].to_bits(), c[1].to_bits(), c[2].to_bits(), c[3].to_bits()]).collect();
+                v.sort();
+                v
+            };
+            assert_eq!(sorted(&banded), sorted(&whole));
+        }
+    }
 }
 
 mod climate_rules {
@@ -1488,15 +1568,67 @@ mod climate_rules {
         let c = climate(false);
         let ground = generator(false);
         let spec = crate::SplatSpec { palette: vec![], coast_materials: vec![] };
-        let splat = crate::SplatGenerator::new(c, &spec, 4321.0, 2.0, 2.0).unwrap();
-        let mut whole = crate::FarMap::new(500.0, -700.0, 4000.0, 8);
-        assert!(whole.build(&ground, &splat, usize::MAX));
-        let mut sliced = crate::FarMap::new(500.0, -700.0, 4000.0, 8);
+        let splat = crate::SplatGenerator::new(c.clone(), &spec, 4321.0, 2.0, 2.0).unwrap();
+        let scatter = crate::ScatterGenerator::new(c, vec![], 4321.0, 2.0, 2.0).unwrap();
+        let mut whole = crate::FarMap::new(500.0, -700.0, 4000.0, 8, false);
+        assert!(whole.build(&ground, &splat, &scatter, usize::MAX));
+        assert!(whole.sprites.is_none());
+        let mut sliced = crate::FarMap::new(500.0, -700.0, 4000.0, 8, false);
         let mut frames = 0;
-        while !sliced.build(&ground, &splat, 3) {
+        while !sliced.build(&ground, &splat, &scatter, 3) {
             frames += 1;
         }
         assert_eq!(frames, 5);
         assert_eq!((sliced.ground, sliced.weights), (whole.ground, whole.weights));
+    }
+
+    #[test]
+    fn places_the_same_far_sprites_a_few_rows_at_a_time() {
+        use crate::scatter::{Jitter, ScatterLayer};
+        let mut c = climate(false);
+        c.continent = None;
+        c.coast = None;
+        for biome in c.biomes.iter_mut() {
+            biome.scatter = vec![ScatterRule {
+                layer: "tree".into(),
+                density: 0.4,
+                slope: None,
+                height: None,
+                noise: None,
+                water_depth: None,
+                water_type: None,
+                underwater: false,
+            }];
+        }
+        let tree = ScatterLayer {
+            name: "tree".into(),
+            footprint: 20.0,
+            jitter: Jitter { scale: Band { from: 1.0, to: 1.0 }, yaw: None, tilt: None },
+            align_to_normal: None,
+            y_offset: None,
+            collider: None,
+            far_sprites: true,
+        };
+        let ground = generator(false);
+        let spec = crate::SplatSpec { palette: vec![], coast_materials: vec![] };
+        let splat = crate::SplatGenerator::new(c.clone(), &spec, 4321.0, 2.0, 2.0).unwrap();
+        let scatter = crate::ScatterGenerator::new(c, vec![tree], 4321.0, 2.0, 2.0).unwrap();
+        let mut whole = crate::FarMap::new(500.0, -700.0, 4000.0, 8, true);
+        assert!(whole.build(&ground, &splat, &scatter, usize::MAX));
+        let mut sliced = crate::FarMap::new(500.0, -700.0, 4000.0, 8, true);
+        let mut frames = 0;
+        while !sliced.build(&ground, &splat, &scatter, 3) {
+            frames += 1;
+        }
+        assert_eq!(frames, 7);
+        let whole = whole.sprites.unwrap();
+        assert_eq!(whole.len(), 1);
+        // 4 km square, 40 m cells, density 0.4.
+        let count = whole[0].1.len() / 4;
+        assert!((3600..4400).contains(&count), "{count}");
+        for sprite in whole[0].1.chunks(4) {
+            assert!((-1500.0..2500.0).contains(&sprite[0]) && (-2700.0..1300.0).contains(&sprite[1]));
+        }
+        assert_eq!(sliced.sprites.unwrap(), whole);
     }
 }

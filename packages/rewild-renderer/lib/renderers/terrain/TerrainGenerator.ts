@@ -6,7 +6,11 @@ import {
   getCoastMaterials,
   validateLakes,
 } from './Biomes';
-import { getScatterLayer, getScatterLayerOrder } from './ScatterLayers';
+import {
+  drawsFarSprites,
+  getScatterLayer,
+  getScatterLayerOrder,
+} from './ScatterLayers';
 
 // Terrain is generated in Rust (packages/rewild-wasm/crates/terrain). The WASM
 // module must be loaded first (see RewildWasm).
@@ -36,7 +40,10 @@ export function terrainGenerator(
         palette: getClimatePalette(climate),
         coastMaterials: getCoastMaterials(climate.coast),
       },
-      getScatterLayerOrder().map(getScatterLayer),
+      getScatterLayerOrder().map((name) => {
+        const layer = getScatterLayer(name);
+        return { ...layer, farSprites: drawsFarSprites(layer) };
+      }),
       seed,
       seaLevel,
       TERRAIN_METERS_PER_SAMPLE

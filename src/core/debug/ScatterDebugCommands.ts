@@ -1,6 +1,8 @@
 import {
+  FAR_SPRITE_CULL,
   Renderer,
   SCATTER_LAYERS,
+  drawsFarSprites,
   getScatterLayerOrder,
 } from 'rewild-renderer';
 import { ScatterColliderStreamer } from '../physics/ScatterColliderStreamer';
@@ -57,7 +59,12 @@ export function registerScatterDebugCommands(renderer: Renderer) {
         `scene pass last asked this layer for instances (-1 never): large ` +
         `while drawn=true means the scene BVH is culling its transform. ` +
         `'selected' is how many instances that selection kept: 0 means ` +
-        `every cell failed the band or frustum test.`
+        `every cell failed the band or frustum test.\n` +
+        `Far sprites (impostor and cullDistance >= ${FAR_SPRITE_CULL}): ` +
+        (getScatterLayerOrder()
+          .filter((name) => drawsFarSprites(SCATTER_LAYERS[name]))
+          .join(', ') || 'none') +
+        '.'
     );
     console.table(
       Array.from(totals, ([layer, total]) => ({

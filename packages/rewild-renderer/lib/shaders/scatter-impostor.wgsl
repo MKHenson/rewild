@@ -37,6 +37,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
 #include "./shader-lib/scatter-impostor.wgsl"
+#include "./shader-lib/scatter-impostor-shading.wgsl"
 #include "./shader-lib/lod-fade.wgsl"
 #include "./shader-lib/scatter-wind.wgsl"
 
@@ -205,31 +206,6 @@ fn sunDirection() -> vec3f {
   return vec3f(0.0);
 }
 
-// Both atlases are premultiplied by coverage, so a tile's colour and normal
-// blend by weight and divide out at the end.
-struct AtlasSample {
-  albedo : vec4f,
-  normal : vec4f,
-}
-
-fn sampleTile(tile : vec2f, uv : vec2f, weight : f32) -> AtlasSample {
-  let atlasUv = (tile + uv) / impostor.atlas.x;
-  var s : AtlasSample;
-  s.albedo = textureSample(albedoAtlas, atlasSampler, atlasUv) * weight;
-  s.normal = textureSample(normalAtlas, atlasSampler, atlasUv) * weight;
-  return s;
-}
-
-// The mip the sampler will pick for a tile, from the atlas-space footprint of
-// one screen pixel. Minified coverage thins under an alpha test as the mip
-// chain averages leaf against gap, so alpha is scaled back up with the level.
-fn tileMipLevel(uv : vec2f) -> f32 {
-  let texels = uv * vec2f(textureDimensions(albedoAtlas)) / impostor.atlas.x;
-  let dx = dpdx(texels);
-  let dy = dpdy(texels);
-  return max(0.0, 0.5 * log2(max(dot(dx, dx), dot(dy, dy))));
-}
-
 @fragment
 fn fs(
   @location(0) uv : vec2f,
@@ -244,43 +220,17 @@ fn fs(
     discard;
   }
 
-  // Tile centres sit at the corners of a (views - 1)² grid over the octahedral
-  // square. The three tiles of the triangle the direction lands in share the
-  // blend by barycentric weight.
-  let tiles = impostor.atlas.x;
-  let grid = impostorOctUv(octDir) * (tiles - 1.0);
-  let cell = min(floor(grid), vec2f(tiles - 2.0));
-  let f = grid - cell;
-
-  // Which of the cell's two triangles, chosen without a branch: a texture
-  // sample has to sit in uniform control flow.
-  let upper = f.x + f.y >= 1.0;
-  let a = sampleTile(
-    select(cell, cell + vec2f(1.0, 1.0), upper),
-    uv,
-    select(1.0 - f.x - f.y, f.x + f.y - 1.0, upper)
-  );
-  let b = sampleTile(cell + vec2f(1.0, 0.0), uv, select(f.x, 1.0 - f.y, upper));
-  let c = sampleTile(cell + vec2f(0.0, 1.0), uv, select(f.y, 1.0 - f.x, upper));
-
-  var s : AtlasSample;
-  s.albedo = a.albedo + b.albedo + c.albedo;
-  s.normal = a.normal + b.normal + c.normal;
-
-  let coverage = s.albedo.a * (1.0 + 0.6 * tileMipLevel(uv));
-  if (coverage < impostor.atlas.y) {
+  let texel = sampleImpostor(uv, octDir);
+  if (texel.coverage < impostor.atlas.y) {
     discard;
   }
-
-  let baseColor = s.albedo.rgb / max(s.albedo.a, 1e-4);
-  let modelNormal = (s.normal.xyz / max(s.normal.a, 1e-4)) * 2.0 - 1.0;
 
   let mv3 = mat3x3f(
     uniforms.modelViewMatrix[0].xyz,
     uniforms.modelViewMatrix[1].xyz,
     uniforms.modelViewMatrix[2].xyz
   );
-  let normal = normalize(mv3 * rotateByQuat(rotation, normalize(modelNormal)));
+  let normal = normalize(mv3 * rotateByQuat(rotation, texel.normal));
 
   // Shadows are received a diameter toward the sun from the texel. The
   // billboard faces the camera while its caster faces the sun, so half of it
@@ -293,42 +243,13 @@ fn fs(
   #include "./shader-lib/directional-shadow.frag.wgsl"
   #include "./shader-lib/spot-light-shadow.frag.wgsl"
 
-  let sunShadow = cloudShadowFactor * directionalShadowFactor;
-  var outColor : vec4f;
-
-  // A foliage layer's crown is most of what the atlas holds, so the whole
-  // billboard takes the foliage lobes; the trunk's share is too few texels at
-  // this range to shade apart. A uniform branch, so the samples inside stay in
-  // uniform control flow.
-  if (impostor.atlas.z > 0.5) {
-    outColor = shadeFoliage(baseColor, normal, surfaceViewPosition, sunShadow);
-  } else {
-    // A rough dielectric: bark and rock alike at the distance this draws.
-    let rainUp = (iblParams.viewToWorld * vec4f(normal, 0.0)).y;
-    let wetColor = rainWet(baseColor, 1.0, 0.0, rainUp, 0.0).color;
-    var surface : PbrSurface;
-    surface.normal = normal;
-    surface.specularNormal = normal;
-    surface.geometricNormal = normal;
-    surface.viewPosition = surfaceViewPosition;
-    surface.diffuseColor = diffuseColorFromBaseColor(wetColor, 0.0);
-    surface.f0 = f0FromBaseColor(wetColor, 0.0);
-    surface.alpha = perceptualRoughnessToAlpha(1.0);
-
-    let lit = accumulatePbrLighting(
-      surface,
-      spotLightShadowParams.hasSpotShadow,
-      spotLightShadowParams.lightIndex
-    );
-    let water = waterLightAt(surfaceViewPosition);
-    var color = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow * water.sun
-              + lit.punctualDiffuse + lit.punctualSpecular
-              + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadowFactor;
-    let indirect = evaluateIbl(surface, 1.0) * water.sky;
-    sceneIndirect = indirect;
-    color += indirect;
-    outColor = vec4f(color, 1.0);
-  }
+  var outColor = shadeImpostor(
+    texel.baseColor,
+    normal,
+    surfaceViewPosition,
+    cloudShadowFactor * directionalShadowFactor,
+    spotShadowFactor
+  );
 
   if (directionalShadowParams.debugMode != 0u) {
     outColor = vec4f(mix(outColor.rgb, cascadeDebugTint, 0.5), outColor.a);

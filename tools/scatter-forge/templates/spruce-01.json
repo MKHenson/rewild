@@ -49,7 +49,7 @@
   "windAmplitude": 12,
   "windFrequency": 0.4,
   "windFlutter": 0.25,
-  "cullDistance": 2600,
+  "cullDistance": 3500,
   "alignToNormal": 0,
   "castShadow": true,
   "impostor": { "fromDistance": 400 },

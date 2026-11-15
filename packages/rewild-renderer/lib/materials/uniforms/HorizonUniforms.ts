@@ -26,7 +26,7 @@ import { Mesh } from '../../core/Mesh';
 //   detailYSign     f32    offset 132
 //   detailTile      f32    offset 136
 //   detailStrength  f32    offset 140
-const PARAMS_FLOATS = 36;
+export const HORIZON_PARAMS_FLOATS = 36;
 const PALETTE_OFFSET = 24;
 const PALETTE_SIZE = 8;
 
@@ -75,7 +75,7 @@ export interface HorizonParams {
 
 export function packHorizonParams(
   params: HorizonParams,
-  out: Float32Array = new Float32Array(PARAMS_FLOATS)
+  out: Float32Array = new Float32Array(HORIZON_PARAMS_FLOATS)
 ): Float32Array {
   out.fill(0);
   out[0] = params.centreX;
@@ -130,7 +130,7 @@ export class HorizonUniforms implements ISharedUniformBuffer {
   private _atmosphere: GPUBuffer | null = null;
   private _atmosphereFallback: GPUBuffer | null = null;
   private _buffer: GPUBuffer | null = null;
-  private _data = new Float32Array(PARAMS_FLOATS);
+  private _data = new Float32Array(HORIZON_PARAMS_FLOATS);
 
   constructor(group: number) {
     this.group = group;
@@ -183,7 +183,7 @@ export class HorizonUniforms implements ISharedUniformBuffer {
     this._buffer?.destroy();
     this._buffer = device.createBuffer({
       label: 'horizon params',
-      size: PARAMS_FLOATS * 4,
+      size: HORIZON_PARAMS_FLOATS * 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     // Tiled and seen at grazing angles, so repeating and anisotropic.

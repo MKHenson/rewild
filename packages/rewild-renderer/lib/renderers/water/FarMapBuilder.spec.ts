@@ -10,7 +10,12 @@ import {
 import { createGroundSampler, sampleGround } from '../terrain/Noise';
 import { worldToLakeSpace } from '../terrain/Lakes';
 import { fromFloat16 } from '../../utils/float16';
-import { FarMapBuilder } from './HorizonCoverage';
+import { FarMapBuilder } from './FarMapBuilder';
+import {
+  drawsFarSprites,
+  getScatterLayer,
+  getScatterLayerOrder,
+} from '../terrain/ScatterLayers';
 
 const SEED = 31337;
 
@@ -104,5 +109,30 @@ describe('FarMapBuilder', () => {
     expect(frames).toBe(5);
     expect(sliced.ground).toEqual(whole.ground);
     expect(sliced.weights).toEqual(whole.weights);
+  });
+
+  it('places sprites for the far sprite layers only, inside the map', () => {
+    const half = span / 2;
+    const builder = new FarMapBuilder(SEED, DEFAULT_CLIMATE, 300, 900, span, 64, 0, true);
+    builder.build();
+    const order = getScatterLayerOrder();
+    const names = Array.from(builder.spriteSlots, (slot) => order[slot]);
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) expect(drawsFarSprites(getScatterLayer(name))).toBe(true);
+
+    const total = builder.spriteCounts.reduce((sum, count) => sum + count, 0);
+    expect(total).toBeGreaterThan(0);
+    expect(builder.sprites.length).toBe(total * 4);
+    for (let i = 0; i < builder.sprites.length; i += 4) {
+      expect(Math.abs(builder.sprites[i] - 300)).toBeLessThanOrEqual(half);
+      expect(Math.abs(builder.sprites[i + 1] - 900)).toBeLessThanOrEqual(half);
+    }
+  });
+
+  it('places no sprites unless asked', () => {
+    const builder = new FarMapBuilder(SEED, DEFAULT_CLIMATE, 0, 0, span, texels);
+    builder.build();
+    expect(builder.sprites.length).toBe(0);
+    expect(builder.spriteSlots.length).toBe(0);
   });
 });
