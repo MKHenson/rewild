@@ -613,3 +613,14 @@ impl<'a> Lakes<'a> {
 pub fn field_origin(width: usize, height: usize, offset_x: f64, offset_y: f64) -> (f64, f64) {
     (offset_x - width as f64 / 2.0, -offset_y - height as f64 / 2.0)
 }
+
+/// Lake space of world (`x`, `z`), at `meters_per_sample`: the sample nearest
+/// the point, with v running down world z. Mirrors `worldToLakeSpace`.
+pub fn world_to_lake(x: f64, z: f64, meters_per_sample: f64) -> (f64, f64) {
+    (x / meters_per_sample - 0.5, -z / meters_per_sample - 0.5)
+}
+
+/// World (x, z) of lake space (`u`, `v`). The inverse of `world_to_lake`.
+pub fn lake_to_world(u: f64, v: f64, meters_per_sample: f64) -> (f64, f64) {
+    ((u + 0.5) * meters_per_sample, -(v + 0.5) * meters_per_sample)
+}

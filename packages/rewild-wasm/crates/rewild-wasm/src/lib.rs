@@ -73,11 +73,12 @@ pub struct FarMapBuild(terrain::FarMap);
 #[wasm_bindgen]
 impl FarMapBuild {
     /// A map of `texels`² over `span` metres centred on world (`centreX`,
-    /// `centreZ`), placing the far sprite layers' instances over it if
-    /// `sprites`.
+    /// `centreZ`) of `generator`'s world, placing its far sprite layers'
+    /// instances over it if `sprites`.
     #[wasm_bindgen(constructor)]
-    pub fn new(centre_x: f64, centre_z: f64, span: f64, texels: u32, sprites: bool) -> FarMapBuild {
-        FarMapBuild(terrain::FarMap::new(centre_x, centre_z, span, texels as usize, sprites))
+    pub fn new(generator: &TerrainGenerator, centre_x: f64, centre_z: f64, span: f64, texels: u32, sprites: bool) -> FarMapBuild {
+        let slots = if sprites { generator.scatter.far_sprite_slots() } else { Vec::new() };
+        FarMapBuild(terrain::FarMap::new(centre_x, centre_z, span, texels as usize, &slots))
     }
 
     /// Builds up to `rows` more rows of `generator`'s world; returns whether
@@ -86,23 +87,23 @@ impl FarMapBuild {
         self.0.build(&generator.heights, &generator.splat, &generator.scatter, rows as usize)
     }
 
-    /// The far sprite layers' slots, in the order `takeSprites` holds them.
+    /// The sprite layers' slots, in the order `takeSprites` holds them.
     #[wasm_bindgen(js_name = spriteSlots)]
     pub fn sprite_slots(&self) -> Vec<u32> {
-        self.0.sprites.iter().flatten().map(|(slot, _)| *slot as u32).collect()
+        self.0.sprites.iter().map(|layer| layer.slot as u32).collect()
     }
 
-    /// Instances per far sprite layer, in the order `takeSprites` holds them.
+    /// Instances per sprite layer, in the order `takeSprites` holds them.
     #[wasm_bindgen(js_name = spriteCounts)]
     pub fn sprite_counts(&self) -> Vec<u32> {
-        self.0.sprites.iter().flatten().map(|(_, data)| (data.len() / 4) as u32).collect()
+        self.0.sprites.iter().map(|layer| (layer.instances.len() / terrain::scatter::FAR_SPRITE_STRIDE) as u32).collect()
     }
 
-    /// Every far sprite layer's instances in turn, four floats each: world x,
-    /// world z, scale and a roll, 0 to 1.
+    /// Every sprite layer's instances in turn, FAR_SPRITE_STRIDE floats each:
+    /// world x, world z, scale, and a roll from 0 to 1.
     #[wasm_bindgen(js_name = takeSprites)]
     pub fn take_sprites(&mut self) -> Vec<f32> {
-        self.0.sprites.iter_mut().flatten().flat_map(|(_, data)| std::mem::take(data)).collect()
+        self.0.sprites.iter_mut().flat_map(|layer| std::mem::take(&mut layer.instances)).collect()
     }
 
     /// rg16float bits per texel: height, then continent.

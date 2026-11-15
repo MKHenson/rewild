@@ -1,3 +1,4 @@
+import { smoothstep } from 'rewild-common';
 import { toFloat16 } from '../../utils/float16';
 
 // Where the ocean's shore waves run: a grid around the camera holding, per
@@ -179,11 +180,6 @@ export function extendArrival(
   sweep(times, costs, size);
 }
 
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
 // d/d(axis) of `times` at texel i along `step` (1 or size): central inside
 // the grid, one-sided at its edge.
 function slope(
@@ -236,7 +232,7 @@ function edgeStrength(x: number, y: number, size: number): number {
   const half = size / 2;
   const edge =
     Math.max(Math.abs(x + 0.5 - half), Math.abs(y + 0.5 - half)) / half;
-  return 1 - smoothstep(EDGE_FADE_START, EDGE_FADE_END, edge);
+  return 1 - smoothstep(edge, EDGE_FADE_START, EDGE_FADE_END);
 }
 
 /**

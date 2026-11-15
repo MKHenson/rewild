@@ -3,6 +3,7 @@ import { EulerRotationOrder } from './EulerOrder';
 import { Euler } from './Euler';
 import { Matrix3 } from './Matrix3';
 import { Quaternion } from './Quaternion';
+import { NumberArray } from './NumberArray';
 
 export class Matrix4 {
   isMatrix4: boolean = true;
@@ -11,6 +12,129 @@ export class Matrix4 {
   constructor() {
     this.elements = new Float32Array(16);
     this.set(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+  }
+
+  /** Column-major `src0 * src1` into `dst`. Safe when `dst` is an input. */
+  static multiplyMatricesFlat(
+    dst: NumberArray,
+    dstOffset: u32,
+    src0: NumberArray,
+    srcOffset0: u32,
+    src1: NumberArray,
+    srcOffset1: u32
+  ): NumberArray {
+    const a = srcOffset0;
+    const a11 = src0[a],
+      a12 = src0[a + 4],
+      a13 = src0[a + 8],
+      a14 = src0[a + 12];
+    const a21 = src0[a + 1],
+      a22 = src0[a + 5],
+      a23 = src0[a + 9],
+      a24 = src0[a + 13];
+    const a31 = src0[a + 2],
+      a32 = src0[a + 6],
+      a33 = src0[a + 10],
+      a34 = src0[a + 14];
+    const a41 = src0[a + 3],
+      a42 = src0[a + 7],
+      a43 = src0[a + 11],
+      a44 = src0[a + 15];
+
+    const b = srcOffset1;
+    const b11 = src1[b],
+      b12 = src1[b + 4],
+      b13 = src1[b + 8],
+      b14 = src1[b + 12];
+    const b21 = src1[b + 1],
+      b22 = src1[b + 5],
+      b23 = src1[b + 9],
+      b24 = src1[b + 13];
+    const b31 = src1[b + 2],
+      b32 = src1[b + 6],
+      b33 = src1[b + 10],
+      b34 = src1[b + 14];
+    const b41 = src1[b + 3],
+      b42 = src1[b + 7],
+      b43 = src1[b + 11],
+      b44 = src1[b + 15];
+
+    const o = dstOffset;
+    dst[o] = a11 * b11 + a12 * b21 + a13 * b31 + a14 * b41;
+    dst[o + 4] = a11 * b12 + a12 * b22 + a13 * b32 + a14 * b42;
+    dst[o + 8] = a11 * b13 + a12 * b23 + a13 * b33 + a14 * b43;
+    dst[o + 12] = a11 * b14 + a12 * b24 + a13 * b34 + a14 * b44;
+
+    dst[o + 1] = a21 * b11 + a22 * b21 + a23 * b31 + a24 * b41;
+    dst[o + 5] = a21 * b12 + a22 * b22 + a23 * b32 + a24 * b42;
+    dst[o + 9] = a21 * b13 + a22 * b23 + a23 * b33 + a24 * b43;
+    dst[o + 13] = a21 * b14 + a22 * b24 + a23 * b34 + a24 * b44;
+
+    dst[o + 2] = a31 * b11 + a32 * b21 + a33 * b31 + a34 * b41;
+    dst[o + 6] = a31 * b12 + a32 * b22 + a33 * b32 + a34 * b42;
+    dst[o + 10] = a31 * b13 + a32 * b23 + a33 * b33 + a34 * b43;
+    dst[o + 14] = a31 * b14 + a32 * b24 + a33 * b34 + a34 * b44;
+
+    dst[o + 3] = a41 * b11 + a42 * b21 + a43 * b31 + a44 * b41;
+    dst[o + 7] = a41 * b12 + a42 * b22 + a43 * b32 + a44 * b42;
+    dst[o + 11] = a41 * b13 + a42 * b23 + a43 * b33 + a44 * b43;
+    dst[o + 15] = a41 * b14 + a42 * b24 + a43 * b34 + a44 * b44;
+
+    return dst;
+  }
+
+  /**
+   * Column-major matrix from translation `t`, unit quaternion `q` and scale `s`,
+   * each read at its own offset, into `dst`.
+   */
+  static composeFlat(
+    dst: NumberArray,
+    dstOffset: u32,
+    t: NumberArray,
+    tOffset: u32,
+    q: NumberArray,
+    qOffset: u32,
+    s: NumberArray,
+    sOffset: u32
+  ): NumberArray {
+    const x = q[qOffset];
+    const y = q[qOffset + 1];
+    const z = q[qOffset + 2];
+    const w = q[qOffset + 3];
+    const sx = s[sOffset];
+    const sy = s[sOffset + 1];
+    const sz = s[sOffset + 2];
+    const x2 = x + x;
+    const y2 = y + y;
+    const z2 = z + z;
+    const xx = x * x2;
+    const xy = x * y2;
+    const xz = x * z2;
+    const yy = y * y2;
+    const yz = y * z2;
+    const zz = z * z2;
+    const wx = w * x2;
+    const wy = w * y2;
+    const wz = w * z2;
+
+    const o = dstOffset;
+    dst[o] = (1 - (yy + zz)) * sx;
+    dst[o + 1] = (xy + wz) * sx;
+    dst[o + 2] = (xz - wy) * sx;
+    dst[o + 3] = 0;
+    dst[o + 4] = (xy - wz) * sy;
+    dst[o + 5] = (1 - (xx + zz)) * sy;
+    dst[o + 6] = (yz + wx) * sy;
+    dst[o + 7] = 0;
+    dst[o + 8] = (xz + wy) * sz;
+    dst[o + 9] = (yz - wx) * sz;
+    dst[o + 10] = (1 - (xx + yy)) * sz;
+    dst[o + 11] = 0;
+    dst[o + 12] = t[tOffset];
+    dst[o + 13] = t[tOffset + 1];
+    dst[o + 14] = t[tOffset + 2];
+    dst[o + 15] = 1;
+    return dst;
   }
 
   set(

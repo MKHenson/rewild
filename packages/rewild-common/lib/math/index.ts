@@ -12,6 +12,7 @@ export * from './MathUtils';
 export * from './Matrix3';
 export * from './Matrix4';
 export * from './Noise';
+export * from './NumberArray';
 export * from './Plane';
 export * from './Quaternion';
 export * from './Ray';

@@ -10,6 +10,7 @@ use serde::Deserialize;
 
 use crate::climate::{ocean_coverage, resolve_biomes, ClimateField, ClimateSample};
 use crate::config::{Band, ClimateConfig, CoastConfig, Layer, Selector};
+use crate::grid::slope_at;
 use crate::paint::{ActiveBiomes, PaintMask};
 use math::{fast_max, smoothstep01, ParkMiller, Simplex};
 
@@ -67,24 +68,6 @@ pub(crate) fn coast_weights(coast: &CoastConfig, above_sea: f64, slope: f64, nea
     let seabed = ramp(-coast.seabed_depth + coast.blend, -coast.seabed_depth);
     let wet = fast_max(wet_below, seabed);
     (total, [total * (1.0 - wet), total * (wet - seabed), total * seabed])
-}
-
-/// The height gradient at sample (x, y) of a `width` × `height` field, as
-/// (dh/dx, dh/dy) per metre: the central difference, one-sided at the edges.
-pub(crate) fn gradient_at(heights: &[f32], width: usize, height: usize, x: usize, y: usize, spacing: f64) -> (f64, f64) {
-    let (x0, x1) = (x.saturating_sub(1), (x + 1).min(width - 1));
-    let (y0, y1) = (y.saturating_sub(1), (y + 1).min(height - 1));
-    let at = |x: usize, y: usize| heights[y * width + x] as f64;
-    (
-        (at(x1, y) - at(x0, y)) / ((x1 - x0) as f64 * spacing),
-        (at(x, y1) - at(x, y0)) / ((y1 - y0) as f64 * spacing),
-    )
-}
-
-/// Slope in degrees at sample (x, y). See `gradient_at`.
-pub(crate) fn slope_at(heights: &[f32], width: usize, height: usize, x: usize, y: usize, spacing: f64) -> f64 {
-    let (dx, dy) = gradient_at(heights, width, height, x, y, spacing);
-    (dx * dx + dy * dy).sqrt().atan().to_degrees()
 }
 
 /// One biome's layer weights at a sample into `out[..layers.len()]`, summing

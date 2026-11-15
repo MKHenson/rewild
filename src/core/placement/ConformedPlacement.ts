@@ -12,27 +12,6 @@ const _normal = new Vector3();
 const _tilt = new Quaternion();
 const _stored = new Quaternion();
 const _slerp = new Quaternion();
-const _up = new Vector3(0, 1, 0);
-const _axis = new Vector3();
-
-/**
- * The rotation taking world up onto `normal`, written into `out`. Antiparallel
- * normals resolve to a half turn about z, since any axis in the plane will do.
- */
-export function quaternionFromUpToNormal(
-  normal: Vector3,
-  out: Quaternion
-): Quaternion {
-  const dot = _up.dot(normal);
-
-  if (dot < -0.9999) return out.set(0, 0, 1, 0);
-  if (dot > 0.9999) return out.set(0, 0, 0, 1);
-
-  _axis.copy(_up).cross(normal).normalize();
-  const halfAngle = Math.acos(dot) / 2;
-  const s = Math.sin(halfAngle);
-  return out.set(_axis.x * s, _axis.y * s, _axis.z * s, Math.cos(halfAngle));
-}
 
 /**
  * Writes the world transform a placement resolves to.
@@ -68,7 +47,7 @@ export function resolvePlacement(
   const align = Math.min(1, Math.max(0, placement.alignToNormal ?? 0));
   if (align > 0 && terrain.sampleNormal(position[0], position[2], _normal)) {
     _stored.copy(outRotation);
-    quaternionFromUpToNormal(_normal, _tilt);
+    _tilt.setFromUnitVectors(Vector3.UP, _normal);
     // Partial alignment slerps out from upright, and the tilt premultiplies so
     // it happens in world space and the stored yaw survives it.
     outRotation.identity().slerp(_tilt, align).multiply(_stored);
@@ -101,7 +80,7 @@ export function writeBackPlacement(
 
     const align = Math.min(1, Math.max(0, placement.alignToNormal ?? 0));
     if (align > 0 && terrain.sampleNormal(position.x, position.z, _normal)) {
-      quaternionFromUpToNormal(_normal, _tilt);
+      _tilt.setFromUnitVectors(Vector3.UP, _normal);
       _stored.premultiply(_slerp.identity().slerp(_tilt, align).invert());
     }
   }

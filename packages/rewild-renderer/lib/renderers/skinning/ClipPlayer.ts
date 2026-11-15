@@ -1,3 +1,4 @@
+import { Quaternion } from 'rewild-common';
 import { GltfClip, GltfClipChannel } from '../../core/GltfSkeleton';
 import { POSE_STRIDE, PoseSlotData, PoseStore } from './PoseStore';
 
@@ -184,7 +185,7 @@ export class ClipPlayer implements PoseSlotData {
           );
 
       for (let j = 0; j < jointCount; j++)
-        normalizeQuat(pose, offset + j * POSE_STRIDE + 3);
+        Quaternion.normalizeFlat(pose, offset + j * POSE_STRIDE + 3);
     }
 
     return posed;
@@ -388,62 +389,14 @@ function sampleRotation(
   const a = Math.max(k, 0) * 4;
   const f = keyFraction(channel, k, t);
 
-  const ax = values[a];
-  const ay = values[a + 1];
-  const az = values[a + 2];
-  const aw = values[a + 3];
   if (f < 0) {
-    out[0] = ax;
-    out[1] = ay;
-    out[2] = az;
-    out[3] = aw;
+    out[0] = values[a];
+    out[1] = values[a + 1];
+    out[2] = values[a + 2];
+    out[3] = values[a + 3];
     return;
   }
 
-  const b = a + 4;
-  let bx = values[b];
-  let by = values[b + 1];
-  let bz = values[b + 2];
-  let bw = values[b + 3];
-  let cos = ax * bx + ay * by + az * bz + aw * bw;
-  if (cos < 0) {
-    cos = -cos;
-    bx = -bx;
-    by = -by;
-    bz = -bz;
-    bw = -bw;
-  }
-
-  let s0 = 1 - f;
-  let s1 = f;
-  if (cos < 0.9995) {
-    const angle = Math.acos(cos);
-    const sin = Math.sin(angle);
-    s0 = Math.sin((1 - f) * angle) / sin;
-    s1 = Math.sin(f * angle) / sin;
-  }
-
-  out[0] = ax * s0 + bx * s1;
-  out[1] = ay * s0 + by * s1;
-  out[2] = az * s0 + bz * s1;
-  out[3] = aw * s0 + bw * s1;
-  normalizeQuat(out, 0);
-}
-
-function normalizeQuat(q: Float32Array, o: number): void {
-  const len = Math.sqrt(
-    q[o] * q[o] +
-      q[o + 1] * q[o + 1] +
-      q[o + 2] * q[o + 2] +
-      q[o + 3] * q[o + 3]
-  );
-  if (len === 0) {
-    q[o + 3] = 1;
-    return;
-  }
-  const inv = 1 / len;
-  q[o] *= inv;
-  q[o + 1] *= inv;
-  q[o + 2] *= inv;
-  q[o + 3] *= inv;
+  Quaternion.slerpFlat(out, 0, values, a, values, a + 4, f);
+  Quaternion.normalizeFlat(out, 0);
 }

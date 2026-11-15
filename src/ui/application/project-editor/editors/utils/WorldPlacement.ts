@@ -8,7 +8,6 @@ import {
 } from 'rewild-common';
 import { Mesh, Renderer, Transform } from 'rewild-renderer';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
-import { quaternionFromUpToNormal } from 'src/core/placement/ConformedPlacement';
 import { TerrainChunk } from 'rewild-renderer/lib/renderers/terrain/TerrainChunk';
 
 const _raycaster = new Raycaster();
@@ -25,7 +24,7 @@ const _surfaceNormal = new Vector3();
 export function computeRotationFromNormal(
   normal: Vector3
 ): [number, number, number, number] {
-  quaternionFromUpToNormal(normal, _rotation);
+  _rotation.setFromUnitVectors(Vector3.UP, normal);
   return [_rotation.x, _rotation.y, _rotation.z, _rotation.w];
 }
 

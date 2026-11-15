@@ -3,6 +3,7 @@ import { Matrix4 } from './Matrix4';
 import { Vector3 } from './Vector3';
 import { Euler } from './Euler';
 import { EulerRotationOrder } from './EulerOrder';
+import { NumberArray } from './NumberArray';
 
 export interface IQuatChangeListener {
   onQuatChanged(quat: Quaternion): void;
@@ -30,11 +31,11 @@ export class Quaternion {
   }
 
   static slerpFlat(
-    dst: f32[],
+    dst: NumberArray,
     dstOffset: u32,
-    src0: f32[],
+    src0: NumberArray,
     srcOffset0: u32,
-    src1: f32[],
+    src1: NumberArray,
     srcOffset1: u32,
     t: f32
   ): void {
@@ -105,14 +106,15 @@ export class Quaternion {
     dst[dstOffset + 3] = w0;
   }
 
+  /** `src0 * src1` into `dst`. Safe when `dst` is an input. */
   static multiplyQuaternionsFlat(
-    dst: f32[],
+    dst: NumberArray,
     dstOffset: u32,
-    src0: f32[],
+    src0: NumberArray,
     srcOffset0: u32,
-    src1: f32[],
+    src1: NumberArray,
     srcOffset1: u32
-  ): f32[] {
+  ): NumberArray {
     const x0 = src0[srcOffset0];
     const y0 = src0[srcOffset0 + 1];
     const z0 = src0[srcOffset0 + 2];
@@ -128,6 +130,106 @@ export class Quaternion {
     dst[dstOffset + 2] = z0 * w1 + w0 * z1 + x0 * y1 - y0 * x1;
     dst[dstOffset + 3] = w0 * w1 - x0 * x1 - y0 * y1 - z0 * z1;
 
+    return dst;
+  }
+
+  /** The inverse of unit quaternion `src` into `dst`. */
+  static conjugateFlat(
+    dst: NumberArray,
+    dstOffset: u32,
+    src: NumberArray,
+    srcOffset: u32
+  ): NumberArray {
+    dst[dstOffset] = -src[srcOffset];
+    dst[dstOffset + 1] = -src[srcOffset + 1];
+    dst[dstOffset + 2] = -src[srcOffset + 2];
+    dst[dstOffset + 3] = src[srcOffset + 3];
+    return dst;
+  }
+
+  /** Scales the quaternion at `offset` to unit length; zero becomes identity. */
+  static normalizeFlat(q: NumberArray, offset: u32): NumberArray {
+    const x = q[offset];
+    const y = q[offset + 1];
+    const z = q[offset + 2];
+    const w = q[offset + 3];
+    const len = Math.sqrt(x * x + y * y + z * z + w * w);
+    if (len === 0) {
+      q[offset + 3] = 1;
+      return q;
+    }
+    const inv = 1 / len;
+    q[offset] = x * inv;
+    q[offset + 1] = y * inv;
+    q[offset + 2] = z * inv;
+    q[offset + 3] = w * inv;
+    return q;
+  }
+
+  /** A turn of `angle` about unit axis (x, y, z), into `dst`. */
+  static setFromAxisAngleFlat(
+    dst: NumberArray,
+    dstOffset: u32,
+    x: f32,
+    y: f32,
+    z: f32,
+    angle: f32
+  ): NumberArray {
+    const s = Math.sin(angle * 0.5);
+    dst[dstOffset] = x * s;
+    dst[dstOffset + 1] = y * s;
+    dst[dstOffset + 2] = z * s;
+    dst[dstOffset + 3] = Math.cos(angle * 0.5);
+    return dst;
+  }
+
+  /**
+   * The shortest turn from direction (ax, ay, az) to (bx, by, bz), into `dst`.
+   * The directions need not be unit length; a zero one gives identity.
+   */
+  static setFromUnitVectorsFlat(
+    dst: NumberArray,
+    dstOffset: u32,
+    ax: f32,
+    ay: f32,
+    az: f32,
+    bx: f32,
+    by: f32,
+    bz: f32
+  ): NumberArray {
+    const la = Math.hypot(ax, ay, az);
+    const lb = Math.hypot(bx, by, bz);
+    if (la === 0 || lb === 0) {
+      dst[dstOffset] = 0;
+      dst[dstOffset + 1] = 0;
+      dst[dstOffset + 2] = 0;
+      dst[dstOffset + 3] = 1;
+      return dst;
+    }
+    const ll = la * lb;
+    const dot = (ax * bx + ay * by + az * bz) / ll;
+    if (dot < -0.999999) {
+      // Opposite directions: a half turn about any axis across `a`.
+      const alongX = Math.abs(ax) >= 0.9 * la;
+      const x = alongX ? -az : 0;
+      const y = alongX ? 0 : az;
+      const z = alongX ? ax : -ay;
+      const l = Math.hypot(x, y, z);
+      dst[dstOffset] = x / l;
+      dst[dstOffset + 1] = y / l;
+      dst[dstOffset + 2] = z / l;
+      dst[dstOffset + 3] = 0;
+      return dst;
+    }
+    const x = (ay * bz - az * by) / ll;
+    const y = (az * bx - ax * bz) / ll;
+    const z = (ax * by - ay * bx) / ll;
+    const w = 1 + dot;
+    const l = Math.hypot(x, y, z, w);
+    dst[dstOffset] = x / l;
+    dst[dstOffset + 1] = y / l;
+    dst[dstOffset + 2] = z / l;
+    dst[dstOffset + 3] = w / l;
     return dst;
   }
 

@@ -1,3 +1,4 @@
+import { Matrix4 } from 'rewild-common';
 import { GltfSkeleton } from '../../core/GltfSkeleton';
 
 /** Floats a joint takes in the working pose: translation, rotation xyzw, scale. */
@@ -153,13 +154,29 @@ export class PoseStore {
       const outBase = slot * jointCount * MATRIX;
 
       for (let j = 0; j < jointCount; j++) {
-        composeInto(local, pose, poseBase + j * POSE_STRIDE);
+        const trs = poseBase + j * POSE_STRIDE;
+        Matrix4.composeFlat(local, 0, pose, trs, pose, trs + 3, pose, trs + 7);
         const parent = parents[j];
         if (parent < 0)
-          multiplyInto(world, j * MATRIX, rootMatrix, 0, local, 0);
-        else multiplyInto(world, j * MATRIX, world, parent * MATRIX, local, 0);
+          Matrix4.multiplyMatricesFlat(
+            world,
+            j * MATRIX,
+            rootMatrix,
+            0,
+            local,
+            0
+          );
+        else
+          Matrix4.multiplyMatricesFlat(
+            world,
+            j * MATRIX,
+            world,
+            parent * MATRIX,
+            local,
+            0
+          );
 
-        multiplyInto(
+        Matrix4.multiplyMatricesFlat(
           jointMatrices,
           outBase + j * MATRIX,
           world,
@@ -218,67 +235,4 @@ function grown(old: Float32Array, size: number): Float32Array<ArrayBuffer> {
   const next = new Float32Array(size);
   next.set(old);
   return next;
-}
-
-/** Column-major matrix from a TRS at `pose[p]`, written into `out`. */
-function composeInto(out: Float32Array, pose: Float32Array, p: number): void {
-  const x = pose[p + 3];
-  const y = pose[p + 4];
-  const z = pose[p + 5];
-  const w = pose[p + 6];
-  const sx = pose[p + 7];
-  const sy = pose[p + 8];
-  const sz = pose[p + 9];
-  const x2 = x + x;
-  const y2 = y + y;
-  const z2 = z + z;
-  const xx = x * x2;
-  const xy = x * y2;
-  const xz = x * z2;
-  const yy = y * y2;
-  const yz = y * z2;
-  const zz = z * z2;
-  const wx = w * x2;
-  const wy = w * y2;
-  const wz = w * z2;
-
-  out[0] = (1 - (yy + zz)) * sx;
-  out[1] = (xy + wz) * sx;
-  out[2] = (xz - wy) * sx;
-  out[3] = 0;
-  out[4] = (xy - wz) * sy;
-  out[5] = (1 - (xx + zz)) * sy;
-  out[6] = (yz + wx) * sy;
-  out[7] = 0;
-  out[8] = (xz + wy) * sz;
-  out[9] = (yz - wx) * sz;
-  out[10] = (1 - (xx + yy)) * sz;
-  out[11] = 0;
-  out[12] = pose[p];
-  out[13] = pose[p + 1];
-  out[14] = pose[p + 2];
-  out[15] = 1;
-}
-
-/** Column-major `a * b` into `out`. `out` must not overlap either input. */
-function multiplyInto(
-  out: Float32Array,
-  o: number,
-  a: Float32Array,
-  ao: number,
-  b: Float32Array,
-  bo: number
-): void {
-  for (let col = 0; col < 4; col++) {
-    const b0 = b[bo + col * 4];
-    const b1 = b[bo + col * 4 + 1];
-    const b2 = b[bo + col * 4 + 2];
-    const b3 = b[bo + col * 4 + 3];
-    for (let row = 0; row < 4; row++)
-      out[o + col * 4 + row] =
-        a[ao + row] * b0 +
-        a[ao + 4 + row] * b1 +
-        a[ao + 8 + row] * b2 +
-        a[ao + 12 + row] * b3;
-  }
 }

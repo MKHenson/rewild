@@ -483,23 +483,10 @@ export function composeNodeMatrix(
   _matrix.compose(_position, _rotation, _scale);
 
   const local = new Float32Array(_matrix.elements);
-  return parent ? multiplyMatrices(parent, local) : local;
-}
-
-/** Column-major `a * b`. */
-function multiplyMatrices(
-  a: Float32Array,
-  b: Float32Array
-): Float32Array<ArrayBuffer> {
-  const out = new Float32Array(16);
-  for (let col = 0; col < 4; col++) {
-    for (let row = 0; row < 4; row++) {
-      let sum = 0;
-      for (let k = 0; k < 4; k++) sum += a[k * 4 + row] * b[col * 4 + k];
-      out[col * 4 + row] = sum;
-    }
-  }
-  return out;
+  if (!parent) return local;
+  const world = new Float32Array(16);
+  Matrix4.multiplyMatricesFlat(world, 0, parent, 0, local, 0);
+  return world;
 }
 
 /**

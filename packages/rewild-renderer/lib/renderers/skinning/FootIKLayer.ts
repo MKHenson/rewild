@@ -1,6 +1,5 @@
 import { Matrix4, Quaternion, Vector3 } from 'rewild-common';
 import { ClipPlayer } from './ClipPlayer';
-import { aboutAxis, between, conjugate, multiply, rotate } from './poseMath';
 import { POSE_STRIDE, PoseSlotData, PoseStore } from './PoseStore';
 
 /** Floats a foot's model-space position takes in `feet`. */
@@ -293,7 +292,7 @@ export class FootIKLayer implements PoseSlotData {
       const pr = i === 0 ? 0 : (i - 1) * 4;
       const parentScale = i === 0 ? this.rootScale : scale[i - 1];
 
-      rotate(
+      Vector3.applyQuaternionFlat(
         position,
         i * 3,
         parentRotation,
@@ -305,7 +304,14 @@ export class FootIKLayer implements PoseSlotData {
       position[i * 3] += parentPosition[pp];
       position[i * 3 + 1] += parentPosition[pp + 1];
       position[i * 3 + 2] += parentPosition[pp + 2];
-      multiply(rotation, i * 4, parentRotation, pr, pose, p + 3);
+      Quaternion.multiplyQuaternionsFlat(
+        rotation,
+        i * 4,
+        parentRotation,
+        pr,
+        pose,
+        p + 3
+      );
       scale[i] = parentScale * pose[p + 7];
     }
   }
@@ -360,9 +366,9 @@ export class FootIKLayer implements PoseSlotData {
     const roll = Math.atan(across * rollShare);
     if (pitch === 0 && roll === 0) return false;
 
-    aboutAxis(_tilt, 0, 0, 1, roll);
-    aboutAxis(_turn, 1, 0, 0, pitch);
-    multiply(_tilt, 0, _tilt, 0, _turn, 0);
+    Quaternion.setFromAxisAngleFlat(_tilt, 0, 0, 0, 1, roll);
+    Quaternion.setFromAxisAngleFlat(_turn, 0, 1, 0, 0, pitch);
+    Quaternion.multiplyQuaternionsFlat(_tilt, 0, _tilt, 0, _turn, 0);
     const py = legs[0].position[this.pelvisAt * 3 + 1];
     this.turnPelvis(offset, mx, py, mz);
     for (let i = 0; i < n; i++) this.forward(legs[i], offset);
@@ -380,7 +386,7 @@ export class FootIKLayer implements PoseSlotData {
     const pr = at === 0 ? 0 : (at - 1) * 4;
     const scale = at === 0 ? this.rootScale : leg.scale[at - 1];
 
-    rotate(
+    Vector3.applyQuaternionFlat(
       _v,
       0,
       _tilt,
@@ -393,10 +399,10 @@ export class FootIKLayer implements PoseSlotData {
     const y = (py + _v[1] - parentPosition[pp + 1]) / scale;
     const z = (pz + _v[2] - parentPosition[pp + 2]) / scale;
 
-    conjugate(_inverse, 0, parentRotation, pr);
-    multiply(_turn, 0, _tilt, 0, R, at * 4);
-    multiply(_local, 0, _inverse, 0, _turn, 0);
-    rotate(_v, 0, _inverse, 0, x, y, z);
+    Quaternion.conjugateFlat(_inverse, 0, parentRotation, pr);
+    Quaternion.multiplyQuaternionsFlat(_turn, 0, _tilt, 0, R, at * 4);
+    Quaternion.multiplyQuaternionsFlat(_local, 0, _inverse, 0, _turn, 0);
+    Vector3.applyQuaternionFlat(_v, 0, _inverse, 0, x, y, z);
 
     const p = offset + this.pelvis * POSE_STRIDE;
     const { pose } = this.poses;
@@ -414,8 +420,8 @@ export class FootIKLayer implements PoseSlotData {
     const r = at === 0 ? 0 : (at - 1) * 4;
     const scale = at === 0 ? this.rootScale : leg.scale[at - 1];
 
-    conjugate(_inverse, 0, rotation, r);
-    rotate(_v, 0, _inverse, 0, 0, drop / scale, 0);
+    Quaternion.conjugateFlat(_inverse, 0, rotation, r);
+    Vector3.applyQuaternionFlat(_v, 0, _inverse, 0, 0, drop / scale, 0);
     const p = offset + this.pelvis * POSE_STRIDE;
     const { pose } = this.poses;
     pose[p] += _v[0];
@@ -463,7 +469,15 @@ export class FootIKLayer implements PoseSlotData {
     const sine = Math.hypot(kx, ky, kz);
     const before = Math.atan2(sine, ux * vx + uy * vy + uz * vz);
     if (sine <= STRAIGHT * la * lb) {
-      rotate(_v, 0, R, leg.upper * 4, leg.bend[0], leg.bend[1], leg.bend[2]);
+      Vector3.applyQuaternionFlat(
+        _v,
+        0,
+        R,
+        leg.upper * 4,
+        leg.bend[0],
+        leg.bend[1],
+        leg.bend[2]
+      );
       kx = _v[0];
       ky = _v[1];
       kz = _v[2];
@@ -474,11 +488,12 @@ export class FootIKLayer implements PoseSlotData {
     }
     const cosine = (la * la + lb * lb - reach * reach) / (2 * la * lb);
     const after = Math.acos(Math.min(1, Math.max(-1, cosine)));
-    aboutAxis(_knee, kx, ky, kz, after - before);
+    Quaternion.setFromAxisAngleFlat(_knee, 0, kx, ky, kz, after - before);
 
-    rotate(_v, 0, _knee, 0, vx, vy, vz);
-    between(
+    Vector3.applyQuaternionFlat(_v, 0, _knee, 0, vx, vy, vz);
+    Quaternion.setFromUnitVectorsFlat(
       _swing,
+      0,
       bx + _v[0] - ax,
       by + _v[1] - ay,
       bz + _v[2] - az,
@@ -487,21 +502,28 @@ export class FootIKLayer implements PoseSlotData {
       tz
     );
 
-    multiply(_upper, 0, _swing, 0, R, leg.upper * 4);
-    multiply(_lower, 0, _knee, 0, R, leg.lower * 4);
-    multiply(_lower, 0, _swing, 0, _lower, 0);
+    Quaternion.multiplyQuaternionsFlat(_upper, 0, _swing, 0, R, leg.upper * 4);
+    Quaternion.multiplyQuaternionsFlat(_lower, 0, _knee, 0, R, leg.lower * 4);
+    Quaternion.multiplyQuaternionsFlat(_lower, 0, _swing, 0, _lower, 0);
 
     const { pose } = this.poses;
-    conjugate(_inverse, 0, R, (leg.upper - 1) * 4);
-    multiply(_local, 0, _inverse, 0, _upper, 0);
+    Quaternion.conjugateFlat(_inverse, 0, R, (leg.upper - 1) * 4);
+    Quaternion.multiplyQuaternionsFlat(_local, 0, _inverse, 0, _upper, 0);
     pose.set(_local, offset + path[leg.upper] * POSE_STRIDE + 3);
 
-    conjugate(_inverse, 0, _upper, 0);
-    multiply(_local, 0, _inverse, 0, _lower, 0);
+    Quaternion.conjugateFlat(_inverse, 0, _upper, 0);
+    Quaternion.multiplyQuaternionsFlat(_local, 0, _inverse, 0, _lower, 0);
     pose.set(_local, offset + path[leg.lower] * POSE_STRIDE + 3);
 
-    conjugate(_inverse, 0, _lower, 0);
-    multiply(_local, 0, _inverse, 0, leg.endRotation, 0);
+    Quaternion.conjugateFlat(_inverse, 0, _lower, 0);
+    Quaternion.multiplyQuaternionsFlat(
+      _local,
+      0,
+      _inverse,
+      0,
+      leg.endRotation,
+      0
+    );
     pose.set(_local, offset + path[leg.end] * POSE_STRIDE + 3);
   }
 
@@ -543,8 +565,8 @@ export class FootIKLayer implements PoseSlotData {
         ky = 0;
         kz = 0;
       }
-      conjugate(_inverse, 0, leg.rotation, leg.upper * 4);
-      rotate(leg.bend, 0, _inverse, 0, kx, ky, kz);
+      Quaternion.conjugateFlat(_inverse, 0, leg.rotation, leg.upper * 4);
+      Vector3.applyQuaternionFlat(leg.bend, 0, _inverse, 0, kx, ky, kz);
     }
   }
 }

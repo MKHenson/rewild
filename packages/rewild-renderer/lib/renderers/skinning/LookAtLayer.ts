@@ -1,6 +1,5 @@
 import { Matrix4, Quaternion, Vector3 } from 'rewild-common';
 import { ClipPlayer } from './ClipPlayer';
-import { aboutAxis, conjugate, multiply } from './poseMath';
 import { POSE_STRIDE, PoseSlotData, PoseStore } from './PoseStore';
 
 /** Part of the turn the last bone of a chain takes. The rest split evenly. */
@@ -155,16 +154,16 @@ export class LookAtLayer implements PoseSlotData {
         const nextPitch = pitch * reached;
 
         // E = D(parent)⁻¹ D(bone), with D = Ry(yaw) Rx(−pitch).
-        aboutAxis(_turn, 1, 0, 0, donePitch);
-        aboutAxis(_a, 0, 1, 0, nextYaw - doneYaw);
-        multiply(_turn, 0, _turn, 0, _a, 0);
-        aboutAxis(_a, 1, 0, 0, -nextPitch);
-        multiply(_turn, 0, _turn, 0, _a, 0);
+        Quaternion.setFromAxisAngleFlat(_turn, 0, 1, 0, 0, donePitch);
+        Quaternion.setFromAxisAngleFlat(_a, 0, 0, 1, 0, nextYaw - doneYaw);
+        Quaternion.multiplyQuaternionsFlat(_turn, 0, _turn, 0, _a, 0);
+        Quaternion.setFromAxisAngleFlat(_a, 0, 1, 0, 0, -nextPitch);
+        Quaternion.multiplyQuaternionsFlat(_turn, 0, _turn, 0, _a, 0);
 
-        multiply(_turn, 0, _turn, 0, _world, 0);
-        conjugate(_a, 0, _world, 0);
-        multiply(_turn, 0, _a, 0, _turn, 0);
-        multiply(_b, 0, _turn, 0, _local, 0);
+        Quaternion.multiplyQuaternionsFlat(_turn, 0, _turn, 0, _world, 0);
+        Quaternion.conjugateFlat(_a, 0, _world, 0);
+        Quaternion.multiplyQuaternionsFlat(_turn, 0, _a, 0, _turn, 0);
+        Quaternion.multiplyQuaternionsFlat(_b, 0, _turn, 0, _local, 0);
 
         pose[p] = _b[0];
         pose[p + 1] = _b[1];
@@ -175,7 +174,7 @@ export class LookAtLayer implements PoseSlotData {
         donePitch = nextPitch;
       }
 
-      multiply(_world, 0, _world, 0, _local, 0);
+      Quaternion.multiplyQuaternionsFlat(_world, 0, _world, 0, _local, 0);
     }
   }
 

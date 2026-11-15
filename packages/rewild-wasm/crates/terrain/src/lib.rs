@@ -5,6 +5,7 @@ pub mod climate;
 pub mod config;
 pub mod edit;
 pub mod far;
+pub mod grid;
 pub mod heights;
 pub mod lakes;
 pub mod mesh;

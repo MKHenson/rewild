@@ -14,9 +14,10 @@ use serde::Deserialize;
 
 use crate::climate::{ocean_coverage, resolve_biomes, ClimateField, ClimateGrid, ClimateSample};
 use crate::config::{Band, ClimateConfig, CoastConfig, ScatterRule};
-use crate::lakes::field_origin;
+use crate::grid::{gradient_at, nearest_index, sample_bilinear, slope_at};
+use crate::lakes::{field_origin, lake_to_world};
 use crate::paint::{ActiveBiomes, PaintMask};
-use crate::splat::{band_coverage, coast_weights, gradient_at, selector_coverage, slope_at};
+use crate::splat::{band_coverage, coast_weights, selector_coverage};
 use crate::water::{WaterEdit, WaterPoint, WaterSampler};
 use crate::HeightGenerator;
 use math::{hash01, lerp, mix_hash, to_int32, ParkMiller, Simplex};
@@ -24,6 +25,9 @@ use math::{hash01, lerp, mix_hash, to_int32, ParkMiller, Simplex};
 /// Floats per instance: position in chunk-local metres (3), rotation
 /// quaternion xyzw (4), uniform scale, wind phase 0..1.
 pub const INSTANCE_STRIDE: usize = 9;
+
+/// Floats per far sprite: world x, world z, scale, and a roll from 0 to 1.
+pub const FAR_SPRITE_STRIDE: usize = 4;
 
 // Bits per cell axis in a kill key; the layer slot takes the top 8.
 const KILL_CELL_BITS: u32 = 12;
@@ -177,20 +181,58 @@ fn alignment(normal: [f64; 3], align: f64) -> Quaternion {
     [axis_x * s, 0.0, axis_z * s, half.cos()]
 }
 
-// Bilinear, because a candidate lands between samples and snapping it would
-// step scatter down the height grid.
-fn sample_height(heights: &[f32], size: usize, x: f64, y: f64) -> f64 {
-    let max = (size - 1) as f64;
-    let x0 = x.floor().clamp(0.0, max);
-    let y0 = y.floor().clamp(0.0, max);
-    let (x1, y1) = ((x0 + 1.0).min(max), (y0 + 1.0).min(max));
-    let at = |x: f64, y: f64| heights[y as usize * size + x as usize] as f64;
-    let (tx, ty) = (x - x0, y - y0);
-    lerp(lerp(at(x0, y0), at(x1, y0), tx), lerp(at(x0, y1), at(x1, y1), tx), ty)
+/// A cell's one candidate: where it stands in the space the cells divide, its
+/// hash, and the roll it must fall under the density to be placed.
+struct Candidate {
+    x: f64,
+    y: f64,
+    hash: u32,
+    roll: f64,
 }
 
-fn nearest(v: f64, size: usize) -> usize {
-    v.round().clamp(0.0, (size - 1) as f64) as usize
+impl Candidate {
+    fn of(cell_x: i64, cell_y: i64, cell_size: f64, slot: usize, seed: i32) -> Self {
+        let hash = cell_hash(cell_x, cell_y, slot, seed);
+        Self {
+            x: (cell_x as f64 + hash01(hash, 0)) * cell_size,
+            y: (cell_y as f64 + hash01(hash, 1)) * cell_size,
+            hash,
+            roll: hash01(hash, 2),
+        }
+    }
+}
+
+/// The beach's share of the ground, which no dry rule grows on. `nearness` is
+/// how close the ocean is (`ocean_coverage`).
+fn beach_share(coast: Option<&CoastConfig>, above_sea: f64, slope: f64, nearness: f64) -> f64 {
+    match coast {
+        Some(c) if nearness > 0.0 && above_sea < c.beach_height + c.blend => coast_weights(c, above_sea, slope, nearness).0,
+        _ => 0.0,
+    }
+}
+
+/// A half-open rectangle of lake space: [`u0`, `u1`) × [`v0`, `v1`).
+#[derive(Clone, Copy, Debug)]
+pub struct LakeRect {
+    pub u0: f64,
+    pub v0: f64,
+    pub u1: f64,
+    pub v1: f64,
+}
+
+impl LakeRect {
+    fn contains(&self, u: f64, v: f64) -> bool {
+        u >= self.u0 && u < self.u1 && v >= self.v0 && v < self.v1
+    }
+}
+
+/// The ground at a point as the far map knows it.
+#[derive(Clone, Copy, Default)]
+pub struct FarSample {
+    pub climate: ClimateSample,
+    pub height: f64,
+    /// Degrees from horizontal.
+    pub slope: f64,
 }
 
 /// Which rule grows a layer in each biome.
@@ -277,23 +319,28 @@ impl ScatterGenerator {
         (0..self.layers.len()).filter(|&s| self.layers[s].far_sprites && self.rules[s].any).collect()
     }
 
+    /// A rule's noise field at lake space (`u`, `v`), 0 to 1; 0 for a rule
+    /// without one.
+    fn rule_noise(&self, biome: usize, rule: usize, u: f64, v: f64) -> f64 {
+        match (self.noise[biome][rule], &self.climate.biomes[biome].scatter[rule].noise) {
+            (Some((ox, oy)), Some(n)) => (self.simplex.noise((u + ox) / n.scale, (v - oy) / n.scale) + 1.0) * 0.5,
+            _ => 0.0,
+        }
+    }
+
     /// Layer `slot`'s density at lake space (`u`, `v`) seen from past the
-    /// chunks: the rules placement resolves, over the far map's climate,
-    /// height and slope. Rules that grow by water stay out, as lakes are finer
-    /// than the far map.
-    pub fn far_density(&self, slot: usize, values: &ClimateSample, u: f64, v: f64, height: f64, slope: f64) -> f64 {
+    /// chunks: the rules placement resolves, over the far map's `ground`.
+    /// Rules that grow by water stay out, as lakes are finer than the far map.
+    pub fn far_density(&self, slot: usize, u: f64, v: f64, ground: &FarSample) -> f64 {
         let climate = &self.climate;
         let rules = &self.rules[slot];
-        let above_sea = height - self.sea_level;
-        let nearness = climate.continent.as_ref().map_or(0.0, |c| ocean_coverage(c, values.continent));
+        let above_sea = ground.height - self.sea_level;
+        let nearness = climate.continent.as_ref().map_or(0.0, |c| ocean_coverage(c, ground.climate.continent));
         if above_sea < 0.0 && nearness > 0.0 {
             return 0.0;
         }
-        let beach = match &climate.coast {
-            Some(c) if nearness > 0.0 && above_sea < c.beach_height + c.blend => coast_weights(c, above_sea, slope, nearness).0,
-            _ => 0.0,
-        };
-        let blend = resolve_biomes(climate, values);
+
+        let blend = resolve_biomes(climate, &ground.climate);
         let mut density = 0.0;
         for b in 0..blend.count {
             let biome = blend.biomes[b];
@@ -304,30 +351,17 @@ impl ScatterGenerator {
             if rule.underwater || rule.water_depth.is_some() || rule.water_type.is_some() {
                 continue;
             }
-            let noise = match (self.noise[biome][r], &rule.noise) {
-                (Some((ox, oy)), Some(n)) => (self.simplex.noise((u + ox) / n.scale, (v - oy) / n.scale) + 1.0) * 0.5,
-                _ => 0.0,
-            };
-            density += blend.weights[b] * rule_density(rule, height, slope, noise);
+            let noise = self.rule_noise(biome, r, u, v);
+            density += blend.weights[b] * rule_density(rule, ground.height, ground.slope, noise);
         }
-        density * (1.0 - beach)
+        density * (1.0 - beach_share(climate.coast.as_ref(), above_sea, ground.slope, nearness))
     }
 
-    /// Far sprites of layer `slot` whose candidates land in lake space
-    /// [`u0`, `u1`) × [`v0`, `v1`), on the same jittered grid placement uses.
-    /// `at` gives the climate, height and slope at a lake-space point. Each is
-    /// pushed onto `out` as world x, world z, scale and a roll, 0 to 1.
-    #[allow(clippy::too_many_arguments)]
-    pub fn far_sprites(
-        &self,
-        slot: usize,
-        u0: f64,
-        u1: f64,
-        v0: f64,
-        v1: f64,
-        at: impl Fn(f64, f64) -> (ClimateSample, f64, f64),
-        out: &mut Vec<f32>,
-    ) {
+    /// Places layer `slot`'s far sprites whose candidates land in `area`, on
+    /// the same jittered cells chunk placement uses. `ground_at` gives the far
+    /// map's ground at a lake-space point. Each sprite is pushed onto `out` as
+    /// FAR_SPRITE_STRIDE floats.
+    pub fn place_far_sprites(&self, slot: usize, area: LakeRect, ground_at: impl Fn(f64, f64) -> FarSample, out: &mut Vec<f32>) {
         let layer = &self.layers[slot];
         let rules = &self.rules[slot];
         if !rules.any {
@@ -337,29 +371,20 @@ impl ScatterGenerator {
         let cell_size = 2.0 * layer.footprint / mps;
         let ceiling = rules.max_density * (1.0 + 1e-9);
         let cell = |v: f64| (v / cell_size).floor() as i64;
-        for cell_y in cell(v0)..=cell(v1) {
-            for cell_x in cell(u0)..=cell(u1) {
-                let hash = cell_hash(cell_x, cell_y, slot, self.seed);
-                let roll = hash01(hash, 2);
-                if roll >= ceiling {
+
+        for cell_y in cell(area.v0)..=cell(area.v1) {
+            for cell_x in cell(area.u0)..=cell(area.u1) {
+                let candidate = Candidate::of(cell_x, cell_y, cell_size, slot, self.seed);
+                if candidate.roll >= ceiling || !area.contains(candidate.x, candidate.y) {
                     continue;
                 }
-                let u = (cell_x as f64 + hash01(hash, 0)) * cell_size;
-                let v = (cell_y as f64 + hash01(hash, 1)) * cell_size;
-                if u < u0 || u >= u1 || v < v0 || v >= v1 {
+                let (u, v) = (candidate.x, candidate.y);
+                if candidate.roll >= self.far_density(slot, u, v, &ground_at(u, v)) {
                     continue;
                 }
-                let (values, height, slope) = at(u, v);
-                if roll >= self.far_density(slot, &values, u, v, height, slope) {
-                    continue;
-                }
-                let scale = lerp(layer.jitter.scale.from, layer.jitter.scale.to, hash01(hash, 3));
-                out.extend_from_slice(&[
-                    ((u + 0.5) * mps) as f32,
-                    (-(v + 0.5) * mps) as f32,
-                    scale as f32,
-                    hash01(hash, 4) as f32,
-                ]);
+                let (x, z) = lake_to_world(u, v, mps);
+                let scale = lerp(layer.jitter.scale.from, layer.jitter.scale.to, hash01(candidate.hash, 3));
+                out.extend_from_slice(&[x as f32, z as f32, scale as f32, hash01(candidate.hash, 4) as f32]);
             }
         }
     }
@@ -473,18 +498,19 @@ impl ScatterGenerator {
                 if chunk.kills.binary_search(&key).is_ok() {
                     continue;
                 }
-                let hash = cell_hash(cell_x, cell_y, slot, self.seed);
-                if hash01(hash, 2) >= ceiling {
+                let candidate = Candidate::of(cell_x, cell_y, cell_size, slot, self.seed);
+                let hash = candidate.hash;
+                if candidate.roll >= ceiling {
                     continue;
                 }
-                let global_x = (cell_x as f64 + hash01(hash, 0)) * cell_size;
-                let global_y = (cell_y as f64 + hash01(hash, 1)) * cell_size;
+                let (global_x, global_y) = (candidate.x, candidate.y);
                 if global_x < start_x || global_x >= end_x || global_y < start_y || global_y >= end_y {
                     continue;
                 }
                 let (sx, sy) = (global_x - start_x, global_y - start_y);
-                let height = sample_height(chunk.heights, size, sx, sy);
-                let slope = slope_at(chunk.heights, size, size, nearest(sx, size), nearest(sy, size), mps);
+                let (nx, ny) = (nearest_index(sx, size), nearest_index(sy, size));
+                let height = sample_bilinear(chunk.heights, size, sx, sy);
+                let slope = slope_at(chunk.heights, size, size, nx, ny, mps);
 
                 // The biome-weighted sum of the rules that grow this layer, so
                 // scatter fades in across a climate transition.
@@ -499,12 +525,7 @@ impl ScatterGenerator {
                             continue;
                         };
                         let rule = &climate.biomes[biome].scatter[r];
-                        let noise = match (self.noise[biome][r], &rule.noise) {
-                            (Some((ox, oy)), Some(n)) => {
-                                (self.simplex.noise((wx + ox) / n.scale, (wy - oy) / n.scale) + 1.0) * 0.5
-                            }
-                            _ => 0.0,
-                        };
+                        let noise = self.rule_noise(biome, r, wx, wy);
                         let rule_density = rule_density(rule, height, slope, noise);
                         if rule_density <= 0.0 {
                             continue;
@@ -513,13 +534,7 @@ impl ScatterGenerator {
                         // wants to grow here.
                         let (point, beach) = *water.get_or_insert_with(|| {
                             let point = chunk.water.sample(sx, sy);
-                            let above_sea = height - self.sea_level;
-                            let beach = match chunk.coast {
-                                Some(c) if point.ocean > 0.0 && above_sea < c.beach_height + c.blend => {
-                                    coast_weights(c, above_sea, slope, point.ocean).0
-                                }
-                                _ => 0.0,
-                            };
+                            let beach = beach_share(chunk.coast, height - self.sea_level, slope, point.ocean);
                             (point, beach)
                         });
                         let type_weight = rules.water_type[biome].map_or(1.0, |t| point.types.get(t).copied().unwrap_or(0.0));
@@ -534,7 +549,7 @@ impl ScatterGenerator {
                     let excluded = mask.sample_channel(self.layers.len(), sx, sy);
                     density = (density + painted * (1.0 - density)) * (1.0 - excluded);
                 }
-                if density <= 0.0 || hash01(hash, 2) >= density {
+                if density <= 0.0 || candidate.roll >= density {
                     continue;
                 }
 
@@ -550,7 +565,7 @@ impl ScatterGenerator {
                     rotation = multiply([azimuth.cos() * s, 0.0, azimuth.sin() * s, (lean * 0.5).cos()], rotation);
                 }
                 if align > 0.0 {
-                    let (dx, dy) = gradient_at(chunk.heights, size, size, nearest(sx, size), nearest(sy, size), mps);
+                    let (dx, dy) = gradient_at(chunk.heights, size, size, nx, ny, mps);
                     // The grid runs +y into -z, so dh/dy enters positively.
                     let (nx, nz) = (-dx, dy);
                     let length = (nx * nx + 1.0 + nz * nz).sqrt();

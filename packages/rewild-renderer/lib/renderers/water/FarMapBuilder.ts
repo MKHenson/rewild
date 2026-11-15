@@ -1,4 +1,7 @@
-import { FarMapBuild } from '../../../../rewild-wasm/pkg/rewild_wasm';
+import {
+  FarMapBuild,
+  TerrainGenerator,
+} from '../../../../rewild-wasm/pkg/rewild_wasm';
 import { ClimateConfig, validateClimateLayers } from '../terrain/Biomes';
 import { terrainGenerator } from '../terrain/TerrainGenerator';
 
@@ -48,9 +51,7 @@ export class FarMapBuilder {
   readonly centreZ: number;
   readonly span: number;
   private readonly texels: number;
-  private readonly seed: number;
-  private readonly climate: ClimateConfig;
-  private readonly seaLevel: number;
+  private readonly generator: TerrainGenerator;
   private map: FarMapBuild | null;
 
   constructor(
@@ -64,14 +65,12 @@ export class FarMapBuilder {
     sprites = false
   ) {
     validateClimateLayers(climate);
-    this.seed = seed;
-    this.climate = climate;
-    this.seaLevel = seaLevel;
     this.centreX = centreX;
     this.centreZ = centreZ;
     this.span = span;
     this.texels = texels;
-    this.map = new FarMapBuild(centreX, centreZ, span, texels, sprites);
+    this.generator = terrainGenerator(seed, climate, seaLevel);
+    this.map = new FarMapBuild(this.generator, centreX, centreZ, span, texels, sprites);
   }
 
   get done(): boolean {
@@ -82,8 +81,9 @@ export class FarMapBuilder {
   build(rows: number = Infinity): boolean {
     const map = this.map;
     if (!map) return true;
-    const generator = terrainGenerator(this.seed, this.climate, this.seaLevel);
-    if (!map.build(generator, Math.min(rows, this.texels * 3))) return false;
+    // The binding takes a u32, so Infinity is capped at every row of all three
+    // passes: ground, weights and sprites.
+    if (!map.build(this.generator, Math.min(rows, this.texels * 3))) return false;
     this.ground = map.takeGround();
     this.weights = map.takeWeights();
     this.spriteSlots = map.spriteSlots();

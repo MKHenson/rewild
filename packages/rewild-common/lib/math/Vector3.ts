@@ -4,6 +4,7 @@ import { IVector } from './IVector';
 import * as MathUtils from './MathUtils';
 import { Matrix3 } from './Matrix3';
 import { Matrix4 } from './Matrix4';
+import { NumberArray } from './NumberArray';
 import { Quaternion } from './Quaternion';
 import { Spherical } from './Spherical';
 import { Vector4 } from './Vector4';
@@ -11,6 +12,29 @@ import { Vector4 } from './Vector4';
 export class Vector3 implements IVector {
   static UP: Vector3 = new Vector3(0, 1, 0);
   static DOWN: Vector3 = new Vector3(0, -1, 0);
+
+  /** (x, y, z) turned by unit quaternion `q`, into `dst`. */
+  static applyQuaternionFlat(
+    dst: NumberArray,
+    dstOffset: u32,
+    q: NumberArray,
+    qOffset: u32,
+    x: f32,
+    y: f32,
+    z: f32
+  ): NumberArray {
+    const qx = q[qOffset];
+    const qy = q[qOffset + 1];
+    const qz = q[qOffset + 2];
+    const qw = q[qOffset + 3];
+    const tx = 2 * (qy * z - qz * y);
+    const ty = 2 * (qz * x - qx * z);
+    const tz = 2 * (qx * y - qy * x);
+    dst[dstOffset] = x + qw * tx + qy * tz - qz * ty;
+    dst[dstOffset + 1] = y + qw * ty + qz * tx - qx * tz;
+    dst[dstOffset + 2] = z + qw * tz + qx * ty - qy * tx;
+    return dst;
+  }
 
   isVector3: boolean = true;
   x: f32;
