@@ -1,5 +1,6 @@
 import { Vector3 } from 'rewild-common';
 import { MovementSettings, SeekSettings } from '../CreaturePresets';
+import { WaterHabitat } from '../Habitat';
 import { MovementSystem, PLAYER_ID } from '../MovementSystem';
 import { TestAnimator, TestWorld } from '../testWorld';
 import { Seek } from './Seek';
@@ -100,5 +101,36 @@ describe('Seek as chase', () => {
     run(1);
 
     expect(system.z).toBeGreaterThan(1);
+  });
+});
+
+describe('Seek as evade in water', () => {
+  function swimmer() {
+    const world = new TestWorld();
+    world.height = () => -30;
+    world.depth = () => 30;
+    const habitat = new WaterHabitat(
+      { type: 'water', bedMargin: 0.5, surfaceMargin: 0.5 },
+      world
+    );
+    const seek = new Seek('evade', EVADE, true);
+    const system = new MovementSystem(SETTINGS, habitat, world, [seek]);
+    return { world, system };
+  }
+
+  it('ignores a player far above it', () => {
+    const { world, system } = swimmer();
+    system.place(0, -20, 0, 0);
+    world.player = new Vector3(0, 0, 1);
+    system.update(0.05);
+    expect(system.activeMode).toBeNull();
+  });
+
+  it('flees a player near it', () => {
+    const { world, system } = swimmer();
+    system.place(0, -20, 0, 0);
+    world.player = new Vector3(0, -18, 1);
+    system.update(0.05);
+    expect(system.activeMode).toBe('evade');
   });
 });
