@@ -1,11 +1,8 @@
-import { UICanvas } from '../lib';
+import type { UISurface } from '../lib';
 
-/** What an example builds into: the same UI on both sides. */
+/** What an example builds into. The inspector mirrors the surface's tree as DOM elements. */
 export interface ExampleView {
-  /** The DOM side, for elements with the same styles as the Mica side. */
-  dom: HTMLElement;
-  /** The Mica side. */
-  canvas: UICanvas;
+  surface: UISurface;
 }
 
 export interface Example {

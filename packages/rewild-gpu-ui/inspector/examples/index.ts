@@ -1,1 +1,1 @@
-import './canvas';
+import './boxes';
