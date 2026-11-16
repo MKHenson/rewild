@@ -7,6 +7,7 @@ import {
 } from './Biomes';
 import { generateBiomeBlendedHeightMap } from './Noise';
 import {
+  NeighbourWet,
   OCEAN_BODY_ID,
   WATER_MAP_STEP,
   WaterMap,
@@ -97,8 +98,44 @@ describe('buildWaterMap', () => {
 
 });
 
+describe('shore distance', () => {
+  it('is 0 where no water stands and rises out to sea', () => {
+    const water = build(COASTAL)!;
+    expect(water.shore.length).toBe(SIZE * SIZE);
+    for (let t = 0; t < SIZE * SIZE; t++)
+      if (water.coverage[t] === 0) expect(water.shore[t]).toBe(0);
+    expect(Math.max(...water.shore)).toBeGreaterThan(0);
+  });
+
+  it('reads dry neighbours past the chunk edges', () => {
+    const plane = SIZE * SIZE;
+    const ocean = climateWith({ ...DEFAULT_CONTINENT, coast: 2 });
+    const heights = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(-40);
+    const at = (neighbours: NeighbourWet | null) =>
+      buildWaterMap(
+        CHUNK_SIZE,
+        SEED,
+        new Vector2(0, 0),
+        ocean,
+        0,
+        heights,
+        null,
+        neighbours
+      )!;
+    const alone = at(null);
+    const beside = at({ wet: new Uint8Array(9 * plane), present: 0x1ef });
+    expect(Array.from(alone.wet).every((w) => w === 1)).toBe(true);
+    expect(Array.from(alone.shore).every((d) => d === 255)).toBe(true);
+    for (let my = 0; my < SIZE; my++)
+      for (let mx = 0; mx < SIZE; mx++) {
+        const edge = Math.min(mx, my, SIZE - 1 - mx, SIZE - 1 - my);
+        expect(beside.shore[mx + my * SIZE]).toBe((edge + 1) * 8);
+      }
+  });
+});
+
 describe('packWaterSurface', () => {
-  it('interleaves level, terrain height and coverage per texel', () => {
+  it('interleaves level, terrain height, coverage and shore distance per texel', () => {
     const water = build(COASTAL)!;
     const packed = packWaterSurface(water);
     expect(packed.length).toBe(SIZE * SIZE * 4);
@@ -109,7 +146,7 @@ describe('packWaterSurface', () => {
         water.coverage[t] / 255,
         3
       );
-      expect(fromFloat16(packed[t * 4 + 3])).toBe(0);
+      expect(fromFloat16(packed[t * 4 + 3])).toBe(water.shore[t]);
     }
   });
 

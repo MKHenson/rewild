@@ -86,6 +86,17 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     );
   };
 
+  (window as any).setWaterShoreDistanceDebug = (enabled = true) => {
+    renderer.terrainRenderer.waterShoreDistanceDebug = enabled;
+    console.log(
+      `setWaterShoreDistanceDebug(${enabled}) — ${
+        enabled
+          ? 'metres to dry ground: red at the coast, green at 128 m, blue at the 255 m cap, a dark line every 32 m'
+          : 'water shaded'
+      }.`
+    );
+  };
+
   (window as any).setWaterRefractionDebug = (view: number | boolean = 1) => {
     const mode = view === true ? 1 : view === false ? 0 : view;
     renderer.terrainRenderer.waterRefractionDebug = mode;

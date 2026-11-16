@@ -46,6 +46,9 @@ export interface WaveFrame {
   /** A water.wgsl refractionDebug view in place of the water: 0 off, 1 the
    *  depth facts, 2 the type weights, 3 the light that passes through. */
   refractionDebug?: number;
+  /** Paints the distance to dry ground instead of the water (water.wgsl
+   *  shoreDistanceDebug). */
+  shoreDistanceDebug?: boolean;
   /** Strength of the sunlight through the wave crests; 1 is the default. */
   crestGlow: number;
   /** Strength of the trough darkening; 1 is the default. */
@@ -137,7 +140,9 @@ export class WaterWaves {
     out[ORIGIN_OFFSET] = this.originX;
     out[ORIGIN_OFFSET + 1] = this.originZ;
     out[ORIGIN_OFFSET + 2] = frame.windSpeed;
-    out[ORIGIN_OFFSET + 3] = frame.refractionDebug
+    out[ORIGIN_OFFSET + 3] = frame.shoreDistanceDebug
+      ? -1
+      : frame.refractionDebug
       ? 2 + frame.refractionDebug
       : frame.shoreDebug
       ? 2

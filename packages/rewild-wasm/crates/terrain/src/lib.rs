@@ -21,7 +21,7 @@ pub use lakes::{CellReport, Lake, Lakes};
 pub use paint::PaintMask;
 pub use scatter::{ScatterGenerator, ScatterLayer, ScatterRequest};
 pub use splat::{Region, SplatGenerator, SplatSpec};
-pub use water::{WaterEdit, WaterMap, WaterPoint, WaterSampler};
+pub use water::{NeighbourWet, WaterEdit, WaterMap, WaterPoint, WaterSampler};
 
 #[cfg(test)]
 mod tests;

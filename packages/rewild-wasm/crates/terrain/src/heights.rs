@@ -375,6 +375,18 @@ impl HeightGenerator {
         (self.sample_with(x, y, &values), values)
     }
 
+    /// The un-eroded, uncarved height at world sample (x, y) with the climate
+    /// read from `grid`, as a chunk generated over that grid reads it.
+    pub(crate) fn height_on(&self, grid: &ClimateGrid, x: f64, y: f64) -> f64 {
+        let values = grid.at(x, y);
+        if let Some(continent) = &self.climate.continent {
+            if continent_land_weight(continent, values.continent) <= 0.0 {
+                return self.sea_level - continent_seabed_depth(continent, values.continent);
+            }
+        }
+        self.sample_with(x, y, &values).height
+    }
+
     fn sample_with(&self, x: f64, y: f64, values: &ClimateSample) -> HeightSample {
         let blend = resolve_biomes(&self.climate, values);
 

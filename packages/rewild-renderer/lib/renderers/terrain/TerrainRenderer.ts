@@ -57,7 +57,7 @@ import { LightShafts } from '../water/LightShafts';
 import { MarineSnow } from '../water/MarineSnow';
 import { GpuPassTimer } from '../../metrics/GpuPassTimer';
 import { WaterQuery, WaterQuerySource } from '../water/WaterQuery';
-import { WATER_MAP_STEP, WaterMap } from './WaterMap';
+import { NeighbourWet, WATER_MAP_STEP, WaterMap } from './WaterMap';
 import { shoreWaveHeight } from '../water/ShoreWaves';
 import { SHORE_FIELD_SPAN, ShoreField } from '../water/ShoreField';
 import { WaterLevelField } from '../water/WaterLevelField';
@@ -292,6 +292,8 @@ export class TerrainRenderer implements WaterQuerySource {
   waterShoreWaves = 1;
   /** Paints the shore field on the water instead of shading it. */
   waterShoreDebug = false;
+  /** Paints the distance to dry ground on the water instead of shading it. */
+  waterShoreDistanceDebug = false;
   /** A debug view of what the water's absorb draw reads, in place of the
    *  water: 0 off, 1 the depth facts, 2 the type weights, 3 the light that
    *  passes through (water.wgsl refractionDebug). */
@@ -477,6 +479,38 @@ export class TerrainRenderer implements WaterQuerySource {
     }
 
     return apron;
+  }
+
+  /** The wet texels of the chunks around `coord` that have built their water,
+   *  for its shore distance, or null when none have. Texel rows run toward
+   *  −Z, so the row above (dy = −1) is the chunk at cy + 1. */
+  neighbourWet(coord: Vector2): NeighbourWet | null {
+    let wet: Uint8Array | null = null;
+    let present = 0;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const mask = this.terrainChunks.get(
+          `${coord.x + dx},${coord.y - dy}`
+        )?.wetMask;
+        if (!mask) continue;
+        const slot = (dy + 1) * 3 + dx + 1;
+        wet ??= new Uint8Array(9 * mask.length);
+        wet.set(mask, slot * mask.length);
+        present |= 1 << slot;
+      }
+    return wet ? { wet, present } : null;
+  }
+
+  /** Marks the water of the chunks around `coord` stale after its wet texels
+   *  changed, so their shore distances read them. */
+  wetChanged(coord: Vector2): void {
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++)
+        if (dx !== 0 || dy !== 0)
+          this.terrainChunks
+            .get(`${coord.x + dx},${coord.y + dy}`)
+            ?.bumpShoreInputVersion();
   }
 
   init(renderer: Renderer) {
@@ -1305,6 +1339,7 @@ export class TerrainRenderer implements WaterQuerySource {
       foamDebug: this.waterFoamDebug,
       shoreDebug: this.waterShoreDebug,
       refractionDebug: this.waterRefractionDebug,
+      shoreDistanceDebug: this.waterShoreDistanceDebug,
       crestGlow: this.waterCrestGlow,
       troughDarkening: this.waterTroughDarkening,
       reflectionSteps: this.waterReflections

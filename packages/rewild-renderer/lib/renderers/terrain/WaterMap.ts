@@ -29,6 +29,9 @@ export const SWASH_REACH = 1.5;
 /** Metres above a covered level within which a chunk keeps its water map for
  *  the terrain's wet band, though no water shows. */
 export const WET_BAND_REACH = 2;
+/** Metres past which all water counts as open: shore distances stop here.
+ *  Mirrors SHORE_CAP in water.rs. */
+export const SHORE_CAP = 255;
 
 export interface WaterMap {
   size: number;
@@ -52,11 +55,25 @@ export interface WaterMap {
   bodyIds: Uint32Array;
   /** RG8 snorm flow direction. Zero is still water. */
   flow: Int8Array;
+  /** Metres to the nearest dry texel, up to SHORE_CAP. 0 where dry. Counts
+   *  dry ground in neighbouring chunks. */
+  shore: Uint8Array;
+  /** 1 where water stands: covered, over ground below the level. */
+  wet: Uint8Array;
   /** The record of every body that covers a texel here. */
   bodies: WaterBody[];
 }
 
 export { OCEAN_BODY_ID };
+
+/** The wet texels of a chunk's neighbours, for its shore distance: nine
+ *  water-map-sized planes, slot (dy + 1) * 3 + dx + 1 holding the neighbour dx
+ *  texel columns and dy texel rows over, each flagged by bit `slot` of
+ *  `present`. Mirrors NeighbourWet in water.rs. */
+export interface NeighbourWet {
+  wet: Uint8Array;
+  present: number;
+}
 
 /** A chunk's water before the terrain is consulted: the generator blended with
  *  the chunk's edit, per water map texel. */
@@ -143,6 +160,8 @@ export function waterShowsAt(
  * everywhere stands WET_BAND_REACH or more above the covered levels. `offset`
  * is the chunk's sample-space offset, as for the height and splat generators.
  * `edit` is the chunk's authored water, blended over the generated.
+ * `neighbours` stand in for the generated water and ground past the chunk's
+ * edges in the shore distance.
  */
 export function buildWaterMap(
   chunkSize: number,
@@ -151,7 +170,8 @@ export function buildWaterMap(
   climate: ClimateConfig,
   seaLevel: number,
   heights: Float32Array,
-  edit: WaterEdit | null = null
+  edit: WaterEdit | null = null,
+  neighbours: NeighbourWet | null = null
 ): WaterMap | null {
   const step = WATER_MAP_STEP;
   const size = paintMaskSize(chunkSize, step);
@@ -161,7 +181,9 @@ export function buildWaterMap(
     offset.x,
     offset.y,
     heights,
-    waterEditData(edit)
+    waterEditData(edit),
+    neighbours?.wet ?? new Uint8Array(0),
+    neighbours?.present ?? 0
   );
   if (!built) return null;
 
@@ -195,6 +217,8 @@ export function buildWaterMap(
     typeWeights,
     bodyIds,
     flow: new Int8Array(size * size * 2),
+    shore: built.takeShore(),
+    wet: built.takeWet(),
     bodies,
   };
   built.free();
@@ -211,12 +235,15 @@ export function waterMapTransferables(water: WaterMap | null): ArrayBuffer[] {
     water.typeWeights.buffer,
     water.bodyIds.buffer,
     water.flow.buffer,
+    water.shore.buffer,
+    water.wet.buffer,
   ] as ArrayBuffer[];
 }
 
 /**
  * Interleaves `water` into one rgba16float texel per map texel: (level,
- * terrain height, coverage, 0). Writes into `out` when it is the right size.
+ * terrain height, coverage, shore distance). Writes into `out` when it is the
+ * right size.
  */
 export function packWaterSurface(
   water: WaterMap,
@@ -225,12 +252,11 @@ export function packWaterSurface(
   const texels = water.size * water.size;
   const packed =
     out && out.length === texels * 4 ? out : new Uint16Array(texels * 4);
-  const zero = toFloat16(0);
   for (let t = 0; t < texels; t++) {
     packed[t * 4] = water.level[t];
     packed[t * 4 + 1] = water.heights[t];
     packed[t * 4 + 2] = toFloat16(water.coverage[t] / 255);
-    packed[t * 4 + 3] = zero;
+    packed[t * 4 + 3] = toFloat16(water.shore[t]);
   }
   return packed;
 }

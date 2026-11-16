@@ -32,6 +32,8 @@ function flatMap(): WaterMap {
     typeWeights,
     bodyIds: new Uint32Array(texels),
     flow: new Int8Array(texels * 2),
+    shore: new Uint8Array(texels),
+    wet: new Uint8Array(texels),
     bodies: [],
   };
 }

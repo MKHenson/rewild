@@ -173,7 +173,7 @@ export class LODMesh {
         );
         const version = this.chunk.heightsVersion;
         const maskVersion = this.chunk.maskVersion;
-        const waterEditVersion = this.chunk.waterEditVersion;
+        const waterInputVersion = this.chunk.waterInputVersion;
 
         // Scatter rides whichever LOD build gets there first — the instances
         // are chunk state, identical for every LOD, so only one build pays.
@@ -215,7 +215,10 @@ export class LODMesh {
         // for these heights and this water edit, a build for another LOD
         // leaves them out. An edit raises a version, so they come back.
         const skipSplat = this.chunk.hasSplatFor(version);
-        const skipWater = this.chunk.waterIsCurrent(version, waterEditVersion);
+        const skipWater = this.chunk.waterIsCurrent(version, waterInputVersion);
+        const neighbourWet = skipWater
+          ? null
+          : renderer.terrainRenderer.neighbourWet(this.chunk.coord);
 
         const {
           splat,
@@ -242,6 +245,7 @@ export class LODMesh {
           scatterMask: scatterMask ?? undefined,
           scatterKills: scatterKills ?? undefined,
           waterEdit: waterEdit ?? undefined,
+          neighbourWet: neighbourWet ?? undefined,
           skipSplat,
           skipWater,
         });
@@ -268,8 +272,11 @@ export class LODMesh {
         // let the chunk create or re-upload it as its version warrants.
         // Absent when this build skipped them. A null water map means dry.
         if (splat) this.chunk.populateSplat(renderer, splat, version);
-        if (water !== undefined)
-          this.chunk.populateWater(renderer, water, version, waterEditVersion);
+        if (
+          water !== undefined &&
+          this.chunk.populateWater(renderer, water, version, waterInputVersion)
+        )
+          renderer.terrainRenderer.wetChanged(this.chunk.coord);
 
         if (wantsScatter)
           this.chunk.populateScatter(

@@ -8,7 +8,7 @@ import { generateSplatMap } from '../Splat';
 import { PaintMask } from '../PaintMask';
 import { ScatterKillSet } from '../ScatterKillSet';
 import { ScatterInstances, scatterChunk } from '../Scatter';
-import { WaterMap, buildWaterMap } from '../WaterMap';
+import { NeighbourWet, WaterMap, buildWaterMap } from '../WaterMap';
 import { WaterEdit } from '../WaterEdit';
 import { Vector2 } from 'rewild-common';
 import { extractApronRing } from '../ApronRing';
@@ -50,6 +50,9 @@ export interface BuildChunkMeshRequest {
   // The chunk's authored water, blended over the generated water map and read
   // by placement's water conditions.
   waterEdit?: WaterEdit;
+  // The loaded neighbours' wet texels, read past the chunk's edges by the
+  // water map's shore distance in place of the generated ones.
+  neighbourWet?: NeighbourWet;
   // The chunk already holds a splat map / water map for these heights and
   // edits, so this build leaves them out. Both are chunk-wide, not per LOD.
   skipSplat?: boolean;
@@ -266,7 +269,8 @@ export function buildChunkMesh(
       climate,
       seaLevel,
       heights,
-      request.waterEdit ?? null
+      request.waterEdit ?? null,
+      request.neighbourWet ?? null
     );
     lap('water');
   }

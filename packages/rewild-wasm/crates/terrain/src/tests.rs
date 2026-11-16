@@ -702,8 +702,10 @@ mod lakes {
 mod water {
     use super::lakes::{along, ground, lake_climate, AREA};
     use super::*;
-    use crate::water::{build_map, resolve, to_f16, WaterEdit, WaterPoint, EDIT_CHANNELS, SWASH_REACH, WET_BAND_REACH};
-    use crate::{Lake, Lakes};
+    use crate::water::{
+        build_map, resolve, to_f16, WaterEdit, WaterPoint, EDIT_CHANNELS, SHORE_CAP, SWASH_REACH, WET_BAND_REACH,
+    };
+    use crate::{Lake, Lakes, NeighbourWet};
 
     const CHUNK: usize = 65;
     const STEP: usize = 4;
@@ -744,9 +746,9 @@ mod water {
     #[test]
     fn is_none_inland_and_where_the_ground_stands_above_the_sea() {
         let inland = with_coast(-1.0);
-        assert!(build_map(&inland, CHUNK, STEP, 0.0, 0.0, &flat(-5.0), None).is_none());
+        assert!(build_map(&inland, CHUNK, STEP, 0.0, 0.0, &flat(-5.0), None, NeighbourWet::default()).is_none());
         let sea = with_coast(2.0);
-        assert!(build_map(&sea, CHUNK, STEP, 0.0, 0.0, &flat(5.0), None).is_none());
+        assert!(build_map(&sea, CHUNK, STEP, 0.0, 0.0, &flat(5.0), None, NeighbourWet::default()).is_none());
     }
 
     #[test]
@@ -754,7 +756,7 @@ mod water {
         let sea = with_coast(2.0);
         let mut heights = flat(5.0);
         heights[3 + 5 * CHUNK] = -1.0;
-        assert!(build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None).unwrap().shows);
+        assert!(build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None, NeighbourWet::default()).unwrap().shows);
     }
 
     #[test]
@@ -762,7 +764,7 @@ mod water {
         let sea = with_coast(2.0);
         let mut heights = flat(5.0);
         heights[3 + 5 * CHUNK] = ((SWASH_REACH + WET_BAND_REACH) / 2.0) as f32;
-        let map = build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None).unwrap();
+        let map = build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None, NeighbourWet::default()).unwrap();
         assert!(!map.shows);
     }
 
@@ -770,7 +772,7 @@ mod water {
     fn stores_terrain_heights_relative_to_the_base_level() {
         let sea = HeightGenerator::new(with_coast(2.0).climate().clone(), 9001.0, 1000.0, 2.0).unwrap();
         let heights: Vec<f32> = (0..CHUNK * CHUNK).map(|i| 1000.0 - 3.0 + (i % 7) as f32 * 0.9).collect();
-        let map = build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None).unwrap();
+        let map = build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None, NeighbourWet::default()).unwrap();
         assert_eq!(map.base_level, 1000.0);
         for my in 0..TEXELS {
             for mx in 0..TEXELS {
@@ -779,6 +781,95 @@ mod water {
                 assert!((from_f16(map.heights[mx + my * TEXELS]) - source).abs() < 0.002);
             }
         }
+    }
+
+    // Metres between texels in `with_coast` worlds.
+    const TEXEL_M: f64 = STEP as f64 * 2.0;
+
+    #[test]
+    fn measures_shore_distance_rising_from_the_coast() {
+        let sea = with_coast(2.0);
+        let mut heights = flat(-5.0);
+        for y in 0..CHUNK {
+            for x in 0..=8 {
+                heights[x + y * CHUNK] = 5.0;
+            }
+        }
+        let map = build_map(&sea, CHUNK, STEP, 0.0, 0.0, &heights, None, NeighbourWet::default()).unwrap();
+        let row = TEXELS / 2;
+        for mx in 0..TEXELS {
+            let expected = if mx <= 2 { 0.0 } else { (mx - 2) as f64 * TEXEL_M };
+            assert_eq!(map.shore[mx + row * TEXELS] as f64, expected, "texel {mx}");
+        }
+    }
+
+    #[test]
+    fn caps_shore_distance_in_open_water() {
+        let sea = with_coast(2.0);
+        let map = build_map(&sea, CHUNK, STEP, 0.0, 0.0, &flat(-30.0), None, NeighbourWet::default()).unwrap();
+        assert!(map.shore.iter().all(|&d| d as f64 == SHORE_CAP));
+    }
+
+    #[test]
+    fn reads_a_neighbours_wet_texels_over_the_generated_ones() {
+        let sea = with_coast(2.0);
+        let mut island = flat(-30.0);
+        for y in 0..CHUNK {
+            for x in 56..CHUNK {
+                island[x + y * CHUNK] = 5.0;
+            }
+        }
+        let left = build_map(&sea, CHUNK, STEP, 0.0, 0.0, &island, None, NeighbourWet::default()).unwrap();
+        assert_eq!(left.wet[TEXELS - 1], 0);
+        assert_eq!(left.wet[0], 1);
+
+        let mut planes = vec![0u8; 9 * TEXELS * TEXELS];
+        planes[3 * TEXELS * TEXELS..4 * TEXELS * TEXELS].copy_from_slice(&left.wet);
+        let neighbours = NeighbourWet { wet: &planes, present: 1 << 3 };
+        // The shared edge is the same ground in both chunks.
+        let mut beside = flat(-30.0);
+        for y in 0..CHUNK {
+            beside[y * CHUNK] = 5.0;
+        }
+        let span = (CHUNK - 1) as f64;
+        let right = build_map(&sea, CHUNK, STEP, span, 0.0, &beside, None, neighbours).unwrap();
+        let alone = build_map(&sea, CHUNK, STEP, span, 0.0, &flat(-30.0), None, NeighbourWet::default()).unwrap();
+        let row = TEXELS / 2;
+        for mx in 1..6 {
+            assert_eq!(right.shore[mx + row * TEXELS] as f64, mx as f64 * TEXEL_M, "texel {mx}");
+            assert_eq!(alone.shore[mx + row * TEXELS] as f64, SHORE_CAP);
+        }
+    }
+
+    #[test]
+    fn counts_dry_ground_in_the_next_chunk() {
+        let mut c = lake_climate();
+        c.continent.as_mut().unwrap().scale = 40.0;
+        c.continent.as_mut().unwrap().coast = 0.5;
+        c.lakes = None;
+        let g = ground(c);
+        let span = (CHUNK - 1) as f64;
+        let chunk = |ox: f64, oy: f64| {
+            let heights = g.generate(CHUNK, CHUNK, ox, oy);
+            build_map(&g, CHUNK, STEP, ox, oy, &heights, None, NeighbourWet::default())
+        };
+        let mut compared = 0;
+        for k in 0..12 {
+            let (ox, oy) = (k as f64 * span, 0.0);
+            let (Some(left), Some(right)) = (chunk(ox, oy), chunk(ox + span, oy)) else {
+                continue;
+            };
+            for i in 0..TEXELS {
+                let a = left.shore[i * TEXELS + TEXELS - 1] as f64;
+                let b = right.shore[i * TEXELS] as f64;
+                if a == 0.0 && b == 0.0 || a == SHORE_CAP && b == SHORE_CAP {
+                    continue;
+                }
+                assert_eq!(a, b, "offset {ox}");
+                compared += 1;
+            }
+        }
+        assert!(compared > 0, "no shared edge crosses a coast");
     }
 
     #[test]

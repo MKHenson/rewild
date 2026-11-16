@@ -23,6 +23,7 @@ import {
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { TextureProperties } from '../../textures/Texture';
 import type { WaterMap } from './WaterMap';
+import { WATER_MAP_STEP } from './WaterMap';
 import {
   WaterEdit,
   WaterEditProvider,
@@ -156,8 +157,15 @@ export class TerrainChunk implements IComponent {
   // Bumped when `waterEdit` changes, so the water map and the instances
   // rebuild from it.
   waterEditVersion = 0;
-  // The waterEditVersion the resident water map was built from.
-  private waterEditBuilt = 0;
+  // Bumped when a neighbour's wet texels change, so the water map rebuilds
+  // its shore distance from them.
+  shoreInputVersion = 0;
+  // The waterInputVersion the resident water map was built from.
+  private waterInputBuilt = 0;
+  // 1 where water stands per water map texel, from the resident water map;
+  // all 0 when it is dry. Null before the first water build. Neighbours read
+  // it for their shore distance.
+  wetMask: Uint8Array | null = null;
   private waterEditLookup: Promise<WaterEdit | null> | null = null;
   private waterEditResolved = false;
   // `water` on the GPU, for the water and the terrain's wet band.
@@ -531,18 +539,26 @@ export class TerrainChunk implements IComponent {
   }
 
   // Adopts a worker-built water map for the heights at `version` and the water
-  // edit at `editVersion`. Both only rise, so their sum orders the builds; older
-  // or equal ones are ignored, on the same terms as populateSplat.
+  // inputs at `inputVersion`. Both only rise, so their sum orders the builds;
+  // older or equal ones are ignored, on the same terms as populateSplat.
+  // Returns true when the wet texels of an edited chunk changed, so the
+  // neighbours' shore distances, which read the seed in place of an edit
+  // they have not seen, must rebuild.
   populateWater(
     renderer: Renderer,
     water: WaterMap | null,
     version: number,
-    editVersion: number
-  ) {
-    if (version + editVersion <= this.waterVersion) return;
-    this.waterVersion = version + editVersion;
-    this.waterEditBuilt = editVersion;
+    inputVersion: number
+  ): boolean {
+    if (version + inputVersion <= this.waterVersion) return false;
+    this.waterVersion = version + inputVersion;
+    this.waterInputBuilt = inputVersion;
     this.water = water;
+    const wet = water
+      ? water.wet
+      : new Uint8Array(paintMaskSize(this.chunkSize, WATER_MAP_STEP) ** 2);
+    const changed = !this.wetMask || !sameBytes(this.wetMask, wet);
+    this.wetMask = wet;
 
     if (water) {
       this.waterTextures ??= new WaterMapTextures();
@@ -575,6 +591,7 @@ export class TerrainChunk implements IComponent {
       this.waterTextures?.dispose();
       this.waterTextures = null;
     }
+    return changed && (this.heightsAreEdited || this.waterEdit !== null);
   }
 
   /** Gives a terrain pass the chunk's water map, for its wet band. */
@@ -660,18 +677,28 @@ export class TerrainChunk implements IComponent {
     this.scatterInputVersion++;
   }
 
-  // The resident water map predates the latest water edit.
+  // Marks the water map stale after a neighbour's wet texels changed.
+  bumpShoreInputVersion() {
+    this.shoreInputVersion++;
+  }
+
+  // Everything besides the heights the water map is built from. Only rises.
+  get waterInputVersion(): number {
+    return this.waterEditVersion + this.shoreInputVersion;
+  }
+
+  // The resident water map predates the latest water edit or neighbour change.
   waterIsStale(): boolean {
-    return this.waterEditBuilt !== this.waterEditVersion;
+    return this.waterInputBuilt !== this.waterInputVersion;
   }
 
   // The resident water map was built from the heights at `version` and the
-  // water edit at `editVersion`, so a build can leave the water out. Both
+  // water inputs at `inputVersion`, so a build can leave the water out. Both
   // versions only rise, so a sum at least as high means both match.
-  waterIsCurrent(version: number, editVersion: number): boolean {
+  waterIsCurrent(version: number, inputVersion: number): boolean {
     return (
-      this.waterVersion >= version + editVersion &&
-      this.waterEditBuilt === editVersion
+      this.waterVersion >= version + inputVersion &&
+      this.waterInputBuilt === inputVersion
     );
   }
 
@@ -897,6 +924,7 @@ export class TerrainChunk implements IComponent {
     this.waterTextures?.dispose();
     this.waterTextures = null;
     this.water = null;
+    this.wetMask = null;
     this.waterVersion = -1;
     this.scatter?.dispose();
     this.scatter = null;
@@ -1033,4 +1061,10 @@ export class TerrainChunk implements IComponent {
   get visible() {
     return this._visible;
   }
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }

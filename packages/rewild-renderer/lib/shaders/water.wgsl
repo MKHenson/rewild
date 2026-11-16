@@ -37,6 +37,10 @@ const WATER_F0: f32 = 0.02;
 // Floor on N·V for the slant path through the water, so a grazing view does
 // not read as infinitely deep.
 const MIN_PATH_NOV: f32 = 0.1;
+// Metres of shore distance the debug view spans, SHORE_CAP in WaterMap.ts.
+const SHORE_DISTANCE_CAP: f32 = 255.0;
+// Metres between the debug view's contour lines.
+const SHORE_DISTANCE_BAND: f32 = 32.0;
 
 // Air over water's index of refraction, and water over air's.
 const AIR_TO_WATER: f32 = 0.75;
@@ -342,6 +346,17 @@ fn shoreDebug(rest: vec2f, depth: f32) -> vec3f {
   let wobble = shoreNoise(rest, SHORE_NOISE_CELL, SHORE_NOISE_CELLS, 0u).x * SHORE_WOBBLE;
   let crest = step(0.7, cos(shorePhase(0, shore.x, wobble))) * fade;
   return vec3f(fade, crest * 0.8, reached * 0.4);
+}
+
+// Shore distance painted for the debug view: red at the coast, green half way
+// to the cap, blue at it, with a dark line every SHORE_DISTANCE_BAND metres.
+fn shoreDistanceDebug(uv: vec2f) -> vec3f {
+  let metres = textureSampleLevel(surfaceMap, surfaceSampler, surfaceUV(uv), 0.0).a;
+  let t = saturate(metres / SHORE_DISTANCE_CAP);
+  let near = mix(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), saturate(t * 2.0));
+  let far = mix(vec3f(0.0, 1.0, 0.0), vec3f(0.0, 0.0, 1.0), saturate(t * 2.0 - 1.0));
+  let line = 1.0 - 0.6 * step(fract(metres / SHORE_DISTANCE_BAND), 0.08);
+  return select(far, near, t < 0.5) * line;
 }
 
 // How a pixel's rest position changes across the screen. Taken before any
@@ -788,6 +803,9 @@ fn fs_absorb(input: VertexOutput, @builtin(front_facing) front: bool) -> @locati
   // Foam hides the water beneath it.
   let foam = waterFoam(ocean, footprint.size, water);
   let passed = (1.0 - waterFresnel(NoV)) * waterTransmittance(water, NoV) * (1.0 - foam);
+  if (waves.origin.w < -0.5) {
+    return vec4f(shoreDistanceDebug(input.uv), 1.0);
+  }
   if (waves.origin.w > 2.5) {
     return vec4f(refractionDebug(input, water, NoV, waves.origin.w - 2.0), 1.0);
   }
@@ -869,7 +887,7 @@ fn fs_light(input: VertexOutput, @builtin(front_facing) front: bool) -> @locatio
   if (water.coverage <= 0.0 || !facesCamera(front, input.viewPosition)) {
     discard;
   }
-  if (waves.origin.w > 2.5) {
+  if (waves.origin.w > 2.5 || waves.origin.w < -0.5) {
     return vec4f(0.0, 0.0, 0.0, 1.0);
   }
   if (waves.origin.w > 1.5) {
