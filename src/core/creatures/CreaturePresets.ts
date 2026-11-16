@@ -80,6 +80,8 @@ export interface MovementSettings {
   climbSpeed?: number;
   /** Radians it rolls at its full turn rate. */
   bank?: number;
+  /** Radians it tilts its nose toward its climb, at most. Needs `climbSpeed`. */
+  pitch?: number;
   modes: {
     wander?: WanderSettings;
     evade?: SeekSettings;
@@ -162,6 +164,7 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
       acceleration: 1.5,
       cruiseSpeed: 1,
       climbSpeed: 0.6,
+      pitch: 0.4,
       modes: {
         wander: { radius: 15, wait: [0, 0], actions: [] },
       },

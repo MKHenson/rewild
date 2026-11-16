@@ -311,6 +311,51 @@ describe('MovementSystem swimming', () => {
     expect(system.z).toBeGreaterThan(0);
   });
 
+  it('tilts its nose up as it climbs, and levels out at its height', () => {
+    const world = new TestWorld();
+    world.height = () => -20;
+    world.depth = () => 20;
+    const habitat = new WaterHabitat(
+      { type: 'water', bedMargin: 0.5, surfaceMargin: 0.5 },
+      world
+    );
+    const mode = new GoalMode('a');
+    const system = new MovementSystem({ ...SWIM, pitch: 0.4 }, habitat, world, [
+      mode,
+    ]);
+    system.place(0, -19, 0, 0);
+    mode.goalZ = 500;
+    system.goalLevel = 1;
+    for (let t = 0; t < 3; t += 0.05) system.update(0.05);
+    expect(system.pitch).toBeGreaterThan(0.1);
+    expect(system.pitch).toBeLessThanOrEqual(0.4);
+
+    const transform = new Transform();
+    system.applyTo(transform);
+    transform.updateMatrix();
+    const forward = new Vector3(0, 0, 1).applyQuaternion(transform.quaternion);
+    expect(forward.y).toBeGreaterThan(0.1);
+    expect(forward.z).toBeGreaterThan(0.5);
+
+    for (let t = 0; t < 80; t += 0.05) system.update(0.05);
+    expect(Math.abs(system.pitch)).toBeLessThan(0.02);
+  });
+
+  it('stays level without a pitch limit', () => {
+    const { mode, system } = swimmer();
+    system.place(0, -5, 0, 0);
+    mode.goalZ = 200;
+    system.goalLevel = 1;
+    for (let t = 0; t < 3; t += 0.05) system.update(0.05);
+    expect(system.pitch).toBe(0);
+  });
+
+  it('measures the player in 3D', () => {
+    const { system } = swimmer();
+    system.place(0, -3, 0, 0);
+    expect(system.distanceTo(3, 1, 0)).toBeCloseTo(5);
+  });
+
   it('turns back at the shore', () => {
     const { world, mode, system } = swimmer();
     world.depth = (_x, z) => (z < 5 ? 6 : 0);

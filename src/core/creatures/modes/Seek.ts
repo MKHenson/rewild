@@ -30,10 +30,8 @@ export class Seek implements IMovementMode {
       this.engaged = false;
       return 0;
     }
-    const distance = Math.hypot(
-      this.player.x - system.x,
-      this.player.z - system.z
-    );
+    const { player } = this;
+    const distance = system.distanceTo(player.x, player.y, player.z);
     const { radius, release } = this.settings;
     this.engaged = distance < (this.engaged ? release : radius);
     return this.engaged ? 2 : 0;

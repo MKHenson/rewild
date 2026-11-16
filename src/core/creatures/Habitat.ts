@@ -35,6 +35,8 @@ export interface HeightRange {
 export interface Habitat {
   /** Never falls. */
   readonly flies?: boolean;
+  /** Moves in 3D, so modes measure the player in 3D. */
+  readonly swims?: boolean;
   /** Seconds of travel ahead to check `heightRange` for rising ground. */
   readonly lookAhead?: number;
   canBe(x: number, z: number): boolean;
@@ -121,6 +123,7 @@ export class LandHabitat implements Habitat {
 }
 
 export class WaterHabitat implements Habitat {
+  readonly swims = true;
   private readonly water = createWaterQuerySample();
   private readonly range: HeightRange = { min: 0, max: 0 };
 

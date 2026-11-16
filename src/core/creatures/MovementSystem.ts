@@ -1,5 +1,5 @@
 import { LocomotionSetName } from 'models';
-import { Quaternion, Vector3 } from 'rewild-common';
+import { EulerRotationOrder, Quaternion, Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
 import { BehaviourState } from 'rewild-routing';
 import { MovementSettings } from './CreaturePresets';
@@ -43,6 +43,8 @@ const LOOK_AHEAD_SAMPLES = 2;
 const HEIGHT_RESPONSE = 1;
 /** Seconds a roll takes to settle. */
 const ROLL_SMOOTHING = 0.4;
+/** Seconds a pitch takes to settle. */
+const PITCH_SMOOTHING = 0.3;
 
 const TWO_PI = Math.PI * 2;
 const _forward = new Vector3();
@@ -71,6 +73,8 @@ export class MovementSystem {
   verticalSpeed = 0;
   /** Radians about the creature's forward axis. */
   roll = 0;
+  /** Radians nose up. */
+  pitch = 0;
   /** Where in its height range it aims, 0 lowest to 1 highest. */
   goalLevel = 0.5;
   /** It is in the wrong medium. */
@@ -114,6 +118,14 @@ export class MovementSystem {
     return this.habitat.flies ? Math.max(0, this.verticalSpeed) : 0;
   }
 
+  /** Metres to a point: in 3D for a creature whose habitat `swims`, else flat. */
+  distanceTo(x: number, y: number, z: number): number {
+    const dx = x - this.x;
+    const dz = z - this.z;
+    if (!this.habitat.swims) return Math.hypot(dx, dz);
+    return Math.hypot(dx, y - this.y, dz);
+  }
+
   /** Puts the creature at rest at a point, which becomes its home. */
   place(x: number, y: number, z: number, heading: number): void {
     this.x = this.homeX = x;
@@ -123,6 +135,7 @@ export class MovementSystem {
     this.speed = 0;
     this.verticalSpeed = 0;
     this.roll = 0;
+    this.pitch = 0;
     this.blocked = false;
     this.stranded = false;
     this.active = null;
@@ -171,10 +184,10 @@ export class MovementSystem {
   applyTo(transform: Transform): void {
     transform.position.set(this.x, this.y, this.z);
     transform.rotation.set(
-      0,
+      -this.pitch,
       this.heading,
       this.roll,
-      transform.rotation.order
+      EulerRotationOrder.YXZ
     );
   }
 
@@ -274,6 +287,15 @@ export class MovementSystem {
 
     this.updateRoll(before, dt);
     this.updateHeight(dt);
+    this.updatePitch(dt);
+  }
+
+  private updatePitch(dt: number): void {
+    const limit = this.settings.pitch;
+    if (!limit) return;
+    const climb = Math.atan2(this.verticalSpeed, this.speed);
+    const target = this.stranded ? 0 : Math.max(-limit, Math.min(limit, climb));
+    this.pitch += (target - this.pitch) * (1 - Math.exp(-dt / PITCH_SMOOTHING));
   }
 
   private updateRoll(before: number, dt: number): void {
