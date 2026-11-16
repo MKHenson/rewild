@@ -1,0 +1,118 @@
+body {
+  display: flex;
+  background: var(--background);
+  color: var(--on-background);
+  font-size: var(--font-size-m);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 220px;
+  flex-shrink: 0;
+  padding: var(--space-4);
+  box-sizing: border-box;
+  border-right: 1px solid var(--on-surface-border);
+  background: var(--surface);
+}
+
+.title {
+  font-size: var(--font-size-l);
+  font-weight: 500;
+}
+
+#parts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex-grow: 1;
+}
+
+#parts a {
+  padding: var(--space-2);
+  border-radius: 4px;
+  color: var(--on-surface);
+  text-decoration: none;
+}
+
+#parts a:hover {
+  background: var(--subtle-400);
+}
+
+#parts a.active {
+  background: var(--primary-400);
+  color: var(--on-primary-400);
+}
+
+#tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--on-surface-light);
+  font-size: var(--font-size-s);
+}
+
+#examples {
+  flex-grow: 1;
+  overflow: auto;
+  padding: var(--space-5);
+}
+
+#examples h1 {
+  margin: 0 0 var(--space-4);
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.example {
+  margin-bottom: var(--space-6);
+}
+
+.example h2 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-l);
+  font-weight: 500;
+}
+
+.example .description {
+  margin: 0 0 var(--space-3);
+  color: var(--on-surface-light);
+}
+
+.sides {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.side {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+}
+
+.pane {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--on-surface-border);
+  background: var(--surface);
+}
+
+.pane canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.side figcaption {
+  margin-top: var(--space-1);
+  color: var(--on-surface-lighter);
+  font-size: var(--font-size-s);
+}

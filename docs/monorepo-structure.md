@@ -9,6 +9,7 @@
 | `rewild-common`   | Shared constants, event dispatcher, enums                                 |
 | `rewild-routing`  | Game state machine and routing types                                      |
 | `rewild-audio`    | Web Audio engine: the audio context, bus graph and mixer                  |
+| `rewild-gpu-ui`   | GPU UI drawn by WebGPU for in-game screens, and the UI inspector          |
 | `rewild-wasm`     | Rust crates compiled to one WASM module (docs/milestones/rust.md)         |
 
 ## Build & Dev Commands
@@ -21,6 +22,7 @@ npm run server         # live-server on :9001
 npm run test           # Jest (root + all workspaces)
 npm run unit-tests     # Jest (root only)
 npm run ts-check       # TypeScript type-check only
+npm run ui-inspector   # UI inspector on :9002: GPU UI examples beside their DOM versions
 npm run bench          # Benchmark the worker code (see packages/rewild-renderer/bench/run.mjs)
 npm run bench:game     # Benchmark the game's main-thread systems (src/bench/main.ts)
 npm run build:wasm     # Build the Rust/WASM module (see docs/milestones/rust.md)

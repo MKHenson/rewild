@@ -1,0 +1,230 @@
+import { UICanvas } from '../lib';
+import { parseComputedColor } from './cssColor';
+import { Example, ExampleRegistry } from './registry';
+import {
+  InspectorSettings,
+  PIXEL_RATIOS,
+  PixelRatioChoice,
+  resolvePixelRatio,
+  saveSettings,
+} from './settings';
+
+const DEFAULT_HEIGHT = 240;
+
+/** One example, drawn by Mica on the left and as DOM elements on the right. */
+class ExampleCard {
+  readonly element: HTMLElement;
+  readonly canvas: UICanvas;
+  private micaPane: HTMLElement;
+  private micaCaption: HTMLElement;
+  private observer: ResizeObserver;
+
+  constructor(
+    device: GPUDevice,
+    example: Example,
+    private getPixelRatio: () => number,
+    private requestDraw: () => void
+  ) {
+    this.element = el('section', 'example');
+    const title = el('h2');
+    title.textContent = example.name;
+    this.element.append(title);
+    if (example.description) {
+      const description = el('p', 'description');
+      description.textContent = example.description;
+      this.element.append(description);
+    }
+
+    const sides = el('div', 'sides');
+    const height = `${example.height ?? DEFAULT_HEIGHT}px`;
+
+    const mica = el('figure', 'side');
+    this.micaPane = el('div', 'pane');
+    this.micaPane.style.height = height;
+    const canvasElement = el('canvas') as HTMLCanvasElement;
+    this.micaPane.append(canvasElement);
+    this.micaCaption = el('figcaption');
+    mica.append(this.micaPane, this.micaCaption);
+
+    const dom = el('figure', 'side');
+    const domPane = el('div', 'pane');
+    domPane.style.height = height;
+    const domCaption = el('figcaption');
+    domCaption.textContent = 'DOM';
+    dom.append(domPane, domCaption);
+
+    sides.append(mica, dom);
+    this.element.append(sides);
+
+    this.canvas = new UICanvas(device, canvasElement);
+    example.build({ dom: domPane, canvas: this.canvas });
+
+    this.observer = new ResizeObserver(() => this.resize());
+    this.observer.observe(this.micaPane);
+  }
+
+  resize(): void {
+    const { width, height } = this.micaPane.getBoundingClientRect();
+    this.canvas.resize(width, height, this.getPixelRatio());
+    const { canvas } = this.canvas;
+    this.micaCaption.textContent = `Mica · ${canvas.width} × ${canvas.height} px at ${this.canvas.pixelRatio}x`;
+    this.requestDraw();
+  }
+
+  draw(): void {
+    const background = getComputedStyle(this.micaPane).backgroundColor;
+    this.canvas.clear(parseComputedColor(background));
+  }
+
+  dispose(): void {
+    this.observer.disconnect();
+    this.canvas.dispose();
+  }
+}
+
+export class Inspector {
+  private cards: ExampleCard[] = [];
+  private drawPending = false;
+  private part = '';
+  private stopWatchingScreen: () => void = () => {};
+
+  constructor(
+    private device: GPUDevice,
+    private registry: ExampleRegistry,
+    private settings: InspectorSettings,
+    private nav: HTMLElement,
+    private tools: HTMLElement,
+    private main: HTMLElement
+  ) {
+    this.buildTools();
+    this.applyTheme();
+    this.watchScreenRatio();
+    window.addEventListener('hashchange', () => this.showPart(this.hashPart()));
+    this.showPart(this.hashPart());
+  }
+
+  private hashPart(): string {
+    const fromHash = decodeURIComponent(location.hash.slice(1));
+    const parts = this.registry.parts();
+    return parts.includes(fromHash) ? fromHash : parts[0] ?? '';
+  }
+
+  private showPart(part: string): void {
+    this.part = part;
+    this.buildNav();
+    for (const card of this.cards) card.dispose();
+    this.main.replaceChildren();
+    this.cards = this.registry.examples(part).map(
+      (example) =>
+        new ExampleCard(
+          this.device,
+          example,
+          () => resolvePixelRatio(this.settings.pixelRatio),
+          () => this.requestDraw()
+        )
+    );
+    const heading = el('h1');
+    heading.textContent = part;
+    this.main.append(heading, ...this.cards.map((card) => card.element));
+  }
+
+  private buildNav(): void {
+    this.nav.replaceChildren(
+      ...this.registry.parts().map((part) => {
+        const link = el('a') as HTMLAnchorElement;
+        link.href = `#${encodeURIComponent(part)}`;
+        link.textContent = `${part} (${this.registry.examples(part).length})`;
+        link.classList.toggle('active', part === this.part);
+        return link;
+      })
+    );
+  }
+
+  private buildTools(): void {
+    const theme = select(
+      'Theme',
+      [
+        ['dark', 'Dark'],
+        ['light', 'Light'],
+      ],
+      this.settings.theme,
+      (value) => {
+        this.settings.theme = value === 'light' ? 'light' : 'dark';
+        this.applyTheme();
+      }
+    );
+    const ratio = select(
+      'Pixel ratio',
+      PIXEL_RATIOS.map((r) => [String(r), r === 'screen' ? 'Screen' : `${r}x`]),
+      String(this.settings.pixelRatio),
+      (value) => {
+        this.settings.pixelRatio = (
+          value === 'screen' ? 'screen' : Number(value)
+        ) as PixelRatioChoice;
+        saveSettings(this.settings);
+        this.resizeAll();
+      }
+    );
+    this.tools.replaceChildren(theme, ratio);
+  }
+
+  private applyTheme(): void {
+    document.documentElement.dataset.theme = this.settings.theme;
+    saveSettings(this.settings);
+    this.requestDraw();
+  }
+
+  /** A `screen` ratio changes when the window moves to another display or zooms. */
+  private watchScreenRatio(): void {
+    this.stopWatchingScreen();
+    const query = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    const onChange = () => {
+      this.watchScreenRatio();
+      if (this.settings.pixelRatio === 'screen') this.resizeAll();
+    };
+    query.addEventListener('change', onChange, { once: true });
+    this.stopWatchingScreen = () =>
+      query.removeEventListener('change', onChange);
+  }
+
+  private resizeAll(): void {
+    for (const card of this.cards) card.resize();
+  }
+
+  private requestDraw(): void {
+    if (this.drawPending) return;
+    this.drawPending = true;
+    requestAnimationFrame(() => {
+      this.drawPending = false;
+      for (const card of this.cards) card.draw();
+    });
+  }
+}
+
+function el(tag: string, className?: string): HTMLElement {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  return element;
+}
+
+function select(
+  label: string,
+  options: [string, string][],
+  value: string,
+  onChange: (value: string) => void
+): HTMLElement {
+  const wrapper = el('label', 'tool');
+  const text = el('span');
+  text.textContent = label;
+  const input = el('select') as HTMLSelectElement;
+  for (const [optionValue, optionLabel] of options) {
+    const option = el('option') as HTMLOptionElement;
+    option.value = optionValue;
+    option.textContent = optionLabel;
+    input.append(option);
+  }
+  input.value = value;
+  input.addEventListener('change', () => onChange(input.value));
+  wrapper.append(text, input);
+  return wrapper;
+}

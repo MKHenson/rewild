@@ -1,0 +1,12 @@
+{
+  "name": "rewild-gpu-ui",
+  "version": "1.0.0",
+  "description": "GPU UI: nodes, surfaces, flex layout and drawing on WebGPU",
+  "main": "index.ts",
+  "scripts": {
+    "test": "jest",
+    "ts-check": "tsc --noEmit -p tsconfig.json"
+  },
+  "author": "Mathew Henson",
+  "license": "ISC"
+}

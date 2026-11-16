@@ -17,6 +17,7 @@
     "watch": "npm run build:wasm && node ./esbuild.js --watch",
     "start": "npm run build:wasm && npm-run-all --parallel serve ts-check-watch",
     "serve": "node ./esbuild.js --serve",
+    "ui-inspector": "node packages/rewild-gpu-ui/inspector/serve.mjs",
     "bench": "npm run build:wasm && node packages/rewild-renderer/bench/run.mjs",
     "bench:game": "npm run build:wasm && node packages/rewild-renderer/bench/run.mjs --game",
     "generate:types": "cd server && .\\gradlew.bat generateSpec && npx openapi-typescript ../openapi.json -o ../src/types/api.ts",
@@ -63,6 +64,7 @@
     "packages/rewild-common",
     "packages/rewild-renderer",
     "packages/rewild-audio",
+    "packages/rewild-gpu-ui",
     "tools/scatter-forge"
   ]
 }
