@@ -4,5 +4,10 @@
     "noEmit": true,
     "types": ["jest", "@webgpu/types"]
   },
-  "include": ["index.ts", "lib/**/*.ts", "inspector/**/*.ts"]
+  "include": [
+    "index.ts",
+    "lib/**/*.ts",
+    "inspector/**/*.ts",
+    "types/**/*.d.ts"
+  ]
 }

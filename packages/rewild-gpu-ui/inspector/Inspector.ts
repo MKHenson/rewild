@@ -1,5 +1,6 @@
-import { UICanvas } from '../lib';
+import { UICanvas, UIRenderer } from '../lib';
 import { parseComputedColor } from './cssColor';
+import { mirrorTree } from './domMirror';
 import { Example, ExampleRegistry } from './registry';
 import {
   InspectorSettings,
@@ -15,6 +16,7 @@ const DEFAULT_HEIGHT = 240;
 class ExampleCard {
   readonly element: HTMLElement;
   readonly canvas: UICanvas;
+  private renderer: UIRenderer;
   private micaPane: HTMLElement;
   private micaCaption: HTMLElement;
   private observer: ResizeObserver;
@@ -57,7 +59,13 @@ class ExampleCard {
     this.element.append(sides);
 
     this.canvas = new UICanvas(device, canvasElement);
-    example.build({ dom: domPane, canvas: this.canvas });
+    this.renderer = new UIRenderer(device, this.canvas.format);
+    const surface = this.renderer.createSurface({
+      kind: 'screen',
+      name: example.name,
+    });
+    example.build({ surface });
+    domPane.append(mirrorTree(surface.root));
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(this.micaPane);
@@ -66,18 +74,29 @@ class ExampleCard {
   resize(): void {
     const { width, height } = this.micaPane.getBoundingClientRect();
     this.canvas.resize(width, height, this.getPixelRatio());
-    const { canvas } = this.canvas;
-    this.micaCaption.textContent = `Mica · ${canvas.width} × ${canvas.height} px at ${this.canvas.pixelRatio}x`;
     this.requestDraw();
   }
 
   draw(): void {
+    const { canvas, context, device, pixelRatio } = this.canvas;
     const background = getComputedStyle(this.micaPane).backgroundColor;
-    this.canvas.clear(parseComputedColor(background));
+    const encoder = device.createCommandEncoder({ label: 'inspector' });
+    this.renderer.render(
+      encoder,
+      context.getCurrentTexture().createView(),
+      { width: canvas.width, height: canvas.height, pixelRatio },
+      parseComputedColor(background)
+    );
+    device.queue.submit([encoder.finish()]);
+    const calls = this.renderer.drawCalls;
+    this.micaCaption.textContent = `Mica · ${canvas.width} × ${
+      canvas.height
+    } px at ${pixelRatio}x · ${calls} draw call${calls === 1 ? '' : 's'}`;
   }
 
   dispose(): void {
     this.observer.disconnect();
+    this.renderer.dispose();
     this.canvas.dispose();
   }
 }

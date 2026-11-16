@@ -36,22 +36,6 @@ export class UICanvas {
     return true;
   }
 
-  clear(color: GPUColor): void {
-    const encoder = this.device.createCommandEncoder({ label: 'ui-clear' });
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [
-        {
-          view: this.context.getCurrentTexture().createView(),
-          clearValue: color,
-          loadOp: 'clear',
-          storeOp: 'store',
-        },
-      ],
-    });
-    pass.end();
-    this.device.queue.submit([encoder.finish()]);
-  }
-
   dispose(): void {
     this.context.unconfigure();
   }
