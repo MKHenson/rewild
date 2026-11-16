@@ -1,7 +1,7 @@
 import type { PaintMask } from './PaintMask';
 import type { ScatterKillSet } from './ScatterKillSet';
 import type { ScatterInstances } from './Scatter';
-import type { WaterMap } from './WaterMap';
+import type { NeighbourWet, WaterMap } from './WaterMap';
 import type { WaterEdit } from './WaterEdit';
 
 interface TerrainWorkerRequest {
@@ -38,6 +38,10 @@ interface TerrainWorkerRequest {
   // The chunk's authored water. Structured-cloned on the same terms as
   // biomeMask.
   waterEdit?: WaterEdit;
+  // The loaded neighbours' wet texels, for the shore distance. Built per
+  // request, so it could be transferred, but at nine small planes the clone
+  // costs little.
+  neighbourWet?: NeighbourWet;
   // The chunk already holds a current splat / water map, so the build leaves
   // them out. See BuildChunkMeshRequest.
   skipSplat?: boolean;

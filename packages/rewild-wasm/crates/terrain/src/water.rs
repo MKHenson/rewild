@@ -10,7 +10,7 @@ use crate::climate::{ocean_coverage, ClimateGrid};
 use crate::config::ContinentConfig;
 use crate::lakes::{field_origin, Lake, Lakes, LEVEL_REACH, OCEAN_BODY_ID};
 use crate::HeightGenerator;
-use math::{fast_max, smoothstep};
+use math::{fast_max, fast_min, smoothstep};
 
 /// Water types a water map blends: one RGBA8 texel.
 pub const MAX_WATER_TYPES: usize = 4;
@@ -21,6 +21,35 @@ pub const SWASH_REACH: f64 = 1.5;
 /// Metres above a covered level within which a chunk keeps its water map for
 /// the terrain's wet band, though no water shows.
 pub const WET_BAND_REACH: f64 = 2.0;
+
+/// Metres past which all water counts as open: shore distances stop here.
+pub const SHORE_CAP: f64 = 255.0;
+
+/// The wet texels of a chunk's neighbours, which the shore distance reads in
+/// place of the generated water and ground. Slot `(dy + 1) * 3 + dx + 1` holds
+/// the neighbour `dx` texel columns and `dy` texel rows over, as a `size` ×
+/// `size` plane of `wet` with 1 where water stands; bit `slot` of `present`
+/// says the plane is there.
+#[derive(Clone, Copy, Default)]
+pub struct NeighbourWet<'a> {
+    pub wet: &'a [u8],
+    pub present: u32,
+}
+
+impl NeighbourWet<'_> {
+    /// Whether water stands at texel (`mx`, `my`) of the chunk's texel grid
+    /// extended past its edges, or None where no neighbour plane covers it.
+    fn at(&self, size: usize, mx: isize, my: isize) -> Option<bool> {
+        let last = size as isize - 1;
+        let side = |m: isize| if m < 0 { (-1, m + last) } else if m > last { (1, m - last) } else { (0, m) };
+        let ((dx, nx), (dy, ny)) = (side(mx), side(my));
+        let slot = ((dy + 1) * 3 + dx + 1) as usize;
+        if slot == 4 || self.present & (1 << slot) == 0 || !(0..=last).contains(&nx) || !(0..=last).contains(&ny) {
+            return None;
+        }
+        Some(self.wet[slot * size * size + nx as usize + ny as usize * size] != 0)
+    }
+}
 
 // A lagoon's water is lake water out to this share of its shore radius, then
 // blends to sea water at the shore.
@@ -343,10 +372,19 @@ pub struct WaterMap {
     pub heights: Vec<u16>,
     /// The first texel each covering body owns, in texel order.
     pub body_texels: Vec<u32>,
+    /// Metres from each texel to the nearest dry texel, up to `SHORE_CAP`. 0
+    /// where the texel is dry.
+    pub shore: Vec<u8>,
+    /// 1 where water stands at the texel: covered, over ground below the
+    /// level. What a neighbour reads through `NeighbourWet`.
+    pub wet: Vec<u8>,
 }
 
 /// The water map of a chunk with LOD-0 `heights`, or None when the ground
 /// everywhere stands `WET_BAND_REACH` or more above the covered levels.
+/// `neighbours` are the wet texels of edited neighbours, for the shore
+/// distance.
+#[allow(clippy::too_many_arguments)]
 pub fn build_map(
     ground: &HeightGenerator,
     chunk_size: usize,
@@ -355,6 +393,7 @@ pub fn build_map(
     offset_y: f64,
     heights: &[f32],
     edit: Option<WaterEdit>,
+    neighbours: NeighbourWet,
 ) -> Option<WaterMap> {
     let climate = ground.climate();
     if climate.continent.is_none() && climate.lakes.is_none() && edit.is_none() {
@@ -426,7 +465,165 @@ pub fn build_map(
         }
     }
 
-    Some(WaterMap { water, base_level, max_level, shows, level, heights: relative, body_texels })
+    let mut wet = vec![0u8; texels];
+    for my in 0..size {
+        for mx in 0..size {
+            let t = mx + my * size;
+            let height = heights[mx * step + my * step * chunk_size] as f64;
+            wet[t] = (water.coverage[t] > 0 && height < water.levels[t]) as u8;
+        }
+    }
+    let shore = shore_distance(ground, chunk_size, step, offset_x, offset_y, &wet, &water, neighbours);
+    Some(WaterMap { water, base_level, max_level, shows, level, heights: relative, body_texels, shore, wet })
+}
+
+/// Metres from each texel of a chunk to the nearest dry texel, capped at
+/// `SHORE_CAP`. Dry ground in neighbouring chunks counts: an apron a cap wide
+/// is read around the chunk, only as far as a texel's distance could reach
+/// past the chunk's edge. It reads a neighbour's own wet texels where
+/// `neighbours` has them, else generated water and un-eroded ground.
+#[allow(clippy::too_many_arguments)]
+fn shore_distance(
+    ground: &HeightGenerator,
+    chunk_size: usize,
+    step: usize,
+    offset_x: f64,
+    offset_y: f64,
+    wet: &[u8],
+    water: &ResolvedWater,
+    neighbours: NeighbourWet,
+) -> Vec<u8> {
+    let size = water.size;
+    let texel = step as f64 * ground.meters_per_sample();
+    let dist_of = |w: u8| if w != 0 { SHORE_CAP } else { 0.0 };
+    let mut dist: Vec<f64> = wet.iter().map(|&w| dist_of(w)).collect();
+    if !wet.iter().any(|&w| w != 0) {
+        return vec![0; size * size];
+    }
+    chamfer(&mut dist, size, texel);
+
+    // Texels of apron each side must read: a texel's distance reaches past
+    // an edge only as far as it exceeds its distance to that edge.
+    let apron = (SHORE_CAP / texel).ceil() as usize;
+    let mut reach = [0usize; 4];
+    for my in 0..size {
+        for mx in 0..size {
+            let d = dist[mx + my * size];
+            if d == 0.0 {
+                continue;
+            }
+            let beyond = |edge: usize| {
+                let k = (d / texel).ceil() as usize;
+                k.saturating_sub(edge + 1).min(apron)
+            };
+            reach[0] = reach[0].max(beyond(mx));
+            reach[1] = reach[1].max(beyond(size - 1 - mx));
+            reach[2] = reach[2].max(beyond(my));
+            reach[3] = reach[3].max(beyond(size - 1 - my));
+        }
+    }
+    if reach.iter().any(|&r| r > 0) {
+        let wide = size + 2 * apron;
+        let field = chunk_size + 2 * apron * step;
+        let mut wide_dist = vec![SHORE_CAP; wide * wide];
+        let origin = field_origin(field, field, offset_x, offset_y);
+        let mut sampler: Option<WaterSampler> = None;
+        let (x0, x1) = (apron - reach[0], apron + size + reach[1]);
+        let (y0, y1) = (apron - reach[2], apron + size + reach[3]);
+        for wy in y0..y1 {
+            for wx in x0..x1 {
+                let w = wx + wy * wide;
+                let inside = (apron..apron + size).contains(&wx) && (apron..apron + size).contains(&wy);
+                if inside {
+                    let t = (wx - apron) + (wy - apron) * size;
+                    if dist[t] == 0.0 {
+                        wide_dist[w] = 0.0;
+                    }
+                    continue;
+                }
+                let (mx, my) = (wx as isize - apron as isize, wy as isize - apron as isize);
+                if let Some(neighbour_wet) = neighbours.at(size, mx, my) {
+                    if !neighbour_wet {
+                        wide_dist[w] = 0.0;
+                    }
+                    continue;
+                }
+                let (x, y) = ((wx * step) as f64, (wy * step) as f64);
+                let sampler = sampler.get_or_insert_with(|| WaterSampler::new(ground, field, offset_x, offset_y, None));
+                let point = sampler.sample(x, y);
+                if point.coverage <= 0.0 {
+                    wide_dist[w] = 0.0;
+                    continue;
+                }
+                let (u, v) = (x + origin.0, y + origin.1);
+                let mut height = ground.height_on(&sampler.grid, u, v);
+                for lake in sampler.lakes() {
+                    height = lake.carve(u, v, height);
+                }
+                if height >= point.level {
+                    wide_dist[w] = 0.0;
+                }
+            }
+        }
+        chamfer(&mut wide_dist, wide, texel);
+        for my in 0..size {
+            for mx in 0..size {
+                dist[mx + my * size] = wide_dist[(mx + apron) + (my + apron) * wide];
+            }
+        }
+    }
+
+    dist.iter().map(|&d| fast_min(d, SHORE_CAP).round() as u8).collect()
+}
+
+/// Two-pass chamfer distance in place over a `size` × `size` grid of `texel`
+/// metre texels: zero texels are the sources, the rest start at their cap.
+fn chamfer(dist: &mut [f64], size: usize, texel: f64) {
+    let diagonal = texel * std::f64::consts::SQRT_2;
+    for y in 0..size {
+        for x in 0..size {
+            let t = x + y * size;
+            let mut d = dist[t];
+            if d == 0.0 {
+                continue;
+            }
+            if x > 0 {
+                d = fast_min(d, dist[t - 1] + texel);
+            }
+            if y > 0 {
+                d = fast_min(d, dist[t - size] + texel);
+                if x > 0 {
+                    d = fast_min(d, dist[t - size - 1] + diagonal);
+                }
+                if x + 1 < size {
+                    d = fast_min(d, dist[t - size + 1] + diagonal);
+                }
+            }
+            dist[t] = d;
+        }
+    }
+    for y in (0..size).rev() {
+        for x in (0..size).rev() {
+            let t = x + y * size;
+            let mut d = dist[t];
+            if d == 0.0 {
+                continue;
+            }
+            if x + 1 < size {
+                d = fast_min(d, dist[t + 1] + texel);
+            }
+            if y + 1 < size {
+                d = fast_min(d, dist[t + size] + texel);
+                if x + 1 < size {
+                    d = fast_min(d, dist[t + size + 1] + diagonal);
+                }
+                if x > 0 {
+                    d = fast_min(d, dist[t + size - 1] + diagonal);
+                }
+            }
+            dist[t] = d;
+        }
+    }
 }
 
 /// IEEE half-precision bits for `value` rounded to f32, then to nearest even,

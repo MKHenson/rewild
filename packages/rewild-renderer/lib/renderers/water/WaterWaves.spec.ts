@@ -56,6 +56,16 @@ describe('WaterWaves', () => {
     expect(waves.cascadeTypes[2]).toBe(0);
   });
 
+  it('packs the debug view, the shore distance before the others', () => {
+    const waves = new WaterWaves();
+    waves.update(PALETTE);
+    const out = new Float32Array(WAVE_UNIFORM_FLOATS);
+    waves.pack(frame({ shoreDebug: true }), out);
+    expect(out[7]).toBe(2);
+    waves.pack(frame({ shoreDebug: true, shoreDistanceDebug: true }), out);
+    expect(out[7]).toBe(-1);
+  });
+
   it('packs the Waves uniform', () => {
     const waves = new WaterWaves();
     waves.update(PALETTE);

@@ -37,6 +37,8 @@ export interface WaterQuerySample {
   /** Flow direction, -1..1 per axis. Zero is still water. */
   flowX: number;
   flowZ: number;
+  /** Metres to dry ground, up to SHORE_CAP; 0 with no water map. */
+  shore: number;
   /** Metres the waves and the swash lift the surface above the level, from
    *  the probe; 0 until it reports. */
   waveHeight: number;
@@ -56,6 +58,7 @@ export function createWaterQuerySample(): WaterQuerySample {
     bodyId: NO_BODY,
     flowX: 0,
     flowZ: 0,
+    shore: 0,
     waveHeight: 0,
     surface: -Infinity,
   };
@@ -72,15 +75,17 @@ function setDry(out: WaterQuerySample, ground: number) {
   out.bodyId = NO_BODY;
   out.flowX = 0;
   out.flowZ = 0;
+  out.shore = 0;
   out.waveHeight = 0;
   out.surface = -Infinity;
 }
 
 /**
  * Reads `water` at texel coordinates (`fx`, `fy`) as the water shader does:
- * level, its heights, coverage, type weights and flow filtered bilinearly, the
- * weights then normalised, and the body from the nearest texel. Fills every
- * field of `out` but ground, depth, wet, waveHeight and surface.
+ * level, its heights, coverage, type weights, flow and shore distance filtered
+ * bilinearly, the weights then normalised, and the body from the nearest
+ * texel. Fills every field of `out` but ground, depth, wet, waveHeight and
+ * surface.
  */
 export function sampleWaterMap(
   water: WaterMap,
@@ -157,6 +162,9 @@ export function sampleWaterMap(
       flow[t01 * 2 + 1] * w01 +
       flow[t11 * 2 + 1] * w11) /
     127;
+  const { shore } = water;
+  out.shore =
+    shore[t00] * w00 + shore[t10] * w10 + shore[t01] * w01 + shore[t11] * w11;
   out.bodyId = water.bodyIds[Math.round(x) + Math.round(y) * size];
 }
 

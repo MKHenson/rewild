@@ -27,6 +27,8 @@ function lakeMap(baseLevel: number): WaterMap {
     typeWeights: new Uint8Array(texels * 4),
     bodyIds: new Uint32Array(texels),
     flow: new Int8Array(texels * 2),
+    shore: new Uint8Array(texels),
+    wet: new Uint8Array(texels),
     bodies: [],
   };
   // World texel (1, 1) of chunk (0, 0): column 3, row 1.

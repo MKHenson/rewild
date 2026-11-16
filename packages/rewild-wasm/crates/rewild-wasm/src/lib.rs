@@ -400,6 +400,18 @@ impl WaterMapBuild {
         std::mem::take(&mut self.0.water.body_ids)
     }
 
+    /// Metres to the nearest dry texel, up to `terrain::water::SHORE_CAP`.
+    #[wasm_bindgen(js_name = takeShore)]
+    pub fn take_shore(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.0.shore)
+    }
+
+    /// 1 where water stands at the texel.
+    #[wasm_bindgen(js_name = takeWet)]
+    pub fn take_wet(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.0.wet)
+    }
+
     /// The first texel each covering body owns, in texel order.
     #[wasm_bindgen(js_name = bodyTexels)]
     pub fn body_texels(&self) -> Vec<u32> {
@@ -531,8 +543,11 @@ impl TerrainGenerator {
     }
 
     /// The water map of a chunk with LOD-0 `heights`, or undefined where no
-    /// water comes near the ground. See `terrain::water::build_map`.
+    /// water comes near the ground. `neighbourWet` holds nine texel planes of
+    /// the neighbours' wet texels, the ones `neighbourPresent` flags; see
+    /// `terrain::NeighbourWet`. See `terrain::water::build_map`.
     #[wasm_bindgen(js_name = waterMap)]
+    #[allow(clippy::too_many_arguments)]
     pub fn water_map(
         &self,
         chunk_size: u32,
@@ -541,8 +556,15 @@ impl TerrainGenerator {
         offset_y: f64,
         heights: &[f32],
         edit: Option<WaterEditData>,
-    ) -> Option<WaterMapBuild> {
-        terrain::water::build_map(
+        neighbour_wet: &[u8],
+        neighbour_present: u32,
+    ) -> Result<Option<WaterMapBuild>, JsError> {
+        let size = terrain::water::water_map_size(chunk_size as usize, step as usize);
+        if neighbour_present != 0 && neighbour_wet.len() != 9 * size * size {
+            return Err(JsError::new("Neighbour wet planes do not match the water map size."));
+        }
+        let neighbours = terrain::NeighbourWet { wet: neighbour_wet, present: neighbour_present };
+        Ok(terrain::water::build_map(
             &self.heights,
             chunk_size as usize,
             step as usize,
@@ -550,8 +572,9 @@ impl TerrainGenerator {
             offset_y,
             heights,
             edit.map(|e| e.0),
+            neighbours,
         )
-        .map(WaterMapBuild)
+        .map(WaterMapBuild))
     }
 
     /// Every scatter instance a `chunkSize` chunk at chunk offset (`offsetX`,

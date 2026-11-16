@@ -89,6 +89,13 @@ time. Each texel (8 m across) holds:
 | Coverage     | Is there water here? Zero means dry land at any height. |
 | Type weights | What kind of water: for example 60% lake, 40% ocean.    |
 | Body ID      | Which body of water owns this texel. The ocean is 0.    |
+| Shore        | Metres to the nearest dry ground, capped at 255.        |
+
+**Shore distance.** A two-pass chamfer over the texels, in Rust. Dry ground in the next chunk
+counts: where a texel's distance could reach past the chunk's edge, the worker reads that much of
+a band around the chunk. A loaded neighbour's own wet texels fill the band, so its edits count;
+past an unloaded one the worker reads the seed's water and ground. When an edited chunk's wet
+texels change, its neighbours rebuild their water.
 
 Water shows where there is coverage **and** the ground is lower than the level. So when you
 sculpt, the shore moves on its own. Dig a hole in a lake bed and it fills. Raise an island and the

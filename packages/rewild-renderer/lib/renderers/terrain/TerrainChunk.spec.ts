@@ -95,6 +95,37 @@ describe('TerrainChunk reuse across LODs', () => {
     });
   });
 
+  describe('populateWater', () => {
+    it('keeps an all-dry wet mask for a dry chunk', () => {
+      const chunk = makeChunk();
+      chunk.populateWater(renderer, null, 0, 0);
+      expect(chunk.wetMask).toEqual(new Uint8Array(4));
+    });
+
+    it('reports a change only for an edited chunk whose wet texels moved', () => {
+      const unedited = makeChunk();
+      expect(unedited.populateWater(renderer, null, 0, 0)).toBe(false);
+
+      const edited = makeChunk();
+      edited.populateHeights(heights());
+      edited.bumpHeightsVersion();
+      expect(edited.populateWater(renderer, null, 1, 0)).toBe(true);
+      edited.bumpHeightsVersion();
+      expect(edited.populateWater(renderer, null, 2, 0)).toBe(false);
+    });
+
+    it('goes stale when a neighbour changes, until the next build', () => {
+      const chunk = makeChunk();
+      chunk.populateWater(renderer, null, 0, 0);
+      chunk.bumpShoreInputVersion();
+      expect(chunk.waterIsStale()).toBe(true);
+      expect(chunk.waterIsCurrent(0, chunk.waterInputVersion)).toBe(false);
+
+      chunk.populateWater(renderer, null, 0, chunk.waterInputVersion);
+      expect(chunk.waterIsStale()).toBe(false);
+    });
+  });
+
   describe('waterIsCurrent', () => {
     it('is false until a water map lands', () => {
       expect(makeChunk().waterIsCurrent(0, 0)).toBe(false);
@@ -112,7 +143,7 @@ describe('TerrainChunk reuse across LODs', () => {
       chunk.bumpWaterEditVersion();
 
       expect(
-        chunk.waterIsCurrent(chunk.heightsVersion, chunk.waterEditVersion)
+        chunk.waterIsCurrent(chunk.heightsVersion, chunk.waterInputVersion)
       ).toBe(false);
     });
 
@@ -122,7 +153,7 @@ describe('TerrainChunk reuse across LODs', () => {
       chunk.bumpHeightsVersion();
 
       expect(
-        chunk.waterIsCurrent(chunk.heightsVersion, chunk.waterEditVersion)
+        chunk.waterIsCurrent(chunk.heightsVersion, chunk.waterInputVersion)
       ).toBe(false);
     });
   });

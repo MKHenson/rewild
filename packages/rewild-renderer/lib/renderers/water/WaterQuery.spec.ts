@@ -24,6 +24,7 @@ function makeMap(): WaterMap {
   const typeWeights = new Uint8Array(texels * 4);
   const bodyIds = new Uint32Array(texels);
   const flow = new Int8Array(texels * 2);
+  const shore = new Uint8Array(texels);
   for (let my = 0; my < size; my++)
     for (let mx = 0; mx < size; mx++) {
       const t = mx + my * size;
@@ -34,6 +35,7 @@ function makeMap(): WaterMap {
       typeWeights[t * 4 + 1] = mx === 0 ? 0 : 255;
       bodyIds[t] = mx;
       flow[t * 2] = 127;
+      shore[t] = mx * 8;
     }
   return {
     size,
@@ -47,6 +49,8 @@ function makeMap(): WaterMap {
     typeWeights,
     bodyIds,
     flow,
+    shore,
+    wet: new Uint8Array(texels),
     bodies: [],
   };
 }
@@ -68,6 +72,12 @@ describe('sampleWaterMap', () => {
     sampleWaterMap(makeMap(), 0.5, 1, out);
     expect(out.level).toBeCloseTo(10.5);
     expect(out.mapDepth).toBeCloseTo(2.5);
+  });
+
+  it('filters the shore distance bilinearly', () => {
+    const out = createWaterQuerySample();
+    sampleWaterMap(makeMap(), 1.5, 1, out);
+    expect(out.shore).toBeCloseTo(12);
   });
 
   it('normalises the type weights after filtering them', () => {
