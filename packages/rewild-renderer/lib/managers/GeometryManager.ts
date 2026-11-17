@@ -8,7 +8,6 @@ import { CapsuleGeometryFactory } from '../geometry/CapsuleGeometryFactory';
 import { ConeGeometryFactory } from '../geometry/ConeGeometryFactory';
 import { CylinderGeometryFactory } from '../geometry/CylinderGeometryFactory';
 import { Geometry } from '../geometry/Geometry';
-import { GUIGeometryFactory } from '../geometry/GUIGeometryFactory';
 import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
 import { SphereGeometryFactory } from '../geometry/SphereGeometryFactory';
 import { Renderer } from '../Renderer';
@@ -76,7 +75,6 @@ export class GeometryManager {
     this.addGeometry('sphere', SphereGeometryFactory.new());
     this.addGeometry('plane', PlaneGeometryFactory.new());
     this.addGeometry('sprite-quad', PlaneGeometryFactory.new(1, 1));
-    this.addGeometry('gui-quad', GUIGeometryFactory.new());
 
     for (const key in geometriesToLoad) {
       const geometryTemplate = geometriesToLoad[key];

@@ -5,7 +5,6 @@ import { PerspectiveCamera } from './PerspectiveCamera';
 import { OrthographicCamera } from './OrthographicCamera';
 import { Transform } from './Transform';
 import { IRaycaster } from '../../types/interfaces';
-import { Renderer } from '..';
 import { SceneBVH } from '../acceleration/SceneBVH';
 
 export class Raycaster implements IRaycaster {
@@ -110,48 +109,6 @@ export class Raycaster implements IRaycaster {
     return intersects;
   }
 }
-export class UIRaycaster implements IRaycaster {
-  layers: Layers;
-  origin: Vector3;
-  renderer: Renderer;
-
-  constructor(renderer: Renderer, origin: Vector3 = new Vector3()) {
-    this.renderer = renderer;
-    this.origin = origin;
-    this.layers = new Layers();
-  }
-
-  set(x: f32, y: f32): void {
-    this.origin.set(x, y, 0);
-  }
-
-  intersectObject(
-    object: Transform,
-    recursive: boolean = false,
-    intersects: Intersection[] = []
-  ): Intersection[] {
-    intersectObject(object, this, intersects, recursive);
-
-    intersects.sort(ascSort);
-
-    return intersects;
-  }
-
-  intersectObjects(
-    objects: Transform[],
-    recursive: boolean = false,
-    intersects: Intersection[] = []
-  ): Intersection[] {
-    for (let i = 0, l = objects.length; i < l; i++) {
-      intersectObject(objects[i], this, intersects, recursive);
-    }
-
-    intersects.sort(ascSort);
-
-    return intersects;
-  }
-}
-
 function ascSort(a: Intersection, b: Intersection): i32 {
   return a.distance - b.distance;
 }

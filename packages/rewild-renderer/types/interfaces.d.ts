@@ -116,11 +116,3 @@ export interface MsdfTextMeasurements {
   spacesPerLine: number[];
   printedCharCount: number;
 }
-
-export interface MsdfTextFormattingOptions {
-  centered?: boolean;
-  justify?: boolean;
-  fontSize?: number;
-  wordWrap?: boolean;
-  color?: [number, number, number, number];
-}

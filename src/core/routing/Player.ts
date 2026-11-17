@@ -23,8 +23,7 @@ import {
   Ray,
 } from '@dimforge/rapier3d-compat';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
-import { UIElementMeterPass } from 'node_modules/rewild-renderer/lib/materials/UIElementMeterPass';
-import { UIElement } from 'node_modules/rewild-renderer/lib/core/UIElement';
+import { hexColor, Meter, UINode, UIRenderer } from 'rewild-gpu-ui';
 import {
   clamp,
   Color,
@@ -129,10 +128,11 @@ const _GROUND_STICK: f32 = 0.001;
 const _HUNGER_DRAIN_PER_SEC: f32 = 100 / 600;
 const _STARVATION_DAMAGE_PER_SEC: f32 = 100 / 60;
 // The body temperature bar: on the right, growing up from its foot to its
-// full height; hidden while the body is within NORMAL of normal.
-const _TEMPERATURE_BAR_X: f32 = 0.975;
-const _TEMPERATURE_BAR_FOOT: f32 = 0.95;
-const _TEMPERATURE_BAR_HEIGHT: f32 = 0.35;
+// full height; hidden while the body is within NORMAL of normal. Percentages
+// of the screen.
+const _TEMPERATURE_BAR_X: f32 = 97.5;
+const _TEMPERATURE_BAR_FOOT: f32 = 5;
+const _TEMPERATURE_BAR_HEIGHT: f32 = 35;
 const _TEMPERATURE_NORMAL: f32 = 0.05;
 // Its colour from slightly to really hot, and from slightly to really cold.
 const _WARM = [1.0, 0.75, 0.4];
@@ -145,6 +145,74 @@ const _HEALTH_REGEN_AFTER: f32 = 20;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
 const _resizeTranslation = { x: 0, y: 0, z: 0 };
+
+interface Hud {
+  health: Meter;
+  hunger: Meter;
+  stamina: Meter;
+  oxygen: Meter;
+  temperature: Meter;
+}
+
+/**
+ * Builds the HUD bars. Health, hunger, stamina and oxygen stack up from the
+ * bottom of the screen in its middle 40%. Bar heights are percentages of the
+ * screen. The temperature bar grows up the right edge.
+ */
+function createHud(ui: UIRenderer): Hud {
+  const surface = ui.createSurface({ kind: 'screen', name: 'hud' });
+  // The gap above each bar is its top margin. A hidden stamina bar takes its
+  // gap with it, so the oxygen bar moves down into its place.
+  const health = new Meter({
+    style: { height: '5%', borderRadius: 20, margin: [10, 0, 0, 0] },
+  });
+  const hunger = new Meter({
+    fullColor: '#f2991a',
+    emptyColor: '#8c3300',
+    style: { height: '3%', borderRadius: 12, margin: [5, 0, 0, 0] },
+  });
+  const stamina = new Meter({
+    fullColor: '#73ccff',
+    emptyColor: '#334d8c',
+    style: { height: '1.5%', borderRadius: 8, margin: [10, 0, 0, 0] },
+  });
+  const oxygen = new Meter({
+    fullColor: '#ebf5ff',
+    emptyColor: '#8c1a73',
+    style: { height: '1.5%', borderRadius: 8 },
+  });
+  const bars = new UINode({
+    style: {
+      position: 'absolute',
+      left: '30%',
+      width: '40%',
+      top: 0,
+      bottom: 0,
+      flexDirection: 'column',
+      justifyContent: 'flex-end',
+    },
+  });
+  // Holds the bars 3% of the screen off the bottom.
+  const foot = new UINode({ style: { height: '3%' } });
+  bars.append(oxygen, stamina, hunger, health, foot);
+
+  const temperature = new Meter({
+    style: {
+      position: 'absolute',
+      left: `${_TEMPERATURE_BAR_X}%`,
+      width: '0.8%',
+      bottom: `${_TEMPERATURE_BAR_FOOT}%`,
+      height: 0,
+      borderRadius: 6,
+    },
+  });
+  surface.root.append(bars, temperature);
+  return { health, hunger, stamina, oxygen, temperature };
+}
+
+function show(node: UINode, visible: boolean): void {
+  node.style.display = visible ? 'flex' : 'none';
+}
 
 export class Player extends Node {
   /** The player in the running game, for the console. */
@@ -194,16 +262,9 @@ export class Player extends Node {
   private _waterLens: WaterLens | null = null;
   // Metres a second the wind's gusts shove the player downwind.
   private _gustPush: f32 = 0;
-  uiHealthBar: UIElementMeterPass;
-  uiHungerBar: UIElementMeterPass;
-  uiStaminaBar: UIElementMeterPass;
-  private _staminaBar: UIElement | null = null;
+  private _hud: Hud | null = null;
   private _stamina = new Stamina();
-  uiOxygenBar: UIElementMeterPass;
-  private _oxygenBar: UIElement | null = null;
   private _oxygen = new Oxygen();
-  uiTemperatureBar: UIElementMeterPass;
-  private _temperatureBar: UIElement | null = null;
   private _body = new BodyTemperature();
   // The body temperature the bar last showed.
   private _shownTemperature: f32 = NaN;
@@ -297,68 +358,7 @@ export class Player extends Node {
 
     const stateData = this.stateMachine?.data as StateMachineData;
 
-    if (!this.uiHealthBar) {
-      const { materialManager, guiManager, ui } = stateData.renderer;
-      this.uiHealthBar = materialManager.get(
-        'ui-health-material'
-      ) as UIElementMeterPass;
-      const healthBar = guiManager.createElement(this.uiHealthBar);
-      ui.addChild(healthBar.transform);
-      healthBar.borderRadius = 20;
-      healthBar.width = 0.4;
-      healthBar.height = 0.05;
-      healthBar.x = 0.3;
-      healthBar.y = 0.92;
-      healthBar.percentageBasedCalculation = true;
-
-      this.uiHungerBar = materialManager.get(
-        'ui-hunger-material'
-      ) as UIElementMeterPass;
-      const hungerBar = guiManager.createElement(this.uiHungerBar);
-      ui.addChild(hungerBar.transform);
-      hungerBar.borderRadius = 12;
-      hungerBar.width = 0.4;
-      hungerBar.height = 0.03;
-      hungerBar.x = 0.3;
-      hungerBar.y = 0.88;
-      hungerBar.percentageBasedCalculation = true;
-
-      this.uiStaminaBar = materialManager.get(
-        'ui-stamina-material'
-      ) as UIElementMeterPass;
-      const staminaBar = guiManager.createElement(this.uiStaminaBar);
-      ui.addChild(staminaBar.transform);
-      staminaBar.borderRadius = 8;
-      staminaBar.width = 0.4;
-      staminaBar.height = 0.015;
-      staminaBar.x = 0.3;
-      staminaBar.y = 0.86;
-      staminaBar.percentageBasedCalculation = true;
-      this._staminaBar = staminaBar;
-
-      this.uiOxygenBar = materialManager.get(
-        'ui-oxygen-material'
-      ) as UIElementMeterPass;
-      const oxygenBar = guiManager.createElement(this.uiOxygenBar);
-      ui.addChild(oxygenBar.transform);
-      oxygenBar.borderRadius = 8;
-      oxygenBar.width = 0.4;
-      oxygenBar.height = 0.015;
-      oxygenBar.x = 0.3;
-      oxygenBar.percentageBasedCalculation = true;
-      this._oxygenBar = oxygenBar;
-
-      this.uiTemperatureBar = materialManager.get(
-        'ui-temperature-material'
-      ) as UIElementMeterPass;
-      const temperatureBar = guiManager.createElement(this.uiTemperatureBar);
-      ui.addChild(temperatureBar.transform);
-      temperatureBar.borderRadius = 6;
-      temperatureBar.width = 0.008;
-      temperatureBar.x = _TEMPERATURE_BAR_X;
-      temperatureBar.percentageBasedCalculation = true;
-      this._temperatureBar = temperatureBar;
-    }
+    if (!this._hud) this._hud = createHud(stateData.renderer.ui);
 
     this.hunger = 100.0;
     this.health = 100.0;
@@ -462,7 +462,7 @@ export class Player extends Node {
 
   set hunger(value: f32) {
     this._hunger = clamp(value, 0.0, 100.0);
-    this.uiHungerBar.meter.value = this._hunger / 100.0;
+    if (this._hud) this._hud.hunger.value = this._hunger / 100.0;
   }
 
   get stamina(): Stamina {
@@ -488,7 +488,7 @@ export class Player extends Node {
   set health(value: f32) {
     if (value < this._health) this._sinceHurt = 0;
     this._health = clamp(value, 0.0, 100.0);
-    this.uiHealthBar.meter.value = this._health / 100.0;
+    if (this._hud) this._hud.health.value = this._health / 100.0;
   }
 
   /**
@@ -497,15 +497,14 @@ export class Player extends Node {
    * place when stamina is full.
    */
   private _showBars(): void {
+    const hud = this._hud;
+    if (!hud) return;
     const stamina = this._stamina.value;
     const oxygen = this._oxygen.value;
-    if (!this._staminaBar || !this._oxygenBar) return;
-    this.uiStaminaBar.meter.value = stamina / STAMINA_FULL;
-    this._staminaBar.visible = stamina < STAMINA_FULL;
-    this.uiOxygenBar.meter.value = oxygen / OXYGEN_FULL;
-    this._oxygenBar.visible = oxygen < OXYGEN_FULL;
-    const y = this._staminaBar.visible ? 0.835 : 0.86;
-    if (this._oxygenBar.y !== y) this._oxygenBar.y = y;
+    hud.stamina.value = stamina / STAMINA_FULL;
+    show(hud.stamina.node, stamina < STAMINA_FULL);
+    hud.oxygen.value = oxygen / OXYGEN_FULL;
+    show(hud.oxygen.node, oxygen < OXYGEN_FULL);
     this._showTemperature();
   }
 
@@ -514,21 +513,23 @@ export class Player extends Node {
    * as the body heats, blue as it chills.
    */
   private _showTemperature(): void {
-    const bar = this._temperatureBar;
+    const bar = this._hud?.temperature;
     if (!bar) return;
     const t = this._body.value;
     const size = Math.abs(t);
-    bar.visible = size > _TEMPERATURE_NORMAL;
-    if (!bar.visible || Math.abs(t - this._shownTemperature) < 0.005) return;
+    const visible = size > _TEMPERATURE_NORMAL;
+    show(bar.node, visible);
+    if (!visible || Math.abs(t - this._shownTemperature) < 0.005) return;
     this._shownTemperature = t;
-    bar.height = size * _TEMPERATURE_BAR_HEIGHT;
-    bar.y = _TEMPERATURE_BAR_FOOT - bar.height;
+    bar.node.style.height = `${size * _TEMPERATURE_BAR_HEIGHT}%`;
     const from = t > 0 ? _WARM : _COOL;
     const to = t > 0 ? _HOT : _COLD;
-    const r = from[0] + (to[0] - from[0]) * size;
-    const g = from[1] + (to[1] - from[1]) * size;
-    const b = from[2] + (to[2] - from[2]) * size;
-    this.uiTemperatureBar.meter.setColors(r, g, b, r, g, b);
+    const color = hexColor(
+      from[0] + (to[0] - from[0]) * size,
+      from[1] + (to[1] - from[1]) * size,
+      from[2] + (to[2] - from[2]) * size
+    );
+    bar.setColors(color, color);
   }
 
   unMount(): void {

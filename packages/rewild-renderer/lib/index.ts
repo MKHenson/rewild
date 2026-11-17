@@ -29,8 +29,6 @@ export * from './core/GltfLoader';
 export * from './core/GltfSkeleton';
 export * from './core/GltfTextures';
 export * from './core/LoadActivity';
-export * from './core/UIElement';
-export * from './core/UIPointerEvent';
 export * from './typeGuards';
 export * from './utils/RenderQuality';
 export * from './utils/QualitySettings';

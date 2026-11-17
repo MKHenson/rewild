@@ -23,10 +23,8 @@ import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
 import { SkinnedModelManager } from './managers/SkinnedModelManager';
 import { IMaterialsTemplate } from './managers/types';
-import { GuiManager } from './managers/GuiManager';
-import { UIElement } from './core/UIElement';
 import { FontManager } from './managers/FontManager';
-import { IUIElementPass } from './materials/IUIElementPass';
+import { UIRenderer } from 'rewild-gpu-ui';
 import { isVisualComponent } from './typeGuards';
 import { SceneBVH } from './acceleration/SceneBVH';
 import { BVHConfig, DEFAULT_BVH_CONFIG } from './acceleration/BVHConfig';
@@ -118,7 +116,6 @@ export class Renderer {
   geometryManager: GeometryManager;
   samplerManager: SamplerManager;
   fontManager: FontManager;
-  guiManager: GuiManager;
   materialManager: MaterialManager;
   skinnedModels: SkinnedModelManager;
   mipmapGenerator: MipMapGenerator;
@@ -165,7 +162,8 @@ export class Renderer {
 
   camera: PerspectiveCamera;
   scene: Transform;
-  ui: Transform;
+  /** Draws the screen UI over the frame. */
+  ui: UIRenderer;
   currentRenderList: RenderList;
   sky: Sky;
   private canvasSizeWatcher: CanvasSizeWatcher;
@@ -178,9 +176,6 @@ export class Renderer {
 
   private onFrameHandler: () => void;
   private pendingScreenshots: ((blob: Blob | null) => void)[] = [];
-  private uiVisibleElements: UIElement[] = [];
-  private uiElementsByMaterial = new Map<IMaterialPass, UIElement[]>();
-  private uiInstanceCounters = new Map<IMaterialPass, number>();
 
   /** The camera's view frustum for the frame being rendered, in world
    *  space. Refreshed before anything is culled, whether or not the scene BVH
@@ -322,8 +317,6 @@ export class Renderer {
     this.onFrameHandler = this.onFrame.bind(this);
     this.scene = new Transform();
     this.scene.matrixAutoUpdate = false;
-    this.ui = new Transform();
-    this.ui.matrixAutoUpdate = false;
     this.sky = new Sky();
     this.terrainRenderer = new TerrainRenderer();
     this.directionalShadowRenderer = new DirectionalShadowRenderer();
@@ -427,7 +420,6 @@ export class Renderer {
     this.materialManager = new MaterialManager();
     this.skinnedModels = new SkinnedModelManager();
     this.mipmapGenerator = new MipMapGenerator();
-    this.guiManager = new GuiManager();
 
     const materialsTemplate = (await fetch('/templates/materials.json').then(
       (res) => res.json()
@@ -444,57 +436,7 @@ export class Renderer {
     this.spotLightShadowRenderer.init(this);
     this.frameCompositor.initToneMap(this);
 
-    this.guiManager.initialize(this);
-
-    const element = this.guiManager.createElement(
-      this.materialManager.get('ui-material')
-    );
-    const element2 = this.guiManager.createElement(
-      this.materialManager.get('ui-material')
-    );
-    // this.ui.addChild(element.transform);
-
-    element.x = 0.3;
-    element.y = 0.2;
-    element.percentageBasedCalculation = true;
-    element.width = 0.3;
-    element.height = 0.1;
-    element.borderRadius = 10;
-    element.backgroundColor.setRGB(0.3, 0.3, 0.3);
-    element.text = 'Hello, World!';
-
-    element2.x = 0.5;
-    element2.y = 0;
-    element2.percentageBasedCalculation = true;
-    element2.width = 0.5;
-    element2.height = 1;
-    element2.borderRadius = 10;
-    element2.backgroundColorAlpha = 1;
-    element2.backgroundColor.setRGB(1, 0, 0);
-    element2.text =
-      'This is a vertical text element. Its a child.It supports multiple lines. And word wrap if enabled in the text options.';
-    element.transform.addChild(element2.transform);
-
-    element.dispatcher.add((e) => {
-      if (e.type === 'click') {
-        console.log('Clicked element 1:', e.target.transform.id);
-      }
-    });
-
-    element2.dispatcher.add((e) => {
-      if (e.type === 'click') {
-        e.stopPropagation(); // Stop the event from bubbling up to the parent element
-        console.log('Clicked element 2:', e.target.transform.id);
-      } else if (e.type === 'mouseenter') {
-        element2.backgroundColor.setRGB(0.8, 0.0, 0);
-      } else if (e.type === 'mouseleave') {
-        element2.backgroundColor.setRGB(1, 0.0, 0.0);
-      } else if (e.type === 'mousedown') {
-        element2.backgroundColor.setRGB(0.5, 0.0, 0);
-      } else if (e.type === 'mouseup') {
-        element2.backgroundColor.setRGB(0.8, 0.0, 0);
-      }
-    });
+    this.ui = new UIRenderer(device, this.presentationFormat);
 
     this.lastTime = performance.now();
     this.delta = 0;
@@ -548,7 +490,7 @@ export class Renderer {
     this.geometryManager.dispose();
     this.materialManager.dispose();
     this.geometryManager.dispose();
-    this.guiManager.dispose();
+    this.ui.dispose();
   }
 
   /**
@@ -698,17 +640,6 @@ export class Renderer {
     for (let i = 0, l = transform.children.length; i < l; i++) {
       this.collectShadowCasters(transform.children[i], target);
     }
-  }
-
-  collectUIElements(transform: Transform): void {
-    if (transform.visible === false) return;
-
-    if (transform.component instanceof UIElement) {
-      this.currentRenderList.uiElements.push(transform);
-    }
-
-    for (let i = 0, l = transform.children.length; i < l; i++)
-      this.collectUIElements(transform.children[i]);
   }
 
   organizeVisuals(
@@ -998,7 +929,6 @@ export class Renderer {
 
     // update scene graph
     this.scene.updateMatrixWorld();
-    this.ui.updateMatrixWorld();
 
     // update camera matrices and frustum
     if (pCamera.camera.transform.parent === null)
@@ -1040,8 +970,6 @@ export class Renderer {
     } else {
       this.projectObject(this.scene, pCamera.camera);
     }
-
-    this.collectUIElements(this.ui);
 
     metrics.end('cpu.cull');
     metrics.begin('cpu.organize');
@@ -1340,96 +1268,16 @@ export class Renderer {
         device.queue.submit([overlayEncoder.finish()]);
       }
 
-      // Render all UI elements in a single pass. Instance data for every
-      // visible element is uploaded once, and each element is drawn via
-      // firstInstance indexing so the shader reads the correct slot.
-      // Text is interleaved between element quads for correct z-ordering.
-      const visibleElements = this.uiVisibleElements;
-      visibleElements.length = 0;
-      for (const transform of this.currentRenderList.uiElements) {
-        const element = transform.component as UIElement;
-        if (!element?.visible) continue;
-        if (element.geometry.requiresBuild)
-          element.geometry.build(
-            this.device,
-            this.bvhConfig,
-            this.bvhWorkerManager ?? undefined
-          );
-        if (element.material.requiresRebuild) element.material.init(this);
-        visibleElements.push(element);
-      }
-
-      if (visibleElements.length > 0) {
-        // Group elements by material for uniform preparation
-        const elementsByMaterial = this.uiElementsByMaterial;
-        elementsByMaterial.clear();
-        for (const element of visibleElements) {
-          const mat = element.material;
-          let group = elementsByMaterial.get(mat);
-          if (!group) {
-            group = [];
-            elementsByMaterial.set(mat, group);
-          }
-          group.push(element);
-        }
-
-        // Prepare uniforms for each material (uploads instance data to GPU)
-        for (const [mat, elements] of elementsByMaterial) {
-          (mat as IUIElementPass).prepareUniforms(
-            this,
-            camera.camera,
-            elements
-          );
-        }
-
-        const guiEncoder = device.createCommandEncoder({
-          label: 'GUI encoder',
-        });
-
-        const guiPass = guiEncoder.beginRenderPass({
-          colorAttachments: [
-            {
-              view: context.getCurrentTexture().createView(),
-              loadOp: 'load',
-              storeOp: 'store',
-            },
-          ],
-        });
-
-        let currentMaterial: IMaterialPass | null = null;
-        let needsStateReset = true;
-        const instanceCounters = this.uiInstanceCounters;
-        instanceCounters.clear();
-
-        for (let i = 0; i < visibleElements.length; i++) {
-          const element = visibleElements[i];
-          const mat = element.material;
-
-          if (mat !== currentMaterial || needsStateReset) {
-            (mat as IUIElementPass).setPassState(guiPass, element.geometry);
-            currentMaterial = mat;
-            needsStateReset = false;
-          }
-
-          const instanceIdx = instanceCounters.get(mat) || 0;
-          instanceCounters.set(mat, instanceIdx + 1);
-
-          const numIndices = element.geometry.indices!.length;
-          guiPass.drawIndexed(numIndices, 1, 0, 0, instanceIdx);
-
-          // Draw text on top of this element
-          const textRenderer = element.textRenderer;
-          if (textRenderer) {
-            if (textRenderer.requiresRebuild) textRenderer.init(this);
-            textRenderer.render(this, guiPass, element);
-            // executeBundles clears all pass state — restore before next quad
-            needsStateReset = true;
-          }
-        }
-
-        guiPass.end();
-        device.queue.submit([guiEncoder.finish()]);
-      }
+      // The UI draws over the finished frame. The canvas may be sized at a
+      // ratio to its CSS size, and UI layout works in CSS pixels.
+      const canvas = this.canvas;
+      const uiEncoder = device.createCommandEncoder({ label: 'ui encoder' });
+      this.ui.render(uiEncoder, context.getCurrentTexture().createView(), {
+        width: canvas.width,
+        height: canvas.height,
+        pixelRatio: canvas.clientWidth ? canvas.width / canvas.clientWidth : 1,
+      });
+      device.queue.submit([uiEncoder.finish()]);
 
       // Shadow debug atlas viewer — rendered on top of everything when active.
       this.directionalShadowRenderer.debugRenderer.render(this);

@@ -5,46 +5,98 @@ import { Rect, UINode } from './UINode';
 
 /**
  * Floats per primitive: rect, clip rect, clip radii, corner radii, fill,
- * border colour, and params (border width, opacity). Matches `Primitive` in
- * ui.wgsl.
+ * border colour, params (border width, opacity) and effect params. Matches
+ * `Primitive` in ui.wgsl.
  */
-export const PRIMITIVE_FLOATS = 28;
+export const PRIMITIVE_FLOATS = 32;
+
+/** Where the effect params start in a primitive. */
+const EFFECT_OFFSET = 28;
 
 type Radii = [number, number, number, number];
+export type EffectParams = [number, number, number, number];
 
 const NO_CLIP: Rect = { x: -1e5, y: -1e5, width: 2e5, height: 2e5 };
 const NO_RADII: Radii = [0, 0, 0, 0];
+const NONE = [0, 0, 0, 0];
+
+export interface RectPrimitive {
+  rect: Rect;
+  clip?: Rect;
+  clipRadii?: Radii;
+  radii?: Radii;
+  fill?: number[];
+  border?: number[];
+  borderWidth?: number;
+  opacity?: number;
+  /** The registered effect that draws the rect, or null for a plain rect. */
+  effect?: string | null;
+  effectParams?: EffectParams;
+  /** The node the rect draws, so its effect params can change in place. */
+  node?: UINode;
+}
 
 /** The primitives of one surface, in draw order. */
 export class PrimitiveStream {
   data = new Float32Array(64 * PRIMITIVE_FLOATS);
   count = 0;
+  /** The effect of each primitive. */
+  readonly effects: (string | null)[] = [];
+  /** The node of each primitive, or null for an overlay primitive. */
+  readonly nodes: (UINode | null)[] = [];
+  /** The primitives changed since the last upload, from `dirtyFrom` up to but not including `dirtyTo`. */
+  dirtyFrom = 0;
+  dirtyTo = 0;
 
   reset(): void {
     this.count = 0;
+    this.dirtyFrom = 0;
+    this.dirtyTo = 0;
   }
 
-  pushRect(
-    rect: Rect,
-    clip: Rect,
-    clipRadii: Radii,
-    radii: Radii,
-    fill: number[],
-    border: number[],
-    borderWidth: number,
-    opacity: number
-  ): void {
+  pushRect(p: RectPrimitive): void {
     this.reserve(this.count + 1);
     const d = this.data;
+    const { rect, clip = NO_CLIP } = p;
     let o = this.count * PRIMITIVE_FLOATS;
     o = write4(d, o, rect.x, rect.y, rect.width, rect.height);
     o = write4(d, o, clip.x, clip.y, clip.width, clip.height);
-    d.set(clipRadii, o);
-    d.set(radii, o + 4);
-    d.set(fill, o + 8);
-    d.set(border, o + 12);
-    write4(d, o + 16, borderWidth, opacity, 0, 0);
+    d.set(p.clipRadii ?? NO_RADII, o);
+    d.set(p.radii ?? NO_RADII, o + 4);
+    d.set(p.fill ?? NONE, o + 8);
+    d.set(p.border ?? NONE, o + 12);
+    write4(d, o + 16, p.borderWidth ?? 0, p.opacity ?? 1, 0, 0);
+    d.set(p.effectParams ?? NONE, o + 20);
+    this.effects[this.count] = p.effect ?? null;
+    this.nodes[this.count] = p.node ?? null;
+    if (p.node) p.node.primitive = this.count;
     this.count++;
+    this.dirtyTo = this.count;
+  }
+
+  /**
+   * Writes a node's effect params in place. Returns false when the node has
+   * no primitive in the stream.
+   */
+  setEffectParams(node: UINode, params: EffectParams): boolean {
+    const index = node.primitive;
+    if (index < 0 || index >= this.count || this.nodes[index] !== node)
+      return false;
+    this.data.set(params, index * PRIMITIVE_FLOATS + EFFECT_OFFSET);
+    if (this.dirtyFrom >= this.dirtyTo) {
+      this.dirtyFrom = index;
+      this.dirtyTo = index + 1;
+    } else {
+      this.dirtyFrom = Math.min(this.dirtyFrom, index);
+      this.dirtyTo = Math.max(this.dirtyTo, index + 1);
+    }
+    return true;
+  }
+
+  /** Marks every primitive as uploaded. */
+  clearDirty(): void {
+    this.dirtyFrom = 0;
+    this.dirtyTo = 0;
   }
 
   private reserve(count: number): void {
@@ -102,8 +154,9 @@ function writeNode(
   const borderWidth = style.borderWidth ?? 0;
   const fill = parseColor(style.backgroundColor);
   const border = parseColor(style.borderColor);
-  if (fill[3] > 0 || (borderWidth > 0 && border[3] > 0))
-    stream.pushRect(
+  // An effect draws its own content, so it draws with no fill or border.
+  if (node.effect || fill[3] > 0 || (borderWidth > 0 && border[3] > 0))
+    stream.pushRect({
       rect,
       clip,
       clipRadii,
@@ -111,8 +164,11 @@ function writeNode(
       fill,
       border,
       borderWidth,
-      opacity
-    );
+      opacity,
+      effect: node.effect,
+      effectParams: node.effectParams,
+      node,
+    });
 
   if (style.overflow === 'hidden') {
     // Nested clips keep only the innermost corner radii.
@@ -158,7 +214,6 @@ const MARGIN_COLOR = [0.96, 0.7, 0.42, 0.4];
 const PADDING_COLOR = [0.58, 0.77, 0.49, 0.4];
 const BOX_COLOR = [0.44, 0.66, 0.86, 1];
 const CLIP_COLOR = [0.86, 0.3, 0.86, 1];
-const NONE = [0, 0, 0, 0];
 
 /** Margins, padding, border boxes and clip rects, like the browser's layout overlay. */
 function writeOverlay(node: UINode, stream: PrimitiveStream): void {
@@ -173,18 +228,9 @@ function writeOverlay(node: UINode, stream: PrimitiveStream): void {
   writeStrips(stream, marginBox, margin, MARGIN_COLOR);
   const inside = innerBox(node);
   writeStrips(stream, inside, node.padding, PADDING_COLOR);
-  stream.pushRect(rect, NO_CLIP, NO_RADII, NO_RADII, NONE, BOX_COLOR, 1, 1);
+  stream.pushRect({ rect, border: BOX_COLOR, borderWidth: 1 });
   if (node.style.overflow === 'hidden')
-    stream.pushRect(
-      inside,
-      NO_CLIP,
-      NO_RADII,
-      NO_RADII,
-      NONE,
-      CLIP_COLOR,
-      1,
-      1
-    );
+    stream.pushRect({ rect: inside, border: CLIP_COLOR, borderWidth: 1 });
   for (const child of node.children) writeOverlay(child, stream);
 }
 
@@ -215,5 +261,5 @@ function writeStrips(
   ];
   for (const strip of strips)
     if (strip.width > 0 && strip.height > 0)
-      stream.pushRect(strip, NO_CLIP, NO_RADII, NO_RADII, color, NONE, 0, 1);
+      stream.pushRect({ rect: strip, fill: color });
 }

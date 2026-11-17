@@ -1,5 +1,6 @@
-import shader from './shaders/ui.wgsl';
+import meterEffect from './shaders/meter.wgsl';
 import { PRIMITIVE_FLOATS } from './stream';
+import { UIEffects } from './UIEffects';
 import { UISurface, UISurfaceOptions } from './UISurface';
 
 export interface UIViewport {
@@ -14,32 +15,40 @@ interface SurfaceBuffers {
   bindGroup: GPUBindGroup;
 }
 
-/** Draws surfaces in order, each in one draw call. */
+/** A run of primitives in one surface that share a pipeline. */
+interface DrawRun {
+  bindGroup: GPUBindGroup;
+  pipeline: GPURenderPipeline;
+  first: number;
+  count: number;
+}
+
+/** Draws surfaces in order, each in one draw call per run of an effect. */
 export class UIRenderer {
   /** Draw calls in the last render. */
   drawCalls = 0;
+  readonly effects: UIEffects;
   private surfaces: UISurface[] = [];
   private buffers = new Map<UISurface, SurfaceBuffers>();
-  private pipeline: GPURenderPipeline;
+  private bindGroupLayout: GPUBindGroupLayout;
   private uniforms: GPUBuffer;
+  private runs: DrawRun[] = [];
 
   constructor(private device: GPUDevice, format: GPUTextureFormat) {
-    const module = device.createShaderModule({ label: 'ui', code: shader });
-    const blend: GPUBlendComponent = {
-      srcFactor: 'one',
-      dstFactor: 'one-minus-src-alpha',
-    };
-    this.pipeline = device.createRenderPipeline({
+    const visibility = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
+    this.bindGroupLayout = device.createBindGroupLayout({
       label: 'ui',
-      layout: 'auto',
-      vertex: { module, entryPoint: 'vs' },
-      fragment: {
-        module,
-        entryPoint: 'fs',
-        targets: [{ format, blend: { color: blend, alpha: blend } }],
-      },
-      primitive: { topology: 'triangle-strip' },
+      entries: [
+        { binding: 0, visibility, buffer: { type: 'uniform' } },
+        { binding: 1, visibility, buffer: { type: 'read-only-storage' } },
+      ],
     });
+    const layout = device.createPipelineLayout({
+      label: 'ui',
+      bindGroupLayouts: [this.bindGroupLayout],
+    });
+    this.effects = new UIEffects(device, format, layout);
+    this.effects.register('meter', meterEffect);
     this.uniforms = device.createBuffer({
       label: 'ui-uniforms',
       size: 16,
@@ -63,7 +72,8 @@ export class UIRenderer {
 
   /**
    * Draws every surface into `view`. Clears it first when `clearValue` is
-   * given, or else draws over what is there.
+   * given, or else draws over what is there. With no `clearValue` and nothing
+   * to draw, it starts no pass.
    */
   render(
     encoder: GPUCommandEncoder,
@@ -77,12 +87,35 @@ export class UIRenderer {
     this.device.queue.writeBuffer(
       this.uniforms,
       0,
-      new Float32Array([width, height, pixelRatio, 0])
+      new Float32Array([width, height, pixelRatio, performance.now() / 1000])
     );
 
-    for (const surface of this.surfaces)
-      if (surface.update(width, height)) this.upload(surface);
+    // Find the pipelines before the pass, so an unknown effect throws
+    // with no pass left open.
+    const runs = this.runs;
+    runs.length = 0;
+    for (const surface of this.surfaces) {
+      surface.update(width, height);
+      this.upload(surface);
+      const buffers = this.buffers.get(surface);
+      const { count, effects } = surface.stream;
+      if (!buffers) continue;
+      for (let first = 0; first < count; ) {
+        const effect = effects[first];
+        let end = first + 1;
+        while (end < count && effects[end] === effect) end++;
+        runs.push({
+          bindGroup: buffers.bindGroup,
+          pipeline: this.effects.pipeline(effect),
+          first,
+          count: end - first,
+        });
+        first = end;
+      }
+    }
 
+    this.drawCalls = 0;
+    if (!runs.length && !clearValue) return;
     const pass = encoder.beginRenderPass({
       label: 'ui',
       colorAttachments: [
@@ -94,14 +127,14 @@ export class UIRenderer {
         },
       ],
     });
-    pass.setPipeline(this.pipeline);
-    this.drawCalls = 0;
-    for (const surface of this.surfaces) {
-      const count = surface.stream.count;
-      const buffers = this.buffers.get(surface);
-      if (!count || !buffers) continue;
-      pass.setBindGroup(0, buffers.bindGroup);
-      pass.draw(4, count);
+    let bindGroup: GPUBindGroup | null = null;
+    let pipeline: GPURenderPipeline | null = null;
+    for (const run of runs) {
+      if (run.pipeline !== pipeline) pass.setPipeline(run.pipeline);
+      if (run.bindGroup !== bindGroup) pass.setBindGroup(0, run.bindGroup);
+      pipeline = run.pipeline;
+      bindGroup = run.bindGroup;
+      pass.draw(4, run.count, 0, run.first);
       this.drawCalls++;
     }
     pass.end();
@@ -113,11 +146,15 @@ export class UIRenderer {
     this.uniforms.destroy();
   }
 
+  /** Uploads the primitives that changed since the last upload. */
   private upload(surface: UISurface): void {
-    const { data, count } = surface.stream;
-    if (!count) return;
+    const stream = surface.stream;
+    const { data, count } = stream;
+    let { dirtyFrom: from, dirtyTo: to } = stream;
+    stream.clearDirty();
+    if (!count || from >= to) return;
     let buffers = this.buffers.get(surface);
-    if (!buffers || buffers.buffer.size < data.byteLength) {
+    if (!buffers || buffers.buffer.size < count * PRIMITIVE_FLOATS * 4) {
       buffers?.buffer.destroy();
       const buffer = this.device.createBuffer({
         label: `ui-${surface.name}`,
@@ -125,7 +162,7 @@ export class UIRenderer {
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
       const bindGroup = this.device.createBindGroup({
-        layout: this.pipeline.getBindGroupLayout(0),
+        layout: this.bindGroupLayout,
         entries: [
           { binding: 0, resource: { buffer: this.uniforms } },
           { binding: 1, resource: { buffer } },
@@ -133,13 +170,16 @@ export class UIRenderer {
       });
       buffers = { buffer, bindGroup };
       this.buffers.set(surface, buffers);
+      // A new buffer holds nothing yet.
+      from = 0;
+      to = count;
     }
     this.device.queue.writeBuffer(
       buffers.buffer,
-      0,
+      from * PRIMITIVE_FLOATS * 4,
       data,
-      0,
-      count * PRIMITIVE_FLOATS
+      from * PRIMITIVE_FLOATS,
+      (to - from) * PRIMITIVE_FLOATS
     );
   }
 }

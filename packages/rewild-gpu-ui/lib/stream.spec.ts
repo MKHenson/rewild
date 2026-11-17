@@ -15,6 +15,7 @@ function primitive(stream: PrimitiveStream, index: number) {
     border: d.slice(20, 24),
     borderWidth: d[24],
     opacity: d[25],
+    effect: d.slice(28, 32),
   };
 }
 
@@ -147,6 +148,58 @@ describe('the primitive stream', () => {
       );
     surface.update(10, 10);
     expect(surface.stream.count).toBe(200);
+  });
+});
+
+describe('effects in the stream', () => {
+  function surfaceWithEffect() {
+    const surface = new UISurface({ kind: 'screen', name: 'test' });
+    const plain = new UINode({
+      style: { width: 10, height: 10, backgroundColor: '#ffffff' },
+    });
+    const node = new UINode({
+      effect: 'meter',
+      style: { width: 10, height: 10 },
+    });
+    node.setEffectParams(0.5, 1, 2, 3);
+    surface.root.append(plain, node);
+    surface.update(100, 100);
+    return { surface, node };
+  }
+
+  it('writes an effect node with no fill, with its effect and params', () => {
+    const { surface } = surfaceWithEffect();
+    const { stream } = surface;
+    expect(stream.count).toBe(2);
+    expect(stream.effects.slice(0, 2)).toEqual([null, 'meter']);
+    expect(primitive(stream, 1).effect).toEqual([0.5, 1, 2, 3]);
+  });
+
+  it('changes params in place, with no rebuild', () => {
+    const { surface, node } = surfaceWithEffect();
+    const { stream } = surface;
+    stream.clearDirty();
+    node.setEffectParams(0.25, 1, 2, 3);
+    expect(primitive(stream, 1).effect).toEqual([0.25, 1, 2, 3]);
+    expect([stream.dirtyFrom, stream.dirtyTo]).toEqual([1, 2]);
+    expect(surface.needsPaint).toBe(false);
+    expect(surface.update(100, 100)).toBe(false);
+  });
+
+  it('keeps the params of a hidden node for when it shows', () => {
+    const { surface, node } = surfaceWithEffect();
+    node.style.display = 'none';
+    surface.update(100, 100);
+    node.setEffectParams(0.75, 1, 2, 3);
+    expect(surface.stream.count).toBe(1);
+    node.style.display = 'flex';
+    surface.update(100, 100);
+    expect(primitive(surface.stream, 1).effect).toEqual([0.75, 1, 2, 3]);
+  });
+
+  it('marks the whole stream for upload after a rebuild', () => {
+    const { surface } = surfaceWithEffect();
+    expect([surface.stream.dirtyFrom, surface.stream.dirtyTo]).toEqual([0, 2]);
   });
 });
 
