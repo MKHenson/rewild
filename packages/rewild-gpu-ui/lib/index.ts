@@ -2,6 +2,8 @@ export * from './canvasSize';
 export * from './color';
 export * from './components';
 export * from './font';
+export * from './iconNames';
+export * from './icons';
 export * from './layout';
 export * from './stream';
 export * from './style';

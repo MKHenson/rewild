@@ -1,3 +1,4 @@
+import { createElement, icons } from 'lucide';
 import { cornerRadii, Edges, Length, UINode, UIStyle } from '../lib';
 
 /** Builds DOM elements with the same styles as a surface's tree. */
@@ -22,6 +23,15 @@ export function mirrorTree(root: UINode): HTMLElement {
 function mirrorNode(node: UINode): HTMLElement {
   const element = document.createElement('div');
   applyStyle(element.style, node.style);
+  if (node.icon !== null) {
+    // Lucide's own SVG, as the DOM UI draws it. It fills the content box, and
+    // its viewBox centres the largest square that fits, as in Mica.
+    const svg = createElement(icons[pascalCase(node.icon)]);
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', '100%');
+    svg.style.display = 'block';
+    element.append(svg);
+  }
   if (node.text !== null) {
     // Text in a block, so it starts at the top left of the content box as in
     // Mica, and `text-overflow` applies.
@@ -77,6 +87,13 @@ function applyStyle(css: CSSStyleDeclaration, style: UIStyle): void {
   // These two do not pass down in Mica, so each element sets its own.
   css.whiteSpace = style.whiteSpace ?? 'normal';
   css.textOverflow = style.textOverflow ?? 'clip';
+}
+
+/** `chevron-down` to `ChevronDown`, the name lucide exports it under. */
+function pascalCase(name: string): keyof typeof icons {
+  return name.replace(/(^|-)([a-z0-9])/g, (_, __, c: string) =>
+    c.toUpperCase()
+  ) as keyof typeof icons;
 }
 
 function edges(value: Edges | undefined): string {

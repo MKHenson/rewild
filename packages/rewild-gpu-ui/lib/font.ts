@@ -1,3 +1,4 @@
+import { loadAtlasTexture } from './atlas';
 import type { FontWeight } from './style';
 
 /** Ems for `left`, `top`, `right` and `bottom`, or texels in the atlas. */
@@ -133,28 +134,11 @@ export class UIFont {
   static async load(device: GPUDevice, url: string): Promise<UIFont> {
     const data = (await (await fetch(url)).json()) as FontAtlasData;
     const font = new UIFont(data);
-    const image = url.replace(/\.json$/, '.png');
-    // The channels are distances, not colours, so the image loads with no
-    // colour conversion.
-    const bitmap = await createImageBitmap(await (await fetch(image)).blob(), {
-      colorSpaceConversion: 'none',
-      premultiplyAlpha: 'none',
-    });
-    const texture = device.createTexture({
-      label: `ui-font ${image}`,
-      size: [bitmap.width, bitmap.height],
-      format: 'rgba8unorm',
-      usage:
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-    device.queue.copyExternalImageToTexture({ source: bitmap }, { texture }, [
-      bitmap.width,
-      bitmap.height,
-    ]);
-    bitmap.close();
-    font.texture = texture;
+    font.texture = await loadAtlasTexture(
+      device,
+      url.replace(/\.json$/, '.png'),
+      'ui-font'
+    );
     return font;
   }
 

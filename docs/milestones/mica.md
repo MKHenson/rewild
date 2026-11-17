@@ -134,8 +134,8 @@ What the package holds:
 
 - Nodes, surfaces, style, layout, drawing, text, icons, events and components.
 - The MSDF font code, moved from `rewild-renderer/lib/fonts` and `lib/core/text-renderer`.
-- The Roboto source fonts and the font atlas, in `fonts/`.
-- The font and icon atlas build scripts. The `opentype.js` dev dependency is for the font script, which also needs msdf-atlas-gen. See Text. The `lucide` dev dependency is for the icon script.
+- The Roboto source fonts and the font atlas, in `fonts/`. The icon atlas, in `icons/`.
+- The font and icon atlas build scripts. Both need msdf-atlas-gen. The `opentype.js` dev dependency is for both scripts. The `lucide` dev dependency is for the icon script and the inspector. See Text and Icons.
 - The UI inspector: its entry, its HTML page and its examples.
 
 The old GPU UI (`UIElement`, `GuiManager`, the UI passes) is not moved. Ticket 4 deletes it.
@@ -259,7 +259,7 @@ One pipeline draws a surface. Each node adds primitives to one instance stream, 
 | --------- | ------------------------------------------------------------------------------------------- |
 | `rect`    | A rounded box: SDF corners per corner, border width, fill, border colour, shadow, backdrop   |
 | `glyph`   | One MSDF character                                                                          |
-| `icon`    | One MSDF icon from the icon atlas                                                           |
+| `icon`    | One icon from the SDF icon atlas                                                            |
 | `custom`  | A rect drawn by a registered fragment function. See Effects                                 |
 
 Each instance carries its rectangle, a clip rectangle, its colours and one `vec4` of parameters. A node with `overflow: hidden` sets the clip for its children.
@@ -278,7 +278,7 @@ MSDF stays. What changes:
 - **Font.** The DOM uses Roboto. Mica makes one Roboto atlas that holds regular and bold, so both UIs use the same face and all text shares one texture. The source is the static Roboto 2.138, because Roboto 3's overlapping contours make holes in a distance field.
 - **Atlas.** MTSDF, with a true distance in the alpha channel for outlines, glow and shadows. `distanceRange` 8, 40 texels per em. Latin-1, the rest of Windows-1252 and common symbols. A character the font does not have draws as "?".
 - **Building the atlas.** `npm run ui-font` runs msdf-atlas-gen 1.4 and writes `fonts/roboto-msdf.png` and `.json` in the package. Both are committed, so only someone who changes the atlas needs the tool. It is found on the `PATH` or through `MSDF_ATLAS_GEN`. On macOS, `brew install msdf-atlas-gen`. On Windows, use the release from GitHub. On Linux, build it from source. When the tool is missing, the script prints the steps for the platform. msdf-atlas-gen reads kerning only from the old `kern` table, and Roboto keeps its kerning in `GPOS`, so the script adds it with `opentype.js`. The JSON is msdf-atlas-gen's, with `yOrigin: 'top'`.
-- **Publishing the atlas.** The deploy caches files for a year, so the game build copies the atlas to `public/fonts` under names with a hash of its contents, such as `roboto-msdf.6b9b16549f.json`, and passes the URL to the game as `process.env.UI_FONT_URL`. A changed atlas gets new URLs, and the JSON and PNG share one hash. `scripts/font-files.mjs` does the hashing. The inspector serves the plain names.
+- **Publishing the atlas.** The deploy caches files for a year, so the game build copies the atlas to `public/fonts` under names with a hash of its contents, such as `roboto-msdf.6b9b16549f.json`, and passes the URL to the game as `process.env.UI_FONT_URL`. A changed atlas gets new URLs, and the JSON and PNG share one hash. `scripts/atlas-files.mjs` does the hashing, for the font and the icons. The inspector serves the plain names.
 - **Crisp.** The glyph's quad size gives the screen pixel range, clamped to at least 1. Baselines snap to device pixels. The canvas is sized by the device pixel ratio.
 - **Lines.** Line height, left, centre and right alignment, wrapping at spaces, clipping and ellipsis. `whiteSpace` is `normal`, `nowrap` or `pre-line`. As in CSS, an ellipsis needs `overflow: 'hidden'`, and a line too long for its box aligns left.
 - **Measuring.** The same code measures text for layout and lays out glyphs for drawing, so they always agree.
@@ -293,7 +293,19 @@ A node with `text` measures from its text and does not lay out its children. Tex
 
 ## Icons
 
-The DOM uses lucide icons. Mica makes an MSDF atlas from the same SVGs, so icons stay sharp at any size and tint like text. The atlas holds only the icons the game uses. A build script makes it, the same as the font.
+The DOM uses lucide icons. Mica makes a distance field atlas from the same icons, so icons stay sharp at any size and tint like text. The atlas holds only the icons the game uses.
+
+- **Building the atlas.** `npm run ui-icons` writes `icons/lucide-icons.png` and `.json` in the package. Both are committed. The icons are listed once, in `lib/iconNames.ts`, which gives the typed names and which the script imports. To add an icon, add its lucide name there and run the script again. The lucide version is the one `rewild-ui` uses.
+- **Strokes to shapes.** Lucide draws 2-unit strokes with round caps and joins on a 24-unit grid. A distance field needs filled shapes, so the script flattens each stroke into line segments and fills each one as a capsule. The capsules go into a font made with `opentype.js`, one icon per private-use code point, and msdf-atlas-gen joins them with the non-zero rule.
+- **SDF, not MSDF.** A round stroke has no sharp outer corners, so the extra MSDF channels keep nothing. And msdf-atlas-gen's MSDF has cracks where many contours overlap. So the icon atlas is a grey, single-channel SDF, 64 texels per icon, `distanceRange` 8. The shader reads it with the same median as text, because grey loads as equal red, green and blue.
+- **Drawing.** `node.icon` draws the icon as the largest square that fits the content box, centred, after the node's box and before its text. Its top left snaps to device pixels. The colour is the text colour that passes down. The icon atlas has its own binding, and icons draw in the same pipeline and the same draw call as boxes and text.
+- **Publishing.** The same as the font: the game build copies the atlas to `public/icons` under hashed names and passes the URL as `process.env.UI_ICONS_URL`.
+
+```ts
+ui.icons = await UIIcons.load(device, '/icons/lucide-icons.json');
+const settings = new Icon({ icon: 'settings', size: 18 });
+settings.icon = 'x'; // draws again, with no layout
+```
 
 ---
 
@@ -646,9 +658,9 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: the MSDF font code moved into the package. The Roboto MTSDF atlas and its build script, one text pipeline, the glyph primitive, line height, alignment, wrapping, clipping, ellipsis, text measuring for layout.
   - Expect: a label wraps and sizes its box, and is sharp at 12 px and 48 px.
 
-- [ ] **6. Icons**
+- [x] **6. Icons**
 
-  - Scope: the MSDF icon atlas from lucide SVGs, its build script, the icon primitive, the `Icon` component.
+  - Scope: the icon atlas from lucide icons, its build script, the icon primitive, the `Icon` component.
   - Expect: the settings icon draws sharp and tinted at any size.
 
 - [ ] **7. Events**

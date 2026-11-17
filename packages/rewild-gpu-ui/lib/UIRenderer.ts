@@ -1,4 +1,5 @@
 import type { UIFont } from './font';
+import type { UIIcons } from './icons';
 import meterEffect from './shaders/meter.wgsl';
 import { PRIMITIVE_FLOATS } from './stream';
 import { UIEffects } from './UIEffects';
@@ -25,8 +26,8 @@ interface DrawRun {
 }
 
 /**
- * Draws surfaces in order, each in one draw call per run of an effect. Boxes
- * and text share the plain rect pipeline.
+ * Draws surfaces in order, each in one draw call per run of an effect. Boxes,
+ * text and icons share the plain rect pipeline.
  */
 export class UIRenderer {
   /** Draw calls in the last render. */
@@ -38,8 +39,9 @@ export class UIRenderer {
   private uniforms: GPUBuffer;
   private runs: DrawRun[] = [];
   private _font: UIFont | null = null;
+  private _icons: UIIcons | null = null;
   private sampler: GPUSampler;
-  /** Bound in place of the atlas until there is a font. */
+  /** Bound in place of an atlas until there is a font or icons. */
   private emptyAtlas: GPUTexture;
 
   constructor(private device: GPUDevice, format: GPUTextureFormat) {
@@ -51,10 +53,11 @@ export class UIRenderer {
         { binding: 1, visibility, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+        { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: {} },
       ],
     });
     this.sampler = device.createSampler({
-      label: 'ui-font',
+      label: 'ui-atlas',
       magFilter: 'linear',
       minFilter: 'linear',
     });
@@ -89,13 +92,28 @@ export class UIRenderer {
     if (font === this._font) return;
     this._font = font;
     for (const surface of this.surfaces) surface.font = font;
-    for (const buffers of this.buffers.values())
-      buffers.bindGroup = this.createBindGroup(buffers.buffer);
+    this.rebindAtlases();
+  }
+
+  /**
+   * The icons every surface draws with. The renderer does not own them, so it
+   * does not dispose them.
+   */
+  get icons(): UIIcons | null {
+    return this._icons;
+  }
+
+  set icons(icons: UIIcons | null) {
+    if (icons === this._icons) return;
+    this._icons = icons;
+    for (const surface of this.surfaces) surface.icons = icons;
+    this.rebindAtlases();
   }
 
   createSurface(options: UISurfaceOptions): UISurface {
     const surface = new UISurface(options);
     surface.font = this._font;
+    surface.icons = this._icons;
     this.surfaces.push(surface);
     this.surfaces.sort((a, b) => a.order - b.order);
     return surface;
@@ -185,15 +203,22 @@ export class UIRenderer {
     this.emptyAtlas.destroy();
   }
 
+  private rebindAtlases(): void {
+    for (const buffers of this.buffers.values())
+      buffers.bindGroup = this.createBindGroup(buffers.buffer);
+  }
+
   private createBindGroup(buffer: GPUBuffer): GPUBindGroup {
-    const atlas = this._font?.texture ?? this.emptyAtlas;
+    const fontAtlas = this._font?.texture ?? this.emptyAtlas;
+    const iconAtlas = this._icons?.texture ?? this.emptyAtlas;
     return this.device.createBindGroup({
       layout: this.bindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: this.uniforms } },
         { binding: 1, resource: { buffer } },
-        { binding: 2, resource: atlas.createView() },
+        { binding: 2, resource: fontAtlas.createView() },
         { binding: 3, resource: this.sampler },
+        { binding: 4, resource: iconAtlas.createView() },
       ],
     });
   }

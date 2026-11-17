@@ -1,3 +1,4 @@
+import type { UIIconName } from './iconNames';
 import type { EffectParams } from './stream';
 import { affectsLayout, Sides, UIStyle } from './style';
 import { measureText } from './text';
@@ -45,6 +46,11 @@ export interface UINodeOptions {
    */
   text?: string;
   measure?: MeasureFunction;
+  /**
+   * An icon drawn in the content box, as large as fits, in the text colour.
+   * It does not size the node.
+   */
+  icon?: UIIconName;
   /** A registered effect that draws the node's box. See `UIEffects`. */
   effect?: string;
 }
@@ -72,12 +78,14 @@ export class UINode {
   readonly effectParams: EffectParams = [0, 0, 0, 0];
   private _effect: string | null;
   private _text: string | null = null;
+  private _icon: UIIconName | null;
   private readonly measureText: MeasureFunction = (limit) =>
     measureText(this, limit);
 
   constructor(options: UINodeOptions = {}) {
     this.measure = options.measure ?? null;
     this._effect = options.effect ?? null;
+    this._icon = options.icon ?? null;
     if (options.text !== undefined) this.text = options.text;
     this.style = new Proxy<UIStyle>(
       { ...options.style },
@@ -118,6 +126,17 @@ export class UINode {
     else if (value !== null && this.measure === null)
       this.measure = this.measureText;
     this.markDirty(Dirty.Layout | Dirty.Paint);
+  }
+
+  /** The icon drawn in the content box, or null. */
+  get icon(): UIIconName | null {
+    return this._icon;
+  }
+
+  set icon(name: UIIconName | null) {
+    if (name === this._icon) return;
+    this._icon = name;
+    this.markDirty(Dirty.Paint);
   }
 
   /** The registered effect that draws the box in place of its fill, or null. */

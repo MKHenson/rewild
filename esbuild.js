@@ -3,7 +3,10 @@ import * as http from 'http';
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { hashedFontAtlas } from './packages/rewild-gpu-ui/scripts/font-files.mjs';
+import {
+  hashedFontAtlas,
+  hashedIconAtlas,
+} from './packages/rewild-gpu-ui/scripts/atlas-files.mjs';
 
 // Load .env into process.env (shell env vars take precedence)
 if (fs.existsSync('.env')) {
@@ -36,6 +39,7 @@ function copyDirRecursive(src, dest) {
 
 // Hashed names, so a changed atlas gets new URLs past the year-long cache.
 const uiFont = hashedFontAtlas();
+const uiIcons = hashedIconAtlas();
 
 const isWatchMode = process.argv.join('').includes('serve') || process.argv.join('').includes('watch');
 
@@ -52,10 +56,13 @@ const copyPlugin = {
       if (fs.existsSync('./index.html')) fs.copyFileSync('./index.html', './public/index.html');
       copyDirRecursive('./templates', './public/templates');
       copyDirRecursive('./static', './public');
-      // The GPU UI's font atlas.
+      // The GPU UI's font and icon atlases.
       fs.mkdirSync('./public/fonts', { recursive: true });
       for (const [src, name] of uiFont.files)
         fs.copyFileSync(src, path.join('./public/fonts', name));
+      fs.mkdirSync('./public/icons', { recursive: true });
+      for (const [src, name] of uiIcons.files)
+        fs.copyFileSync(src, path.join('./public/icons', name));
     });
 
     build.onEnd(() => {
@@ -101,6 +108,7 @@ const defines = {
     process.env.GOOGLE_CLIENT_ID || ''
   ),
   'process.env.UI_FONT_URL': JSON.stringify(uiFont.url),
+  'process.env.UI_ICONS_URL': JSON.stringify(uiIcons.url),
 };
 
 const logPlugin = {
