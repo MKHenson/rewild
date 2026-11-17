@@ -3,6 +3,7 @@ import type { UIIcons } from './icons';
 import meterEffect from './shaders/meter.wgsl';
 import { PRIMITIVE_FLOATS } from './stream';
 import { UIEffects } from './UIEffects';
+import { UIInput } from './UIInput';
 import { UISurface, UISurfaceOptions } from './UISurface';
 
 export interface UIViewport {
@@ -33,7 +34,9 @@ export class UIRenderer {
   /** Draw calls in the last render. */
   drawCalls = 0;
   readonly effects: UIEffects;
-  private surfaces: UISurface[] = [];
+  /** Sends input to the surfaces. Attach it to the canvas the UI draws on. */
+  readonly input = new UIInput(this);
+  private _surfaces: UISurface[] = [];
   private buffers = new Map<UISurface, SurfaceBuffers>();
   private bindGroupLayout: GPUBindGroupLayout;
   private uniforms: GPUBuffer;
@@ -91,7 +94,7 @@ export class UIRenderer {
   set font(font: UIFont | null) {
     if (font === this._font) return;
     this._font = font;
-    for (const surface of this.surfaces) surface.font = font;
+    for (const surface of this._surfaces) surface.font = font;
     this.rebindAtlases();
   }
 
@@ -106,22 +109,27 @@ export class UIRenderer {
   set icons(icons: UIIcons | null) {
     if (icons === this._icons) return;
     this._icons = icons;
-    for (const surface of this.surfaces) surface.icons = icons;
+    for (const surface of this._surfaces) surface.icons = icons;
     this.rebindAtlases();
+  }
+
+  /** The surfaces in draw order, from bottom to top. */
+  get surfaces(): readonly UISurface[] {
+    return this._surfaces;
   }
 
   createSurface(options: UISurfaceOptions): UISurface {
     const surface = new UISurface(options);
     surface.font = this._font;
     surface.icons = this._icons;
-    this.surfaces.push(surface);
-    this.surfaces.sort((a, b) => a.order - b.order);
+    this._surfaces.push(surface);
+    this._surfaces.sort((a, b) => a.order - b.order);
     return surface;
   }
 
   removeSurface(surface: UISurface): void {
-    const index = this.surfaces.indexOf(surface);
-    if (index !== -1) this.surfaces.splice(index, 1);
+    const index = this._surfaces.indexOf(surface);
+    if (index !== -1) this._surfaces.splice(index, 1);
     this.buffers.get(surface)?.buffer.destroy();
     this.buffers.delete(surface);
   }
@@ -150,7 +158,7 @@ export class UIRenderer {
     // with no pass left open.
     const runs = this.runs;
     runs.length = 0;
-    for (const surface of this.surfaces) {
+    for (const surface of this._surfaces) {
       surface.update(width, height, pixelRatio);
       this.upload(surface);
       const buffers = this.buffers.get(surface);
@@ -197,6 +205,7 @@ export class UIRenderer {
   }
 
   dispose(): void {
+    this.input.detach();
     for (const { buffer } of this.buffers.values()) buffer.destroy();
     this.buffers.clear();
     this.uniforms.destroy();

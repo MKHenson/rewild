@@ -1,7 +1,9 @@
 export * from './canvasSize';
 export * from './color';
 export * from './components';
+export * from './events';
 export * from './font';
+export * from './hitTest';
 export * from './iconNames';
 export * from './icons';
 export * from './layout';
@@ -10,6 +12,7 @@ export * from './style';
 export * from './text';
 export * from './UICanvas';
 export * from './UIEffects';
+export * from './UIInput';
 export * from './UINode';
 export * from './UIRenderer';
 export * from './UISurface';

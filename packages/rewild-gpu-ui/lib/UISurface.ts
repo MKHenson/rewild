@@ -4,11 +4,24 @@ import { layoutTree } from './layout';
 import { PrimitiveStream, writeTree } from './stream';
 import { Dirty, UINode } from './UINode';
 
+/**
+ * Which pointer and key input a surface takes from what is under it.
+ *
+ * - `none`: no input. Its nodes get no events.
+ * - `nodes`: pointer input over a node other than the root. The root lets
+ *   input through, so the game gets what misses the nodes.
+ * - `all`: all pointer and key input while the root shows. A miss goes to
+ *   the root. Keys go to the root.
+ */
+export type UISurfaceInput = 'none' | 'nodes' | 'all';
+
 export interface UISurfaceOptions {
   kind: 'screen';
   name: string;
   /** Surfaces draw from low to high order, then in the order they were made. */
   order?: number;
+  /** Defaults to `nodes`. */
+  input?: UISurfaceInput;
 }
 
 /** Owns one UI tree and says where it draws. */
@@ -18,6 +31,9 @@ export class UISurface {
   readonly order: number;
   readonly root = new UINode();
   readonly stream = new PrimitiveStream();
+  input: UISurfaceInput;
+  /** The node that captured each pointer, by pointer id. See `UINode.setPointerCapture`. */
+  readonly pointerCaptures = new Map<number, UINode>();
   width = 0;
   height = 0;
   /** Device pixels per CSS pixel. Text baselines snap to device pixels. */
@@ -32,6 +48,7 @@ export class UISurface {
     this.kind = options.kind;
     this.name = options.name;
     this.order = options.order ?? 0;
+    this.input = options.input ?? 'nodes';
     this.root.owner = this;
   }
 
@@ -67,6 +84,11 @@ export class UISurface {
     if (value === this.overlay) return;
     this.overlay = value;
     this.needsPaint = true;
+  }
+
+  /** True when the root shows. A surface that is not open takes no input. */
+  get open(): boolean {
+    return this.root.style.display !== 'none';
   }
 
   invalidate(flags: Dirty): void {

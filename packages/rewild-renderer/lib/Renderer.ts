@@ -433,6 +433,7 @@ export class Renderer {
     this.frameCompositor.initToneMap(this);
 
     this.ui = new UIRenderer(device, this.presentationFormat);
+    this.ui.input.attach(canvas);
     // esbuild.js defines the URLs, with a hash of each atlas in its name.
     const [font, icons] = await Promise.all([
       UIFont.load(device, process.env.UI_FONT_URL!),

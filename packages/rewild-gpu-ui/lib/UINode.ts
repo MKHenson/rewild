@@ -1,6 +1,13 @@
+import {
+  UIEvent,
+  UIEventListener,
+  UIEventPhase,
+  UIEventType,
+  UIListenerOptions,
+} from './events';
 import type { UIIconName } from './iconNames';
 import type { EffectParams } from './stream';
-import { affectsLayout, Sides, UIStyle } from './style';
+import { affectsLayout, affectsOnlyInput, Sides, UIStyle } from './style';
 import { measureText } from './text';
 import type { UISurface } from './UISurface';
 
@@ -36,6 +43,11 @@ export type UIChild = UINode | UIComponent;
 
 function toNode(child: UIChild): UINode {
   return child instanceof UINode ? child : child.node;
+}
+
+interface Listener {
+  listener: (event: UIEvent) => void;
+  capture: boolean;
 }
 
 export interface UINodeOptions {
@@ -79,6 +91,7 @@ export class UINode {
   private _effect: string | null;
   private _text: string | null = null;
   private _icon: UIIconName | null;
+  private listeners: Map<UIEventType, Listener[]> | null = null;
   private readonly measureText: MeasureFunction = (limit) =>
     measureText(this, limit);
 
@@ -122,7 +135,8 @@ export class UINode {
   set text(value: string | null) {
     if (value === this._text) return;
     this._text = value;
-    if (value === null && this.measure === this.measureText) this.measure = null;
+    if (value === null && this.measure === this.measureText)
+      this.measure = null;
     else if (value !== null && this.measure === null)
       this.measure = this.measureText;
     this.markDirty(Dirty.Layout | Dirty.Paint);
@@ -171,6 +185,81 @@ export class UINode {
     this.surface?.stream.setEffectParams(this, params);
   }
 
+  /** Adds a listener. Adding the same listener and phase twice does nothing. */
+  on<K extends UIEventType>(
+    type: K,
+    listener: UIEventListener<K>,
+    options: UIListenerOptions = {}
+  ): void {
+    const capture = options.capture ?? false;
+    this.listeners ??= new Map();
+    const list = this.listeners.get(type) ?? [];
+    if (list.some((l) => l.listener === listener && l.capture === capture))
+      return;
+    list.push({ listener: listener as Listener['listener'], capture });
+    this.listeners.set(type, list);
+  }
+
+  off<K extends UIEventType>(
+    type: K,
+    listener: UIEventListener<K>,
+    options: UIListenerOptions = {}
+  ): void {
+    const list = this.listeners?.get(type);
+    if (!list) return;
+    const capture = options.capture ?? false;
+    const index = list.findIndex(
+      (l) => l.listener === listener && l.capture === capture
+    );
+    if (index !== -1) list.splice(index, 1);
+  }
+
+  /**
+   * Sends the event down from the root in the capture phase, to this node,
+   * then up to the root if it bubbles. The path is fixed when the dispatch
+   * starts. Returns false when a listener called `preventDefault`.
+   */
+  dispatchEvent(event: UIEvent): boolean {
+    const path: UINode[] = [];
+    for (let node: UINode | null = this; node; node = node.parent)
+      path.push(node);
+    event.target = this;
+    for (let i = path.length - 1; i > 0 && !event.propagationStopped; i--)
+      path[i].invoke(event, UIEventPhase.Capture, true);
+    // At the target, capture listeners run first, as in the DOM.
+    if (!event.propagationStopped)
+      this.invoke(event, UIEventPhase.Target, true);
+    if (!event.propagationStopped)
+      this.invoke(event, UIEventPhase.Target, false);
+    if (event.bubbles)
+      for (let i = 1; i < path.length && !event.propagationStopped; i++)
+        path[i].invoke(event, UIEventPhase.Bubble, false);
+    event.currentTarget = null;
+    event.eventPhase = UIEventPhase.None;
+    return !event.defaultPrevented;
+  }
+
+  /**
+   * Sends the pointer's moves, its up and its cancel to this node, even off
+   * the node, until the pointer is up. Call it from a `pointerdown` listener.
+   */
+  setPointerCapture(pointerId: number): void {
+    const surface = this.surface;
+    if (!surface)
+      throw new Error('A node must be on a surface to capture the pointer');
+    surface.pointerCaptures.set(pointerId, this);
+  }
+
+  releasePointerCapture(pointerId: number): void {
+    const surface = this.surface;
+    if (surface?.pointerCaptures.get(pointerId) === this)
+      surface.pointerCaptures.delete(pointerId);
+  }
+
+  hasPointerCapture(pointerId: number): boolean {
+    return this.surface?.pointerCaptures.get(pointerId) === this;
+  }
+
   markDirty(flags: Dirty): void {
     this.dirty |= flags;
     this.surface?.invalidate(flags);
@@ -209,8 +298,21 @@ export class UINode {
     while (this.children.length) this.children[0].remove();
     this.append(...nodes);
   }
+
+  private invoke(event: UIEvent, phase: UIEventPhase, capture: boolean): void {
+    const list = this.listeners?.get(event.type);
+    if (!list?.length) return;
+    event.currentTarget = this;
+    event.eventPhase = phase;
+    // A listener can add or remove listeners. Those added wait for the next
+    // event, and those removed do not run.
+    for (const entry of list.slice())
+      if (entry.capture === capture && list.includes(entry))
+        entry.listener(event);
+  }
 }
 
 function styleDirty(key: keyof UIStyle): Dirty {
+  if (affectsOnlyInput(key)) return Dirty.None;
   return affectsLayout(key) ? Dirty.Layout | Dirty.Paint : Dirty.Paint;
 }

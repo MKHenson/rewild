@@ -340,7 +340,7 @@ function ratio(side: number, sum: number): number {
   return sum > 0 ? side / sum : 1;
 }
 
-function intersect(a: Rect, b: Rect): Rect {
+export function intersect(a: Rect, b: Rect): Rect {
   const x = Math.max(a.x, b.x);
   const y = Math.max(a.y, b.y);
   const right = Math.min(a.x + a.width, b.x + b.width);
