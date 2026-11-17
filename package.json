@@ -19,6 +19,7 @@
     "serve": "node ./esbuild.js --serve",
     "ui-inspector": "node packages/rewild-gpu-ui/inspector/serve.mjs",
     "ui-font": "node packages/rewild-gpu-ui/scripts/build-font-atlas.mjs",
+    "ui-icons": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON packages/rewild-gpu-ui/scripts/build-icon-atlas.mjs",
     "bench": "npm run build:wasm && node packages/rewild-renderer/bench/run.mjs",
     "bench:game": "npm run build:wasm && node packages/rewild-renderer/bench/run.mjs --game",
     "generate:types": "cd server && .\\gradlew.bat generateSpec && npx openapi-typescript ../openapi.json -o ../src/types/api.ts",

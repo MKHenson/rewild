@@ -1,5 +1,6 @@
 import { parseColor, RGBA } from './color';
 import type { Bounds, UIFont } from './font';
+import type { UIIcons } from './icons';
 import { innerBox } from './layout';
 import { cornerRadii, Sides } from './style';
 import { placeText, resolveTextStyle } from './text';
@@ -16,6 +17,7 @@ export const PRIMITIVE_FLOATS = 32;
 export enum PrimitiveKind {
   Rect = 0,
   Glyph = 1,
+  Icon = 2,
 }
 
 /** Where the effect params start in a primitive. */
@@ -44,14 +46,18 @@ export interface RectPrimitive {
   node?: UINode;
 }
 
-/** One MTSDF glyph. It draws with the plain rect pipeline. */
-export interface GlyphPrimitive {
+/**
+ * One quad from a distance field atlas: a glyph from the font or an icon. It
+ * draws with the plain rect pipeline.
+ */
+export interface AtlasPrimitive {
+  kind: PrimitiveKind.Glyph | PrimitiveKind.Icon;
   rect: Rect;
   clip: Rect;
   clipRadii: Radii;
   color: RGBA;
   opacity: number;
-  /** The glyph's cell in the atlas, in texels. */
+  /** The quad's cell in the atlas, in texels. */
   atlas: Bounds;
   distanceRange: number;
 }
@@ -94,7 +100,7 @@ export class PrimitiveStream {
     this.dirtyTo = this.count;
   }
 
-  pushGlyph(p: GlyphPrimitive): void {
+  pushAtlas(p: AtlasPrimitive): void {
     this.reserve(this.count + 1);
     const d = this.data;
     const { rect, clip, atlas } = p;
@@ -105,7 +111,7 @@ export class PrimitiveStream {
     d.set(NO_RADII, o + 4);
     d.set(p.color, o + 8);
     d.set(NONE, o + 12);
-    write4(d, o + 16, 0, p.opacity, PrimitiveKind.Glyph, p.distanceRange);
+    write4(d, o + 16, 0, p.opacity, p.kind, p.distanceRange);
     write4(d, o + 20, atlas.left, atlas.top, atlas.right, atlas.bottom);
     this.effects[this.count] = null;
     this.nodes[this.count] = null;
@@ -166,13 +172,15 @@ export interface WriteOptions {
   overlay?: boolean;
   /** Text draws only when there is a font. */
   font?: UIFont | null;
+  /** Icons draw only when there are icons. */
+  icons?: UIIcons | null;
   /** Device pixels per CSS pixel, which text baselines snap to. */
   pixelRatio?: number;
 }
 
 /**
- * Writes the tree's primitives in tree order: a node's box, then its text,
- * then its children. Layout must have run.
+ * Writes the tree's primitives in tree order: a node's box, then its icon,
+ * then its text, then its children. Layout must have run.
  */
 export function writeTree(
   root: UINode,
@@ -225,6 +233,8 @@ function writeNode(
     clip = intersect(clip, innerBox(node));
     clipRadii = radii.map((r) => Math.max(0, r - borderWidth)) as Radii;
   }
+  if (node.icon && options.icons)
+    writeIcon(node, stream, options, options.icons, clip, clipRadii, opacity);
   if (node.text && options.font)
     writeText(node, stream, options, options.font, clip, clipRadii, opacity);
   for (const child of node.children)
@@ -243,17 +253,11 @@ function writeText(
   const style = resolveTextStyle(node);
   const color = parseColor(style.color);
   if (color[3] <= 0) return;
-  const inside = innerBox(node);
-  const [top, right, bottom, left] = node.padding;
-  const box = {
-    x: inside.x + left,
-    y: inside.y + top,
-    width: Math.max(0, inside.width - left - right),
-    height: Math.max(0, inside.height - top - bottom),
-  };
+  const box = contentBox(node);
   const glyphs = placeText(node, font, style, box, options.pixelRatio ?? 1);
   for (const { rect, atlas } of glyphs)
-    stream.pushGlyph({
+    stream.pushAtlas({
+      kind: PrimitiveKind.Glyph,
       rect,
       clip,
       clipRadii,
@@ -262,6 +266,61 @@ function writeText(
       atlas,
       distanceRange: font.distanceRange,
     });
+}
+
+/**
+ * Draws the node's icon as the largest square that fits its content box,
+ * centred, in the text colour. The square's top left snaps to device pixels,
+ * so lucide's strokes on whole grid units stay sharp.
+ */
+function writeIcon(
+  node: UINode,
+  stream: PrimitiveStream,
+  options: WriteOptions,
+  icons: UIIcons,
+  clip: Rect,
+  clipRadii: Radii,
+  opacity: number
+): void {
+  const icon = icons.icon(node.icon!);
+  if (!icon) return;
+  const color = parseColor(resolveTextStyle(node).color);
+  if (color[3] <= 0) return;
+  const box = contentBox(node);
+  const size = Math.min(box.width, box.height);
+  if (size <= 0) return;
+  const ratio = options.pixelRatio ?? 1;
+  const snap = (v: number) => Math.round(v * ratio) / ratio;
+  const x = snap(box.x + (box.width - size) / 2);
+  const y = snap(box.y + (box.height - size) / 2);
+  const { planeBounds: plane, atlasBounds: atlas } = icon;
+  stream.pushAtlas({
+    kind: PrimitiveKind.Icon,
+    rect: {
+      x: x + plane.left * size,
+      y: y + plane.top * size,
+      width: (plane.right - plane.left) * size,
+      height: (plane.bottom - plane.top) * size,
+    },
+    clip,
+    clipRadii,
+    color,
+    opacity,
+    atlas,
+    distanceRange: icons.distanceRange,
+  });
+}
+
+/** The box inside the border and padding. */
+function contentBox(node: UINode): Rect {
+  const inside = innerBox(node);
+  const [top, right, bottom, left] = node.padding;
+  return {
+    x: inside.x + left,
+    y: inside.y + top,
+    width: Math.max(0, inside.width - left - right),
+    height: Math.max(0, inside.height - top - bottom),
+  };
 }
 
 /** Scales the radii down when adjacent corners overlap, as CSS does. */

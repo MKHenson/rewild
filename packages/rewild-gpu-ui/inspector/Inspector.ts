@@ -3,6 +3,7 @@ import {
   observeCanvasSize,
   UICanvas,
   UIFont,
+  UIIcons,
   UIRenderer,
   UISurface,
 } from '../lib';
@@ -34,6 +35,7 @@ class ExampleCard {
   constructor(
     device: GPUDevice,
     font: UIFont,
+    icons: UIIcons,
     example: Example,
     private getPixelRatio: () => number,
     private requestDraw: () => void
@@ -72,6 +74,7 @@ class ExampleCard {
     this.canvas = new UICanvas(device, canvasElement);
     this.renderer = new UIRenderer(device, this.canvas.format);
     this.renderer.font = font;
+    this.renderer.icons = icons;
     this.surface = this.renderer.createSurface({
       kind: 'screen',
       name: example.name,
@@ -139,6 +142,7 @@ export class Inspector {
   constructor(
     private device: GPUDevice,
     private font: UIFont,
+    private icons: UIIcons,
     private registry: ExampleRegistry,
     private settings: InspectorSettings,
     private nav: HTMLElement,
@@ -168,6 +172,7 @@ export class Inspector {
         new ExampleCard(
           this.device,
           this.font,
+          this.icons,
           example,
           () => resolvePixelRatio(this.settings.pixelRatio),
           () => this.requestDraw()

@@ -7,13 +7,8 @@
  * Writes `fonts/roboto-msdf.png` and `fonts/roboto-msdf.json`. Commit both,
  * so only someone who changes the atlas needs the tools below.
  *
- * It needs msdf-atlas-gen 1.4 or later (https://github.com/Chlumsky/msdf-atlas-gen)
- * on the PATH, or at the path in the MSDF_ATLAS_GEN environment variable:
- *
- * - macOS: `brew install msdf-atlas-gen`.
- * - Windows: download the Windows release from the GitHub releases page and
- *   put `msdf-atlas-gen.exe` on the PATH, or set MSDF_ATLAS_GEN to it.
- * - Linux: there is no package. Build it from source. See `howToInstall()`.
+ * It needs msdf-atlas-gen 1.4 or later. See `msdf-atlas-gen.mjs` for how to
+ * install it.
  *
  * msdf-atlas-gen reads kerning only from the old `kern` table, and Roboto
  * keeps its kerning in `GPOS`. So this script reads the kerning with
@@ -24,10 +19,10 @@
  * from the pen on the baseline. Atlas bounds are in texels from the top left.
  */
 import opentype from 'opentype.js';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fail, findTool, runTool } from './msdf-atlas-gen.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fontsDir = path.join(here, '..', 'fonts');
@@ -43,8 +38,6 @@ const FACES = [
 const EM_SIZE = 40;
 /** The width of the distance field in texels, across the edge. */
 const DISTANCE_RANGE = 8;
-/** The version this script was written against. */
-const TESTED_VERSION = [1, 4];
 
 /** Latin-1, the rest of Windows-1252, and common symbols, in msdf-atlas-gen's charset syntax. */
 const CHARSET = [
@@ -66,71 +59,6 @@ function charsetCodes() {
   return codes;
 }
 
-function fail(message) {
-  console.error(`\nbuild-font-atlas: ${message}\n`);
-  process.exit(1);
-}
-
-function howToInstall() {
-  const releases = 'https://github.com/Chlumsky/msdf-atlas-gen/releases';
-  switch (process.platform) {
-    case 'darwin':
-      return 'Install it with Homebrew:\n\n    brew install msdf-atlas-gen';
-    case 'win32':
-      return [
-        `Download the Windows release from ${releases}`,
-        'and unzip it. Then put the folder with msdf-atlas-gen.exe on the PATH,',
-        'or point MSDF_ATLAS_GEN at the file:',
-        '',
-        '    set MSDF_ATLAS_GEN=C:\\tools\\msdf-atlas-gen\\msdf-atlas-gen.exe',
-      ].join('\n');
-    default:
-      return [
-        'There is no Linux package. Build it from source, with the FreeType,',
-        'libpng and tinyxml2 development packages installed:',
-        '',
-        '    git clone --recursive https://github.com/Chlumsky/msdf-atlas-gen.git',
-        '    cd msdf-atlas-gen',
-        '    cmake -B build -DCMAKE_BUILD_TYPE=Release \\',
-        '      -DMSDF_ATLAS_USE_VCPKG=OFF -DMSDF_ATLAS_USE_SKIA=OFF',
-        '    cmake --build build',
-        '',
-        'Then put build/bin on the PATH, or point MSDF_ATLAS_GEN at the binary.',
-        'With vcpkg, leave out the two OFF options and set VCPKG_ROOT. CMake then',
-        'fetches the dependencies. See the msdf-atlas-gen README.',
-      ].join('\n');
-  }
-}
-
-/** Finds msdf-atlas-gen and checks its version. Returns the command to run. */
-function findTool() {
-  const fromEnv = process.env.MSDF_ATLAS_GEN;
-  if (fromEnv && !fs.existsSync(fromEnv))
-    fail(
-      `MSDF_ATLAS_GEN is set to "${fromEnv}", but there is no file there.\n\n` +
-        howToInstall()
-    );
-  const command = fromEnv || 'msdf-atlas-gen';
-  const result = spawnSync(command, ['-version'], { encoding: 'utf8' });
-  if (result.error?.code === 'ENOENT')
-    fail(`msdf-atlas-gen is not on the PATH.\n\n${howToInstall()}`);
-  if (result.error)
-    fail(`msdf-atlas-gen did not start: ${result.error.message}`);
-
-  const output = `${result.stdout}${result.stderr}`;
-  const match = output.match(/MSDF-Atlas-Gen v(\d+)\.(\d+)/i);
-  if (!match)
-    fail(`"${command} -version" printed no version:\n\n${output.trim()}`);
-  const [major, minor] = [Number(match[1]), Number(match[2])];
-  if (major < TESTED_VERSION[0] || (major === TESTED_VERSION[0] && minor < TESTED_VERSION[1]))
-    console.warn(
-      `build-font-atlas: msdf-atlas-gen v${major}.${minor} is older than ` +
-        `v${TESTED_VERSION.join('.')}, which this script was written for. ` +
-        'If the atlas looks wrong, update it.'
-    );
-  return command;
-}
-
 function fontPath(face) {
   const file = path.join(fontsDir, 'src', face.file);
   if (!fs.existsSync(file))
@@ -138,7 +66,7 @@ function fontPath(face) {
   return file;
 }
 
-function runTool(command) {
+function buildAtlas(command) {
   const args = [];
   FACES.forEach((face, i) => {
     if (i > 0) args.push('-and');
@@ -153,15 +81,7 @@ function runTool(command) {
     '-imageout', pngFile,
     '-json', jsonFile
   );
-  const result = spawnSync(command, args, { encoding: 'utf8' });
-  if (result.error) fail(`msdf-atlas-gen did not run: ${result.error.message}`);
-  if (result.status !== 0)
-    fail(
-      `msdf-atlas-gen stopped with code ${result.status}:\n\n` +
-        `${result.stdout}${result.stderr}`.trim()
-    );
-  for (const file of [pngFile, jsonFile])
-    if (!fs.existsSync(file)) fail(`msdf-atlas-gen did not write ${file}.`);
+  runTool(command, args, [pngFile, jsonFile]);
 }
 
 /** The GPOS kerning of each pair of glyphs in the atlas, in ems. */
@@ -188,7 +108,7 @@ function kerning(face, glyphs) {
 
 function main() {
   const command = findTool();
-  runTool(command);
+  buildAtlas(command);
 
   const json = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
   if (json.atlas?.type !== 'mtsdf' || !Array.isArray(json.variants))

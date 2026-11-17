@@ -1,4 +1,5 @@
 import type { UIFont } from './font';
+import type { UIIcons } from './icons';
 import { layoutTree } from './layout';
 import { PrimitiveStream, writeTree } from './stream';
 import { Dirty, UINode } from './UINode';
@@ -25,6 +26,7 @@ export class UISurface {
   needsPaint = true;
   private overlay = false;
   private _font: UIFont | null = null;
+  private _icons: UIIcons | null = null;
 
   constructor(options: UISurfaceOptions) {
     this.kind = options.kind;
@@ -42,6 +44,17 @@ export class UISurface {
     if (font === this._font) return;
     this._font = font;
     this.needsLayout = true;
+    this.needsPaint = true;
+  }
+
+  /** The icons that icon nodes draw with. Icons do not draw until it is set. */
+  get icons(): UIIcons | null {
+    return this._icons;
+  }
+
+  set icons(icons: UIIcons | null) {
+    if (icons === this._icons) return;
+    this._icons = icons;
     this.needsPaint = true;
   }
 
@@ -80,6 +93,7 @@ export class UISurface {
     writeTree(this.root, this.stream, {
       overlay: this.overlay,
       font: this._font,
+      icons: this._icons,
       pixelRatio,
     });
     clearDirty(this.root);

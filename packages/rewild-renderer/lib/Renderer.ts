@@ -23,7 +23,7 @@ import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
 import { SkinnedModelManager } from './managers/SkinnedModelManager';
 import { IMaterialsTemplate } from './managers/types';
-import { UIFont, UIRenderer } from 'rewild-gpu-ui';
+import { UIFont, UIIcons, UIRenderer } from 'rewild-gpu-ui';
 import { isVisualComponent } from './typeGuards';
 import { SceneBVH } from './acceleration/SceneBVH';
 import { BVHConfig, DEFAULT_BVH_CONFIG } from './acceleration/BVHConfig';
@@ -433,8 +433,13 @@ export class Renderer {
     this.frameCompositor.initToneMap(this);
 
     this.ui = new UIRenderer(device, this.presentationFormat);
-    // esbuild.js defines the URL, with a hash of the atlas in its name.
-    this.ui.font = await UIFont.load(device, process.env.UI_FONT_URL!);
+    // esbuild.js defines the URLs, with a hash of each atlas in its name.
+    const [font, icons] = await Promise.all([
+      UIFont.load(device, process.env.UI_FONT_URL!),
+      UIIcons.load(device, process.env.UI_ICONS_URL!),
+    ]);
+    this.ui.font = font;
+    this.ui.icons = icons;
 
     this.lastTime = performance.now();
     this.delta = 0;
@@ -488,6 +493,7 @@ export class Renderer {
     this.materialManager.dispose();
     this.geometryManager.dispose();
     this.ui.font?.dispose();
+    this.ui.icons?.dispose();
     this.ui.dispose();
   }
 

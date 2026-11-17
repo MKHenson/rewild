@@ -7,7 +7,8 @@
 // coverage inside the border. It returns a premultiplied colour. The base
 // applies the box's edge, its clip and its opacity.
 //
-// Glyph primitives skip the effect. The base draws them from the font atlas.
+// Glyph and icon primitives skip the effect. The base draws them from the
+// font atlas and the icon atlas.
 
 struct Uniforms {
   // The surface size in CSS pixels.
@@ -24,23 +25,25 @@ struct Primitive {
   clip: vec4f,
   clipRadii: vec4f,
   radii: vec4f,
-  // The colour of a glyph.
+  // The colour of a glyph or an icon.
   fill: vec4f,
   border: vec4f,
-  // x: border width, y: opacity, z: kind, w: a glyph's distance range.
+  // x: border width, y: opacity, z: kind, w: the atlas's distance range.
   params: vec4f,
-  // Free for the effect. A glyph's cell in the atlas, in texels: left, top,
-  // right, bottom, on texel centres.
+  // Free for the effect. A glyph's or an icon's cell in its atlas, in texels:
+  // left, top, right, bottom, on texel centres.
   effect: vec4f,
 };
 
 // Matches PrimitiveKind in stream.ts.
 const KIND_GLYPH = 1.0;
+const KIND_ICON = 2.0;
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var<storage, read> primitives: array<Primitive>;
 @group(0) @binding(2) var fontAtlas: texture_2d<f32>;
-@group(0) @binding(3) var fontSampler: sampler;
+@group(0) @binding(3) var atlasSampler: sampler;
+@group(0) @binding(4) var iconAtlas: texture_2d<f32>;
 
 struct VertexOut {
   @builtin(position) position: vec4f,
@@ -86,18 +89,19 @@ fn withBorder(fill: vec4f, prim: Primitive, inner: f32) -> vec4f {
   return mix(ring, fill, inner);
 }
 
-// The coverage of an MTSDF glyph at `p`, from the median of its colour
-// channels. Alpha holds the true distance, for later effects such as
-// outlines. The glyph's quad maps its cell with no rotation, so the quad's
-// size gives the device pixels per texel, with no derivatives.
-fn glyphCoverage(prim: Primitive, p: vec2f) -> f32 {
+// The coverage of a glyph or an icon at `p`, from the median of the atlas's
+// colour channels. The font atlas is an MTSDF, and its alpha holds the true
+// distance, for later effects such as outlines. The icon atlas is a grey SDF,
+// so its three channels are equal. The quad maps its cell with no rotation,
+// so the quad's size gives the device pixels per texel, with no derivatives.
+fn atlasCoverage(atlas: texture_2d<f32>, prim: Primitive, p: vec2f) -> f32 {
   let cell = prim.effect;
   let t = (p - prim.rect.xy) / prim.rect.zw;
   // The quad has a device pixel of padding. Clamp so it does not read the
   // next cell. The cell's edges are on texel centres.
   let texel = clamp(mix(cell.xy, cell.zw, t), cell.xy, cell.zw);
-  let uv = texel / vec2f(textureDimensions(fontAtlas));
-  let s = textureSampleLevel(fontAtlas, fontSampler, uv, 0.0).rgb;
+  let uv = texel / vec2f(textureDimensions(atlas));
+  let s = textureSampleLevel(atlas, atlasSampler, uv, 0.0).rgb;
   let distance = max(min(s.r, s.g), min(max(s.r, s.g), s.b)) - 0.5;
   let pixelsPerTexel = prim.rect.z * u.pixelRatio / (cell.z - cell.x);
   // At least 1, so small text stays smooth.
@@ -113,7 +117,10 @@ fn fs(input: VertexOut) -> @location(0) vec4f {
   let clip = coverage(roundRectDistance(p, prim.clip, prim.clipRadii));
 
   if (prim.params.z == KIND_GLYPH) {
-    return premultiply(prim.fill) * glyphCoverage(prim, p) * clip * prim.params.y;
+    return premultiply(prim.fill) * atlasCoverage(fontAtlas, prim, p) * clip * prim.params.y;
+  }
+  if (prim.params.z == KIND_ICON) {
+    return premultiply(prim.fill) * atlasCoverage(iconAtlas, prim, p) * clip * prim.params.y;
   }
 
   let outer = coverage(roundRectDistance(p, prim.rect, prim.radii));

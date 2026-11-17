@@ -1,4 +1,4 @@
-import { requestUIDevice, UIFont } from '../lib';
+import { requestUIDevice, UIFont, UIIcons } from '../lib';
 import './examples';
 import { Inspector } from './Inspector';
 import { registry } from './registry';
@@ -8,9 +8,13 @@ async function start() {
   const main = document.getElementById('examples')!;
   let device: GPUDevice;
   let font: UIFont;
+  let icons: UIIcons;
   try {
     device = await requestUIDevice();
-    font = await UIFont.load(device, '/fonts/roboto-msdf.json');
+    [font, icons] = await Promise.all([
+      UIFont.load(device, '/fonts/roboto-msdf.json'),
+      UIIcons.load(device, '/icons/lucide-icons.json'),
+    ]);
   } catch (error) {
     main.textContent = (error as Error).message;
     return;
@@ -23,6 +27,7 @@ async function start() {
   new Inspector(
     device,
     font,
+    icons,
     registry,
     loadSettings(),
     document.getElementById('parts')!,
