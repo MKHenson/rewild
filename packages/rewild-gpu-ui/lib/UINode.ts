@@ -7,8 +7,13 @@ import {
 } from './events';
 import type { UIIconName } from './iconNames';
 import type { EffectParams } from './stream';
-import { affectsLayout, affectsOnlyInput, Sides, UIStyle } from './style';
+import { affectsLayout, affectsNoDrawing, Sides, UIStyle } from './style';
 import { measureText } from './text';
+import {
+  findTransition,
+  isTransitionProperty,
+  NodeTransitions,
+} from './transition';
 import type { UISurface } from './UISurface';
 
 export enum Dirty {
@@ -65,6 +70,11 @@ export interface UINodeOptions {
   icon?: UIIconName;
   /** A registered effect that draws the node's box. See `UIEffects`. */
   effect?: string;
+  /**
+   * Grows the effect's quad by this many CSS pixels on each side, so the
+   * effect can draw outside the box, such as a glow. See ui.wgsl.
+   */
+  effectOutset?: number;
 }
 
 /** A 2D box in a UI tree. Later children draw on top of earlier ones. */
@@ -88,7 +98,10 @@ export class UINode {
   /** The node's index in its surface's primitive stream, written by the stream. */
   primitive = -1;
   readonly effectParams: EffectParams = [0, 0, 0, 0];
+  /** The running transitions and the values last drawn, or null before the first transition. */
+  transitions: NodeTransitions | null = null;
   private _effect: string | null;
+  private _effectOutset: number;
   private _text: string | null = null;
   private _icon: UIIconName | null;
   private listeners: Map<UIEventType, Listener[]> | null = null;
@@ -98,6 +111,7 @@ export class UINode {
   constructor(options: UINodeOptions = {}) {
     this.measure = options.measure ?? null;
     this._effect = options.effect ?? null;
+    this._effectOutset = options.effectOutset ?? 0;
     this._icon = options.icon ?? null;
     if (options.text !== undefined) this.text = options.text;
     this.style = new Proxy<UIStyle>(
@@ -106,6 +120,7 @@ export class UINode {
         set: (target, key, value) => {
           const name = key as keyof UIStyle;
           if (target[name] === value) return true;
+          this.startTransition(target, name);
           (target as Record<string, unknown>)[name] = value;
           this.markDirty(styleDirty(name));
           return true;
@@ -113,6 +128,7 @@ export class UINode {
         deleteProperty: (target, key) => {
           const name = key as keyof UIStyle;
           if (!(name in target)) return true;
+          this.startTransition(target, name);
           delete target[name];
           this.markDirty(styleDirty(name));
           return true;
@@ -161,6 +177,17 @@ export class UINode {
   set effect(name: string | null) {
     if (name === this._effect) return;
     this._effect = name;
+    this.markDirty(Dirty.Paint);
+  }
+
+  /** CSS pixels the effect's quad grows by on each side. */
+  get effectOutset(): number {
+    return this._effectOutset;
+  }
+
+  set effectOutset(value: number) {
+    if (value === this._effectOutset) return;
+    this._effectOutset = value;
     this.markDirty(Dirty.Paint);
   }
 
@@ -317,6 +344,14 @@ export class UINode {
     this.append(...nodes);
   }
 
+  /** Starts the property's transition, when the style has one for it. */
+  private startTransition(style: UIStyle, key: keyof UIStyle): void {
+    if (!isTransitionProperty(key)) return;
+    const transition = findTransition(style, key);
+    if (transition)
+      (this.transitions ??= new NodeTransitions()).start(key, transition);
+  }
+
   private invoke(event: UIEvent, phase: UIEventPhase, capture: boolean): void {
     const list = this.listeners?.get(event.type);
     if (!list?.length) return;
@@ -331,6 +366,6 @@ export class UINode {
 }
 
 function styleDirty(key: keyof UIStyle): Dirty {
-  if (affectsOnlyInput(key)) return Dirty.None;
+  if (affectsNoDrawing(key)) return Dirty.None;
   return affectsLayout(key) ? Dirty.Layout | Dirty.Paint : Dirty.Paint;
 }

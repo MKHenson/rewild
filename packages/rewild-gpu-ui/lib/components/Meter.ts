@@ -1,14 +1,14 @@
 import { packColor, parseColor } from '../color';
-import { UIColor, UIStyle } from '../style';
+import { HexColor, UIStyle } from '../style';
 import { UIComponent, UINode } from '../UINode';
 
 export interface MeterOptions {
   /** From 0 to 1. Defaults to 1. */
   value?: number;
   /** The fill when full. The fill turns towards `emptyColor` as it drains. */
-  fullColor?: UIColor;
+  fullColor?: HexColor;
   /** The fill when empty. A darker shade of it is the track. */
-  emptyColor?: UIColor;
+  emptyColor?: HexColor;
   style?: UIStyle;
 }
 
@@ -41,7 +41,7 @@ export class Meter implements UIComponent {
     this.write();
   }
 
-  setColors(full: UIColor, empty: UIColor): void {
+  setColors(full: HexColor, empty: HexColor): void {
     this.full = packColor(parseColor(full));
     this.empty = packColor(parseColor(empty));
     this.write();

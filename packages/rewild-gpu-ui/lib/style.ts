@@ -1,8 +1,22 @@
 /** Pixels as a number, or a percentage of the containing block. */
 export type Length = number | `${number}%`;
 
+import type { UIThemeColor } from './theme';
+
 /** `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`. */
-export type UIColor = `#${string}`;
+export type HexColor = `#${string}`;
+
+/**
+ * A theme colour with its alpha scaled by `alpha`, from 0 to 1. It is the
+ * DOM's `color-mix(in srgb, var(--surface) 60%, transparent)`.
+ */
+export interface UIThemeColorAlpha {
+  theme: UIThemeColor;
+  alpha: number;
+}
+
+/** A hex colour, or a theme colour by name, such as `surface`. See `UITheme`. */
+export type UIColor = HexColor | UIThemeColor | UIThemeColorAlpha;
 
 /** One radius for all corners, or top left, top right, bottom right, bottom left. */
 export type CornerRadius = number | [number, number, number, number];
@@ -14,6 +28,62 @@ export type Edges = Length | [Length, Length, Length, Length];
 export type Sides = [number, number, number, number];
 
 export type FlexAlign = 'flex-start' | 'flex-end' | 'center' | 'stretch';
+
+/**
+ * One CSS box shadow, in CSS pixels. An outer shadow draws under the box and
+ * only outside it, so a see-through box does not show it. An inset shadow
+ * draws inside the padding box, over the background.
+ */
+export interface UIBoxShadow {
+  x?: number;
+  y?: number;
+  /** The CSS blur radius. The shadow's edge is a Gaussian with half this as its deviation. */
+  blur?: number;
+  /** Grows an outer shadow and shrinks an inset one. */
+  spread?: number;
+  color: UIColor;
+  inset?: boolean;
+}
+
+/**
+ * A move and a uniform scale, applied when the node draws, after layout. It
+ * does not move other nodes. The scale is about the centre of the box, as
+ * CSS's `translate(x, y) scale(s)` with the default origin.
+ */
+export interface UITransform {
+  x?: number;
+  y?: number;
+  scale?: number;
+}
+
+/** The properties that transition. Layout properties do not. */
+export type UITransitionProperty =
+  | 'backgroundColor'
+  | 'borderColor'
+  | 'color'
+  | 'opacity'
+  | 'transform';
+
+/** The CSS easing keywords. */
+export type UIEasing =
+  | 'linear'
+  | 'ease'
+  | 'ease-in'
+  | 'ease-out'
+  | 'ease-in-out';
+
+/**
+ * Eases a property from the value it shows to a new one, as a CSS
+ * transition. Times are in milliseconds.
+ */
+export interface UITransition {
+  /** `all` is every property in `UITransitionProperty`. */
+  property: UITransitionProperty | 'all';
+  duration: number;
+  /** Defaults to `ease`, as in CSS. */
+  easing?: UIEasing;
+  delay?: number;
+}
 
 export type FontWeight = 'normal' | 'bold';
 export type TextAlign = 'left' | 'center' | 'right';
@@ -63,6 +133,17 @@ export interface UIStyle {
   borderWidth?: number;
   borderRadius?: CornerRadius;
   opacity?: number;
+  /** The first shadow draws on top, as in CSS. */
+  boxShadow?: UIBoxShadow | UIBoxShadow[];
+  /**
+   * `glass` blurs what is under the box and raises its saturation, as the
+   * DOM's `backdrop-filter: blur(18px) saturate(150%)`. The background colour
+   * lies over it. Pair it with a see-through background, as `glassSurface()`.
+   */
+  backdrop?: 'none' | 'glass';
+  transform?: UITransform;
+  /** One transition, or one per property. */
+  transition?: UITransition | UITransition[];
   /** `hidden` clips the node's text and its children to the inside of the border. */
   overflow?: 'visible' | 'hidden';
 
@@ -143,9 +224,12 @@ const LAYOUT_KEYS = new Set<keyof UIStyle>([
   'whiteSpace',
 ]);
 
-/** True when a change to the property changes only input, not layout or drawing. */
-export function affectsOnlyInput(key: keyof UIStyle): boolean {
-  return key === 'pointerEvents' || key === 'focusable';
+/**
+ * True when a change to the property does not change what draws: it changes
+ * only input, or how later changes transition.
+ */
+export function affectsNoDrawing(key: keyof UIStyle): boolean {
+  return key === 'pointerEvents' || key === 'focusable' || key === 'transition';
 }
 
 /** True when a change to the property can move or resize boxes. */

@@ -209,7 +209,7 @@ menu.append(resume.node);
 A node has one `style` object with typed properties. Setting a property marks the node dirty.
 
 - **Names.** Where a property means the same as in CSS, it has the CSS name in camel case, such as `flexDirection` or `borderRadius`. The names are familiar and CSS documents them. Where Mica needs something CSS does not have, it gets its own name.
-- **Values.** Lengths are pixels as numbers, or percentages as strings. Colours are a theme value name or a colour. There are no units and no shorthand strings.
+- **Values.** Lengths are pixels as numbers, or percentages as strings. Colours are a hex colour, a theme colour name such as `'surface'`, or a theme colour with an alpha, `{ theme: 'surface', alpha: 0.6 }`. There are no units and no shorthand strings.
 - **Sharing.** A shared style is a plain TypeScript object or function, the same as `glassSurface()` in `rewild-ui`. Spread it into a node's style. There are no classes.
 - **States.** A component handles its own states. A `Button` sets its colours for hover, press, focus and disabled. The style system does not know about states.
 - **Passed down.** Only `color`, `fontSize`, `fontWeight`, `lineHeight` and `textAlign` pass from a parent to its children, as in CSS.
@@ -225,7 +225,7 @@ The theme values, not the CSS. The DOM's components keep their styles as CSS tex
 | Layout     | `display` (`flex`, `none`), `position` (`relative`, `absolute`), `top` `right` `bottom` `left`, `width` `height`, `minWidth` `maxWidth` `minHeight` `maxHeight`, `padding`, `margin`, `flexDirection`, `flexWrap`, `gap`, `flexGrow` `flexShrink` `flexBasis`, `justifyContent`, `alignItems`, `alignSelf` | 1 |
 | Box        | `backgroundColor`, `borderColor`, `borderWidth`, `borderRadius` (per corner), `opacity`, `overflow` (`visible`, `hidden`) | 1 |
 | Text       | `color`, `fontSize`, `fontWeight`, `lineHeight`, `textAlign`, `whiteSpace`, `textOverflow` (`ellipsis`)       | 2 |
-| Effects    | `boxShadow`, `backdrop` (`glass`), `transform` (translate, scale), `transition` (colours, opacity, `transform`) | 2 |
+| Effects    | `boxShadow` (outer and inset, a list), `backdrop` (`glass`), `transform` (`x`, `y` and a uniform `scale`), `transition` (colours, opacity, `transform`) | 2 |
 | Input      | `pointerEvents` (`auto`, `none`), `focusable`                                                                 | 2 |
 
 ---
@@ -351,7 +351,7 @@ The look-at ray and the XR controller give the same thing: a ray. The surface tu
 - **Actions.** Enter or A clicks the focused node. A held key does not click again. Escape or B has no action of its own: a modal or popup listens for the `Escape` key down and closes. Tab, the arrows and Enter are default actions, so a `keydown` listener can prevent them.
 - **The gamepad.** `GamepadReader` turns a pad with the standard mapping into keys: A is `Enter`, B is `Escape`, and the d-pad and the left stick are the arrow keys. The event's `code` names the control, such as `GamepadA` or `GamepadStickLeft`. The d-pad and the stick repeat while held, after 400 ms and then every 100 ms. The stick points past 0.5 on its stronger axis and stops below 0.3.
 - **Who reads the pad.** A pad has no events, so the UI cannot stop a press before the game sees it. One owner reads the pads once per frame and gives them to one side. In the game, that owner is `Gamepad` in `src/core/input`, and `GameManager` routes it. While a focus scope is open, the pad goes to `ui.input.readGamepads`. Otherwise the player reads it. When the UI gets the pad, `syncGamepads` takes the controls already down as held, so a press that began in play does not act in the UI. The inspector reads the pads itself, for the card whose canvas has focus.
-- **Focus ring.** It shows only when focus came from a key or the gamepad, as with `:focus-visible`. It is the DOM's `outline: 2px solid` in `--primary-400`, drawn over the node's children. Until Theme reads the theme values, the colour is the dark theme's.
+- **Focus ring.** It shows only when focus came from a key or the gamepad, as with `:focus-visible`. It is the DOM's `outline: 2px solid` in the theme's `primary400`, drawn over the node's children.
 
 ---
 
@@ -361,10 +361,11 @@ The look-at ray and the XR controller give the same thing: a ray. The surface tu
 
 The DOM's glass is `backdrop-filter: blur(18px) saturate(150%)` under a surface colour at 60%, with a 1 px edge in `glassEdge`. Mica draws the same:
 
-- **The source.** The blur reads `renderer.sceneColorTarget`, the HDR scene that the tone map reads. It is there already, so there is no copy of the canvas.
-- **The blur.** A downsample to a quarter resolution, then a dual Kawase blur. The last step applies the same tone map curve, so the blur matches the colours on screen.
-- **The glass rect** samples the blur at its screen position, raises the saturation, then lays the surface colour over it.
+- **The source.** `renderer.ui.backdrop` names the image to blur. The game sets it each frame to `renderer.sceneColorTarget`, the HDR scene that the tone map reads, with the camera's exposure. It is there already, so there is no copy of the canvas. The inspector sets it to a copy of its test image.
+- **The blur.** A prefilter averages each 4 by 4 block into a quarter size image. Then a dual Kawase blur halves the image some times and doubles it back. The prefilter applies the exposure and the game's ACES curve to each tap, before the blur. A tone map after the blur lets a bright sun spread a glow that the screen does not show. `blurSteps` picks the levels and the tap offset from the pixel ratio, so the blur is a Gaussian of deviation 18 CSS pixels at any ratio. A simulation of the chain fitted the rule to within 5 %.
+- **The glass rect** samples the blur at its screen position, raises the saturation with the CSS `saturate()` matrix, then lays its fill and border over it. `glassSurface(opacity)` gives the DOM's style: `backdrop: 'glass'` and the surface colour at 60 %.
 - **Cost.** The blur runs once per frame for all glass nodes, and not at all when none is visible. At a quarter resolution it is a small part of the frame.
+- **Not the same as the DOM.** The blur reads the whole screen, so a colour just outside a panel shows a little at its edge. Chrome mirrors the panel's own pixels at its edge. Glass does not see the UI under it, such as the HUD under the menu.
 - **World surfaces** draw inside the scene, before this frame's blur exists, so they read last frame's blur. The one-frame lag cannot be seen.
 
 Bloom's blur is not reused. It keeps only the light above its threshold, not the whole scene.
@@ -374,10 +375,10 @@ Bloom's blur is not reused. It keeps only the light above its threshold, not the
 A registered WGSL `effect` function draws a `custom` rect, with the node's `vec4` of parameters. The effect is a text block, not a full shader. Mica adds it to the end of the base shader, `ui.wgsl`, and compiles the two as one module:
 
 ```wgsl
-fn effect(prim: Primitive, local: vec2f, inner: f32) -> vec4f
+fn effect(prim: Primitive, px: Pixel) -> vec4f
 ```
 
-`local` is the pixel's position in the box, in CSS pixels, and `inner` is the coverage inside the border. The effect returns a premultiplied colour. The base shader applies the rounded edge, the clip and the opacity. A plain box uses the same contract, in `rect.wgsl`.
+`px.local` is the pixel's position in the box, in CSS pixels. `px.edge` is the signed distance to the box's rounded edge, `px.outer` the coverage of the box and `px.inner` the coverage inside the border. The effect returns a premultiplied colour. The base shader applies the rounded edge, the clip and the opacity. A plain box uses the same contract, in `rect.wgsl`.
 
 ```ts
 ui.effects.register('stripes', stripesWgsl);
@@ -385,7 +386,14 @@ const node = new UINode({ effect: 'stripes' });
 node.setEffectParams(x, y, z, w); // `prim.effect` in WGSL
 ```
 
-An effect colours only the inside of its box. The quad covers the box and one device pixel round it, and the base shader cuts everything outside the rounded edge. So an effect cannot draw a glow or an outer shadow. Box shadows in ticket 9 need an outset quad and the distance to the edge. When ticket 9 adds them to the base shader, effects can use them too.
+By default an effect colours only the inside of its box. The quad covers the box and one device pixel round it, and the base shader cuts everything outside the rounded edge. A node's `effectOutset` grows the quad by that many CSS pixels. Then the base does not cut the edge, and the effect draws a glow or a shadow from `px.edge` and covers what it draws itself.
+
+### Box shadows
+
+`boxShadow` takes one shadow or a list, with CSS's `x`, `y`, `blur`, `spread`, `color` and `inset`. The first shadow draws on top. Each shadow is its own primitive in the plain pipeline, so shadows add no draw calls.
+
+- **Outer shadows** draw before the box, on a quad grown by the offset, the spread and three deviations of the blur. The blur is a Gaussian with half the CSS blur radius as its deviation. The shader integrates the blurred rounded box, after Evan Wallace's method. As in CSS, an outer shadow draws only outside the box, so a glass box does not show it, and a spread grows a round corner but keeps a square corner square.
+- **Inset shadows** draw after the box, inside its padding box.
 
 Each effect gets its own pipeline, made when a node first uses it. All the pipelines share one bind group layout. A surface draws in runs of primitives with the same effect, in tree order, so a surface with mixed effects takes a few draw calls.
 
@@ -401,7 +409,9 @@ The meter is the first effect. `UIRenderer` registers it. Its parameters are the
 - **Opacity**, for a modal or a crosshair that fades in and out.
 - **`transform`**, a translate and a scale, for a modal that slides or grows in, or a button that shrinks a little when pressed.
 
-`transform` is applied when the node draws, after layout, the same as in CSS. It does not move other nodes, so a transition never runs layout again. The hit test follows the transformed box.
+`transform` is applied when the node draws, after layout, the same as in CSS. It does not move other nodes, so a transition never runs layout again. The scale is uniform and about the centre of the box, so a rounded box stays a rounded box. The hit test follows the transformed box.
+
+A transition is `{ property, duration, easing, delay }`, with times in milliseconds, CSS's easing keywords, and `all` for the five properties. A change starts from the value the node shows, so a change in the middle of a transition turns round with no jump. A node that has not drawn yet jumps, as in CSS. Colours mix with premultiplied alpha. While a transition runs, its surface writes its stream on each frame, and `renderer.ui.animating` is true.
 
 Layout properties, such as `width` or `top`, do not transition. Each frame of such a transition would run layout.
 
@@ -411,8 +421,9 @@ Layout properties, such as `width` or `top`, do not transition. Each frame of su
 
 The DOM's theme values are CSS custom properties in `style.css`: colours, spacing, radius and font sizes, with light and dark sets.
 
-- At start, and when the theme changes, Mica reads the computed values from the document and stores them as numbers.
-- A Mica style names a theme value. It does not copy the colour.
+- At start, and when the theme changes, Mica reads the computed values from the document and stores them as numbers. `UIRenderer` owns a `UITheme`. It watches the root's `data-theme`, `class` and `style`, which is how `applyUiTheme` switches the theme.
+- A Mica style names a theme value. It does not copy the colour. The names are the colour names of `theme.colors` in `rewild-ui`, such as `surface`, `onSurface`, `primary400` and `glassEdge`.
+- When the theme changes, each surface writes its stream again. Layout does not run.
 
 So a colour changed in `style.css` changes both UIs.
 
@@ -687,7 +698,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: focusable nodes, tab order, spatial moves, gamepad and keyboard actions, the focus ring.
   - Expect: the d-pad moves between buttons, A clicks, B closes the modal.
 
-- [ ] **9. Theme and glass**
+- [x] **9. Theme and glass**
 
   - Scope: theme values from the document, light and dark. The backdrop blur from `sceneColorTarget` and glass rects. Box shadows, with an outset quad and the distance to the edge in the base shader, which effects can also use. `transform` and transitions.
   - Expect: in the inspector, a Mica glass panel next to a DOM glass panel over the same test image looks the same, in light and dark.
