@@ -334,13 +334,27 @@ Bloom's blur is not reused. It keeps only the light above its threshold, not the
 
 ### Custom effects
 
-A registered fragment function draws a `custom` rect, with the node's `vec4` of parameters. The meter is the first one:
+A registered WGSL `effect` function draws a `custom` rect, with the node's `vec4` of parameters. The effect is a text block, not a full shader. Mica adds it to the end of the base shader, `ui.wgsl`, and compiles the two as one module:
 
-```ts
-ui.effects.register('meter', meterWgsl); // fill, full colour, empty colour
+```wgsl
+fn effect(prim: Primitive, local: vec2f, inner: f32) -> vec4f
 ```
 
-Per-node values live in the instance, not in a material. One meter effect serves all five bars.
+`local` is the pixel's position in the box, in CSS pixels, and `inner` is the coverage inside the border. The effect returns a premultiplied colour. The base shader applies the rounded edge, the clip and the opacity. A plain box uses the same contract, in `rect.wgsl`.
+
+```ts
+ui.effects.register('stripes', stripesWgsl);
+const node = new UINode({ effect: 'stripes' });
+node.setEffectParams(x, y, z, w); // `prim.effect` in WGSL
+```
+
+An effect colours only the inside of its box. The quad covers the box and one device pixel round it, and the base shader cuts everything outside the rounded edge. So an effect cannot draw a glow or an outer shadow. Box shadows in ticket 9 need an outset quad and the distance to the edge. When ticket 9 adds them to the base shader, effects can use them too.
+
+Each effect gets its own pipeline, made when a node first uses it. All the pipelines share one bind group layout. A surface draws in runs of primitives with the same effect, in tree order, so a surface with mixed effects takes a few draw calls.
+
+`setEffectParams` writes the node's primitive in place and uploads only that primitive. The stream is not rebuilt.
+
+The meter is the first effect. `UIRenderer` registers it. Its parameters are the value and the full and empty colours, each packed into one float as `r * 65536 + g * 256 + b`. Per-node values live in the instance, not in a material. One meter effect serves all five bars.
 
 ### Transitions
 
@@ -604,12 +618,12 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: `UINode`, `UISurface` (screen only), tree operations, dirty flags, the style object with the Box properties and absolute position. The primitive stream, the `rect` primitive with per-corner radius, border width and clipping, one pipeline per surface, surface order. Examples for boxes.
   - Expect: a test changes a style and only the changed nodes are dirty. In the inspector, nested, clipped, rounded boxes draw in one call, match their DOM versions, and are sharp on a high DPI screen.
 
-- [ ] **3. Flex layout**
+- [x] **3. Flex layout**
 
   - Scope: the flex subset and the rest of the Layout properties, percentages, min and max, measure functions. Unit tests with rectangles worked out by hand. The layout overlay in the inspector. Examples for layout.
   - Expect: the unit tests pass for a set of trees that cover each property. In the inspector, each layout example matches its DOM version.
 
-- [ ] **4. Meters and the HUD**
+- [x] **4. Meters and the HUD**
 
   - Scope: custom effects, the meter effect, the `Meter` component. The HUD bars move to Mica. The old GPU UI and its dead code go.
   - Expect: the bars look and act as today. `UIElement`, `GuiManager`, the UI passes and `TextRenderer` are gone.
@@ -638,7 +652,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
 
 - [ ] **9. Theme and glass**
 
-  - Scope: theme values from the document, light and dark. The backdrop blur from `sceneColorTarget` and glass rects. Box shadows. `transform` and transitions.
+  - Scope: theme values from the document, light and dark. The backdrop blur from `sceneColorTarget` and glass rects. Box shadows, with an outset quad and the distance to the edge in the base shader, which effects can also use. `transform` and transitions.
   - Expect: in the inspector, a Mica glass panel next to a DOM glass panel over the same test image looks the same, in light and dark.
 
 - [ ] **10. The in-game menu and game over**

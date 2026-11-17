@@ -1,3 +1,4 @@
+import type { EffectParams } from './stream';
 import { affectsLayout, Sides, UIStyle } from './style';
 import type { UISurface } from './UISurface';
 
@@ -23,9 +24,23 @@ export type MeasureFunction = (widthLimit: number) => {
   height: number;
 };
 
+/** A class that builds a subtree. Its `node` is where it joins a tree. */
+export interface UIComponent {
+  readonly node: UINode;
+}
+
+/** A node, or a component, which the tree methods take as its node. */
+export type UIChild = UINode | UIComponent;
+
+function toNode(child: UIChild): UINode {
+  return child instanceof UINode ? child : child.node;
+}
+
 export interface UINodeOptions {
   style?: UIStyle;
   measure?: MeasureFunction;
+  /** A registered effect that draws the node's box. See `UIEffects`. */
+  effect?: string;
 }
 
 /** A 2D box in a UI tree. Later children draw on top of earlier ones. */
@@ -46,9 +61,14 @@ export class UINode {
   dirty: Dirty = Dirty.Layout | Dirty.Paint;
   /** Set on the root node of a surface. */
   owner: UISurface | null = null;
+  /** The node's index in its surface's primitive stream, written by the stream. */
+  primitive = -1;
+  readonly effectParams: EffectParams = [0, 0, 0, 0];
+  private _effect: string | null;
 
   constructor(options: UINodeOptions = {}) {
     this.measure = options.measure ?? null;
+    this._effect = options.effect ?? null;
     this.style = new Proxy<UIStyle>(
       { ...options.style },
       {
@@ -76,17 +96,51 @@ export class UINode {
     return node.owner;
   }
 
+  /** The registered effect that draws the box in place of its fill, or null. */
+  get effect(): string | null {
+    return this._effect;
+  }
+
+  set effect(name: string | null) {
+    if (name === this._effect) return;
+    this._effect = name;
+    this.markDirty(Dirty.Paint);
+  }
+
+  /**
+   * Sets the four values the effect reads. Only this node's primitive
+   * changes, so the stream is not rebuilt.
+   */
+  setEffectParams(x: number, y: number, z: number, w: number): void {
+    const params = this.effectParams;
+    if (
+      params[0] === x &&
+      params[1] === y &&
+      params[2] === z &&
+      params[3] === w
+    )
+      return;
+    params[0] = x;
+    params[1] = y;
+    params[2] = z;
+    params[3] = w;
+    // A node with no primitive gets its params when the stream is rebuilt.
+    this.surface?.stream.setEffectParams(this, params);
+  }
+
   markDirty(flags: Dirty): void {
     this.dirty |= flags;
     this.surface?.invalidate(flags);
   }
 
-  append(...nodes: UINode[]): void {
+  append(...nodes: UIChild[]): void {
     for (const node of nodes) this.insertBefore(node, null);
   }
 
-  /** Inserts before `ref`, or at the end when `ref` is null. Moves a node that is in a tree. */
-  insertBefore(node: UINode, ref: UINode | null): void {
+  /** Inserts before `refChild`, or at the end when it is null. Moves a node that is in a tree. */
+  insertBefore(child: UIChild, refChild: UIChild | null): void {
+    const node = toNode(child);
+    const ref = refChild && toNode(refChild);
     if (ref && ref.parent !== this)
       throw new Error('The reference node is not a child of this node');
     for (let n: UINode | null = this; n; n = n.parent)
@@ -108,7 +162,7 @@ export class UINode {
     parent.markDirty(Dirty.Layout | Dirty.Paint);
   }
 
-  replaceChildren(...nodes: UINode[]): void {
+  replaceChildren(...nodes: UIChild[]): void {
     while (this.children.length) this.children[0].remove();
     this.append(...nodes);
   }

@@ -1,8 +1,18 @@
+// The base of every UI pipeline. Each pipeline adds one `effect` function,
+// which colours the inside of a box:
+//
+//   fn effect(prim: Primitive, local: vec2f, inner: f32) -> vec4f
+//
+// `local` is the pixel's position in the box, in CSS pixels. `inner` is the
+// coverage inside the border. It returns a premultiplied colour. The base
+// applies the box's edge, its clip and its opacity.
+
 struct Uniforms {
   // The surface size in CSS pixels.
   viewport: vec2f,
   pixelRatio: f32,
-  _pad: f32,
+  // Seconds, for effects that animate.
+  time: f32,
 };
 
 // Matches PrimitiveStream in stream.ts. Rects are x, y, width, height in CSS
@@ -16,6 +26,8 @@ struct Primitive {
   border: vec4f,
   // x: border width, y: opacity.
   params: vec4f,
+  // Free for the effect.
+  effect: vec4f,
 };
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
@@ -53,6 +65,18 @@ fn coverage(d: f32) -> f32 {
   return clamp(0.5 - d * u.pixelRatio, 0.0, 1.0);
 }
 
+fn premultiply(color: vec4f) -> vec4f {
+  return vec4f(color.rgb * color.a, color.a);
+}
+
+// Lays the border over a premultiplied fill. The fill runs under the border,
+// as in CSS.
+fn withBorder(fill: vec4f, prim: Primitive, inner: f32) -> vec4f {
+  let border = premultiply(prim.border);
+  let ring = border + fill * (1.0 - border.a);
+  return mix(ring, fill, inner);
+}
+
 @fragment
 fn fs(input: VertexOut) -> @location(0) vec4f {
   let prim = primitives[input.index];
@@ -65,9 +89,5 @@ fn fs(input: VertexOut) -> @location(0) vec4f {
   let inner = select(1.0, coverage(roundRectDistance(p, innerRect, innerRadii)), borderWidth > 0.0);
   let clip = coverage(roundRectDistance(p, prim.clip, prim.clipRadii));
 
-  // The background fills the whole box, under the border, as in CSS.
-  let fill = vec4f(prim.fill.rgb * prim.fill.a, prim.fill.a);
-  let border = vec4f(prim.border.rgb * prim.border.a, prim.border.a);
-  let ring = border + fill * (1.0 - border.a);
-  return mix(ring, fill, inner) * outer * clip * prim.params.y;
+  return effect(prim, p - prim.rect.xy, inner) * outer * clip * prim.params.y;
 }

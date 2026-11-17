@@ -12,7 +12,11 @@ export interface Example {
   description?: string;
   /** The height of each side in CSS pixels. */
   height?: number;
-  build(view: ExampleView): void;
+  /**
+   * Builds the tree. An example that animates returns a function, which the
+   * inspector calls with the time in seconds before each frame it draws.
+   */
+  build(view: ExampleView): void | ((seconds: number) => void);
 }
 
 export class ExampleRegistry {

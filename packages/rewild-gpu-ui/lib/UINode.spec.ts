@@ -73,6 +73,16 @@ describe('UINode tree', () => {
     expect(() => child.append(parent)).toThrow();
   });
 
+  it('takes a component as its node', () => {
+    const parent = new UINode();
+    const first = { node: new UINode() };
+    const second = { node: new UINode() };
+    parent.append(second);
+    parent.insertBefore(first, second);
+    expect(parent.children).toEqual([first.node, second.node]);
+    expect(first.node.parent).toBe(parent);
+  });
+
   it('finds its surface through the root', () => {
     const { surface, b } = tree();
     expect(b.surface).toBe(surface);

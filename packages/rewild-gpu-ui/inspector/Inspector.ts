@@ -21,6 +21,7 @@ class ExampleCard {
   private micaPane: HTMLElement;
   private micaCaption: HTMLElement;
   private observer: ResizeObserver;
+  private animate: ((seconds: number) => void) | null;
 
   constructor(
     device: GPUDevice,
@@ -65,11 +66,15 @@ class ExampleCard {
       kind: 'screen',
       name: example.name,
     });
-    example.build({ surface: this.surface });
+    this.animate = example.build({ surface: this.surface }) ?? null;
     domPane.append(mirrorTree(this.surface.root));
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(this.micaPane);
+  }
+
+  get animated(): boolean {
+    return this.animate !== null;
   }
 
   showLayout(show: boolean): void {
@@ -84,6 +89,7 @@ class ExampleCard {
   }
 
   draw(): void {
+    this.animate?.(performance.now() / 1000);
     const { canvas, context, device, pixelRatio } = this.canvas;
     const background = getComputedStyle(this.micaPane).backgroundColor;
     const encoder = device.createCommandEncoder({ label: 'inspector' });
@@ -232,6 +238,7 @@ export class Inspector {
     requestAnimationFrame(() => {
       this.drawPending = false;
       for (const card of this.cards) card.draw();
+      if (this.cards.some((card) => card.animated)) this.requestDraw();
     });
   }
 }
