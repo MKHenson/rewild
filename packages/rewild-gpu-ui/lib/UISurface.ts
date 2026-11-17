@@ -1,3 +1,4 @@
+import type { UIFont } from './font';
 import { layoutTree } from './layout';
 import { PrimitiveStream, writeTree } from './stream';
 import { Dirty, UINode } from './UINode';
@@ -18,15 +19,30 @@ export class UISurface {
   readonly stream = new PrimitiveStream();
   width = 0;
   height = 0;
+  /** Device pixels per CSS pixel. Text baselines snap to device pixels. */
+  pixelRatio = 1;
   needsLayout = true;
   needsPaint = true;
   private overlay = false;
+  private _font: UIFont | null = null;
 
   constructor(options: UISurfaceOptions) {
     this.kind = options.kind;
     this.name = options.name;
     this.order = options.order ?? 0;
     this.root.owner = this;
+  }
+
+  /** The font that text measures and draws with. Text has no size until it is set. */
+  get font(): UIFont | null {
+    return this._font;
+  }
+
+  set font(font: UIFont | null) {
+    if (font === this._font) return;
+    this._font = font;
+    this.needsLayout = true;
+    this.needsPaint = true;
   }
 
   /** Draws the layout overlay over the tree. */
@@ -49,15 +65,23 @@ export class UISurface {
    * Lays out and rebuilds the stream if anything changed. Returns true when
    * the stream changed.
    */
-  update(width: number, height: number): boolean {
+  update(width: number, height: number, pixelRatio = 1): boolean {
     if (width !== this.width || height !== this.height) {
       this.width = width;
       this.height = height;
       this.needsLayout = true;
     }
+    if (pixelRatio !== this.pixelRatio) {
+      this.pixelRatio = pixelRatio;
+      this.needsPaint = true;
+    }
     if (!this.needsLayout && !this.needsPaint) return false;
     if (this.needsLayout) layoutTree(this.root, width, height);
-    writeTree(this.root, this.stream, this.overlay);
+    writeTree(this.root, this.stream, {
+      overlay: this.overlay,
+      font: this._font,
+      pixelRatio,
+    });
     clearDirty(this.root);
     this.needsLayout = false;
     this.needsPaint = false;

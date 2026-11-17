@@ -1,4 +1,11 @@
-import { UICanvas, UIRenderer, UISurface } from '../lib';
+import {
+  CanvasResize,
+  observeCanvasSize,
+  UICanvas,
+  UIFont,
+  UIRenderer,
+  UISurface,
+} from '../lib';
 import { parseComputedColor } from './cssColor';
 import { mirrorTree } from './domMirror';
 import { Example, ExampleRegistry } from './registry';
@@ -20,11 +27,13 @@ class ExampleCard {
   private surface: UISurface;
   private micaPane: HTMLElement;
   private micaCaption: HTMLElement;
-  private observer: ResizeObserver;
+  private stopObserving: () => void;
+  private size: CanvasResize | null = null;
   private animate: ((seconds: number) => void) | null;
 
   constructor(
     device: GPUDevice,
+    font: UIFont,
     example: Example,
     private getPixelRatio: () => number,
     private requestDraw: () => void
@@ -62,6 +71,7 @@ class ExampleCard {
 
     this.canvas = new UICanvas(device, canvasElement);
     this.renderer = new UIRenderer(device, this.canvas.format);
+    this.renderer.font = font;
     this.surface = this.renderer.createSurface({
       kind: 'screen',
       name: example.name,
@@ -69,8 +79,10 @@ class ExampleCard {
     this.animate = example.build({ surface: this.surface }) ?? null;
     domPane.append(mirrorTree(this.surface.root));
 
-    this.observer = new ResizeObserver(() => this.resize());
-    this.observer.observe(this.micaPane);
+    this.stopObserving = observeCanvasSize(canvasElement, (size) => {
+      this.size = size;
+      this.resize();
+    });
   }
 
   get animated(): boolean {
@@ -83,8 +95,13 @@ class ExampleCard {
   }
 
   resize(): void {
-    const { width, height } = this.micaPane.getBoundingClientRect();
-    this.canvas.resize(width, height, this.getPixelRatio());
+    if (!this.size) return;
+    const { cssWidth, cssHeight, devicePixels } = this.size;
+    const ratio = this.getPixelRatio();
+    // At the screen's own ratio, the exact device pixels map 1:1 to the
+    // screen. Another ratio is resampled on purpose.
+    const exact = ratio === window.devicePixelRatio ? devicePixels : null;
+    this.canvas.resize(cssWidth, cssHeight, ratio, exact ?? undefined);
     this.requestDraw();
   }
 
@@ -107,7 +124,7 @@ class ExampleCard {
   }
 
   dispose(): void {
-    this.observer.disconnect();
+    this.stopObserving();
     this.renderer.dispose();
     this.canvas.dispose();
   }
@@ -121,6 +138,7 @@ export class Inspector {
 
   constructor(
     private device: GPUDevice,
+    private font: UIFont,
     private registry: ExampleRegistry,
     private settings: InspectorSettings,
     private nav: HTMLElement,
@@ -149,6 +167,7 @@ export class Inspector {
       (example) =>
         new ExampleCard(
           this.device,
+          this.font,
           example,
           () => resolvePixelRatio(this.settings.pixelRatio),
           () => this.requestDraw()

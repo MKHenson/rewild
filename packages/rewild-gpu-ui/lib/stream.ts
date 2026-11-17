@@ -1,14 +1,22 @@
-import { parseColor } from './color';
+import { parseColor, RGBA } from './color';
+import type { Bounds, UIFont } from './font';
 import { innerBox } from './layout';
 import { cornerRadii, Sides } from './style';
+import { placeText, resolveTextStyle } from './text';
 import { Rect, UINode } from './UINode';
 
 /**
  * Floats per primitive: rect, clip rect, clip radii, corner radii, fill,
- * border colour, params (border width, opacity) and effect params. Matches
- * `Primitive` in ui.wgsl.
+ * border colour, params (border width, opacity, kind, distance range) and
+ * effect params. Matches `Primitive` in ui.wgsl.
  */
 export const PRIMITIVE_FLOATS = 32;
+
+/** The kind in a primitive's params. Matches the constants in ui.wgsl. */
+export enum PrimitiveKind {
+  Rect = 0,
+  Glyph = 1,
+}
 
 /** Where the effect params start in a primitive. */
 const EFFECT_OFFSET = 28;
@@ -34,6 +42,18 @@ export interface RectPrimitive {
   effectParams?: EffectParams;
   /** The node the rect draws, so its effect params can change in place. */
   node?: UINode;
+}
+
+/** One MTSDF glyph. It draws with the plain rect pipeline. */
+export interface GlyphPrimitive {
+  rect: Rect;
+  clip: Rect;
+  clipRadii: Radii;
+  color: RGBA;
+  opacity: number;
+  /** The glyph's cell in the atlas, in texels. */
+  atlas: Bounds;
+  distanceRange: number;
 }
 
 /** The primitives of one surface, in draw order. */
@@ -70,6 +90,25 @@ export class PrimitiveStream {
     this.effects[this.count] = p.effect ?? null;
     this.nodes[this.count] = p.node ?? null;
     if (p.node) p.node.primitive = this.count;
+    this.count++;
+    this.dirtyTo = this.count;
+  }
+
+  pushGlyph(p: GlyphPrimitive): void {
+    this.reserve(this.count + 1);
+    const d = this.data;
+    const { rect, clip, atlas } = p;
+    let o = this.count * PRIMITIVE_FLOATS;
+    o = write4(d, o, rect.x, rect.y, rect.width, rect.height);
+    o = write4(d, o, clip.x, clip.y, clip.width, clip.height);
+    d.set(p.clipRadii, o);
+    d.set(NO_RADII, o + 4);
+    d.set(p.color, o + 8);
+    d.set(NONE, o + 12);
+    write4(d, o + 16, 0, p.opacity, PrimitiveKind.Glyph, p.distanceRange);
+    write4(d, o + 20, atlas.left, atlas.top, atlas.right, atlas.bottom);
+    this.effects[this.count] = null;
+    this.nodes[this.count] = null;
     this.count++;
     this.dirtyTo = this.count;
   }
@@ -122,23 +161,34 @@ function write4(
   return o + 4;
 }
 
+export interface WriteOptions {
+  /** Draws the layout overlay on top. */
+  overlay?: boolean;
+  /** Text draws only when there is a font. */
+  font?: UIFont | null;
+  /** Device pixels per CSS pixel, which text baselines snap to. */
+  pixelRatio?: number;
+}
+
 /**
- * Writes the tree's primitives in tree order. Layout must have run. With
- * `overlay`, the layout overlay draws on top.
+ * Writes the tree's primitives in tree order: a node's box, then its text,
+ * then its children. Layout must have run.
  */
 export function writeTree(
   root: UINode,
   stream: PrimitiveStream,
-  overlay = false
+  options: WriteOptions = {}
 ): void {
   stream.reset();
-  writeNode(root, stream, NO_CLIP, NO_RADII, 1);
-  if (overlay) for (const child of root.children) writeOverlay(child, stream);
+  writeNode(root, stream, options, NO_CLIP, NO_RADII, 1);
+  if (options.overlay)
+    for (const child of root.children) writeOverlay(child, stream);
 }
 
 function writeNode(
   node: UINode,
   stream: PrimitiveStream,
+  options: WriteOptions,
   clip: Rect,
   clipRadii: Radii,
   parentOpacity: number
@@ -175,8 +225,43 @@ function writeNode(
     clip = intersect(clip, innerBox(node));
     clipRadii = radii.map((r) => Math.max(0, r - borderWidth)) as Radii;
   }
+  if (node.text && options.font)
+    writeText(node, stream, options, options.font, clip, clipRadii, opacity);
   for (const child of node.children)
-    writeNode(child, stream, clip, clipRadii, opacity);
+    writeNode(child, stream, options, clip, clipRadii, opacity);
+}
+
+function writeText(
+  node: UINode,
+  stream: PrimitiveStream,
+  options: WriteOptions,
+  font: UIFont,
+  clip: Rect,
+  clipRadii: Radii,
+  opacity: number
+): void {
+  const style = resolveTextStyle(node);
+  const color = parseColor(style.color);
+  if (color[3] <= 0) return;
+  const inside = innerBox(node);
+  const [top, right, bottom, left] = node.padding;
+  const box = {
+    x: inside.x + left,
+    y: inside.y + top,
+    width: Math.max(0, inside.width - left - right),
+    height: Math.max(0, inside.height - top - bottom),
+  };
+  const glyphs = placeText(node, font, style, box, options.pixelRatio ?? 1);
+  for (const { rect, atlas } of glyphs)
+    stream.pushGlyph({
+      rect,
+      clip,
+      clipRadii,
+      color,
+      opacity,
+      atlas,
+      distanceRange: font.distanceRange,
+    });
 }
 
 /** Scales the radii down when adjacent corners overlap, as CSS does. */

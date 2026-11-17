@@ -14,14 +14,17 @@ const root = path.join(here, '..', '..', '..');
 const outdir = path.join(here, 'build');
 const port = 9002;
 
+const fonts = path.join(here, '..', 'fonts');
 const staticFiles = [
   [path.join(here, 'index.html'), 'index.html'],
   [path.join(here, 'inspector.css'), 'inspector.css'],
   [path.join(root, 'style.css'), 'style.css'],
+  [path.join(fonts, 'roboto-msdf.json'), 'fonts/roboto-msdf.json'],
+  [path.join(fonts, 'roboto-msdf.png'), 'fonts/roboto-msdf.png'],
 ];
 
 function copyStatic() {
-  fs.mkdirSync(outdir, { recursive: true });
+  fs.mkdirSync(path.join(outdir, 'fonts'), { recursive: true });
   for (const [src, name] of staticFiles)
     fs.copyFileSync(src, path.join(outdir, name));
 }

@@ -1,4 +1,4 @@
-import { canvasPixelSize } from './canvasSize';
+import { canvasPixelSize, PixelSize } from './canvasSize';
 
 /**
  * A canvas that the GPU UI draws into, on a device it does not own. Layout
@@ -23,12 +23,20 @@ export class UICanvas {
     });
   }
 
-  /** Returns true when the backing size changed. */
-  resize(cssWidth: number, cssHeight: number, pixelRatio: number): boolean {
+  /**
+   * Sizes the backing texture to `pixels`, or else to the CSS size times the
+   * pixel ratio, rounded. Returns true when the backing size changed.
+   */
+  resize(
+    cssWidth: number,
+    cssHeight: number,
+    pixelRatio: number,
+    pixels: PixelSize = canvasPixelSize(cssWidth, cssHeight, pixelRatio)
+  ): boolean {
     this.cssWidth = cssWidth;
     this.cssHeight = cssHeight;
     this.pixelRatio = pixelRatio;
-    const { width, height } = canvasPixelSize(cssWidth, cssHeight, pixelRatio);
+    const { width, height } = pixels;
     if (this.canvas.width === width && this.canvas.height === height)
       return false;
     this.canvas.width = width;

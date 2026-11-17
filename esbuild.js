@@ -3,6 +3,7 @@ import * as http from 'http';
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { hashedFontAtlas } from './packages/rewild-gpu-ui/scripts/font-files.mjs';
 
 // Load .env into process.env (shell env vars take precedence)
 if (fs.existsSync('.env')) {
@@ -33,6 +34,9 @@ function copyDirRecursive(src, dest) {
   }
 }
 
+// Hashed names, so a changed atlas gets new URLs past the year-long cache.
+const uiFont = hashedFontAtlas();
+
 const isWatchMode = process.argv.join('').includes('serve') || process.argv.join('').includes('watch');
 
 // Replaces esbuild-plugin-copy, which crashes in watch mode on Windows because
@@ -48,6 +52,10 @@ const copyPlugin = {
       if (fs.existsSync('./index.html')) fs.copyFileSync('./index.html', './public/index.html');
       copyDirRecursive('./templates', './public/templates');
       copyDirRecursive('./static', './public');
+      // The GPU UI's font atlas.
+      fs.mkdirSync('./public/fonts', { recursive: true });
+      for (const [src, name] of uiFont.files)
+        fs.copyFileSync(src, path.join('./public/fonts', name));
     });
 
     build.onEnd(() => {
@@ -92,6 +100,7 @@ const defines = {
   'process.env.GOOGLE_CLIENT_ID': JSON.stringify(
     process.env.GOOGLE_CLIENT_ID || ''
   ),
+  'process.env.UI_FONT_URL': JSON.stringify(uiFont.url),
 };
 
 const logPlugin = {

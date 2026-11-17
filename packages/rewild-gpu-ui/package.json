@@ -8,5 +8,8 @@
     "ts-check": "tsc --noEmit -p tsconfig.json"
   },
   "author": "Mathew Henson",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "opentype.js": "^2.0.0"
+  }
 }
