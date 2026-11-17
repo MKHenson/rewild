@@ -71,11 +71,14 @@ import {
   floatRock,
 } from './utils/Posture';
 import { audio, footstepsDef, voiceDef } from '../audio/audio';
+import { GamepadButton } from '../input/Gamepad';
 import { PlayerSounds } from '../audio/PlayerSounds';
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
 const _PI_HALF = Math.PI / 2 - 0.01;
 const _MOUSE_SENSITIVITY = 0.002;
+// Radians a second with the right stick pushed all the way.
+const _PAD_LOOK_SPEED = 3.0;
 // Per dt (two seconds' worth of delta): walking is 3 m/s.
 const _MOVE_SPEED: f32 = 1.5;
 const _RUN_MULTIPLIER: f32 = 3.0;
@@ -301,6 +304,12 @@ export class Player extends Node {
   // Held keys: C dives and Space rises while swimming.
   private _downHeld = false;
   private _upHeld = false;
+  // The gamepad's share of this frame's input. The keys add to it.
+  private _padMoveX: f32 = 0;
+  private _padMoveY: f32 = 0;
+  private _padSprint = false;
+  private _padDown = false;
+  private _padUp = false;
   jumpRequested: boolean = false;
   private _isLocked = false;
   private _canvas: HTMLCanvasElement | null = null;
@@ -683,6 +692,7 @@ export class Player extends Node {
 
   onUpdate(delta: f32, total: u32): void {
     const alive = !this._dead;
+    this._readGamepad(delta);
 
     // Mouse look; a dying body levels its gaze and rolls onto its side.
     let pitch = this._pitch;
@@ -846,8 +856,11 @@ export class Player extends Node {
       this._movingForward ||
       this._movingBackward ||
       this._movingLeft ||
-      this._movingRight;
-    const sprinting = this._sprinting && this._stamina.canSprint;
+      this._movingRight ||
+      this._padMoveX !== 0 ||
+      this._padMoveY !== 0;
+    const sprinting =
+      (this._sprinting || this._padSprint) && this._stamina.canSprint;
     this._stamina.update(sprinting && pushing, delta);
     const speed =
       _MOVE_SPEED *
@@ -879,6 +892,11 @@ export class Player extends Node {
       moveX -= cosYaw * speed * dt;
       moveZ += sinYaw * speed * dt;
     }
+    // The left stick moves at its push, so a light push walks slowly.
+    const padForward = -this._padMoveY;
+    const padRight = this._padMoveX;
+    moveX += (cosYaw * padRight - sinYaw * padForward) * speed * dt;
+    moveZ += (-sinYaw * padRight - cosYaw * padForward) * speed * dt;
 
     // A gale holds back a player walking into it, and its gusts shove them
     // downwind, arriving with the gusts the trees around them bend to.
@@ -931,8 +949,8 @@ export class Player extends Node {
       this._swimHold = holdHeight(
         this._swimHold,
         eyeY,
-        this._downHeld,
-        this._upHeld,
+        this._downHeld || this._padDown,
+        this._upHeld || this._padUp,
         delta,
         water.level,
         water.ground + _SWIM_EYE_ABOVE_FEET + BED_CLEARANCE
@@ -1089,8 +1107,8 @@ export class Player extends Node {
       s.crouching = this._crouching;
       s.sprinting = sprinting;
       s.pushing = pushing;
-      s.diving = this._downHeld;
-      s.rising = this._upHeld;
+      s.diving = this._downHeld || this._padDown;
+      s.rising = this._upHeld || this._padUp;
       s.wetness = sky?.rainWetness.soak ?? 0;
       s.stamina = this._stamina.value / STAMINA_FULL;
       s.bodyTemperature = this._body.value;
@@ -1141,14 +1159,60 @@ export class Player extends Node {
       this._sprinting = true;
     else if (e.code === 'KeyC') {
       this._downHeld = true;
-      if (!e.repeat && !this.swimming) this._crouching = !this._crouching;
-    } else if (e.code === 'KeyF' && this._flashlight) {
-      this._flashlightOn = !this._flashlightOn;
-      this._sounds?.flashlight();
-      this._flashlight.intensity = this._flashlightOn
-        ? Player._FLASHLIGHT_INTENSITY
-        : 0.0;
+      if (!e.repeat) this._toggleCrouch();
+    } else if (e.code === 'KeyF') this._toggleFlashlight();
+  }
+
+  private _toggleCrouch(): void {
+    if (!this.swimming) this._crouching = !this._crouching;
+  }
+
+  private _toggleFlashlight(): void {
+    if (!this._flashlight) return;
+    this._flashlightOn = !this._flashlightOn;
+    this._sounds?.flashlight();
+    this._flashlight.intensity = this._flashlightOn
+      ? Player._FLASHLIGHT_INTENSITY
+      : 0.0;
+  }
+
+  /**
+   * Reads the gamepad, while the player has it and is in play. The right
+   * stick looks and the left stick moves. A jumps and rises in water, B
+   * crouches and dives, the left stick's click or the left trigger sprints,
+   * and Y toggles the flashlight.
+   */
+  private _readGamepad(delta: f32): void {
+    const gameManager = (this.stateMachine?.data as StateMachineData)
+      ?.gameManager;
+    const pad = gameManager?.gamepad;
+    if (
+      !pad?.connected ||
+      !gameManager.playerHasPad ||
+      !this._isLocked ||
+      this._dead
+    ) {
+      this._padMoveX = 0;
+      this._padMoveY = 0;
+      this._padSprint = false;
+      this._padDown = false;
+      this._padUp = false;
+      return;
     }
+    // A square curve aims finely near the centre and turns fast at the edge.
+    const { look, move } = pad;
+    this._yaw -= look.x * Math.abs(look.x) * _PAD_LOOK_SPEED * delta;
+    this._pitch -= look.y * Math.abs(look.y) * _PAD_LOOK_SPEED * delta;
+    this._pitch = Math.max(-_PI_HALF, Math.min(_PI_HALF, this._pitch));
+    this._padMoveX = move.x;
+    this._padMoveY = move.y;
+    this._padSprint =
+      pad.held(GamepadButton.LeftStick) || pad.held(GamepadButton.LeftTrigger);
+    this._padUp = pad.held(GamepadButton.A);
+    this._padDown = pad.held(GamepadButton.B);
+    if (pad.pressed(GamepadButton.A)) this.jumpRequested = true;
+    if (pad.pressed(GamepadButton.B)) this._toggleCrouch();
+    if (pad.pressed(GamepadButton.Y)) this._toggleFlashlight();
   }
 
   private _handleKeyUp(e: KeyboardEvent) {

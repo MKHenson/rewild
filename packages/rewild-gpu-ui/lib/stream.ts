@@ -176,6 +176,8 @@ export interface WriteOptions {
   icons?: UIIcons | null;
   /** Device pixels per CSS pixel, which text baselines snap to. */
   pixelRatio?: number;
+  /** The node that draws the focus ring, or null. */
+  focus?: UINode | null;
 }
 
 /**
@@ -228,6 +230,8 @@ function writeNode(
       node,
     });
 
+  const outerClip = clip;
+  const outerRadii = clipRadii;
   if (style.overflow === 'hidden') {
     // Nested clips keep only the innermost corner radii.
     clip = intersect(clip, innerBox(node));
@@ -239,6 +243,44 @@ function writeNode(
     writeText(node, stream, options, options.font, clip, clipRadii, opacity);
   for (const child of node.children)
     writeNode(child, stream, options, clip, clipRadii, opacity);
+  // The ring draws over the node's children, and its parent's clip cuts it,
+  // as with a CSS outline.
+  if (node === options.focus)
+    writeFocusRing(stream, rect, radii, outerClip, outerRadii, opacity);
+}
+
+/**
+ * The DOM's focus ring: `outline: 2px solid` in the primary colour, with no
+ * offset. A rounded box gets a ring with its radii plus the width, as Chrome
+ * draws it.
+ */
+const FOCUS_RING_WIDTH = 2;
+// The dark theme's `--primary-400`, until Mica reads the theme.
+const FOCUS_RING_COLOR = parseColor('#3a86cf');
+
+function writeFocusRing(
+  stream: PrimitiveStream,
+  rect: Rect,
+  radii: Radii,
+  clip: Rect,
+  clipRadii: Radii,
+  opacity: number
+): void {
+  const w = FOCUS_RING_WIDTH;
+  stream.pushRect({
+    rect: {
+      x: rect.x - w,
+      y: rect.y - w,
+      width: rect.width + 2 * w,
+      height: rect.height + 2 * w,
+    },
+    clip,
+    clipRadii,
+    radii: radii.map((r) => (r > 0 ? r + w : 0)) as Radii,
+    border: FOCUS_RING_COLOR,
+    borderWidth: w,
+    opacity,
+  });
 }
 
 function writeText(

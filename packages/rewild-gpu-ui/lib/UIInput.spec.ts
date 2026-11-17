@@ -250,3 +250,144 @@ describe('UIInput wheel and keys', () => {
     expect(all.input.key('down', { key: 'a', code: 'KeyA' })).toBe('passed');
   });
 });
+
+describe('UIInput focus', () => {
+  /** A menu that takes all input, with three focusable buttons in a row. */
+  function menu() {
+    const surface = new UISurface({
+      kind: 'screen',
+      name: 'menu',
+      input: 'all',
+    });
+    const buttons = [0, 50, 100].map((left) => {
+      const node = box(left, 0, 40);
+      node.style.focusable = true;
+      return node;
+    });
+    surface.root.append(...buttons);
+    surface.update(200, 200);
+    const input = new UIInput({ surfaces: [surface] });
+    const press = (key: string, shiftKey = false) =>
+      input.key('down', { key, code: key, shiftKey });
+    return { surface, buttons, input, press };
+  }
+
+  it('moves focus with the arrow keys and shows the ring', () => {
+    const { surface, buttons, press } = menu();
+    expect(press('ArrowRight')).toBe('prevented');
+    expect(surface.focused).toBe(buttons[0]);
+    expect(surface.focusVisible).toBe(true);
+    press('ArrowRight');
+    press('ArrowRight');
+    press('ArrowRight');
+    expect(surface.focused).toBe(buttons[2]);
+    press('ArrowLeft');
+    expect(surface.focused).toBe(buttons[1]);
+  });
+
+  it('moves focus with Tab and Shift+Tab, and wraps', () => {
+    const { surface, buttons, press } = menu();
+    press('Tab');
+    expect(surface.focused).toBe(buttons[0]);
+    press('Tab', true);
+    expect(surface.focused).toBe(buttons[2]);
+  });
+
+  it('sends keys to the focused node, and they bubble', () => {
+    const { surface, buttons, press } = menu();
+    const targets: UINode[] = [];
+    surface.root.on('keydown', (e) => targets.push(e.target!));
+    press('a');
+    buttons[1].focus();
+    press('a');
+    expect(targets).toEqual([surface.root, buttons[1]]);
+  });
+
+  it('clicks the focused node with Enter, but not on a repeat', () => {
+    const { buttons, input, press } = menu();
+    const click = jest.fn();
+    buttons[1].on('click', click);
+    buttons[1].focus();
+    expect(press('Enter')).toBe('prevented');
+    input.key('down', { key: 'Enter', code: 'Enter', repeat: true });
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(click.mock.calls[0][0]).toMatchObject({
+      pointerType: '',
+      x: 70,
+      y: 20,
+    });
+  });
+
+  it('does no default action when a listener prevents it', () => {
+    const { surface, buttons, press } = menu();
+    buttons[0].focus();
+    buttons[0].on('keydown', (e) => e.preventDefault());
+    expect(press('ArrowRight')).toBe('prevented');
+    expect(surface.focused).toBe(buttons[0]);
+  });
+
+  it('passes Escape on, so a menu can close itself', () => {
+    const { surface, buttons, press } = menu();
+    buttons[0].focus();
+    surface.root.on('keydown', (e) => {
+      if (e.key === 'Escape') surface.root.style.display = 'none';
+    });
+    expect(press('Escape')).toBe('taken');
+    expect(surface.open).toBe(false);
+    expect(press('Escape')).toBe('passed');
+  });
+
+  it('focuses a pressed node with no ring, and blurs on a press elsewhere', () => {
+    const { surface, buttons, input } = menu();
+    input.pointer('down', at(60, 10));
+    expect(surface.focused).toBe(buttons[1]);
+    expect(surface.focusVisible).toBe(false);
+    input.pointer('up', at(60, 10));
+    input.pointer('down', at(180, 180));
+    expect(surface.focused).toBeNull();
+  });
+
+  it('keeps focus on each surface, so it goes back when a popup closes', () => {
+    const { surface, buttons } = menu();
+    const popup = new UISurface({
+      kind: 'screen',
+      name: 'popup',
+      order: 1,
+      input: 'all',
+    });
+    const ok = box(0, 100, 40);
+    ok.style.focusable = true;
+    popup.root.append(ok);
+    popup.update(200, 200);
+    const input = new UIInput({ surfaces: [surface, popup] });
+    buttons[2].focus();
+    input.key('down', { key: 'Tab', code: 'Tab' });
+    expect(popup.focused).toBe(ok);
+    expect(surface.focused).toBe(buttons[2]);
+    popup.root.style.display = 'none';
+    expect(input.focusScope()).toBe(surface);
+    input.key('down', { key: 'ArrowLeft', code: 'ArrowLeft' });
+    expect(surface.focused).toBe(buttons[1]);
+  });
+
+  it('takes gamepad presses as keys', () => {
+    const { surface, buttons, input } = menu();
+    const click = jest.fn();
+    buttons[1].on('click', click);
+    const pad = (pressed: number[]) =>
+      ({
+        index: 0,
+        mapping: 'standard',
+        buttons: Array.from({ length: 17 }, (_, i) => ({
+          pressed: pressed.includes(i),
+        })),
+        axes: [0, 0],
+      } as unknown as Gamepad);
+    input.readGamepads([pad([15])], 0);
+    input.readGamepads([pad([])], 10);
+    input.readGamepads([pad([15])], 20);
+    expect(surface.focused).toBe(buttons[1]);
+    input.readGamepads([pad([0])], 30);
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+});

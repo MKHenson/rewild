@@ -12,6 +12,7 @@ import { bindScreenshotHotkey } from './ScreenshotHotkey';
 import { audio, closeSceneScope, openSceneScope } from './audio/audio';
 import { AudioScope } from 'rewild-audio';
 import { WorldSound } from './audio/WorldSound';
+import { Gamepad } from './input/Gamepad';
 
 export class GameManager {
   renderer: Renderer;
@@ -20,6 +21,12 @@ export class GameManager {
   /** Why init() failed, or null. */
   loadError: Error | null = null;
   player: Player;
+  readonly gamepad = new Gamepad();
+  /**
+   * True when the player acts on the gamepad. While a UI surface holds focus,
+   * such as a menu, the UI gets the pad instead.
+   */
+  playerHasPad = true;
   clock: Clock;
   /** Every sound this game plays; it fades out when the game is disposed. */
   sound: AudioScope;
@@ -186,6 +193,7 @@ export class GameManager {
     this.scatterColliders.update(viewer.x, viewer.y, viewer.z);
     this.physicsWorld.step();
 
+    this.routeGamepad();
     this.stateMachine?.OnLoop(delta, total);
     this.renderer.onFrame();
     audio.setListenerFromMatrix(
@@ -193,6 +201,18 @@ export class GameManager {
     );
     this.worldSound.update(this.renderer, delta);
     audio.update();
+  }
+
+  /** Reads the pad once, and gives it to the UI or leaves it to the player. */
+  private routeGamepad(): void {
+    const pad = this.gamepad;
+    const ui = this.renderer.ui.input;
+    pad.poll();
+    const uiHasPad = ui.focusScope() !== null;
+    // A press that began in play does not act in the UI.
+    if (uiHasPad && this.playerHasPad) ui.syncGamepads(pad.pads);
+    if (uiHasPad) ui.readGamepads(pad.pads, performance.now());
+    this.playerHasPad = !uiHasPad;
   }
 
   dispose() {
