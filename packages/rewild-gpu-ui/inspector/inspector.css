@@ -59,6 +59,11 @@ body {
   font-size: var(--font-size-s);
 }
 
+.tool.check {
+  flex-direction: row;
+  align-items: center;
+}
+
 #examples {
   flex-grow: 1;
   overflow: auto;

@@ -8,10 +8,15 @@ export const PIXEL_RATIOS: PixelRatioChoice[] = ['screen', 1, 1.5, 2, 3];
 export interface InspectorSettings {
   theme: InspectorTheme;
   pixelRatio: PixelRatioChoice;
+  layoutOverlay: boolean;
 }
 
 const STORAGE_KEY = 'rewild.ui-inspector';
-const DEFAULTS: InspectorSettings = { theme: 'dark', pixelRatio: 'screen' };
+const DEFAULTS: InspectorSettings = {
+  theme: 'dark',
+  pixelRatio: 'screen',
+  layoutOverlay: false,
+};
 
 export function loadSettings(): InspectorSettings {
   try {
@@ -21,6 +26,7 @@ export function loadSettings(): InspectorSettings {
       pixelRatio: PIXEL_RATIOS.includes(stored.pixelRatio)
         ? stored.pixelRatio
         : DEFAULTS.pixelRatio,
+      layoutOverlay: stored.layoutOverlay === true,
     };
   } catch {
     return { ...DEFAULTS };

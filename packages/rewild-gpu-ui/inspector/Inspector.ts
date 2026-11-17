@@ -1,4 +1,4 @@
-import { UICanvas, UIRenderer } from '../lib';
+import { UICanvas, UIRenderer, UISurface } from '../lib';
 import { parseComputedColor } from './cssColor';
 import { mirrorTree } from './domMirror';
 import { Example, ExampleRegistry } from './registry';
@@ -17,6 +17,7 @@ class ExampleCard {
   readonly element: HTMLElement;
   readonly canvas: UICanvas;
   private renderer: UIRenderer;
+  private surface: UISurface;
   private micaPane: HTMLElement;
   private micaCaption: HTMLElement;
   private observer: ResizeObserver;
@@ -60,15 +61,20 @@ class ExampleCard {
 
     this.canvas = new UICanvas(device, canvasElement);
     this.renderer = new UIRenderer(device, this.canvas.format);
-    const surface = this.renderer.createSurface({
+    this.surface = this.renderer.createSurface({
       kind: 'screen',
       name: example.name,
     });
-    example.build({ surface });
-    domPane.append(mirrorTree(surface.root));
+    example.build({ surface: this.surface });
+    domPane.append(mirrorTree(this.surface.root));
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(this.micaPane);
+  }
+
+  showLayout(show: boolean): void {
+    this.surface.showLayout = show;
+    this.requestDraw();
   }
 
   resize(): void {
@@ -142,6 +148,7 @@ export class Inspector {
           () => this.requestDraw()
         )
     );
+    for (const card of this.cards) card.showLayout(this.settings.layoutOverlay);
     const heading = el('h1');
     heading.textContent = part;
     this.main.append(heading, ...this.cards.map((card) => card.element));
@@ -184,7 +191,16 @@ export class Inspector {
         this.resizeAll();
       }
     );
-    this.tools.replaceChildren(theme, ratio);
+    const overlay = checkbox(
+      'Layout overlay',
+      this.settings.layoutOverlay,
+      (checked) => {
+        this.settings.layoutOverlay = checked;
+        saveSettings(this.settings);
+        for (const card of this.cards) card.showLayout(checked);
+      }
+    );
+    this.tools.replaceChildren(theme, ratio, overlay);
   }
 
   private applyTheme(): void {
@@ -245,5 +261,21 @@ function select(
   input.value = value;
   input.addEventListener('change', () => onChange(input.value));
   wrapper.append(text, input);
+  return wrapper;
+}
+
+function checkbox(
+  label: string,
+  checked: boolean,
+  onChange: (checked: boolean) => void
+): HTMLElement {
+  const wrapper = el('label', 'tool check');
+  const input = el('input') as HTMLInputElement;
+  input.type = 'checkbox';
+  input.checked = checked;
+  input.addEventListener('change', () => onChange(input.checked));
+  const text = el('span');
+  text.textContent = label;
+  wrapper.append(input, text);
   return wrapper;
 }

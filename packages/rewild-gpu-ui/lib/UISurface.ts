@@ -20,12 +20,24 @@ export class UISurface {
   height = 0;
   needsLayout = true;
   needsPaint = true;
+  private overlay = false;
 
   constructor(options: UISurfaceOptions) {
     this.kind = options.kind;
     this.name = options.name;
     this.order = options.order ?? 0;
     this.root.owner = this;
+  }
+
+  /** Draws the layout overlay over the tree. */
+  get showLayout(): boolean {
+    return this.overlay;
+  }
+
+  set showLayout(value: boolean) {
+    if (value === this.overlay) return;
+    this.overlay = value;
+    this.needsPaint = true;
   }
 
   invalidate(flags: Dirty): void {
@@ -45,7 +57,7 @@ export class UISurface {
     }
     if (!this.needsLayout && !this.needsPaint) return false;
     if (this.needsLayout) layoutTree(this.root, width, height);
-    writeTree(this.root, this.stream);
+    writeTree(this.root, this.stream, this.overlay);
     clearDirty(this.root);
     this.needsLayout = false;
     this.needsPaint = false;
