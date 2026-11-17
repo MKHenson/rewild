@@ -1,17 +1,25 @@
 import { innerBox } from './layout';
 import { fitRadii, intersect } from './stream';
 import { cornerRadii } from './style';
+import {
+  drawnTransform,
+  IDENTITY,
+  Placement,
+  placeNode,
+  placeRect,
+} from './transform';
 import type { Rect, UINode } from './UINode';
 
 type Radii = [number, number, number, number];
 
 /**
  * The topmost node at a point in surface CSS pixels, or null. It tests the
- * same shapes the stream draws: each box with its corner radius, inside the
- * clip of its `overflow: 'hidden'` parents. Layout must have run.
+ * same shapes the stream draws: each box with its corner radius and its
+ * transform, inside the clip of its `overflow: 'hidden'` parents. Layout
+ * must have run.
  */
 export function hitTest(root: UINode, x: number, y: number): UINode | null {
-  return hitNode(root, x, y, null, null);
+  return hitNode(root, x, y, null, null, IDENTITY);
 }
 
 function hitNode(
@@ -19,23 +27,37 @@ function hitNode(
   x: number,
   y: number,
   clip: Rect | null,
-  clipRadii: Radii | null
+  clipRadii: Radii | null,
+  parentPlacement: Placement
 ): UINode | null {
-  const { style, rect } = node;
+  const { style } = node;
   if (style.display === 'none') return null;
-  const radii = fitRadii(cornerRadii(style.borderRadius), rect);
+  const placement = placeNode(parentPlacement, node.rect, drawnTransform(node));
+  const { scale } = placement;
+  const rect = placeRect(node.rect, placement);
+  const radii = fitRadii(cornerRadii(style.borderRadius), node.rect).map(
+    (r) => r * scale
+  ) as Radii;
 
   let childClip = clip;
   let childRadii = clipRadii;
   if (style.overflow === 'hidden') {
     // Nested clips keep only the innermost corner radii, as the stream does.
-    const borderWidth = style.borderWidth ?? 0;
-    childClip = clip ? intersect(clip, innerBox(node)) : innerBox(node);
+    const borderWidth = (style.borderWidth ?? 0) * scale;
+    const inside = placeRect(innerBox(node), placement);
+    childClip = clip ? intersect(clip, inside) : inside;
     childRadii = radii.map((r) => Math.max(0, r - borderWidth)) as Radii;
   }
   if (!childClip || insideRounded(x, y, childClip, childRadii!))
     for (let i = node.children.length - 1; i >= 0; i--) {
-      const hit = hitNode(node.children[i], x, y, childClip, childRadii);
+      const hit = hitNode(
+        node.children[i],
+        x,
+        y,
+        childClip,
+        childRadii,
+        placement
+      );
       if (hit) return hit;
     }
 

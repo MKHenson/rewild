@@ -5,3 +5,7 @@ import './text';
 import './icons';
 import './events';
 import './focus';
+import './theme';
+import './shadows';
+import './glass';
+import './transitions';

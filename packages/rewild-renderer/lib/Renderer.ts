@@ -1104,7 +1104,10 @@ export class Renderer {
       // copied next, and water and the transparent groups draw over it in a
       // pass of their own.
       let opaqueEnd = 0;
-      while (opaqueEnd < renderList.length && drawRank(renderList[opaqueEnd]) === 0)
+      while (
+        opaqueEnd < renderList.length &&
+        drawRank(renderList[opaqueEnd]) === 0
+      )
         opaqueEnd++;
       const hasWater =
         opaqueEnd < renderList.length && drawRank(renderList[opaqueEnd]) === 1;
@@ -1277,6 +1280,11 @@ export class Renderer {
       // ratio to its CSS size, and UI layout works in CSS pixels.
       const canvas = this.canvas;
       const uiEncoder = device.createCommandEncoder({ label: 'ui encoder' });
+      // Glass blurs the HDR scene, with the same exposure as the tone map.
+      this.ui.backdrop = {
+        texture: this.sceneColorTarget,
+        exposure: camera.camera.exposure,
+      };
       this.ui.render(uiEncoder, context.getCurrentTexture().createView(), {
         width: canvas.width,
         height: canvas.height,

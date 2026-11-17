@@ -7,7 +7,8 @@ fn unpackColor(packed: f32) -> vec3f {
   return vec3f(f32((v >> 16u) & 255u), f32((v >> 8u) & 255u), f32(v & 255u)) / 255.0;
 }
 
-fn effect(prim: Primitive, local: vec2f, inner: f32) -> vec4f {
+fn effect(prim: Primitive, px: Pixel) -> vec4f {
+  let local = px.local;
   let value = prim.effect.x;
   let full = unpackColor(prim.effect.y);
   let empty = unpackColor(prim.effect.z);
@@ -20,5 +21,5 @@ fn effect(prim: Primitive, local: vec2f, inner: f32) -> vec4f {
 
   // The bar pulses more as it drains, and is steady when full.
   let pulse = mix(mix(0.5, 0.9, 0.5 + 0.5 * sin(u.time * 20.0)), 1.0, value);
-  return withBorder(fill, prim, inner) * pulse;
+  return withBorder(fill, prim, px.inner) * pulse;
 }

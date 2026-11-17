@@ -2,6 +2,8 @@ import type { UIFont } from './font';
 import type { UIIcons } from './icons';
 import meterEffect from './shaders/meter.wgsl';
 import { PRIMITIVE_FLOATS } from './stream';
+import { UITheme } from './theme';
+import { UIBackdrop, UIBackdropSource } from './UIBackdrop';
 import { UIEffects } from './UIEffects';
 import { UIInput } from './UIInput';
 import { UISurface, UISurfaceOptions } from './UISurface';
@@ -36,6 +38,19 @@ export class UIRenderer {
   readonly effects: UIEffects;
   /** Sends input to the surfaces. Attach it to the canvas the UI draws on. */
   readonly input = new UIInput(this);
+  /**
+   * The DOM's theme colours. In a page, it reads them at the start and again
+   * when the theme changes.
+   */
+  readonly theme = new UITheme();
+  /**
+   * What glass blurs: the image the UI draws over, the size of the target.
+   * Set it before each render. With none, glass shows no backdrop.
+   */
+  backdrop: UIBackdropSource | null = null;
+  private blur: UIBackdrop;
+  private boundBackdrop: GPUTexture | null = null;
+  private stopWatchingTheme: () => void = () => {};
   private _surfaces: UISurface[] = [];
   private buffers = new Map<UISurface, SurfaceBuffers>();
   private bindGroupLayout: GPUBindGroupLayout;
@@ -57,6 +72,7 @@ export class UIRenderer {
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
         { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+        { binding: 5, visibility: GPUShaderStage.FRAGMENT, texture: {} },
       ],
     });
     this.sampler = device.createSampler({
@@ -81,6 +97,11 @@ export class UIRenderer {
       size: 16,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    this.blur = new UIBackdrop(device);
+    if (typeof document !== 'undefined') {
+      this.theme.read();
+      this.stopWatchingTheme = this.theme.watch();
+    }
   }
 
   /**
@@ -95,7 +116,7 @@ export class UIRenderer {
     if (font === this._font) return;
     this._font = font;
     for (const surface of this._surfaces) surface.font = font;
-    this.rebindAtlases();
+    this.rebind();
   }
 
   /**
@@ -110,7 +131,7 @@ export class UIRenderer {
     if (icons === this._icons) return;
     this._icons = icons;
     for (const surface of this._surfaces) surface.icons = icons;
-    this.rebindAtlases();
+    this.rebind();
   }
 
   /** The surfaces in draw order, from bottom to top. */
@@ -122,6 +143,7 @@ export class UIRenderer {
     const surface = new UISurface(options);
     surface.font = this._font;
     surface.icons = this._icons;
+    surface.theme = this.theme;
     this._surfaces.push(surface);
     this._surfaces.sort((a, b) => a.order - b.order);
     return surface;
@@ -134,10 +156,15 @@ export class UIRenderer {
     this.buffers.delete(surface);
   }
 
+  /** True when a transition is running, so the UI must draw again on the next frame. */
+  get animating(): boolean {
+    return this._surfaces.some((surface) => surface.needsPaint);
+  }
+
   /**
    * Draws every surface into `view`. Clears it first when `clearValue` is
    * given, or else draws over what is there. With no `clearValue` and nothing
-   * to draw, it starts no pass.
+   * to draw, it starts no pass. When glass shows, it blurs the backdrop first.
    */
   render(
     encoder: GPUCommandEncoder,
@@ -154,13 +181,24 @@ export class UIRenderer {
       new Float32Array([width, height, pixelRatio, performance.now() / 1000])
     );
 
+    const now = performance.now();
+    let glass = false;
+    for (const surface of this._surfaces) {
+      surface.update(width, height, pixelRatio, now);
+      this.upload(surface);
+      if (surface.stream.glass > 0) glass = true;
+    }
+    // The blur runs only when glass shows.
+    if (glass && this.backdrop) {
+      this.blur.render(encoder, this.backdrop, pixelRatio);
+      if (this.blur.texture !== this.boundBackdrop) this.rebind();
+    }
+
     // Find the pipelines before the pass, so an unknown effect throws
     // with no pass left open.
     const runs = this.runs;
     runs.length = 0;
     for (const surface of this._surfaces) {
-      surface.update(width, height, pixelRatio);
-      this.upload(surface);
       const buffers = this.buffers.get(surface);
       const { count, effects } = surface.stream;
       if (!buffers) continue;
@@ -206,13 +244,16 @@ export class UIRenderer {
 
   dispose(): void {
     this.input.detach();
+    this.stopWatchingTheme();
+    this.blur.dispose();
     for (const { buffer } of this.buffers.values()) buffer.destroy();
     this.buffers.clear();
     this.uniforms.destroy();
     this.emptyAtlas.destroy();
   }
 
-  private rebindAtlases(): void {
+  /** Binds the atlases and the backdrop again, after one of them changed. */
+  private rebind(): void {
     for (const buffers of this.buffers.values())
       buffers.bindGroup = this.createBindGroup(buffers.buffer);
   }
@@ -220,6 +261,8 @@ export class UIRenderer {
   private createBindGroup(buffer: GPUBuffer): GPUBindGroup {
     const fontAtlas = this._font?.texture ?? this.emptyAtlas;
     const iconAtlas = this._icons?.texture ?? this.emptyAtlas;
+    this.boundBackdrop = this.blur.texture;
+    const backdrop = this.blur.texture ?? this.emptyAtlas;
     return this.device.createBindGroup({
       layout: this.bindGroupLayout,
       entries: [
@@ -228,6 +271,7 @@ export class UIRenderer {
         { binding: 2, resource: fontAtlas.createView() },
         { binding: 3, resource: this.sampler },
         { binding: 4, resource: iconAtlas.createView() },
+        { binding: 5, resource: backdrop.createView() },
       ],
     });
   }

@@ -20,6 +20,8 @@ export interface Example {
   height?: number;
   /** Shows an event log in place of the DOM side. */
   log?: boolean;
+  /** Draws the test image under both sides, so glass has something to blur. */
+  backdrop?: boolean;
   /**
    * Builds the tree. An example that animates returns a function, which the
    * inspector calls with the time in seconds before each frame it draws.

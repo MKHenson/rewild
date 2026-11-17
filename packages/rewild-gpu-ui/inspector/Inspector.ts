@@ -7,8 +7,9 @@ import {
   UIRenderer,
   UISurface,
 } from '../lib';
+import { BackdropImage, testImage } from './backdropImage';
 import { parseComputedColor } from './cssColor';
-import { mirrorTree } from './domMirror';
+import { DomMirror, mirrorTree } from './domMirror';
 import { Example, ExampleRegistry } from './registry';
 import {
   InspectorSettings,
@@ -32,6 +33,8 @@ class ExampleCard {
   private stopObserving: () => void;
   private size: CanvasResize | null = null;
   private animate: ((seconds: number) => void) | null;
+  private mirror: DomMirror | null = null;
+  private backdrop: BackdropImage | null = null;
 
   constructor(
     device: GPUDevice,
@@ -65,6 +68,10 @@ class ExampleCard {
     const dom = el('figure', 'side');
     const domPane = el('div', example.log ? 'pane log' : 'pane');
     domPane.style.height = height;
+    if (example.backdrop) {
+      // CSS's cover, as the Mica side draws it.
+      domPane.style.background = `center / cover url(${testImage().url})`;
+    }
     const domCaption = el('figcaption');
     domCaption.textContent = example.log ? 'Events, the newest first' : 'DOM';
     dom.append(domPane, domCaption);
@@ -74,6 +81,8 @@ class ExampleCard {
 
     this.canvas = new UICanvas(device, canvasElement);
     this.renderer = new UIRenderer(device, this.canvas.format);
+    if (example.backdrop)
+      this.backdrop = new BackdropImage(device, this.canvas.format);
     this.renderer.font = font;
     this.renderer.icons = icons;
     // Keys and the gamepad go to the card whose canvas has focus, not to
@@ -99,7 +108,10 @@ class ExampleCard {
         log,
         createSurface: (options) => this.renderer.createSurface(options),
       }) ?? null;
-    if (!example.log) domPane.append(mirrorTree(this.surface.root));
+    if (!example.log) {
+      this.mirror = mirrorTree(this.surface.root);
+      domPane.append(this.mirror.element);
+    }
 
     this.stopObserving = observeCanvasSize(canvasElement, (size) => {
       this.size = size;
@@ -120,8 +132,9 @@ class ExampleCard {
     this.renderer.input.syncGamepads(pads);
   }
 
+  /** True when the card must draw on the next frame: its example animates, or a transition runs. */
   get animated(): boolean {
-    return this.animate !== null;
+    return this.animate !== null || this.renderer.animating;
   }
 
   showLayout(show: boolean): void {
@@ -142,15 +155,25 @@ class ExampleCard {
 
   draw(): void {
     this.animate?.(performance.now() / 1000);
+    // Styles the example changed reach the DOM side, so its transitions run too.
+    this.mirror?.sync();
     const { canvas, context, device, pixelRatio } = this.canvas;
-    const background = getComputedStyle(this.micaPane).backgroundColor;
     const encoder = device.createCommandEncoder({ label: 'inspector' });
-    this.renderer.render(
-      encoder,
-      context.getCurrentTexture().createView(),
-      { width: canvas.width, height: canvas.height, pixelRatio },
-      parseComputedColor(background)
-    );
+    const view = context.getCurrentTexture().createView();
+    const viewport = { width: canvas.width, height: canvas.height, pixelRatio };
+    if (this.backdrop) {
+      this.backdrop.draw(encoder, view, canvas.width, canvas.height);
+      this.renderer.backdrop = { texture: this.backdrop.scene! };
+      this.renderer.render(encoder, view, viewport);
+    } else {
+      const background = getComputedStyle(this.micaPane).backgroundColor;
+      this.renderer.render(
+        encoder,
+        view,
+        viewport,
+        parseComputedColor(background)
+      );
+    }
     device.queue.submit([encoder.finish()]);
     const calls = this.renderer.drawCalls;
     this.micaCaption.textContent = `Mica · ${canvas.width} × ${
@@ -160,6 +183,7 @@ class ExampleCard {
 
   dispose(): void {
     this.stopObserving();
+    this.backdrop?.dispose();
     this.renderer.dispose();
     this.canvas.dispose();
   }

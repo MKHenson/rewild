@@ -1,15 +1,30 @@
-import { parseColor, RGBA } from './color';
+import { RGBA, resolveColor } from './color';
 import type { Bounds, UIFont } from './font';
 import type { UIIcons } from './icons';
 import { innerBox } from './layout';
-import { cornerRadii, Sides } from './style';
+import {
+  cornerRadii,
+  Sides,
+  UIBoxShadow,
+  UIColor,
+  UITransitionProperty,
+} from './style';
 import { placeText, resolveTextStyle } from './text';
+import type { UITheme } from './theme';
+import {
+  IDENTITY,
+  Placement,
+  placeNode,
+  placeRect,
+  transformValue,
+} from './transform';
+import { findTransition, NodeTransitions, TransitionValue } from './transition';
 import { Rect, UINode } from './UINode';
 
 /**
  * Floats per primitive: rect, clip rect, clip radii, corner radii, fill,
- * border colour, params (border width, opacity, kind, distance range) and
- * effect params. Matches `Primitive` in ui.wgsl.
+ * border colour, params (border width, opacity, kind, distance range or
+ * outset) and effect params. Matches `Primitive` in ui.wgsl.
  */
 export const PRIMITIVE_FLOATS = 32;
 
@@ -18,6 +33,12 @@ export enum PrimitiveKind {
   Rect = 0,
   Glyph = 1,
   Icon = 2,
+  /** A box over the blurred backdrop. */
+  Glass = 3,
+  /** An outer box shadow. Its border colour holds the shadow's radii. */
+  Shadow = 4,
+  /** An inset box shadow. Its border colour holds the radii of the hole. */
+  InsetShadow = 5,
 }
 
 /** Where the effect params start in a primitive. */
@@ -39,6 +60,10 @@ export interface RectPrimitive {
   border?: number[];
   borderWidth?: number;
   opacity?: number;
+  /** Defaults to `Rect`. Not a glyph or an icon. */
+  kind?: PrimitiveKind;
+  /** CSS pixels the quad grows by on each side. */
+  outset?: number;
   /** The registered effect that draws the rect, or null for a plain rect. */
   effect?: string | null;
   effectParams?: EffectParams;
@@ -66,6 +91,8 @@ export interface AtlasPrimitive {
 export class PrimitiveStream {
   data = new Float32Array(64 * PRIMITIVE_FLOATS);
   count = 0;
+  /** The glass primitives, which need the blurred backdrop. */
+  glass = 0;
   /** The effect of each primitive. */
   readonly effects: (string | null)[] = [];
   /** The node of each primitive, or null for an overlay primitive. */
@@ -76,6 +103,7 @@ export class PrimitiveStream {
 
   reset(): void {
     this.count = 0;
+    this.glass = 0;
     this.dirtyFrom = 0;
     this.dirtyTo = 0;
   }
@@ -91,8 +119,10 @@ export class PrimitiveStream {
     d.set(p.radii ?? NO_RADII, o + 4);
     d.set(p.fill ?? NONE, o + 8);
     d.set(p.border ?? NONE, o + 12);
-    write4(d, o + 16, p.borderWidth ?? 0, p.opacity ?? 1, 0, 0);
+    const kind = p.kind ?? PrimitiveKind.Rect;
+    write4(d, o + 16, p.borderWidth ?? 0, p.opacity ?? 1, kind, p.outset ?? 0);
     d.set(p.effectParams ?? NONE, o + 20);
+    if (kind === PrimitiveKind.Glass) this.glass++;
     this.effects[this.count] = p.effect ?? null;
     this.nodes[this.count] = p.node ?? null;
     if (p.node) p.node.primitive = this.count;
@@ -178,44 +208,120 @@ export interface WriteOptions {
   pixelRatio?: number;
   /** The node that draws the focus ring, or null. */
   focus?: UINode | null;
+  /** Resolves theme colours. With no theme, they are transparent. */
+  theme?: UITheme | null;
+  /** The time in milliseconds, for transitions. */
+  now?: number;
+}
+
+interface WriteContext extends WriteOptions {
+  /** Set when a transition has not ended, so the tree must draw again. */
+  animating: boolean;
 }
 
 /**
- * Writes the tree's primitives in tree order: a node's box, then its icon,
- * then its text, then its children. Layout must have run.
+ * Writes the tree's primitives in tree order: a node's outer shadows, its
+ * box, its inset shadows, then its icon, its text and its children. Layout
+ * must have run. Returns true when a transition is running, so the tree
+ * must be written again on the next frame.
  */
 export function writeTree(
   root: UINode,
   stream: PrimitiveStream,
   options: WriteOptions = {}
-): void {
+): boolean {
+  const context: WriteContext = { ...options, animating: false };
   stream.reset();
-  writeNode(root, stream, options, NO_CLIP, NO_RADII, 1);
+  writeNode(root, stream, context, NO_CLIP, NO_RADII, 1, IDENTITY);
   if (options.overlay)
     for (const child of root.children) writeOverlay(child, stream);
+  return context.animating;
 }
+
+/**
+ * The property's value to draw: its target, or a value on the way to it
+ * when the style has a transition for it.
+ */
+function animated(
+  node: UINode,
+  key: UITransitionProperty,
+  target: TransitionValue,
+  context: WriteContext
+): TransitionValue {
+  if (!findTransition(node.style, key)) {
+    node.transitions?.clear(key);
+    return target;
+  }
+  node.transitions ??= new NodeTransitions();
+  const { value, running } = node.transitions.value(
+    key,
+    target,
+    context.now ?? 0
+  );
+  if (running) context.animating = true;
+  return value;
+}
+
+function animatedColor(
+  node: UINode,
+  key: 'backgroundColor' | 'borderColor' | 'color',
+  context: WriteContext
+): RGBA {
+  const target = resolveColor(node.style[key], context.theme);
+  return animated(node, key, target, context) as RGBA;
+}
+
+/** The text colour that passes down to the node, part way through a transition. */
+function textColor(node: UINode, context: WriteContext): RGBA {
+  for (let n: UINode | null = node; n; n = n.parent)
+    if (n.style.color !== undefined) return animatedColor(n, 'color', context);
+  return WHITE;
+}
+
+const WHITE: RGBA = [1, 1, 1, 1];
 
 function writeNode(
   node: UINode,
   stream: PrimitiveStream,
-  options: WriteOptions,
+  context: WriteContext,
   clip: Rect,
   clipRadii: Radii,
-  parentOpacity: number
+  parentOpacity: number,
+  parentPlacement: Placement
 ): void {
-  const { style, rect } = node;
+  const { style } = node;
   if (style.display === 'none') return;
   // Opacity multiplies down the tree, so overlapping children of a faded
   // node fade one by one, not as a group as in CSS.
-  const opacity = parentOpacity * (style.opacity ?? 1);
+  const [ownOpacity] = animated(node, 'opacity', [style.opacity ?? 1], context);
+  const opacity = parentOpacity * ownOpacity;
   if (opacity <= 0) return;
 
-  const radii = fitRadii(cornerRadii(style.borderRadius), rect);
-  const borderWidth = style.borderWidth ?? 0;
-  const fill = parseColor(style.backgroundColor);
-  const border = parseColor(style.borderColor);
+  const transform = animated(
+    node,
+    'transform',
+    transformValue(style.transform),
+    context
+  );
+  const placement = placeNode(parentPlacement, node.rect, transform);
+  const { scale } = placement;
+  const rect = placeRect(node.rect, placement);
+  const radii = scaleRadii(
+    fitRadii(cornerRadii(style.borderRadius), node.rect),
+    scale
+  );
+  const borderWidth = (style.borderWidth ?? 0) * scale;
+  const fill = animatedColor(node, 'backgroundColor', context);
+  const border = animatedColor(node, 'borderColor', context);
+  const glass = style.backdrop === 'glass';
+  const shadows = boxShadows(style.boxShadow);
+  const box = { rect, radii, borderWidth, clip, clipRadii, opacity, scale };
+
+  // The first shadow draws on top, as in CSS.
+  for (let i = shadows.length - 1; i >= 0; i--)
+    if (!shadows[i].inset) writeShadow(stream, context, box, shadows[i]);
   // An effect draws its own content, so it draws with no fill or border.
-  if (node.effect || fill[3] > 0 || (borderWidth > 0 && border[3] > 0))
+  if (node.effect || glass || fill[3] > 0 || (borderWidth > 0 && border[3] > 0))
     stream.pushRect({
       rect,
       clip,
@@ -225,48 +331,147 @@ function writeNode(
       border,
       borderWidth,
       opacity,
+      kind: glass ? PrimitiveKind.Glass : PrimitiveKind.Rect,
+      outset: node.effect ? node.effectOutset * scale : 0,
       effect: node.effect,
       effectParams: node.effectParams,
       node,
     });
+  for (let i = shadows.length - 1; i >= 0; i--)
+    if (shadows[i].inset) writeShadow(stream, context, box, shadows[i]);
 
   const outerClip = clip;
   const outerRadii = clipRadii;
   if (style.overflow === 'hidden') {
     // Nested clips keep only the innermost corner radii.
-    clip = intersect(clip, innerBox(node));
+    clip = intersect(clip, placeRect(innerBox(node), placement));
     clipRadii = radii.map((r) => Math.max(0, r - borderWidth)) as Radii;
   }
-  if (node.icon && options.icons)
-    writeIcon(node, stream, options, options.icons, clip, clipRadii, opacity);
-  if (node.text && options.font)
-    writeText(node, stream, options, options.font, clip, clipRadii, opacity);
+  if (node.icon && context.icons)
+    writeIcon(
+      node,
+      stream,
+      context,
+      context.icons,
+      clip,
+      clipRadii,
+      opacity,
+      placement
+    );
+  if (node.text && context.font)
+    writeText(
+      node,
+      stream,
+      context,
+      context.font,
+      clip,
+      clipRadii,
+      opacity,
+      placement
+    );
   for (const child of node.children)
-    writeNode(child, stream, options, clip, clipRadii, opacity);
+    writeNode(child, stream, context, clip, clipRadii, opacity, placement);
   // The ring draws over the node's children, and its parent's clip cuts it,
   // as with a CSS outline.
-  if (node === options.focus)
-    writeFocusRing(stream, rect, radii, outerClip, outerRadii, opacity);
+  if (node === context.focus)
+    writeFocusRing(stream, context, box, outerClip, outerRadii);
+}
+
+/** A node's box as it draws, on the surface. */
+interface PlacedBox {
+  rect: Rect;
+  radii: Radii;
+  borderWidth: number;
+  clip: Rect;
+  clipRadii: Radii;
+  opacity: number;
+  scale: number;
+}
+
+function boxShadows(
+  value: UIBoxShadow | UIBoxShadow[] | undefined
+): UIBoxShadow[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
 }
 
 /**
- * The DOM's focus ring: `outline: 2px solid` in the primary colour, with no
+ * One box shadow. A transform scales it with the box. The shader blurs the
+ * shadow's box with a Gaussian whose deviation is half the CSS blur radius.
+ */
+function writeShadow(
+  stream: PrimitiveStream,
+  context: WriteContext,
+  box: PlacedBox,
+  shadow: UIBoxShadow
+): void {
+  const color = resolveColor(shadow.color, context.theme);
+  if (color[3] <= 0) return;
+  const { scale } = box;
+  const x = (shadow.x ?? 0) * scale;
+  const y = (shadow.y ?? 0) * scale;
+  const sigma = (Math.max(0, shadow.blur ?? 0) / 2) * scale;
+  const spread = (shadow.spread ?? 0) * scale;
+  const inset = shadow.inset ?? false;
+  let shapeRadii: Radii;
+  if (inset) {
+    // The hole is the padding box, moved and shrunk by the spread.
+    const padding = box.radii.map((r) => Math.max(0, r - box.borderWidth));
+    shapeRadii = padding.map((r) => spreadRadius(r, -spread)) as Radii;
+  } else {
+    shapeRadii = box.radii.map((r) => spreadRadius(r, spread)) as Radii;
+  }
+  stream.pushRect({
+    rect: box.rect,
+    clip: box.clip,
+    clipRadii: box.clipRadii,
+    radii: box.radii,
+    fill: color,
+    border: shapeRadii,
+    borderWidth: box.borderWidth,
+    opacity: box.opacity,
+    kind: inset ? PrimitiveKind.InsetShadow : PrimitiveKind.Shadow,
+    // The quad covers the blur's tail, three deviations out.
+    outset: inset
+      ? 0
+      : Math.max(Math.abs(x), Math.abs(y)) + Math.max(0, spread) + 3 * sigma,
+    effectParams: [x, y, sigma, spread],
+  });
+}
+
+/**
+ * A corner radius grown by a spread, as CSS grows a shadow's corners. A
+ * small radius grows less than the spread, so a square corner stays square.
+ * A negative spread shrinks it.
+ */
+export function spreadRadius(radius: number, spread: number): number {
+  if (spread <= 0) return Math.max(0, radius + spread);
+  const ratio = radius / spread;
+  const factor = ratio < 1 ? 1 + (ratio - 1) ** 3 : 1;
+  return radius + spread * factor;
+}
+
+function scaleRadii(radii: Radii, scale: number): Radii {
+  return scale === 1 ? radii : (radii.map((r) => r * scale) as Radii);
+}
+
+/**
+ * The DOM's focus ring: `outline: 2px solid` in `primary400`, with no
  * offset. A rounded box gets a ring with its radii plus the width, as Chrome
  * draws it.
  */
 const FOCUS_RING_WIDTH = 2;
-// The dark theme's `--primary-400`, until Mica reads the theme.
-const FOCUS_RING_COLOR = parseColor('#3a86cf');
+const FOCUS_RING_COLOR: UIColor = 'primary400';
 
 function writeFocusRing(
   stream: PrimitiveStream,
-  rect: Rect,
-  radii: Radii,
+  context: WriteContext,
+  box: PlacedBox,
   clip: Rect,
-  clipRadii: Radii,
-  opacity: number
+  clipRadii: Radii
 ): void {
-  const w = FOCUS_RING_WIDTH;
+  const w = FOCUS_RING_WIDTH * box.scale;
+  const { rect, radii } = box;
   stream.pushRect({
     rect: {
       x: rect.x - w,
@@ -277,30 +482,31 @@ function writeFocusRing(
     clip,
     clipRadii,
     radii: radii.map((r) => (r > 0 ? r + w : 0)) as Radii,
-    border: FOCUS_RING_COLOR,
+    border: resolveColor(FOCUS_RING_COLOR, context.theme),
     borderWidth: w,
-    opacity,
+    opacity: box.opacity,
   });
 }
 
 function writeText(
   node: UINode,
   stream: PrimitiveStream,
-  options: WriteOptions,
+  context: WriteContext,
   font: UIFont,
   clip: Rect,
   clipRadii: Radii,
-  opacity: number
+  opacity: number,
+  placement: Placement
 ): void {
-  const style = resolveTextStyle(node);
-  const color = parseColor(style.color);
+  const color = textColor(node, context);
   if (color[3] <= 0) return;
+  const style = resolveTextStyle(node);
   const box = contentBox(node);
-  const glyphs = placeText(node, font, style, box, options.pixelRatio ?? 1);
+  const glyphs = placeText(node, font, style, box, context.pixelRatio ?? 1);
   for (const { rect, atlas } of glyphs)
     stream.pushAtlas({
       kind: PrimitiveKind.Glyph,
-      rect,
+      rect: placeRect(rect, placement),
       clip,
       clipRadii,
       color,
@@ -318,32 +524,34 @@ function writeText(
 function writeIcon(
   node: UINode,
   stream: PrimitiveStream,
-  options: WriteOptions,
+  context: WriteContext,
   icons: UIIcons,
   clip: Rect,
   clipRadii: Radii,
-  opacity: number
+  opacity: number,
+  placement: Placement
 ): void {
   const icon = icons.icon(node.icon!);
   if (!icon) return;
-  const color = parseColor(resolveTextStyle(node).color);
+  const color = textColor(node, context);
   if (color[3] <= 0) return;
   const box = contentBox(node);
   const size = Math.min(box.width, box.height);
   if (size <= 0) return;
-  const ratio = options.pixelRatio ?? 1;
+  const ratio = context.pixelRatio ?? 1;
   const snap = (v: number) => Math.round(v * ratio) / ratio;
   const x = snap(box.x + (box.width - size) / 2);
   const y = snap(box.y + (box.height - size) / 2);
   const { planeBounds: plane, atlasBounds: atlas } = icon;
+  const rect = {
+    x: x + plane.left * size,
+    y: y + plane.top * size,
+    width: (plane.right - plane.left) * size,
+    height: (plane.bottom - plane.top) * size,
+  };
   stream.pushAtlas({
     kind: PrimitiveKind.Icon,
-    rect: {
-      x: x + plane.left * size,
-      y: y + plane.top * size,
-      width: (plane.right - plane.left) * size,
-      height: (plane.bottom - plane.top) * size,
-    },
+    rect: placeRect(rect, placement),
     clip,
     clipRadii,
     color,

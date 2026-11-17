@@ -4,6 +4,7 @@ import type { UIFont } from './font';
 import type { UIIcons } from './icons';
 import { layoutTree } from './layout';
 import { PrimitiveStream, writeTree } from './stream';
+import type { UITheme } from './theme';
 import { Dirty, UINode } from './UINode';
 
 /**
@@ -47,6 +48,8 @@ export class UISurface {
   private _focusVisible = false;
   private _font: UIFont | null = null;
   private _icons: UIIcons | null = null;
+  private _theme: UITheme | null = null;
+  private themeRevision = -1;
 
   constructor(options: UISurfaceOptions) {
     this.kind = options.kind;
@@ -76,6 +79,17 @@ export class UISurface {
   set icons(icons: UIIcons | null) {
     if (icons === this._icons) return;
     this._icons = icons;
+    this.needsPaint = true;
+  }
+
+  /** Resolves theme colours. With no theme, they are transparent. */
+  get theme(): UITheme | null {
+    return this._theme;
+  }
+
+  set theme(theme: UITheme | null) {
+    if (theme === this._theme) return;
+    this._theme = theme;
     this.needsPaint = true;
   }
 
@@ -140,10 +154,11 @@ export class UISurface {
   }
 
   /**
-   * Lays out and rebuilds the stream if anything changed. Returns true when
-   * the stream changed.
+   * Lays out and rebuilds the stream if anything changed. `now` is the time
+   * in milliseconds, for transitions. Returns true when the stream changed.
+   * While a transition runs, the stream changes on each update.
    */
-  update(width: number, height: number, pixelRatio = 1): boolean {
+  update(width: number, height: number, pixelRatio = 1, now = 0): boolean {
     if (width !== this.width || height !== this.height) {
       this.width = width;
       this.height = height;
@@ -153,18 +168,25 @@ export class UISurface {
       this.pixelRatio = pixelRatio;
       this.needsPaint = true;
     }
+    const themeRevision = this._theme?.revision ?? -1;
+    if (themeRevision !== this.themeRevision) {
+      this.themeRevision = themeRevision;
+      this.needsPaint = true;
+    }
     if (!this.needsLayout && !this.needsPaint) return false;
     if (this.needsLayout) layoutTree(this.root, width, height);
-    writeTree(this.root, this.stream, {
+    const animating = writeTree(this.root, this.stream, {
       overlay: this.overlay,
       font: this._font,
       icons: this._icons,
       pixelRatio,
       focus: this.focusVisible ? this._focused : null,
+      theme: this._theme,
+      now,
     });
     clearDirty(this.root);
     this.needsLayout = false;
-    this.needsPaint = false;
+    this.needsPaint = animating;
     return true;
   }
 }
