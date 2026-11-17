@@ -238,6 +238,9 @@ A flex subset in TypeScript, written to CSS semantics so its output can be check
 - **Text.** A text node gives layout a measure function: given a width limit, it returns the wrapped width and height. Results are cached by text, style and width.
 - **When.** Layout runs before drawing, only for surfaces with a dirty node, and only for the dirty subtree where it can.
 - **Pixels.** Layout works in CSS pixels. Drawing scales by the device pixel ratio, so a layout is the same on any screen.
+- **Defaults.** Each node is a flex container with `box-sizing: border-box`. `flexDirection` is `row`, `flexShrink` is 1 and `alignItems` is `stretch`, as in CSS. Min sizes are 0: there is no automatic minimum size from the content. The DOM mirror in the inspector sets `min-width: 0` and `min-height: 0` to match.
+- **Absolute nodes** are placed in the padding box of their parent. With no inset on an axis, a node goes where it would go as the only flex item.
+- **Browser rules.** Layout follows Chrome where the spec leaves room: a percentage height resolves only against a definite height, and a container sized by its content uses each item's content width only when the item's grow or shrink factor lets it move off its flex basis.
 
 ### Checking it
 
@@ -591,12 +594,12 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
 
 ### Stage 1: boxes and bars
 
-- [ ] **1. The package and the inspector**
+- [x] **1. The package and the inspector**
 
   - Scope: the `rewild-gpu-ui` package: its workspace entry, `package.json`, `tsconfig.json`, Jest setup and a row in `docs/monorepo-structure.md`. `npm run ui-inspector` with the list, the example registry, a WebGPU canvas on a bare `GPUDevice` sized by the device pixel ratio, the DOM side by side view, and the theme and pixel ratio switches.
   - Expect: `npm test` and `npm run ts-check` run the package. The inspector opens, lists a first example, and shows its DOM side and a cleared Mica canvas.
 
-- [ ] **2. Nodes, surfaces and the UI pass**
+- [x] **2. Nodes, surfaces and the UI pass**
 
   - Scope: `UINode`, `UISurface` (screen only), tree operations, dirty flags, the style object with the Box properties and absolute position. The primitive stream, the `rect` primitive with per-corner radius, border width and clipping, one pipeline per surface, surface order. Examples for boxes.
   - Expect: a test changes a style and only the changed nodes are dirty. In the inspector, nested, clipped, rounded boxes draw in one call, match their DOM versions, and are sharp on a high DPI screen.

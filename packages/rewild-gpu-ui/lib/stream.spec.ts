@@ -109,6 +109,36 @@ describe('the primitive stream', () => {
     expect(stream.count).toBe(0);
   });
 
+  it('skips a subtree with display none', () => {
+    const { stream } = surfaceWith(
+      { width: 50, height: 50, display: 'none', backgroundColor: '#ffffff' },
+      { width: 10, height: 10, backgroundColor: '#ffffff' }
+    );
+    expect(stream.count).toBe(0);
+  });
+
+  it('draws the layout overlay after the tree', () => {
+    const surface = surfaceWith({
+      left: 10,
+      top: 10,
+      width: 50,
+      height: 40,
+      margin: 5,
+      padding: [4, 0, 0, 0],
+      backgroundColor: '#ff0000',
+    });
+    surface.showLayout = true;
+    expect(surface.update(200, 100)).toBe(true);
+    const { stream } = surface;
+    // The box, four margin strips, one padding strip and the outline.
+    expect(stream.count).toBe(7);
+    expect(primitive(stream, 0).fill).toEqual([1, 0, 0, 1]);
+    expect(primitive(stream, 1).rect).toEqual([10, 10, 60, 5]);
+    expect(primitive(stream, 5).rect).toEqual([15, 15, 50, 4]);
+    expect(primitive(stream, 6).rect).toEqual([15, 15, 50, 40]);
+    expect(primitive(stream, 6).borderWidth).toBe(1);
+  });
+
   it('grows past its first size', () => {
     const surface = new UISurface({ kind: 'screen', name: 'test' });
     for (let i = 0; i < 200; i++)

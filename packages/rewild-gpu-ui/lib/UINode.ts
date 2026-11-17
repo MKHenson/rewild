@@ -1,4 +1,4 @@
-import { affectsLayout, UIStyle } from './style';
+import { affectsLayout, Sides, UIStyle } from './style';
 import type { UISurface } from './UISurface';
 
 export enum Dirty {
@@ -14,8 +14,18 @@ export interface Rect {
   height: number;
 }
 
+/**
+ * Sizes a node's content, such as text. Given a width limit in CSS pixels,
+ * which can be `Infinity`, it returns the content size inside the padding.
+ */
+export type MeasureFunction = (widthLimit: number) => {
+  width: number;
+  height: number;
+};
+
 export interface UINodeOptions {
   style?: UIStyle;
+  measure?: MeasureFunction;
 }
 
 /** A 2D box in a UI tree. Later children draw on top of earlier ones. */
@@ -25,11 +35,20 @@ export class UINode {
   parent: UINode | null = null;
   /** The border box in surface CSS pixels, written by layout. */
   rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  /** Resolved margin and padding in CSS pixels, written by layout. */
+  margin: Sides = [0, 0, 0, 0];
+  padding: Sides = [0, 0, 0, 0];
+  /**
+   * Sizes the node from its content instead of its children. Call
+   * `markDirty(Dirty.Layout)` when the content changes.
+   */
+  measure: MeasureFunction | null;
   dirty: Dirty = Dirty.Layout | Dirty.Paint;
   /** Set on the root node of a surface. */
   owner: UISurface | null = null;
 
   constructor(options: UINodeOptions = {}) {
+    this.measure = options.measure ?? null;
     this.style = new Proxy<UIStyle>(
       { ...options.style },
       {

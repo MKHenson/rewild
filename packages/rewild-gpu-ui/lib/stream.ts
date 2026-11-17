@@ -1,6 +1,6 @@
 import { parseColor } from './color';
 import { innerBox } from './layout';
-import { cornerRadii } from './style';
+import { cornerRadii, Sides } from './style';
 import { Rect, UINode } from './UINode';
 
 /**
@@ -70,10 +70,18 @@ function write4(
   return o + 4;
 }
 
-/** Writes the tree's primitives in tree order. Layout must have run. */
-export function writeTree(root: UINode, stream: PrimitiveStream): void {
+/**
+ * Writes the tree's primitives in tree order. Layout must have run. With
+ * `overlay`, the layout overlay draws on top.
+ */
+export function writeTree(
+  root: UINode,
+  stream: PrimitiveStream,
+  overlay = false
+): void {
   stream.reset();
   writeNode(root, stream, NO_CLIP, NO_RADII, 1);
+  if (overlay) for (const child of root.children) writeOverlay(child, stream);
 }
 
 function writeNode(
@@ -84,6 +92,7 @@ function writeNode(
   parentOpacity: number
 ): void {
   const { style, rect } = node;
+  if (style.display === 'none') return;
   // Opacity multiplies down the tree, so overlapping children of a faded
   // node fade one by one, not as a group as in CSS.
   const opacity = parentOpacity * (style.opacity ?? 1);
@@ -142,4 +151,69 @@ function intersect(a: Rect, b: Rect): Rect {
     width: Math.max(0, right - x),
     height: Math.max(0, bottom - y),
   };
+}
+
+// Overlay colours follow the browser's layout overlay.
+const MARGIN_COLOR = [0.96, 0.7, 0.42, 0.4];
+const PADDING_COLOR = [0.58, 0.77, 0.49, 0.4];
+const BOX_COLOR = [0.44, 0.66, 0.86, 1];
+const CLIP_COLOR = [0.86, 0.3, 0.86, 1];
+const NONE = [0, 0, 0, 0];
+
+/** Margins, padding, border boxes and clip rects, like the browser's layout overlay. */
+function writeOverlay(node: UINode, stream: PrimitiveStream): void {
+  if (node.style.display === 'none') return;
+  const { rect, margin } = node;
+  const marginBox = {
+    x: rect.x - margin[3],
+    y: rect.y - margin[0],
+    width: rect.width + margin[1] + margin[3],
+    height: rect.height + margin[0] + margin[2],
+  };
+  writeStrips(stream, marginBox, margin, MARGIN_COLOR);
+  const inside = innerBox(node);
+  writeStrips(stream, inside, node.padding, PADDING_COLOR);
+  stream.pushRect(rect, NO_CLIP, NO_RADII, NO_RADII, NONE, BOX_COLOR, 1, 1);
+  if (node.style.overflow === 'hidden')
+    stream.pushRect(
+      inside,
+      NO_CLIP,
+      NO_RADII,
+      NO_RADII,
+      NONE,
+      CLIP_COLOR,
+      1,
+      1
+    );
+  for (const child of node.children) writeOverlay(child, stream);
+}
+
+/** Fills the band inside `outer` that `sides` wide edges make. */
+function writeStrips(
+  stream: PrimitiveStream,
+  outer: Rect,
+  sides: Sides,
+  color: number[]
+): void {
+  const [top, right, bottom, left] = sides.map((s) => Math.max(0, s));
+  const middle = outer.height - top - bottom;
+  const strips: Rect[] = [
+    { x: outer.x, y: outer.y, width: outer.width, height: top },
+    {
+      x: outer.x,
+      y: outer.y + outer.height - bottom,
+      width: outer.width,
+      height: bottom,
+    },
+    { x: outer.x, y: outer.y + top, width: left, height: middle },
+    {
+      x: outer.x + outer.width - right,
+      y: outer.y + top,
+      width: right,
+      height: middle,
+    },
+  ];
+  for (const strip of strips)
+    if (strip.width > 0 && strip.height > 0)
+      stream.pushRect(strip, NO_CLIP, NO_RADII, NO_RADII, color, NONE, 0, 1);
 }
