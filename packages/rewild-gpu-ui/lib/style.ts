@@ -90,6 +90,12 @@ export interface UIStyle {
    * `overflow: 'hidden'`, as in CSS. It does not pass down.
    */
   textOverflow?: 'clip' | 'ellipsis';
+
+  /**
+   * `none` keeps the node out of the hit test, so pointer events go to what
+   * is under it. Its children can still be hit. It does not pass down.
+   */
+  pointerEvents?: 'auto' | 'none';
 }
 
 /** The text properties that pass from a parent to its children, as in CSS. */
@@ -131,6 +137,11 @@ const LAYOUT_KEYS = new Set<keyof UIStyle>([
   'lineHeight',
   'whiteSpace',
 ]);
+
+/** True when a change to the property changes only input, not layout or drawing. */
+export function affectsOnlyInput(key: keyof UIStyle): boolean {
+  return key === 'pointerEvents';
+}
 
 /** True when a change to the property can move or resize boxes. */
 export function affectsLayout(key: keyof UIStyle): boolean {

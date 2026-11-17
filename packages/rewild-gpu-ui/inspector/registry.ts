@@ -3,6 +3,10 @@ import type { UISurface } from '../lib';
 /** What an example builds into. The inspector mirrors the surface's tree as DOM elements. */
 export interface ExampleView {
   surface: UISurface;
+  /** The Mica canvas. Its own DOM listeners stand in for the game's. */
+  canvas: HTMLCanvasElement;
+  /** Adds a line to the event log of an example with `log` set. */
+  log(line: string): void;
 }
 
 export interface Example {
@@ -12,6 +16,8 @@ export interface Example {
   description?: string;
   /** The height of each side in CSS pixels. */
   height?: number;
+  /** Shows an event log in place of the DOM side. */
+  log?: boolean;
   /**
    * Builds the tree. An example that animates returns a function, which the
    * inspector calls with the time in seconds before each frame it draws.

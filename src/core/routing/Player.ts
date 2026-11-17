@@ -160,7 +160,12 @@ interface Hud {
  * screen. The temperature bar grows up the right edge.
  */
 function createHud(ui: UIRenderer): Hud {
-  const surface = ui.createSurface({ kind: 'screen', name: 'hud' });
+  // The bars take no input, so clicks on them reach the game.
+  const surface = ui.createSurface({
+    kind: 'screen',
+    name: 'hud',
+    input: 'none',
+  });
   // The gap above each bar is its top margin. A hidden stamina bar takes its
   // gap with it, so the oxygen bar moves down into its place.
   const health = new Meter({

@@ -313,11 +313,21 @@ settings.icon = 'x'; // draws again, with no layout
 
 The shape follows the DOM.
 
-- **Types.** `pointerdown`, `pointerup`, `pointermove`, `pointerenter`, `pointerleave`, `click`, `wheel`, `focus`, `blur`, `keydown`, `keyup`.
-- **Phases.** Capture down from the surface root, then bubble up from the target. `stopPropagation` and `preventDefault`. Enter and leave do not bubble.
-- **Pointer capture.** A node that captures the pointer gets its moves and its up, even off the node. The slider needs this.
-- **Hit test.** From layout rectangles, inside clip rectangles, with corner radius. `pointerEvents: 'none'` skips a node.
-- **Taking input from the game.** An open menu surface takes pointer and key input, so a click on Resume does not also act in the game.
+- **Types.** `pointerdown`, `pointerup`, `pointermove`, `pointercancel`, `pointerenter`, `pointerleave`, `click`, `wheel`, `focus`, `blur`, `keydown`, `keyup`.
+- **Phases.** Capture down from the surface root, then bubble up from the target. At the target, capture listeners run first. `stopPropagation` and `preventDefault`. Enter and leave do not bubble. `node.on(type, listener, { capture })` and `node.off` add and remove listeners.
+- **Click.** A click goes to the nearest node that holds both the down and the up, as in the DOM. Only the main button clicks.
+- **Pointer capture.** A node that captures the pointer gets its moves, its up and its cancel, even off the node. The slider needs this. The capture ends when the pointer is up.
+- **Hit test.** From layout rectangles, inside clip rectangles, with corner radius. `pointerEvents: 'none'` skips a node, but not its children.
+- **Taking input from the game.** Each surface has an `input` mode:
+
+  | Mode    | Takes                                                                          | Used by        |
+  | ------- | ------------------------------------------------------------------------------ | -------------- |
+  | `none`  | Nothing. Its nodes get no events                                               | The HUD        |
+  | `nodes` | Pointer input over a node other than the root. The default                     | WorldPanel, later |
+  | `all`   | All pointer and key input while its root shows. Keys go to the root until ticket 8 adds focus | The menu       |
+
+  A press that a surface takes stays taken until it is up, and a press that starts in the game stays in the game. `UIInput` listens on the window in the capture phase. When a surface takes a DOM event, the event stops there, so no listener of the game gets it. A click on Resume does not also act in the game. Keys typed in a DOM control are not taken.
+- **The source.** `renderer.ui.input.attach(canvas)`. It sets `touch-action: none` on the canvas, so a touch points and does not scroll. A locked mouse has no screen point, so it gives no pointer events.
 
 ### Pointer sources
 
@@ -663,7 +673,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: the icon atlas from lucide icons, its build script, the icon primitive, the `Icon` component.
   - Expect: the settings icon draws sharp and tinted at any size.
 
-- [ ] **7. Events**
+- [x] **7. Events**
 
   - Scope: event types and phases, pointer capture, the hit test with clip and radius, mouse and touch sources, input taken from the game by an open surface.
   - Expect: a click on a nested node bubbles to its parent. A click on a menu does not reach the game.

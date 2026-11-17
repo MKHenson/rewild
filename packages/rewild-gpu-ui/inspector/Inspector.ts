@@ -19,6 +19,7 @@ import {
 } from './settings';
 
 const DEFAULT_HEIGHT = 240;
+const LOG_LINES = 40;
 
 /** One example, drawn by Mica on the left and as DOM elements on the right. */
 class ExampleCard {
@@ -62,10 +63,10 @@ class ExampleCard {
     mica.append(this.micaPane, this.micaCaption);
 
     const dom = el('figure', 'side');
-    const domPane = el('div', 'pane');
+    const domPane = el('div', example.log ? 'pane log' : 'pane');
     domPane.style.height = height;
     const domCaption = el('figcaption');
-    domCaption.textContent = 'DOM';
+    domCaption.textContent = example.log ? 'Events, the newest first' : 'DOM';
     dom.append(domPane, domCaption);
 
     sides.append(mica, dom);
@@ -75,12 +76,25 @@ class ExampleCard {
     this.renderer = new UIRenderer(device, this.canvas.format);
     this.renderer.font = font;
     this.renderer.icons = icons;
+    // Focus on the canvas sends keys to it.
+    canvasElement.tabIndex = 0;
+    this.renderer.input.attach(canvasElement);
+    this.renderer.input.onDispatch = () => requestDraw();
     this.surface = this.renderer.createSurface({
       kind: 'screen',
       name: example.name,
     });
-    this.animate = example.build({ surface: this.surface }) ?? null;
-    domPane.append(mirrorTree(this.surface.root));
+    const log = (line: string) => {
+      if (!example.log) return;
+      const entry = el('div');
+      entry.textContent = line;
+      domPane.prepend(entry);
+      while (domPane.childElementCount > LOG_LINES) domPane.lastChild!.remove();
+    };
+    this.animate =
+      example.build({ surface: this.surface, canvas: canvasElement, log }) ??
+      null;
+    if (!example.log) domPane.append(mirrorTree(this.surface.root));
 
     this.stopObserving = observeCanvasSize(canvasElement, (size) => {
       this.size = size;
