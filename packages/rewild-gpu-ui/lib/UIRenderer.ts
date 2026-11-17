@@ -1,3 +1,4 @@
+import type { UIFont } from './font';
 import meterEffect from './shaders/meter.wgsl';
 import { PRIMITIVE_FLOATS } from './stream';
 import { UIEffects } from './UIEffects';
@@ -23,7 +24,10 @@ interface DrawRun {
   count: number;
 }
 
-/** Draws surfaces in order, each in one draw call per run of an effect. */
+/**
+ * Draws surfaces in order, each in one draw call per run of an effect. Boxes
+ * and text share the plain rect pipeline.
+ */
 export class UIRenderer {
   /** Draw calls in the last render. */
   drawCalls = 0;
@@ -33,6 +37,10 @@ export class UIRenderer {
   private bindGroupLayout: GPUBindGroupLayout;
   private uniforms: GPUBuffer;
   private runs: DrawRun[] = [];
+  private _font: UIFont | null = null;
+  private sampler: GPUSampler;
+  /** Bound in place of the atlas until there is a font. */
+  private emptyAtlas: GPUTexture;
 
   constructor(private device: GPUDevice, format: GPUTextureFormat) {
     const visibility = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
@@ -41,7 +49,20 @@ export class UIRenderer {
       entries: [
         { binding: 0, visibility, buffer: { type: 'uniform' } },
         { binding: 1, visibility, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: {} },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
       ],
+    });
+    this.sampler = device.createSampler({
+      label: 'ui-font',
+      magFilter: 'linear',
+      minFilter: 'linear',
+    });
+    this.emptyAtlas = device.createTexture({
+      label: 'ui-empty-atlas',
+      size: [1, 1],
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING,
     });
     const layout = device.createPipelineLayout({
       label: 'ui',
@@ -56,8 +77,25 @@ export class UIRenderer {
     });
   }
 
+  /**
+   * The font every surface's text measures and draws with. The renderer does
+   * not own it, so it does not dispose it.
+   */
+  get font(): UIFont | null {
+    return this._font;
+  }
+
+  set font(font: UIFont | null) {
+    if (font === this._font) return;
+    this._font = font;
+    for (const surface of this.surfaces) surface.font = font;
+    for (const buffers of this.buffers.values())
+      buffers.bindGroup = this.createBindGroup(buffers.buffer);
+  }
+
   createSurface(options: UISurfaceOptions): UISurface {
     const surface = new UISurface(options);
+    surface.font = this._font;
     this.surfaces.push(surface);
     this.surfaces.sort((a, b) => a.order - b.order);
     return surface;
@@ -95,7 +133,7 @@ export class UIRenderer {
     const runs = this.runs;
     runs.length = 0;
     for (const surface of this.surfaces) {
-      surface.update(width, height);
+      surface.update(width, height, pixelRatio);
       this.upload(surface);
       const buffers = this.buffers.get(surface);
       const { count, effects } = surface.stream;
@@ -144,6 +182,20 @@ export class UIRenderer {
     for (const { buffer } of this.buffers.values()) buffer.destroy();
     this.buffers.clear();
     this.uniforms.destroy();
+    this.emptyAtlas.destroy();
+  }
+
+  private createBindGroup(buffer: GPUBuffer): GPUBindGroup {
+    const atlas = this._font?.texture ?? this.emptyAtlas;
+    return this.device.createBindGroup({
+      layout: this.bindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.uniforms } },
+        { binding: 1, resource: { buffer } },
+        { binding: 2, resource: atlas.createView() },
+        { binding: 3, resource: this.sampler },
+      ],
+    });
   }
 
   /** Uploads the primitives that changed since the last upload. */
@@ -161,14 +213,7 @@ export class UIRenderer {
         size: data.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
-      const bindGroup = this.device.createBindGroup({
-        layout: this.bindGroupLayout,
-        entries: [
-          { binding: 0, resource: { buffer: this.uniforms } },
-          { binding: 1, resource: { buffer } },
-        ],
-      });
-      buffers = { buffer, bindGroup };
+      buffers = { buffer, bindGroup: this.createBindGroup(buffer) };
       this.buffers.set(surface, buffers);
       // A new buffer holds nothing yet.
       from = 0;

@@ -90,29 +90,3 @@ export interface IComponent {
 export interface ITransformObserver {
   worldMatrixUpdated(source: ITransform): void;
 }
-
-export interface MsdfChar {
-  id: number;
-  index: number;
-  char: string;
-  width: number;
-  height: number;
-  xoffset: number;
-  yofsset: number;
-  xadvance: number;
-  chnl: number;
-  x: number;
-  y: number;
-  page: number;
-  charIndex: number;
-}
-
-export type KerningMap = Map<number, Map<number, number>>;
-
-export interface MsdfTextMeasurements {
-  width: number;
-  height: number;
-  lineWidths: number[];
-  spacesPerLine: number[];
-  printedCharCount: number;
-}

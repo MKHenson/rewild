@@ -1,5 +1,6 @@
 import type { EffectParams } from './stream';
 import { affectsLayout, Sides, UIStyle } from './style';
+import { measureText } from './text';
 import type { UISurface } from './UISurface';
 
 export enum Dirty {
@@ -38,6 +39,11 @@ function toNode(child: UIChild): UINode {
 
 export interface UINodeOptions {
   style?: UIStyle;
+  /**
+   * Text drawn in the content box. The text sizes the node, and the node's
+   * children are not laid out.
+   */
+  text?: string;
   measure?: MeasureFunction;
   /** A registered effect that draws the node's box. See `UIEffects`. */
   effect?: string;
@@ -65,10 +71,14 @@ export class UINode {
   primitive = -1;
   readonly effectParams: EffectParams = [0, 0, 0, 0];
   private _effect: string | null;
+  private _text: string | null = null;
+  private readonly measureText: MeasureFunction = (limit) =>
+    measureText(this, limit);
 
   constructor(options: UINodeOptions = {}) {
     this.measure = options.measure ?? null;
     this._effect = options.effect ?? null;
+    if (options.text !== undefined) this.text = options.text;
     this.style = new Proxy<UIStyle>(
       { ...options.style },
       {
@@ -94,6 +104,20 @@ export class UINode {
     let node: UINode = this;
     while (node.parent) node = node.parent;
     return node.owner;
+  }
+
+  /** The node's text, or null. Text sizes the node unless it has its own measure function. */
+  get text(): string | null {
+    return this._text;
+  }
+
+  set text(value: string | null) {
+    if (value === this._text) return;
+    this._text = value;
+    if (value === null && this.measure === this.measureText) this.measure = null;
+    else if (value !== null && this.measure === null)
+      this.measure = this.measureText;
+    this.markDirty(Dirty.Layout | Dirty.Paint);
   }
 
   /** The registered effect that draws the box in place of its fill, or null. */

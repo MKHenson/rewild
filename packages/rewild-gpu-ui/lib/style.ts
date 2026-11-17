@@ -15,6 +15,9 @@ export type Sides = [number, number, number, number];
 
 export type FlexAlign = 'flex-start' | 'flex-end' | 'center' | 'stretch';
 
+export type FontWeight = 'normal' | 'bold';
+export type TextAlign = 'left' | 'center' | 'right';
+
 export interface UIStyle {
   /** Each node is a flex container. `none` removes the node and its children from layout and drawing. */
   display?: 'flex' | 'none';
@@ -60,9 +63,43 @@ export interface UIStyle {
   borderWidth?: number;
   borderRadius?: CornerRadius;
   opacity?: number;
-  /** `hidden` clips the children to the inside of the border. */
+  /** `hidden` clips the node's text and its children to the inside of the border. */
   overflow?: 'visible' | 'hidden';
+
+  /** The text colour. Passes down to children. Defaults to white, for text over the game. */
+  color?: UIColor;
+  /** In CSS pixels. Passes down. Defaults to 16. */
+  fontSize?: number;
+  /** Passes down. Defaults to `normal`. */
+  fontWeight?: FontWeight;
+  /**
+   * A multiple of the font size, as a unitless CSS `line-height`. `normal`
+   * uses the font's own line height. Passes down. Defaults to `normal`.
+   */
+  lineHeight?: number | 'normal';
+  /** Passes down. Defaults to `left`. A line too long for its box aligns left. */
+  textAlign?: TextAlign;
+  /**
+   * `normal` joins runs of spaces and line breaks into one space and wraps.
+   * `nowrap` joins them and does not wrap. `pre-line` keeps line breaks and
+   * wraps. It does not pass down.
+   */
+  whiteSpace?: 'normal' | 'nowrap' | 'pre-line';
+  /**
+   * `ellipsis` ends a line too long for its box with "…". It needs
+   * `overflow: 'hidden'`, as in CSS. It does not pass down.
+   */
+  textOverflow?: 'clip' | 'ellipsis';
 }
+
+/** The text properties that pass from a parent to its children, as in CSS. */
+export const INHERITED_KEYS = [
+  'color',
+  'fontSize',
+  'fontWeight',
+  'lineHeight',
+  'textAlign',
+] as const;
 
 const LAYOUT_KEYS = new Set<keyof UIStyle>([
   'display',
@@ -89,6 +126,10 @@ const LAYOUT_KEYS = new Set<keyof UIStyle>([
   'alignItems',
   'alignSelf',
   'borderWidth',
+  'fontSize',
+  'fontWeight',
+  'lineHeight',
+  'whiteSpace',
 ]);
 
 /** True when a change to the property can move or resize boxes. */

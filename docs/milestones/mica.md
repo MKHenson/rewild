@@ -134,7 +134,8 @@ What the package holds:
 
 - Nodes, surfaces, style, layout, drawing, text, icons, events and components.
 - The MSDF font code, moved from `rewild-renderer/lib/fonts` and `lib/core/text-renderer`.
-- The font and icon atlas build scripts. The `lucide` dev dependency is for the icon script.
+- The Roboto source fonts and the font atlas, in `fonts/`.
+- The font and icon atlas build scripts. The `opentype.js` dev dependency is for the font script, which also needs msdf-atlas-gen. See Text. The `lucide` dev dependency is for the icon script.
 - The UI inspector: its entry, its HTML page and its examples.
 
 The old GPU UI (`UIElement`, `GuiManager`, the UI passes) is not moved. Ticket 4 deletes it.
@@ -273,12 +274,22 @@ Each instance carries its rectangle, a clip rectangle, its colours and one `vec4
 
 MSDF stays. What changes:
 
-- **One text system.** One pipeline and one glyph stream for all text, in place of a pipeline per element.
-- **Font.** The DOM uses Roboto. Mica makes one Roboto atlas that holds regular and bold, so both UIs use the same face and all text shares one texture.
-- **Atlas.** MTSDF, with a true distance in the alpha channel for outlines, glow and shadows. `distanceRange` 8. Latin-1 and common symbols.
-- **Crisp.** Clamp the screen pixel range to at least 1. Size the canvas by the device pixel ratio.
-- **Lines.** Line height, left, centre and right alignment, wrapping, clipping and ellipsis.
+- **One text system.** Glyphs are primitives in the surface's stream, in tree order: a node's box, then its text, then its children. The plain rect pipeline draws them, so boxes and text draw in one call.
+- **Font.** The DOM uses Roboto. Mica makes one Roboto atlas that holds regular and bold, so both UIs use the same face and all text shares one texture. The source is the static Roboto 2.138, because Roboto 3's overlapping contours make holes in a distance field.
+- **Atlas.** MTSDF, with a true distance in the alpha channel for outlines, glow and shadows. `distanceRange` 8, 40 texels per em. Latin-1, the rest of Windows-1252 and common symbols. A character the font does not have draws as "?".
+- **Building the atlas.** `npm run ui-font` runs msdf-atlas-gen 1.4 and writes `fonts/roboto-msdf.png` and `.json` in the package. Both are committed, so only someone who changes the atlas needs the tool. It is found on the `PATH` or through `MSDF_ATLAS_GEN`. On macOS, `brew install msdf-atlas-gen`. On Windows, use the release from GitHub. On Linux, build it from source. When the tool is missing, the script prints the steps for the platform. msdf-atlas-gen reads kerning only from the old `kern` table, and Roboto keeps its kerning in `GPOS`, so the script adds it with `opentype.js`. The JSON is msdf-atlas-gen's, with `yOrigin: 'top'`.
+- **Publishing the atlas.** The deploy caches files for a year, so the game build copies the atlas to `public/fonts` under names with a hash of its contents, such as `roboto-msdf.6b9b16549f.json`, and passes the URL to the game as `process.env.UI_FONT_URL`. A changed atlas gets new URLs, and the JSON and PNG share one hash. `scripts/font-files.mjs` does the hashing. The inspector serves the plain names.
+- **Crisp.** The glyph's quad size gives the screen pixel range, clamped to at least 1. Baselines snap to device pixels. The canvas is sized by the device pixel ratio.
+- **Lines.** Line height, left, centre and right alignment, wrapping at spaces, clipping and ellipsis. `whiteSpace` is `normal`, `nowrap` or `pre-line`. As in CSS, an ellipsis needs `overflow: 'hidden'`, and a line too long for its box aligns left.
 - **Measuring.** The same code measures text for layout and lays out glyphs for drawing, so they always agree.
+
+```ts
+ui.font = await UIFont.load(device, '/fonts/roboto-msdf.json');
+const label = new UINode({ text: 'Resume', style: { fontSize: 20, fontWeight: 'bold' } });
+label.text = 'Continue'; // lays out again
+```
+
+A node with `text` measures from its text and does not lay out its children. Text style that passes down comes from the nearest parent that sets it. Until the surface has a font, text has no size. The DOM mirror in the inspector draws a text node as a block, so its text starts at the top left of the content box, the same as in Mica.
 
 ## Icons
 
@@ -630,7 +641,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
 
 ### Stage 2: the menu
 
-- [ ] **5. Text v2**
+- [x] **5. Text v2**
 
   - Scope: the MSDF font code moved into the package. The Roboto MTSDF atlas and its build script, one text pipeline, the glyph primitive, line height, alignment, wrapping, clipping, ellipsis, text measuring for layout.
   - Expect: a label wraps and sizes its box, and is sharp at 12 px and 48 px.

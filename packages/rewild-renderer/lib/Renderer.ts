@@ -23,8 +23,7 @@ import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
 import { SkinnedModelManager } from './managers/SkinnedModelManager';
 import { IMaterialsTemplate } from './managers/types';
-import { FontManager } from './managers/FontManager';
-import { UIRenderer } from 'rewild-gpu-ui';
+import { UIFont, UIRenderer } from 'rewild-gpu-ui';
 import { isVisualComponent } from './typeGuards';
 import { SceneBVH } from './acceleration/SceneBVH';
 import { BVHConfig, DEFAULT_BVH_CONFIG } from './acceleration/BVHConfig';
@@ -115,7 +114,6 @@ export class Renderer {
   textureManager: TextureManager;
   geometryManager: GeometryManager;
   samplerManager: SamplerManager;
-  fontManager: FontManager;
   materialManager: MaterialManager;
   skinnedModels: SkinnedModelManager;
   mipmapGenerator: MipMapGenerator;
@@ -415,7 +413,6 @@ export class Renderer {
 
     this.textureManager = new TextureManager();
     this.samplerManager = new SamplerManager();
-    this.fontManager = new FontManager();
     this.geometryManager = new GeometryManager();
     this.materialManager = new MaterialManager();
     this.skinnedModels = new SkinnedModelManager();
@@ -426,7 +423,6 @@ export class Renderer {
     )) as IMaterialsTemplate;
 
     await this.samplerManager.initialize(this);
-    await this.fontManager.initialize(this);
     await this.textureManager.initialize(this, materialsTemplate);
     await initTerrainTextureArrays(this);
     await this.geometryManager.initialize(this);
@@ -437,6 +433,8 @@ export class Renderer {
     this.frameCompositor.initToneMap(this);
 
     this.ui = new UIRenderer(device, this.presentationFormat);
+    // esbuild.js defines the URL, with a hash of the atlas in its name.
+    this.ui.font = await UIFont.load(device, process.env.UI_FONT_URL!);
 
     this.lastTime = performance.now();
     this.delta = 0;
@@ -485,11 +483,11 @@ export class Renderer {
     this.sky.dispose();
     this.textureManager.dispose();
     this.samplerManager.dispose();
-    this.fontManager.dispose();
     this.skinnedModels.dispose();
     this.geometryManager.dispose();
     this.materialManager.dispose();
     this.geometryManager.dispose();
+    this.ui.font?.dispose();
     this.ui.dispose();
   }
 

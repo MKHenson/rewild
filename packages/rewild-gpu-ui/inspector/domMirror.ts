@@ -8,13 +8,28 @@ export function mirrorTree(root: UINode): HTMLElement {
   element.style.margin = '';
   element.style.width = '100%';
   element.style.height = '100%';
+  // Mica's text defaults, in place of what the page passes down.
+  const css = element.style;
+  css.fontFamily = 'Roboto, sans-serif';
+  css.color ||= '#ffffff';
+  css.fontSize ||= '16px';
+  css.fontWeight ||= 'normal';
+  css.lineHeight ||= 'normal';
+  css.textAlign ||= 'left';
   return element;
 }
 
 function mirrorNode(node: UINode): HTMLElement {
   const element = document.createElement('div');
   applyStyle(element.style, node.style);
-  for (const child of node.children) element.append(mirrorNode(child));
+  if (node.text !== null) {
+    // Text in a block, so it starts at the top left of the content box as in
+    // Mica, and `text-overflow` applies.
+    if (element.style.display !== 'none') element.style.display = 'block';
+    element.textContent = node.text;
+  } else {
+    for (const child of node.children) element.append(mirrorNode(child));
+  }
   return element;
 }
 
@@ -54,6 +69,14 @@ function applyStyle(css: CSSStyleDeclaration, style: UIStyle): void {
     .join(' ');
   css.opacity = style.opacity === undefined ? '' : String(style.opacity);
   css.overflow = style.overflow ?? '';
+  css.color = style.color ?? '';
+  css.fontSize = style.fontSize === undefined ? '' : `${style.fontSize}px`;
+  css.fontWeight = style.fontWeight ?? '';
+  css.lineHeight = style.lineHeight === undefined ? '' : String(style.lineHeight);
+  css.textAlign = style.textAlign ?? '';
+  // These two do not pass down in Mica, so each element sets its own.
+  css.whiteSpace = style.whiteSpace ?? 'normal';
+  css.textOverflow = style.textOverflow ?? 'clip';
 }
 
 function edges(value: Edges | undefined): string {
