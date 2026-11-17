@@ -324,7 +324,7 @@ The shape follows the DOM.
   | ------- | ------------------------------------------------------------------------------ | -------------- |
   | `none`  | Nothing. Its nodes get no events                                               | The HUD        |
   | `nodes` | Pointer input over a node other than the root. The default                     | WorldPanel, later |
-  | `all`   | All pointer and key input while its root shows. Keys go to the root until ticket 8 adds focus | The menu       |
+  | `all`   | All pointer, key and gamepad input while its root shows. See Focus and gamepad | The menu       |
 
   A press that a surface takes stays taken until it is up, and a press that starts in the game stays in the game. `UIInput` listens on the window in the capture phase. When a surface takes a DOM event, the event stops there, so no listener of the game gets it. A click on Resume does not also act in the game. Keys typed in a DOM control are not taken.
 - **The source.** `renderer.ui.input.attach(canvas)`. It sets `touch-action: none` on the canvas, so a touch points and does not scroll. A locked mouse has no screen point, so it gives no pointer events.
@@ -344,10 +344,14 @@ The look-at ray and the XR controller give the same thing: a ray. The surface tu
 
 ### Focus and gamepad
 
-- **Focus.** `focusable` nodes take focus. Tab and Shift+Tab move through them in tree order.
-- **Spatial moves.** The d-pad, the thumbstick and the arrow keys move focus to the nearest focusable node in that direction, by rectangle.
-- **Actions.** Enter or A clicks the focused node. Escape or B closes the top popup or modal.
-- **Focus ring.** The `focus` state draws it, in the theme's primary colour, the same as the DOM's focus ring.
+- **Focus.** `focusable` nodes take focus. `node.focus()` and `node.blur()`, with `focus` and `blur` events that do not bubble. A press focuses the nearest focusable node under it, unless a `pointerdown` listener prevents the default.
+- **The focus scope.** Focus lives on the topmost open surface that takes all input. Each surface keeps its own focused node, so focus goes back to the menu when a popup over it closes. Keys go to the focused node, or to the scope's root, and bubble.
+- **Tab order.** Tab and Shift+Tab move through the focusable nodes in tree order. They wrap, so focus stays in the scope.
+- **Spatial moves.** The d-pad, the left stick and the arrow keys move focus to the nearest focusable node in that direction, by rectangle. A candidate must start past the focused box's edge. Its score is its gap along the move plus five times its gap across it, so a node in line wins over a nearer one to the side. With nothing focused, a move focuses the first node.
+- **Actions.** Enter or A clicks the focused node. A held key does not click again. Escape or B has no action of its own: a modal or popup listens for the `Escape` key down and closes. Tab, the arrows and Enter are default actions, so a `keydown` listener can prevent them.
+- **The gamepad.** `GamepadReader` turns a pad with the standard mapping into keys: A is `Enter`, B is `Escape`, and the d-pad and the left stick are the arrow keys. The event's `code` names the control, such as `GamepadA` or `GamepadStickLeft`. The d-pad and the stick repeat while held, after 400 ms and then every 100 ms. The stick points past 0.5 on its stronger axis and stops below 0.3.
+- **Who reads the pad.** A pad has no events, so the UI cannot stop a press before the game sees it. One owner reads the pads once per frame and gives them to one side. In the game, that owner is `Gamepad` in `src/core/input`, and `GameManager` routes it. While a focus scope is open, the pad goes to `ui.input.readGamepads`. Otherwise the player reads it. When the UI gets the pad, `syncGamepads` takes the controls already down as held, so a press that began in play does not act in the UI. The inspector reads the pads itself, for the card whose canvas has focus.
+- **Focus ring.** It shows only when focus came from a key or the gamepad, as with `:focus-visible`. It is the DOM's `outline: 2px solid` in `--primary-400`, drawn over the node's children. Until Theme reads the theme values, the colour is the dark theme's.
 
 ---
 
@@ -678,7 +682,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: event types and phases, pointer capture, the hit test with clip and radius, mouse and touch sources, input taken from the game by an open surface.
   - Expect: a click on a nested node bubbles to its parent. A click on a menu does not reach the game.
 
-- [ ] **8. Focus and gamepad**
+- [x] **8. Focus and gamepad**
 
   - Scope: focusable nodes, tab order, spatial moves, gamepad and keyboard actions, the focus ring.
   - Expect: the d-pad moves between buttons, A clicks, B closes the modal.

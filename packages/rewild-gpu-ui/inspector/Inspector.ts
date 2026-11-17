@@ -76,9 +76,10 @@ class ExampleCard {
     this.renderer = new UIRenderer(device, this.canvas.format);
     this.renderer.font = font;
     this.renderer.icons = icons;
-    // Focus on the canvas sends keys to it.
+    // Keys and the gamepad go to the card whose canvas has focus, not to
+    // every card on the page.
     canvasElement.tabIndex = 0;
-    this.renderer.input.attach(canvasElement);
+    this.renderer.input.attach(canvasElement, { pageKeys: false });
     this.renderer.input.onDispatch = () => requestDraw();
     this.surface = this.renderer.createSurface({
       kind: 'screen',
@@ -92,14 +93,31 @@ class ExampleCard {
       while (domPane.childElementCount > LOG_LINES) domPane.lastChild!.remove();
     };
     this.animate =
-      example.build({ surface: this.surface, canvas: canvasElement, log }) ??
-      null;
+      example.build({
+        surface: this.surface,
+        canvas: canvasElement,
+        log,
+        createSurface: (options) => this.renderer.createSurface(options),
+      }) ?? null;
     if (!example.log) domPane.append(mirrorTree(this.surface.root));
 
     this.stopObserving = observeCanvasSize(canvasElement, (size) => {
       this.size = size;
       this.resize();
     });
+  }
+
+  /** True when the card's canvas has focus, so it takes keys and the gamepad. */
+  get focused(): boolean {
+    return document.activeElement === this.canvas.canvas;
+  }
+
+  readGamepads(pads: readonly (Gamepad | null)[], now: number): void {
+    this.renderer.input.readGamepads(pads, now);
+  }
+
+  syncGamepads(pads: readonly (Gamepad | null)[]): void {
+    this.renderer.input.syncGamepads(pads);
   }
 
   get animated(): boolean {
@@ -152,6 +170,9 @@ export class Inspector {
   private drawPending = false;
   private part = '';
   private stopWatchingScreen: () => void = () => {};
+  private gamepadFrame = 0;
+  /** The card that had the gamepad on the last frame. */
+  private gamepadCard: ExampleCard | null = null;
 
   constructor(
     private device: GPUDevice,
@@ -167,6 +188,7 @@ export class Inspector {
     this.applyTheme();
     this.watchScreenRatio();
     window.addEventListener('hashchange', () => this.showPart(this.hashPart()));
+    window.addEventListener('gamepadconnected', () => this.readGamepads());
     this.showPart(this.hashPart());
   }
 
@@ -264,6 +286,24 @@ export class Inspector {
     query.addEventListener('change', onChange, { once: true });
     this.stopWatchingScreen = () =>
       query.removeEventListener('change', onChange);
+  }
+
+  /**
+   * Reads the pads each frame while one is connected, as the game does, and
+   * gives them to the card whose canvas has focus.
+   */
+  private readGamepads(): void {
+    if (this.gamepadFrame) return;
+    this.gamepadFrame = requestAnimationFrame((now) => {
+      this.gamepadFrame = 0;
+      const pads = navigator.getGamepads();
+      const card = this.cards.find((c) => c.focused) ?? null;
+      // A press that began on another card does not act on this one.
+      if (card !== this.gamepadCard) card?.syncGamepads(pads);
+      this.gamepadCard = card;
+      card?.readGamepads(pads, now);
+      if (pads.some(Boolean)) this.readGamepads();
+    });
   }
 
   private resizeAll(): void {

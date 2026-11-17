@@ -96,6 +96,11 @@ export interface UIStyle {
    * is under it. Its children can still be hit. It does not pass down.
    */
   pointerEvents?: 'auto' | 'none';
+  /**
+   * The node takes focus: from a click, Tab, the arrow keys or the gamepad.
+   * It does not pass down.
+   */
+  focusable?: boolean;
 }
 
 /** The text properties that pass from a parent to its children, as in CSS. */
@@ -140,7 +145,7 @@ const LAYOUT_KEYS = new Set<keyof UIStyle>([
 
 /** True when a change to the property changes only input, not layout or drawing. */
 export function affectsOnlyInput(key: keyof UIStyle): boolean {
-  return key === 'pointerEvents';
+  return key === 'pointerEvents' || key === 'focusable';
 }
 
 /** True when a change to the property can move or resize boxes. */

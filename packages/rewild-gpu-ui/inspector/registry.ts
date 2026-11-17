@@ -1,4 +1,4 @@
-import type { UISurface } from '../lib';
+import type { UISurface, UISurfaceOptions } from '../lib';
 
 /** What an example builds into. The inspector mirrors the surface's tree as DOM elements. */
 export interface ExampleView {
@@ -7,6 +7,8 @@ export interface ExampleView {
   canvas: HTMLCanvasElement;
   /** Adds a line to the event log of an example with `log` set. */
   log(line: string): void;
+  /** Adds another surface on the same canvas, such as a modal. The DOM side does not mirror it. */
+  createSurface(options: UISurfaceOptions): UISurface;
 }
 
 export interface Example {

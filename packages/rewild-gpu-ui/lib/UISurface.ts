@@ -1,3 +1,5 @@
+import { UIFocusEvent } from './events';
+import { canFocus } from './focus';
 import type { UIFont } from './font';
 import type { UIIcons } from './icons';
 import { layoutTree } from './layout';
@@ -11,7 +13,7 @@ import { Dirty, UINode } from './UINode';
  * - `nodes`: pointer input over a node other than the root. The root lets
  *   input through, so the game gets what misses the nodes.
  * - `all`: all pointer and key input while the root shows. A miss goes to
- *   the root. Keys go to the root.
+ *   the root. Keys go to the focused node, or else to the root.
  */
 export type UISurfaceInput = 'none' | 'nodes' | 'all';
 
@@ -41,6 +43,8 @@ export class UISurface {
   needsLayout = true;
   needsPaint = true;
   private overlay = false;
+  private _focused: UINode | null = null;
+  private _focusVisible = false;
   private _font: UIFont | null = null;
   private _icons: UIIcons | null = null;
 
@@ -86,6 +90,45 @@ export class UISurface {
     this.needsPaint = true;
   }
 
+  /**
+   * The node with focus, or null. Each surface keeps its own, so focus goes
+   * back to a menu when a popup over it closes.
+   */
+  get focused(): UINode | null {
+    const node = this._focused;
+    if (node && (node.surface !== this || !canFocus(node))) {
+      // The node left the tree, or no longer shows or takes focus.
+      this._focused = null;
+      this.needsPaint = true;
+    }
+    return this._focused;
+  }
+
+  /** True when the focus ring shows: focus came from a key or the gamepad, not a pointer. */
+  get focusVisible(): boolean {
+    return this._focusVisible && this.focused !== null;
+  }
+
+  /**
+   * Moves focus to a focusable node on this surface, or clears it. The node
+   * that loses focus gets `blur`, then the node that gets it gets `focus`.
+   * Returns false when the node cannot take focus.
+   */
+  setFocus(node: UINode | null, visible = false): boolean {
+    if (node && (node.surface !== this || !canFocus(node))) return false;
+    const old = this.focused;
+    if (visible !== this._focusVisible) {
+      this._focusVisible = visible;
+      this.needsPaint = true;
+    }
+    if (node === old) return true;
+    this._focused = node;
+    this.needsPaint = true;
+    old?.dispatchEvent(new UIFocusEvent('blur', node));
+    node?.dispatchEvent(new UIFocusEvent('focus', old));
+    return true;
+  }
+
   /** True when the root shows. A surface that is not open takes no input. */
   get open(): boolean {
     return this.root.style.display !== 'none';
@@ -117,6 +160,7 @@ export class UISurface {
       font: this._font,
       icons: this._icons,
       pixelRatio,
+      focus: this.focusVisible ? this._focused : null,
     });
     clearDirty(this.root);
     this.needsLayout = false;

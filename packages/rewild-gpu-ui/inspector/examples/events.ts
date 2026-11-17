@@ -203,7 +203,7 @@ example({
   part,
   name: 'Wheel and keys',
   description:
-    'This surface takes all input. The wheel scrolls the list and does not scroll the page. Keys go to the root while the canvas or the page has focus. Click the canvas, then type.',
+    'This surface takes all input. The wheel scrolls the list and does not scroll the page. Keys go to the root while the canvas has focus. Click the canvas, then type.',
   log: true,
   height: 200,
   build: ({ surface, log }) => {

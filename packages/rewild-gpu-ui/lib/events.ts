@@ -1,6 +1,7 @@
 import type { UINode } from './UINode';
 
-export type UIPointerType = 'mouse' | 'touch' | 'pen';
+/** `''` for a click from a key or a gamepad, as in the DOM. */
+export type UIPointerType = 'mouse' | 'touch' | 'pen' | '';
 
 /** The phases of a dispatch, with the same values as the DOM's `Event` constants. */
 export enum UIEventPhase {
@@ -142,6 +143,17 @@ export class UIKeyboardEvent extends UIEvent implements UIModifiers {
   }
 }
 
+export class UIFocusEvent extends UIEvent {
+  /** The node that loses focus for `focus`, or that gets it for `blur`. */
+  readonly relatedTarget: UINode | null;
+
+  constructor(type: 'focus' | 'blur', relatedTarget: UINode | null) {
+    // Focus and blur do not bubble, as in the DOM.
+    super(type, false);
+    this.relatedTarget = relatedTarget;
+  }
+}
+
 /** The event each type sends to its listeners. */
 export interface UIEventMap {
   pointerdown: UIPointerEvent;
@@ -154,6 +166,8 @@ export interface UIEventMap {
   wheel: UIWheelEvent;
   keydown: UIKeyboardEvent;
   keyup: UIKeyboardEvent;
+  focus: UIFocusEvent;
+  blur: UIFocusEvent;
 }
 
 export type UIEventType = keyof UIEventMap;

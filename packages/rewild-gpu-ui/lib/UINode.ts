@@ -260,6 +260,24 @@ export class UINode {
     return this.surface?.pointerCaptures.get(pointerId) === this;
   }
 
+  /** True when the node has focus on its surface. */
+  get focused(): boolean {
+    return this.surface?.focused === this;
+  }
+
+  /**
+   * Takes focus, if the node is focusable, shows and is on a surface.
+   * `focusVisible` shows the focus ring, as after a key.
+   */
+  focus(options: { focusVisible?: boolean } = {}): void {
+    this.surface?.setFocus(this, options.focusVisible ?? false);
+  }
+
+  blur(): void {
+    const surface = this.surface;
+    if (surface?.focused === this) surface.setFocus(null);
+  }
+
   markDirty(flags: Dirty): void {
     this.dirty |= flags;
     this.surface?.invalidate(flags);

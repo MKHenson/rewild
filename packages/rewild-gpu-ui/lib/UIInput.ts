@@ -8,6 +8,14 @@ import {
   UIWheelEvent,
   UIWheelInit,
 } from './events';
+import {
+  FocusDirection,
+  focusableAncestor,
+  focusableNodes,
+  nearestInDirection,
+  nextInTabOrder,
+} from './focus';
+import { GamepadReader } from './gamepad';
 import { hitTest } from './hitTest';
 import type { UINode } from './UINode';
 import type { UISurface } from './UISurface';
@@ -69,14 +77,43 @@ const MOUSE_EVENTS = [
 const MOUSE_POINTER_ID = 1;
 /** CSS pixels for a wheel delta in lines. */
 const LINE_HEIGHT = 16;
+/** The pointer id of a click from a key or a gamepad. */
+const KEY_POINTER_ID = -1;
+
+const ARROWS: Record<string, FocusDirection> = {
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+};
+
+export interface UIInputAttachOptions {
+  /**
+   * Also takes keys while the page has focus, not only while the element has
+   * it. The game's canvas does not take focus, so it needs this. Defaults to
+   * true.
+   */
+  pageKeys?: boolean;
+}
 
 /**
  * Turns pointer and key input into UI events on the surfaces' trees.
  *
  * Sources call `pointer`, `wheel` and `key` with points in surface CSS
- * pixels. `attach` makes the mouse and touch of an element such as the game's
- * canvas a source. When a surface takes a DOM event, the event stops at the
- * window, so no listener of the game gets it.
+ * pixels. `attach` makes the mouse, touch and keys of an element such as the
+ * game's canvas a source. When a surface takes a DOM event, the
+ * event stops at the window, so no listener of the game gets it.
+ *
+ * Focus lives on the topmost open surface that takes all input, the focus
+ * scope. Keys go to its focused node, or else to its root. When no listener
+ * prevents the default, Tab and Shift+Tab move focus in tree order, the
+ * arrow keys move it to the nearest node in that direction, and Enter clicks
+ * the focused node.
+ *
+ * A gamepad acts as these keys: see `GamepadReader`. The input does not read
+ * the pads itself. Their owner reads them once per frame and gives them to
+ * `readGamepads` while the UI has the pad, so the UI and the game never both
+ * act on one press.
  */
 export class UIInput {
   /** Called after each event the input sends. */
@@ -87,6 +124,8 @@ export class UIInput {
   /** Whether the last DOM pointer down and pointer move were taken, for the mouse events after them. */
   private pressTaken = false;
   private moveTaken = false;
+  private pageKeys = true;
+  private gamepads = new GamepadReader();
 
   constructor(private source: UISurfaceList) {}
 
@@ -126,7 +165,11 @@ export class UIInput {
       }
       state.down = target;
       state.taken = true;
-      return this.send(target, new UIPointerEvent('pointerdown', init));
+      const result = this.send(target, new UIPointerEvent('pointerdown', init));
+      // A press focuses its nearest focusable node, as in the DOM, unless a
+      // listener prevents it.
+      if (result !== 'prevented') this.focusFromPointer(target);
+      return result;
     }
 
     if (action === 'move') {
@@ -164,16 +207,44 @@ export class UIInput {
     return target ? this.send(target, new UIWheelEvent(init)) : 'passed';
   }
 
-  /** Sends a key to the root of the topmost open surface that takes all input. */
+  /**
+   * Sends a key to the focused node of the focus scope, or else to its root.
+   * Then, unless a listener prevents it, a key down does its default action.
+   */
   key(action: 'down' | 'up', init: UIKeyboardInit): UIInputResult {
+    const scope = this.focusScope();
+    if (!scope) return 'passed';
+    const target = scope.focused ?? scope.root;
+    const type = action === 'down' ? 'keydown' : 'keyup';
+    const result = this.send(target, new UIKeyboardEvent(type, init));
+    if (result === 'prevented' || action === 'up') return result;
+    // A listener can close the scope, as Escape closes a menu.
+    if (!scope.open) return result;
+    return this.keyAction(scope, init) ? 'prevented' : result;
+  }
+
+  /** The topmost open surface that takes all input, where focus lives. */
+  focusScope(): UISurface | null {
     const surfaces = this.source.surfaces;
     for (let i = surfaces.length - 1; i >= 0; i--) {
       const surface = surfaces[i];
-      if (surface.input !== 'all' || !surface.open) continue;
-      const type = action === 'down' ? 'keydown' : 'keyup';
-      return this.send(surface.root, new UIKeyboardEvent(type, init));
+      if (surface.input === 'all' && surface.open) return surface;
     }
-    return 'passed';
+    return null;
+  }
+
+  /** Reads the gamepads once, as keys. Call it once per frame while the UI has the pad. */
+  readGamepads(pads: readonly (Gamepad | null)[], now: number): void {
+    this.gamepads.update(pads, now, (action, init) => this.key(action, init));
+  }
+
+  /**
+   * Takes the controls that are down now as held, with no keys, so a press
+   * that began while the game had the pad does not act in the UI. Call it
+   * when the UI gets the pad.
+   */
+  syncGamepads(pads: readonly (Gamepad | null)[]): void {
+    this.gamepads.sync(pads);
   }
 
   /** Ends the pointer's hover, for a pointer that leaves the source or stops pointing. */
@@ -184,10 +255,11 @@ export class UIInput {
     this.pointers.delete(pointerId);
   }
 
-  /** Makes the mouse and touch of the element a source. */
-  attach(element: HTMLElement): void {
+  /** Makes the mouse, touch and keys of the element a source. */
+  attach(element: HTMLElement, options: UIInputAttachOptions = {}): void {
     this.detach();
     this.element = element;
+    this.pageKeys = options.pageKeys ?? true;
     // Touch on the element points, and does not scroll or zoom the page.
     this.touchAction = element.style.touchAction;
     element.style.touchAction = 'none';
@@ -218,6 +290,7 @@ export class UIInput {
     window.removeEventListener('keyup', this.onKey, true);
     element.removeEventListener('pointerleave', this.onLeave);
     document.removeEventListener('pointerlockchange', this.onLockChange);
+    this.gamepads.reset();
     this.element = null;
     this.pointers.clear();
   }
@@ -236,6 +309,65 @@ export class UIInput {
       if (hit && hit !== surface.root) return hit;
     }
     return null;
+  }
+
+  private focusFromPointer(target: UINode): void {
+    const surface = target.surface;
+    if (surface?.input !== 'all') return;
+    surface.setFocus(focusableAncestor(target), false);
+  }
+
+  /** Does the default action of a key down. Returns true when it did one. */
+  private keyAction(scope: UISurface, init: UIKeyboardInit): boolean {
+    const { key } = init;
+    const current = scope.focused;
+    if (key === 'Tab') {
+      const nodes = focusableNodes(scope.root);
+      const next = nextInTabOrder(nodes, current, init.shiftKey ?? false);
+      if (next) scope.setFocus(next, true);
+      // Tab stays in the scope, so it does not move the page's focus.
+      return true;
+    }
+    const direction = ARROWS[key];
+    if (direction) {
+      const nodes = focusableNodes(scope.root);
+      if (!nodes.length) return false;
+      const next = current
+        ? nearestInDirection(
+            nodes.filter((node) => node !== current),
+            current.rect,
+            direction
+          )
+        : nodes[0];
+      // With nowhere to go, the ring still shows where focus is.
+      scope.setFocus(next ?? current, true);
+      return true;
+    }
+    if (key === 'Enter' && current && !init.repeat) {
+      const { x, y, width, height } = current.rect;
+      this.send(
+        current,
+        new UIPointerEvent('click', {
+          pointerId: KEY_POINTER_ID,
+          pointerType: '',
+          x: x + width / 2,
+          y: y + height / 2,
+        })
+      );
+      return true;
+    }
+    return false;
+  }
+
+  /** True when keys belong to the source while this has focus. */
+  private takesKeysFrom(target: EventTarget | null): boolean {
+    if (target === this.element) return true;
+    return (
+      this.pageKeys &&
+      (target === null ||
+        target === document.body ||
+        target === document.documentElement)
+    );
   }
 
   private captured(pointerId: number): UINode | null {
@@ -372,13 +504,7 @@ export class UIInput {
 
   private onKey = (e: KeyboardEvent): void => {
     // Keys typed into the page's own controls stay theirs.
-    const target = e.target;
-    if (
-      target !== this.element &&
-      target !== document.body &&
-      target !== document.documentElement
-    )
-      return;
+    if (!this.takesKeysFrom(e.target)) return;
     const result = this.key(e.type === 'keydown' ? 'down' : 'up', {
       ...modifiers(e),
       key: e.key,
