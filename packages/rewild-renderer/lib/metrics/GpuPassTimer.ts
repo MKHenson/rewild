@@ -246,9 +246,10 @@ export class GpuPassTimer {
     } catch {
       // Buffer destroyed or device lost. Nothing to publish.
     }
-    // Guarded because dispose() may have emptied the ring while this was in
-    // flight, in which case the slot no longer exists.
-    if (index < this.busy.length) this.busy[index] = false;
+    // Guarded because init() or dispose() may have replaced the ring while
+    // this was in flight. The slot at this index then belongs to a new buffer,
+    // which can still be mapped, and freeing it would submit it while mapped.
+    if (this.readBuffers[index] === buffer) this.busy[index] = false;
   }
 
   /**

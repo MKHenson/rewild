@@ -47,7 +47,10 @@ fn fs(@builtin(position) position: vec4f) -> @location(0) vec4f {
   let down = aoViewPosition(texel + vec2i(0, 1), size);
   let dx = select(P - left, right - P, abs(right.z - P.z) < abs(P.z - left.z));
   let dy = select(P - up, down - P, abs(down.z - P.z) < abs(P.z - up.z));
-  var N = normalize(cross(dy, dx));
+  // Two collinear neighbour vectors give no normal, and normalize() of zero is
+  // NaN. Face the camera instead.
+  let crossN = cross(dy, dx);
+  var N = select(normalize(-P), normalize(crossN), dot(crossN, crossN) > 1e-12);
   if (dot(N, -P) < 0.0) {
     N = -N;
   }
@@ -88,6 +91,10 @@ fn fs(@builtin(position) position: vec4f) -> @location(0) vec4f {
     occlusion += select(0.0, range, sceneZ > S.z + bias);
   }
 
-  let visibility = pow(1.0 - occlusion / f32(AO_SAMPLES), ao.intensity);
+  // pow() is exp2(y * log2(x)), and log2(0) is indeterminate: Apple GPUs give
+  // NaN for a texel whose every tap is occluded, which dense foliage reaches.
+  // The blur then spreads that one NaN over its whole 4x4 window.
+  let unoccluded = max(1.0 - occlusion / f32(AO_SAMPLES), 1e-4);
+  let visibility = pow(unoccluded, ao.intensity);
   return vec4f(mix(1.0, visibility, fade), viewDepth, 0.0, 0.0);
 }

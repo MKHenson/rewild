@@ -250,8 +250,8 @@ export class EnvironmentUniforms implements ISharedUniformBuffer {
     // map if its resolution changes, and the shadow atlas is recreated with the
     // cascade config. The bind group would go on sampling the old texture, which
     // nothing renders into any more: shadows frozen mid-drift, no error. The
-    // tracker checks this flag before prepare() each frame, so flagging here
-    // costs one stale frame and then self-heals.
+    // tracker checks this flag again after prepare() and rebuilds before it
+    // binds, so the stale bind group is never drawn with.
     if (
       this.boundCloudShadowMap !== renderer.cloudShadowMap ||
       this.boundShadowAtlas !== renderer.shadowAtlas ||

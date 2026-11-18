@@ -25,9 +25,18 @@ struct TemporalUniforms {
 @fragment fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
   let dims    = vec2f(textureDimensions(currentBloom));
   let uv      = fragCoord.xy / dims;
-  let current = textureSampleLevel(currentBloom, ourSampler, uv, 0.0);
-  let history = textureSampleLevel(historyBloom, ourSampler, uv, 0.0);
+  let current = finiteOrZero(textureSampleLevel(currentBloom, ourSampler, uv, 0.0));
+  let history = finiteOrZero(textureSampleLevel(historyBloom, ourSampler, uv, 0.0));
   // Blend toward history to dampen temporal noise; history decays naturally
   // when the underlying brightness changes across multiple frames.
   return mix(current, history, uniforms.blendFactor);
+}
+
+// A NaN or Inf in the history never decays, since a mix with it stays NaN,
+// and the blur spreads it further every frame. Drop it to black, which the
+// next frames refill. Tests the exponent bits, not `x != x`: fast-math
+// compilers can fold a NaN comparison away.
+fn finiteOrZero(v: vec4f) -> vec4f {
+  let exponent = bitcast<vec4u>(v) & vec4u(0x7f800000u);
+  return select(vec4f(0.0), v, all(exponent != vec4u(0x7f800000u)));
 }
