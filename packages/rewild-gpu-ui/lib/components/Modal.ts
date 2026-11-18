@@ -66,7 +66,10 @@ export class Modal {
       order: options.order ?? 1,
       input: 'none',
     });
-    this.panel = new UINode({ style: { ...PANEL, ...options.style } });
+    this.panel = new UINode({
+      name: 'panel',
+      style: { ...PANEL, ...options.style },
+    });
     const root = this.surface.root;
     const backdrop: UIStyle = {
       justifyContent: 'center',

@@ -63,6 +63,8 @@ export interface ButtonOptions {
   color?: ButtonColor;
   disabled?: boolean;
   onClick?: () => void;
+  /** Names the node in debug output. Defaults to `button`. */
+  name?: string;
   style?: UIStyle;
 }
 
@@ -85,6 +87,7 @@ export class Button implements UIComponent {
     this.onClick = options.onClick ?? null;
     this.label = new Label({ text: options.label });
     this.node = new UINode({
+      name: options.name ?? 'button',
       style: {
         flexDirection: 'row',
         justifyContent: 'center',

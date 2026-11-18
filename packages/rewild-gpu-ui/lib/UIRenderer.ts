@@ -15,6 +15,32 @@ export interface UIViewport {
   pixelRatio: number;
 }
 
+/** What the last render cost. */
+export interface UIStats {
+  surfaces: number;
+  nodes: number;
+  primitives: number;
+  drawCalls: number;
+  /** Surfaces that laid out. */
+  layouts: number;
+  /** Milliseconds of layout, over all surfaces. */
+  layoutTime: number;
+  /** Surfaces that wrote their stream. */
+  writes: number;
+  /** Milliseconds of stream writes, over all surfaces. */
+  writeTime: number;
+}
+
+/**
+ * `timestampWrites` for the UI's passes. Each function is called only when
+ * its pass begins, so a frame with no glass does not count a blur.
+ */
+export interface UITimestampWrites {
+  /** Brackets all the blur passes, from the start of the first to the end of the last. */
+  blur?: () => GPURenderPassTimestampWrites | undefined;
+  draw?: () => GPURenderPassTimestampWrites | undefined;
+}
+
 interface SurfaceBuffers {
   buffer: GPUBuffer;
   bindGroup: GPUBindGroup;
@@ -35,6 +61,19 @@ interface DrawRun {
 export class UIRenderer {
   /** Draw calls in the last render. */
   drawCalls = 0;
+  /** What the last render cost. */
+  readonly stats: UIStats = {
+    surfaces: 0,
+    nodes: 0,
+    primitives: 0,
+    drawCalls: 0,
+    layouts: 0,
+    layoutTime: 0,
+    writes: 0,
+    writeTime: 0,
+  };
+  /** Times the UI's passes on the GPU, when set. */
+  timestampWrites: UITimestampWrites | null = null;
   readonly effects: UIEffects;
   /** Sends input to the surfaces. Attach it to the canvas the UI draws on. */
   readonly input = new UIInput(this);
@@ -58,6 +97,7 @@ export class UIRenderer {
   private runs: DrawRun[] = [];
   private _font: UIFont | null = null;
   private _icons: UIIcons | null = null;
+  private _showLayout = false;
   private sampler: GPUSampler;
   /** Bound in place of an atlas until there is a font or icons. */
   private emptyAtlas: GPUTexture;
@@ -134,6 +174,16 @@ export class UIRenderer {
     this.rebind();
   }
 
+  /** Draws the layout overlay over every surface. */
+  get showLayout(): boolean {
+    return this._showLayout;
+  }
+
+  set showLayout(value: boolean) {
+    this._showLayout = value;
+    for (const surface of this._surfaces) surface.showLayout = value;
+  }
+
   /** The surfaces in draw order, from bottom to top. */
   get surfaces(): readonly UISurface[] {
     return this._surfaces;
@@ -144,6 +194,7 @@ export class UIRenderer {
     surface.font = this._font;
     surface.icons = this._icons;
     surface.theme = this.theme;
+    surface.showLayout = this._showLayout;
     this._surfaces.push(surface);
     this._surfaces.sort((a, b) => a.order - b.order);
     return surface;
@@ -182,17 +233,32 @@ export class UIRenderer {
     );
 
     const now = performance.now();
+    const stats = this.stats;
+    stats.surfaces = this._surfaces.length;
+    stats.nodes = stats.primitives = 0;
+    stats.layouts = stats.layoutTime = stats.writes = stats.writeTime = 0;
     let glass = false;
     for (const surface of this._surfaces) {
       surface.update(width, height, pixelRatio, now);
       this.upload(surface);
       if (surface.stream.glass > 0) glass = true;
+      stats.nodes += surface.nodeCount;
+      stats.primitives += surface.stream.count;
+      if (surface.laidOut) stats.layouts++;
+      if (surface.wrote) stats.writes++;
+      stats.layoutTime += surface.layoutTime;
+      stats.writeTime += surface.writeTime;
     }
     // The blur runs only when glass shows.
     if (glass && this.backdrop) {
       // Backdrop pixels per CSS pixel. The backdrop can be smaller than the target.
       const backdropRatio = this.backdrop.texture.width / width;
-      this.blur.render(encoder, this.backdrop, backdropRatio);
+      this.blur.render(
+        encoder,
+        this.backdrop,
+        backdropRatio,
+        this.timestampWrites?.blur?.()
+      );
       if (this.blur.texture !== this.boundBackdrop) this.rebind();
     }
 
@@ -218,10 +284,11 @@ export class UIRenderer {
       }
     }
 
-    this.drawCalls = 0;
+    this.drawCalls = stats.drawCalls = 0;
     if (!runs.length && !clearValue) return;
     const pass = encoder.beginRenderPass({
       label: 'ui',
+      timestampWrites: this.timestampWrites?.draw?.(),
       colorAttachments: [
         {
           view,
@@ -241,6 +308,7 @@ export class UIRenderer {
       pass.draw(4, run.count, 0, run.first);
       this.drawCalls++;
     }
+    stats.drawCalls = this.drawCalls;
     pass.end();
   }
 

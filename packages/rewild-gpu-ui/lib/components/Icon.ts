@@ -8,6 +8,8 @@ export interface IconOptions {
   size?: number;
   /** The tint. Defaults to the text colour that passes down to the icon. */
   color?: UIColor;
+  /** Names the node in debug output. Defaults to `icon`. */
+  name?: string;
   style?: UIStyle;
 }
 
@@ -21,6 +23,7 @@ export class Icon implements UIComponent {
   constructor(options: IconOptions) {
     const size = options.size ?? 24;
     this.node = new UINode({
+      name: options.name ?? 'icon',
       icon: options.icon,
       style: {
         width: size,

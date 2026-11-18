@@ -30,6 +30,7 @@ export class GameOverScreen {
       input: 'none',
     });
     this.title = new Label({
+      name: 'title',
       text: 'YOU DIED',
       style: {
         color: '#c8102e',
@@ -40,6 +41,7 @@ export class GameOverScreen {
       },
     });
     this.options = new Stack({
+      name: 'options',
       gap: 'l',
       style: {
         width: 256,

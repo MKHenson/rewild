@@ -233,7 +233,7 @@ export function writeTree(
   const context: WriteContext = { ...options, animating: false };
   stream.reset();
   writeNode(root, stream, context, NO_CLIP, NO_RADII, 1, IDENTITY);
-  if (options.overlay)
+  if (options.overlay && showsInOverlay(root))
     for (const child of root.children) writeOverlay(child, stream);
   return context.animating;
 }
@@ -613,7 +613,7 @@ const CLIP_COLOR = [0.86, 0.3, 0.86, 1];
 
 /** Margins, padding, border boxes and clip rects, like the browser's layout overlay. */
 function writeOverlay(node: UINode, stream: PrimitiveStream): void {
-  if (node.style.display === 'none') return;
+  if (!showsInOverlay(node)) return;
   const { rect, margin } = node;
   const marginBox = {
     x: rect.x - margin[3],
@@ -628,6 +628,15 @@ function writeOverlay(node: UINode, stream: PrimitiveStream): void {
   if (node.style.overflow === 'hidden')
     stream.pushRect({ rect: inside, border: CLIP_COLOR, borderWidth: 1 });
   for (const child of node.children) writeOverlay(child, stream);
+}
+
+/**
+ * False for a node that draws nothing: hidden, or at opacity 0. A closed
+ * modal stays in its tree at opacity 0, and its boxes would hide the boxes
+ * that show.
+ */
+function showsInOverlay(node: UINode): boolean {
+  return node.style.display !== 'none' && node.style.opacity !== 0;
 }
 
 /** Fills the band inside `outer` that `sides` wide edges make. */

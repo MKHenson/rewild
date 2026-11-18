@@ -140,6 +140,19 @@ describe('the primitive stream', () => {
     expect(primitive(stream, 6).borderWidth).toBe(1);
   });
 
+  it('leaves nodes that draw nothing out of the overlay', () => {
+    const surface = surfaceWith({ width: 50, height: 40, opacity: 0 });
+    surface.showLayout = true;
+    surface.update(200, 100);
+    expect(surface.stream.count).toBe(0);
+    surface.root.children[0].style.opacity = 1;
+    surface.update(200, 100);
+    expect(surface.stream.count).toBe(1);
+    surface.root.style.display = 'none';
+    surface.update(200, 100);
+    expect(surface.stream.count).toBe(0);
+  });
+
   it('grows past its first size', () => {
     const surface = new UISurface({ kind: 'screen', name: 'test' });
     for (let i = 0; i < 200; i++)

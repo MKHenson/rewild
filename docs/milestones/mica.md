@@ -578,7 +578,7 @@ The renderer uses WebGPU. An XR session needs the browser to share WebXR with We
 - **The stream** uploads only for dirty surfaces. A changed value updates one instance.
 - **Draw calls.** One per surface, plus one per custom effect pipeline in use.
 - **Blur** only when a glass node is visible.
-- **Stats.** Add UI nodes, layout time and UI draw calls to the perf panel.
+- **Stats.** `UIRenderer.stats` holds what the last render cost: surfaces, nodes, primitives, draw calls, and the layouts and stream writes with their times. The renderer publishes them to the perf panel. `ui layout` and `ui stream` are under `cpu`, recorded only on frames where they run, so the panel shows how often they run. `ui nodes`, `ui primitives` and `ui draw calls` are under `counts`. `gpu · ui` times the blur, from the start of its first pass to the end of its last, and the draw pass. The inspector shows the counts under each example.
 
 ## The UI inspector
 
@@ -602,9 +602,17 @@ Mica runs on a bare `GPUDevice` and a canvas. It does not need the game's `Rende
 
 ## Debug views and commands
 
-- A view of node rectangles, padding and clip rectangles, like the browser's layout overlay.
-- A console command to print a surface's tree with each node's rectangle and style.
-- A console command to show the focus target and the pointer hit.
+| In the game                | Does                                                                                                             |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `setUILayoutOverlay(true)` | Draws the layout overlay on each surface: border boxes, margins, padding and clip rectangles, like the browser's |
+| `printUITree(name?)`       | Prints the tree of a surface, or of all surfaces: each node's path, rectangle, text, icon, effect and style       |
+| `printUIFocus()`           | Prints the focus scope, the focused node of each surface, and the node under each pointer                         |
+
+- **One overlay.** `UIRenderer.showLayout` sets the overlay on all its surfaces, and on surfaces made later. The inspector's switch uses it too.
+- **What shows.** The overlay leaves out a surface whose root is hidden, and a node at opacity 0 with its children. A closed modal stays in its tree at opacity 0, and its boxes would hide the boxes that show.
+- **Names.** `printUITree` and `printUIFocus` show each node's path, the child index at each level, such as `root/0/2`, and its `name` after a `#`. `name` is for debug output only. A component names its node by its kind, such as `#button`, unless its options give a `name`. The HUD names its bars, such as `#health`.
+- **Pointers.** A locked mouse has no screen point, so in play `printUIFocus` shows no pointer. Open the menu first.
+- **The code.** `printTree` and `printFocus` in `lib/debug.ts` return text, so tests can check them. `src/core/debug/UIDebugCommands.ts` puts them on the window.
 
 ---
 
