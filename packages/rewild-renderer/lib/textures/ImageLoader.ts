@@ -1,6 +1,13 @@
 import { loadActivity } from '../core/LoadActivity';
 
-const BITMAP_OPTIONS: ImageBitmapOptions = { colorSpaceConversion: 'none' };
+// premultiplyAlpha 'none', because the default lets the platform choose, and
+// macOS decodes premultiplied. That zeroes the colour a texture keeps in its
+// transparent texels, and the mips then blend that black into every cutout
+// edge: a dark outline on foliage that grows with distance.
+const BITMAP_OPTIONS: ImageBitmapOptions = {
+  colorSpaceConversion: 'none',
+  premultiplyAlpha: 'none',
+};
 
 // Images fetched at once, across every loader instance.
 //
