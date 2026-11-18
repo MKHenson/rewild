@@ -18,6 +18,8 @@ import {
   lodFadeHalfWidth,
   lodTierFar,
   lodTierNear,
+  scatterCullDistance,
+  shadowTierBand,
   writeScatterWindParams,
 } from './ScatterLayers';
 
@@ -111,10 +113,17 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
   /**
    * The band the scene pass draws, wider than the hard one: the tier fades in
    * over [0] to [1] and out over [2] to [3], sharing each handover's metres
-   * with its neighbour so the two cross-fade. The shadow pass keeps the hard
-   * band — a filtered shadow map hides a swap the eye would catch.
+   * with its neighbour so the two cross-fade.
    */
   readonly fadeBand = new Float32Array(4);
+  /**
+   * Metres at which this tier starts and stops casting a shadow. A hard band,
+   * since a filtered shadow map hides a swap the eye would catch. It differs
+   * from the drawn band near the viewer: the finest mesh casts nothing, and
+   * the next mesh casts in its place. See `shadowTierBand`.
+   */
+  shadowNearDistance = 0;
+  shadowCullDistance = 0;
   /**
    * Chunk-local bounds over every instance. Without it the scene BVH would cull
    * a whole chunk of scatter by the bounds of the single model at the chunk
@@ -151,10 +160,12 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
   private bindGroupPipeline: GPURenderPipeline | null = null;
   private frameUniforms = new Float32Array(SCATTER_UNIFORM_BYTES / 4);
   private nodeMatrixWritten = false;
-  // What the band was last derived from: the bias and the layer's cull
-  // distance, which a debug command can change at runtime.
+  // What the band was last derived from: the bias, the draw-distance scale and
+  // the layer's cull distance, which a debug command can change at runtime.
   private bandBias = NaN;
+  private bandScale = NaN;
   private bandCull = NaN;
+  private readonly layerCastsShadow: boolean;
 
   /**
    * `reach` is how far the drawn thing extends from an instance's origin at
@@ -171,7 +182,8 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     tier: number,
     lodBias: number,
     reach: number,
-    private readonly appear: ScatterAppear = new ScatterAppear()
+    private readonly appear: ScatterAppear = new ScatterAppear(),
+    distanceScale = 1
   ) {
     this.transform = transform;
     this.transform.component = this;
@@ -181,8 +193,9 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     this.instanceCount = instances.count;
     this.layer = layer;
     this.tier = tier;
-    this.castShadow = layer.castShadow !== false;
-    this.applyLodBias(lodBias);
+    this.layerCastsShadow = layer.castShadow !== false;
+    this.castShadow = this.layerCastsShadow;
+    this.applyLodBias(lodBias, distanceScale);
     this.cells = bucketInstances(instances, reach);
     this.instanceData = packInstances(instances, this.cells.order);
     this.localBounds = cellsBounds(this.cells);
@@ -197,21 +210,21 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
    * more than recomputing it.
    *
    * The scene pass selects over the faded band and its frustum; the shadow
-   * pass over the hard band, with no frustum or a cascade's light frustum,
+   * pass over the shadow band, with no frustum or a cascade's light frustum,
    * since a caster off screen still shadows what is on it.
    */
   selectInstances(
     viewer: Vector3,
     frustum: Frustum | null,
-    hardBand = frustum === null
+    shadowBand = frustum === null
   ): void {
     this.rangeCount = 0;
-    if (!hardBand) {
+    if (!shadowBand) {
       this.lastSelected = performance.now();
       this.selectedCount = 0;
     }
-    const near = hardBand ? this.nearDistance : this.fadeBand[0];
-    const far = hardBand ? this.cullDistance : this.fadeBand[3];
+    const near = shadowBand ? this.shadowNearDistance : this.fadeBand[0];
+    const far = shadowBand ? this.shadowCullDistance : this.fadeBand[3];
     if (near >= far) return;
 
     const { starts, bounds } = this.cells;
@@ -271,19 +284,37 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     this.selectedCount += end - start;
   }
 
-  /** Re-reads the tier's distance band from the layer table under a bias.
-   *  Picked up by the next frame's uniform write, so a bias set at runtime
-   *  lands without touching the instance buffer. */
-  applyLodBias(lodBias: number): void {
-    if (lodBias === this.bandBias && this.layer.cullDistance === this.bandCull)
+  /** Re-reads the tier's distance bands from the layer table under a bias
+   *  and the draw-distance scale. Picked up by the next frame's uniform
+   *  write, so a change at runtime lands without touching the instance
+   *  buffer. */
+  applyLodBias(lodBias: number, distanceScale = 1): void {
+    if (
+      lodBias === this.bandBias &&
+      distanceScale === this.bandScale &&
+      this.layer.cullDistance === this.bandCull
+    )
       return;
     this.bandBias = lodBias;
+    this.bandScale = distanceScale;
     this.bandCull = this.layer.cullDistance;
 
-    const near = lodTierNear(this.layer, this.tier, lodBias);
-    const far = lodTierFar(this.layer, this.tier, lodBias);
+    const near = lodTierNear(this.layer, this.tier, lodBias, distanceScale);
+    const far = lodTierFar(this.layer, this.tier, lodBias, distanceScale);
     this.nearDistance = near;
     this.cullDistance = far;
+
+    const [shadowNear, shadowFar] = shadowTierBand(
+      this.layer,
+      this.tier,
+      lodBias,
+      distanceScale
+    );
+    this.shadowNearDistance = shadowNear;
+    this.shadowCullDistance = shadowFar;
+    // Off the shadow caster list altogether when the band is empty, so the
+    // shadow pass spends no uniform writes on it.
+    this.castShadow = this.layerCastsShadow && shadowNear < shadowFar;
 
     const fade = this.fadeBand;
     if (near >= far) {
@@ -297,7 +328,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     const nearHalf = near > 0 ? lodFadeHalfWidth(near) : 0;
     fade[0] = near - nearHalf;
     fade[1] = near + nearHalf;
-    if (far >= this.layer.cullDistance) {
+    if (far >= scatterCullDistance(this.layer, distanceScale)) {
       fade[2] = far - 2 * lodFadeHalfWidth(far);
       fade[3] = far;
     } else {

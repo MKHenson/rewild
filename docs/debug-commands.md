@@ -77,7 +77,7 @@ resolution rather than 0.7x, which is roughly twice the cloud pixels.
 
 Individual subsystems can sit on their own tier — `clouds` (which covers the
 bilateral that cleans them up), `cloudShadows`, `godRays`, `bloom`, `terrain`,
-`water`, `ao` and `heatShimmer`. They are read through `renderer.quality.aspect('clouds')` rather than
+`water`, `ao`, `heatShimmer` and `drawDistance`. They are read through `renderer.quality.aspect('clouds')` rather than
 `.level`, and stored separately under `rewild.render.quality.overrides`.
 
 `terrain` is the one that moves the frame most on an open view, because terrain
@@ -111,6 +111,21 @@ frames on `ultra` down to 256² every 6 on `low`, and that pass measures as most
 of the sky's GPU cost. Pinning it low while the rest of the sky stays high costs
 very little on screen, because the map covers a fixed 5000 m of ground and cloud
 shadows are soft at any resolution.
+
+`drawDistance` scales the scatter distances in `templates/scatter-layers.json`.
+The table holds the `ultra` distances. `high` draws at 0.85 of them, `medium` at
+0.7 and `low` at 0.5. The LOD handovers, the impostor handover and the cull
+distance all scale together, so coarser tiers take over nearer the viewer. A
+layer that hands over to far sprites keeps its cull distance, because the far
+sprites start where the chunks stop. Pin it to `ultra` to keep the full view on
+a low overall tier. See `ScatterQuality.ts`.
+
+Scatter shadows do not depend on a tier. The finest mesh of a layer casts no
+shadow, and its next mesh casts in its place from the viewer out. A layer with
+one mesh casts from that mesh. From 120 m out, or from the drawn impostor
+handover when that is nearer, the impostor casts in place of the meshes. Past
+that distance the cascades are too coarse to show the difference. See
+`shadowTierBand` in `ScatterLayers.ts`.
 
 `setRenderQuality` — like the Render Quality dropdown in the settings menu —
 clears them all, since the app-wide tier is the coarse control. To set one

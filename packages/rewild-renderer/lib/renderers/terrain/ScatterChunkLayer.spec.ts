@@ -321,6 +321,7 @@ describe('bucketInstances', () => {
 });
 
 describe('selectInstances', () => {
+  // Tier 2 sits past the shadow floor, so its shadow band is its drawn band.
   function layerWith(band: [number, number], instances: number[][]) {
     const geometry = new Geometry();
     geometry.vertices = new Float32Array([-1, -1, -1, 1, 1, 1]);
@@ -330,8 +331,11 @@ describe('selectInstances', () => {
       {} as never,
       identityMatrix(),
       instancesOf(instances),
-      { cullDistance: band[1], lodDistances: [band[0]] } as ScatterLayer,
-      1,
+      {
+        cullDistance: band[1],
+        lodDistances: [band[0] / 2, band[0]],
+      } as ScatterLayer,
+      2,
       0,
       modelRadius(geometry, identityMatrix())
     );
@@ -435,6 +439,60 @@ describe('LOD fade band', () => {
     (last.layer as { cullDistance: number }).cullDistance = 0;
     last.applyLodBias(0);
     expect(last.draws).toBe(false);
+  });
+
+  it('follows a draw-distance scale changed under the same bias', () => {
+    const last = tier([0, 200], 1, [100]);
+    last.applyLodBias(0, 0.5);
+    expect([last.nearDistance, last.cullDistance]).toEqual([50, 100]);
+    expect(last.fadeBand[3]).toBe(100);
+  });
+});
+
+describe('shadow band', () => {
+  function tier(tierIndex: number, lods: number[]) {
+    const geometry = new Geometry();
+    geometry.vertices = new Float32Array([-1, -1, -1, 1, 1, 1]);
+    return new ScatterChunkLayer(
+      new Transform(),
+      geometry,
+      {} as never,
+      identityMatrix(),
+      instancesOf([[0, 0, 0, 0, 0, 0, 1, 1, 0]]),
+      { cullDistance: 200, lodDistances: lods } as ScatterLayer,
+      tierIndex,
+      0,
+      1
+    );
+  }
+
+  it('takes the finest mesh off the shadow caster list', () => {
+    const model = tier(0, [100]);
+    expect(model.castShadow).toBe(false);
+    expect(model.draws).toBe(true);
+  });
+
+  it('casts from the next mesh out from the viewer', () => {
+    const coarse = tier(1, [100]);
+    expect(coarse.castShadow).toBe(true);
+    expect([coarse.shadowNearDistance, coarse.shadowCullDistance]).toEqual([
+      0, 200,
+    ]);
+    expect([coarse.nearDistance, coarse.cullDistance]).toEqual([100, 200]);
+  });
+
+  it('selects the shadow band when no frustum is given', () => {
+    const coarse = tier(1, [100]);
+    coarse.selectInstances(new Vector3(0, 0, 0), null);
+    expect(coarse.rangeCount).toBe(1);
+  });
+
+  it('casts from the only mesh of a chainless layer', () => {
+    const model = tier(0, []);
+    expect(model.castShadow).toBe(true);
+    expect([model.shadowNearDistance, model.shadowCullDistance]).toEqual([
+      0, 200,
+    ]);
   });
 });
 

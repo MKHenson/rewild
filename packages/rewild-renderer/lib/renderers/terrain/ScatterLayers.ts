@@ -224,10 +224,23 @@ export function lodTierCount(layer: ScatterLayer): number {
 }
 
 /** Metres at which tier k + 1 takes over from tier k: the LOD distances, then
- *  the impostor's. */
-function lodHandover(layer: ScatterLayer, k: number): number {
+ *  the impostor's, scaled by the draw-distance quality. */
+function lodHandover(layer: ScatterLayer, k: number, scale: number): number {
   const lods = layer.lodDistances ?? [];
-  return k < lods.length ? lods[k] : layer.impostor!.fromDistance;
+  return (k < lods.length ? lods[k] : layer.impostor!.fromDistance) * scale;
+}
+
+/**
+ * The layer's cull distance under the draw-distance quality.
+ *
+ * A layer that hands over to far sprites keeps its authored cull. The sprites
+ * start where the chunks stop, so a shorter cull would leave a gap with
+ * nothing in it. The sprites cost little and cast no shadow.
+ */
+export function scatterCullDistance(layer: ScatterLayer, scale = 1): number {
+  return drawsFarSprites(layer)
+    ? layer.cullDistance
+    : layer.cullDistance * scale;
 }
 
 // The bands a tier draws once the bias has shifted the chain. An instance in
@@ -267,16 +280,18 @@ export function lodFadeHalfWidth(handover: number): number {
   );
 }
 
-/** Metres at which a tier starts drawing; 0 for whichever tier is nearest. */
+/** Metres at which a tier starts drawing; 0 for whichever tier is nearest.
+ *  `scale` is the draw-distance quality, applied to every handover. */
 export function lodTierNear(
   layer: ScatterLayer,
   tier: number,
-  bias = 0
+  bias = 0,
+  scale = 1
 ): number {
   const tierCount = lodTierCount(layer);
   if (drawsNothing(tier, tierCount, bias)) return 0;
   const band = lowestSourceBand(tier, tierCount, bias);
-  return band === 0 ? 0 : lodHandover(layer, band - 1);
+  return band === 0 ? 0 : lodHandover(layer, band - 1, scale);
 }
 
 /**
@@ -289,14 +304,97 @@ export function lodTierNear(
 export function lodTierFar(
   layer: ScatterLayer,
   tier: number,
-  bias = 0
+  bias = 0,
+  scale = 1
 ): number {
   const tierCount = lodTierCount(layer);
   if (drawsNothing(tier, tierCount, bias)) return 0;
   const band = highestSourceBand(tier, tierCount, bias);
+  const cull = scatterCullDistance(layer, scale);
   return band === tierCount - 1
-    ? layer.cullDistance
-    : Math.min(lodHandover(layer, band), layer.cullDistance);
+    ? cull
+    : Math.min(lodHandover(layer, band, scale), cull);
+}
+
+/** The lowest mesh tier that casts a shadow. The shadow map needs only the
+ *  outline of a model, and a coarser mesh costs far less in the vertex stage. */
+const SHADOW_MESH_TIER = 1;
+
+/**
+ * Metres from the viewer at which the impostor takes over the shadow from the
+ * meshes, when the drawn handover is further out. Past this the cascades are
+ * too coarse to show a mesh's outline over an impostor's, and an impostor
+ * caster costs a fraction of a mesh.
+ */
+const SHADOW_IMPOSTOR_DISTANCE = 120;
+
+/** The mesh tier that casts a shadow from the viewer outwards: the shadow tier
+ *  when the layer has a mesh that coarse, else its coarsest mesh. Never the
+ *  impostor. */
+function shadowFloorTier(layer: ScatterLayer): number {
+  return Math.min(SHADOW_MESH_TIER, meshTierCount(layer) - 1);
+}
+
+/** Metres at which the impostor starts to cast a shadow, or null when the
+ *  layer draws no impostor. */
+function shadowImpostorNear(
+  layer: ScatterLayer,
+  bias: number,
+  scale: number
+): number | null {
+  if (!layer.impostor) return null;
+  const impostor = lodTierCount(layer) - 1;
+  const near = lodTierNear(layer, impostor, bias, scale);
+  const far = lodTierFar(layer, impostor, bias, scale);
+  if (near >= far) return null;
+  return Math.min(near, SHADOW_IMPOSTOR_DISTANCE);
+}
+
+/**
+ * The band a tier casts a shadow over, as `[near, far)`.
+ *
+ * Tiers finer than the floor cast nothing, and the floor tier casts from the
+ * viewer out to its own far edge in their place. When a bias leaves the floor
+ * tier nothing to draw, the tiers keep their drawn bands, so the shadows never
+ * go missing.
+ *
+ * The impostor then takes the shadow over from the meshes at
+ * SHADOW_IMPOSTOR_DISTANCE, or at its drawn handover when that is nearer.
+ */
+export function shadowTierBand(
+  layer: ScatterLayer,
+  tier: number,
+  bias = 0,
+  scale = 1
+): [number, number] {
+  const [near, far] = meshShadowBand(layer, tier, bias, scale);
+  const impostorNear = shadowImpostorNear(layer, bias, scale);
+  if (impostorNear === null || near >= far) return [near, far];
+
+  if (tier === lodTierCount(layer) - 1)
+    return [Math.min(near, impostorNear), far];
+  const meshFar = Math.min(far, impostorNear);
+  return near < meshFar ? [near, meshFar] : [0, 0];
+}
+
+/** The shadow band with the floor applied, before the impostor takes over. */
+function meshShadowBand(
+  layer: ScatterLayer,
+  tier: number,
+  bias: number,
+  scale: number
+): [number, number] {
+  const near = lodTierNear(layer, tier, bias, scale);
+  const far = lodTierFar(layer, tier, bias, scale);
+  const floor = shadowFloorTier(layer);
+  if (tier > floor) return [near, far];
+
+  const floorDraws =
+    lodTierNear(layer, floor, bias, scale) <
+    lodTierFar(layer, floor, bias, scale);
+  if (!floorDraws) return [near, far];
+  if (tier < floor) return [0, 0];
+  return near < far ? [0, far] : [near, far];
 }
 
 function validateBand(layer: string, field: string, band: SelectorBand): void {

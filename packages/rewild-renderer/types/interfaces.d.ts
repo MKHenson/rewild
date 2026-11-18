@@ -38,14 +38,19 @@ export interface IScatterInstanceGroup extends IVisualComponent {
   readonly nearDistance: number;
   /** Metres beyond which instances are not drawn. */
   readonly cullDistance: number;
+  /** Metres from the viewer before which instances cast no shadow. */
+  readonly shadowNearDistance: number;
+  /** Metres beyond which instances cast no shadow. */
+  readonly shadowCullDistance: number;
   /** Narrows the draw to the contiguous instance runs whose cells the band can
    *  reach from a viewer in the group's local space, and that the frustum can
    *  see when one is given. Fills `rangeCount` runs of `rangeStarts[i]` +
-   *  `rangeCounts[i]`. */
+   *  `rangeCounts[i]`. `shadowBand` selects over the shadow band in place of
+   *  the drawn one. */
   selectInstances(
     viewer: Vector3,
     frustum: Frustum | null,
-    hardBand?: boolean
+    shadowBand?: boolean
   ): void;
   readonly rangeStarts: Int32Array;
   readonly rangeCounts: Int32Array;
