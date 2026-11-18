@@ -9,3 +9,4 @@ import './theme';
 import './shadows';
 import './glass';
 import './transitions';
+import './components';

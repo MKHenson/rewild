@@ -1,4 +1,8 @@
-// The plain box: its fill under its border.
+// The plain box: its fill under its border. A glass box also gets its light.
 fn effect(prim: Primitive, px: Pixel) -> vec4f {
-  return withBorder(premultiply(prim.fill), prim, px.inner);
+  let box = withBorder(premultiply(prim.fill), prim, px.inner);
+  if (prim.params.z == KIND_GLASS) {
+    return glassLight(prim, px, box);
+  }
+  return box;
 }

@@ -1,9 +1,10 @@
-import { InGameMenu } from './InGameMenu';
-import { GameOverMenu } from './GameOverMenu';
 import { SettingsPanel } from './SettingsPanel';
 import { Component, register } from 'rewild-ui';
 import { ViewportStateMachine } from './ViewportStateMachine';
 import { audio } from '../../core/audio/audio';
+import { GameManager } from '../../core/GameManager';
+import { InGameMenu } from '../../core/menus/InGameMenu';
+import { GameOverScreen } from '../../core/menus/GameOverScreen';
 
 interface Props {
   projectId: string;
@@ -16,11 +17,20 @@ export class InGame extends Component<Props> {
   init() {
     const [modalOpen, setModalOpen] = this.useState(false);
     const [activeMenu, setActiveMenu] = this.useState<ActiveMenu>('ingameMenu');
+    // The game's renderer draws the menu and game over. Each game has its own
+    // renderer, so they are made again for each game.
+    let menu: InGameMenu | null = null;
+    let gameOver: GameOverScreen | null = null;
 
     const onResume = () => {
       setModalOpen(false);
       audio.duckWorld(false);
       viewport.gameManager.lock();
+    };
+
+    const onClose = () => {
+      setModalOpen(false);
+      audio.duckWorld(false);
     };
 
     const onDeath = () => {
@@ -40,10 +50,41 @@ export class InGame extends Component<Props> {
           onUnlock={onUnlock}
           onDeath={onDeath}
           onQuit={onQuit}
+          onReady={onReady}
         />
       ) as ViewportStateMachine;
 
+    const onReady = (gameManager: GameManager) => {
+      disposeMenus();
+      const ui = gameManager.renderer.ui;
+      menu = new InGameMenu(ui, {
+        onResume,
+        onSettings,
+        onQuit,
+        onClose,
+      });
+      gameOver = new GameOverScreen(ui, {
+        onRestart,
+        onQuit,
+      });
+      syncMenus();
+    };
+
+    const disposeMenus = () => {
+      menu?.dispose();
+      gameOver?.dispose();
+      menu = null;
+      gameOver = null;
+    };
+
+    /** Shows the menu or game over that the state asks for. */
+    const syncMenus = () => {
+      if (menu) menu.isOpen = modalOpen() && activeMenu() === 'ingameMenu';
+      if (activeMenu() === 'gameOverMenu') gameOver?.show();
+    };
+
     const onRestart = () => {
+      disposeMenus();
       viewport.dispose();
       viewport = createViewport();
       setModalOpen(false);
@@ -51,6 +92,7 @@ export class InGame extends Component<Props> {
     };
 
     const onTravel = (target: string) => {
+      disposeMenus();
       viewport.dispose();
       setLevelId(target, false);
       viewport = createViewport();
@@ -88,39 +130,28 @@ export class InGame extends Component<Props> {
       audio.duckWorld(true);
     };
 
-    /** The one panel the overlay is showing, if any. */
-    const renderMenu = () => {
-      if (activeMenu() === 'gameOverMenu')
-        return (
-          <GameOverMenu onRestartClick={onRestart} onQuitClick={onQuit} />
-        );
-
-      if (activeMenu() === 'settings')
-        return <SettingsPanel onClose={onSettingsClose} />;
-
-      return (
-        <InGameMenu
-          open={modalOpen()}
-          onResumeClick={onResume}
-          onSettingsClick={onSettings}
-          onQuitClick={onQuit}
-        />
-      );
-    };
-
     this.onCleanup = () => {
       document.removeEventListener('keydown', onKeyDown);
+      disposeMenus();
       viewport.dispose();
     };
 
     let viewport = createViewport();
 
-    return () => (
-      <div>
-        {viewport}
-        {renderMenu()}
-      </div>
-    );
+    return () => {
+      syncMenus();
+      // Settings is still the DOM panel. The menu and game over draw in the game.
+      return (
+        <div>
+          {viewport}
+          {activeMenu() === 'settings' ? (
+            <SettingsPanel onClose={onSettingsClose} />
+          ) : (
+            ''
+          )}
+        </div>
+      );
+    };
   }
 
   getStyle() {

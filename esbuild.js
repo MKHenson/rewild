@@ -84,15 +84,17 @@ const copyPlugin = {
           fs.copyFileSync(src, dest);
         }
       });
-      fs.watch('./static', { recursive: true }, (_event, filename) => {
-        if (!filename) return;
-        const src = path.join('./static', filename);
-        const dest = path.join('./public', filename);
-        if (fs.existsSync(src)) {
-          fs.mkdirSync(path.dirname(dest), { recursive: true });
-          fs.copyFileSync(src, dest);
-        }
-      });
+      // Git keeps no empty folders, so `static` can be missing.
+      if (fs.existsSync('./static'))
+        fs.watch('./static', { recursive: true }, (_event, filename) => {
+          if (!filename) return;
+          const src = path.join('./static', filename);
+          const dest = path.join('./public', filename);
+          if (fs.existsSync(src)) {
+            fs.mkdirSync(path.dirname(dest), { recursive: true });
+            fs.copyFileSync(src, dest);
+          }
+        });
     });
   },
 };
