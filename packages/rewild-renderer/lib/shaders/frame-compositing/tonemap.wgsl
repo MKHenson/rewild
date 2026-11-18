@@ -48,7 +48,8 @@ struct VSOut {
 @fragment fn fs(in: VSOut) -> @location(0) vec4f {
   let texel = vec2i(in.position.xy);
 
-  // The HDR scene target is always canvas-sized, so this is an exact 1:1 fetch.
+  // The HDR scene target is the same size as this pass's target, so this is
+  // an exact 1:1 fetch.
   let sceneHDR = textureLoad(sceneTexture, texel, 0).rgb;
 
   // Bloom is generated at a reduced resolution, so it is sampled rather than

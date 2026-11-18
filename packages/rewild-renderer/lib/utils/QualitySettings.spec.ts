@@ -253,4 +253,35 @@ describe('QualitySettings', () => {
       expect(quality.aspect('clouds')).toBe('low');
     });
   });
+
+  describe('render scale', () => {
+    const SCALE_STORAGE_KEY = 'rewild.render.scale';
+
+    it('starts at 1 with nothing stored', () => {
+      expect(new QualitySettings().renderScale).toBe(1);
+    });
+
+    it('stores and restores it', () => {
+      new QualitySettings().renderScale = 0.75;
+      expect(localStorage.getItem(SCALE_STORAGE_KEY)).toBe('0.75');
+      expect(new QualitySettings().renderScale).toBe(0.75);
+    });
+
+    it('ignores a value that is not a render scale', () => {
+      localStorage.setItem(SCALE_STORAGE_KEY, '0.6');
+      expect(new QualitySettings().renderScale).toBe(1);
+    });
+
+    it('is not changed by the level and does not bump the revision', () => {
+      const settings = new QualitySettings();
+      settings.renderScale = 0.5;
+      const revision = settings.revision;
+
+      settings.level = 'low';
+      expect(settings.renderScale).toBe(0.5);
+
+      settings.renderScale = 0.9;
+      expect(settings.revision).toBe(revision + 1);
+    });
+  });
 });

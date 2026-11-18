@@ -190,7 +190,9 @@ export class UIRenderer {
     }
     // The blur runs only when glass shows.
     if (glass && this.backdrop) {
-      this.blur.render(encoder, this.backdrop, pixelRatio);
+      // Backdrop pixels per CSS pixel. The backdrop can be smaller than the target.
+      const backdropRatio = this.backdrop.texture.width / width;
+      this.blur.render(encoder, this.backdrop, backdropRatio);
       if (this.blur.texture !== this.boundBackdrop) this.rebind();
     }
 

@@ -162,7 +162,7 @@ export function registerWaterDebugCommands(renderer: Renderer) {
       const d = vertex(cx + 1, cz + 1);
       return d.map((v, k) => v + (c[k] - v) * (1 - fx) + (b[k] - v) * (1 - fz));
     };
-    const rows = renderer.canvas.height;
+    const rows = renderer.sceneHeight;
     const tanHalf = Math.tan((renderer.camera.fov * Math.PI) / 360);
     let patchRow = -1;
     let probeRow = -1;

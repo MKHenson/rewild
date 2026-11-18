@@ -17,14 +17,14 @@ export class SkyGradientRenderer {
     nightSkyCubemap: GPUTexture,
     moonTexture: GPUTexture
   ) {
-    const { device, canvas } = renderer;
+    const { device } = renderer;
 
     const module = device.createShaderModule({
       code: shader + constantsFns + fogFns + commonShaderFns,
     });
 
     this.renderTarget = device.createTexture({
-      size: [canvas.width, canvas.height, 1],
+      size: [renderer.sceneWidth, renderer.sceneHeight, 1],
       label: 'atmosphere render target',
       format: 'rgba16float',
       usage:

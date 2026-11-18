@@ -197,7 +197,7 @@ export class LightningBoltPass {
     }
 
     // Update pre-allocated descriptor in place — no object allocation each frame
-    this.colorAttachment.view = renderer.getCurrentTextureView();
+    this.colorAttachment.view = renderer.frameView;
     this.depthAttachment.view = this.cachedDepthView!;
 
     const enc = device.createCommandEncoder(this.encoderDesc);

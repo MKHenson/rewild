@@ -9,7 +9,7 @@ import {
   Vector2,
   Vector3,
 } from 'rewild-common';
-import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
+import { SceneSizeWatcher } from '../../utils/SceneSizeWatcher';
 import {
   bilateralSigmas,
   cloudResolutionScale,
@@ -173,7 +173,7 @@ export class SkyRenderer {
   uniformBuffer: GPUBuffer;
   uniformData: Float32Array;
 
-  canvasSizeWatcher: CanvasSizeWatcher;
+  sceneSizeWatcher: SceneSizeWatcher;
 
   _dayColor: Color;
   _eveColor: Color;
@@ -278,8 +278,8 @@ export class SkyRenderer {
     this.bilateralPass.sigmaFar = sigmas.far;
     this.bilateralPass.sigmaRange = sigmas.range;
 
-    const { canvas, device } = renderer;
-    this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
+    const { device } = renderer;
+    this.sceneSizeWatcher = new SceneSizeWatcher(renderer);
 
     if (!this.uniformBuffer) {
       const uniformBufferSize =
@@ -609,22 +609,22 @@ export class SkyRenderer {
     // and godRaysPass hold references to that texture which have to be re-bound.
     //
     // requiresRebuild is tested first so the short-circuit covers the case where
-    // canvasSizeWatcher has not been created yet.
+    // sceneSizeWatcher has not been created yet.
     if (
       this.requiresRebuild ||
-      this.canvasSizeWatcher.hasResized() ||
+      this.sceneSizeWatcher.hasResized() ||
       renderer.quality.hasChangedSince(this.builtQualityRevision)
     ) {
       this.init(renderer);
     }
 
-    const { canvas, device } = renderer;
+    const { device } = renderer;
 
     const uniformData = this.update(
       renderer,
       camera,
-      canvas.width,
-      canvas.height
+      renderer.sceneWidth,
+      renderer.sceneHeight
     );
 
     // upload the uniform values to the uniform buffer
@@ -754,7 +754,7 @@ export class SkyRenderer {
     this.gpuTimer.resolve();
   }
 
-  /** Called after the sky compositor is submitted — renders bolt then rain onto the canvas. */
+  /** Called after the sky compositor is submitted — renders bolt then rain onto the frame target. */
   postRender(renderer: Renderer): void {
     // Under water the view is the water's, not the air's.
     if (renderer.terrainRenderer.underWater.submerged) return;

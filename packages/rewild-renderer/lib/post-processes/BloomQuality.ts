@@ -11,7 +11,7 @@ import { ShaderDefines, wgslF32, wgslI32 } from '../utils/shaderDefines';
  */
 interface BloomQualityTier {
   /**
-   * Bloom render-target scale, as a fraction of canvas. The safest thing in the
+   * Bloom render-target scale, as a fraction of the scene size. The safest thing in the
    * chain to downscale — the output is a wide Gaussian, so it has no high
    * frequencies to lose.
    *
@@ -65,7 +65,7 @@ export function bloomShaderDefines(quality: RenderQuality): ShaderDefines {
   };
 }
 
-/** Bloom render-target scale, as a fraction of canvas. */
+/** Bloom render-target scale, as a fraction of the scene size. */
 export function bloomScale(quality: RenderQuality): number {
   return TIERS[quality].bloomScale;
 }

@@ -51,7 +51,7 @@ export class FrameCompositor {
   /**
    * (Re)builds the bloom chain against the current scene colour target. Safe to
    * call repeatedly; must be called after a resize, since bloom's targets are
-   * derived from the canvas size.
+   * derived from the scene size.
    */
   init(renderer: Renderer): void {
     this.bloom.quality = renderer.quality.aspect('bloom');

@@ -30,11 +30,16 @@ describe('SettingsPanel', () => {
     return { panel, onClose };
   }
 
-  /** The Display tab's selects, in render order: overall tier first, then one per aspect. */
+  /** The Display tab's tier selects, in render order: overall tier first, then one per aspect. */
   const selectsOf = (panel: SettingsPanel) =>
     Array.from(
-      panel.shadow!.querySelector('x-tab')!.querySelectorAll('x-select')
+      panel
+        .shadow!.querySelector('x-tab')!
+        .querySelectorAll(':not(.render-scale) > x-field > x-select')
     ) as Select[];
+
+  const scaleSelectOf = (panel: SettingsPanel) =>
+    panel.shadow!.querySelector('.render-scale x-select') as Select;
 
   /** Modal renders its own buttons into its shadow root, not the panel's. */
   const buttonLabelled = (panel: SettingsPanel, label: string) => {
@@ -134,6 +139,34 @@ describe('SettingsPanel', () => {
       buttonLabelled(panel, 'Apply').click();
 
       expect(stored().overrides).toEqual({});
+    });
+  });
+
+  describe('render scale', () => {
+    it('starts at 100%', () => {
+      const { panel } = createPanel();
+
+      expect(scaleSelectOf(panel).props.value).toBe('1');
+    });
+
+    it('commits the scale on Apply', async () => {
+      const { panel } = createPanel();
+
+      await change(scaleSelectOf(panel), '0.75');
+      expect(stored().renderScale).toBe(1);
+      buttonLabelled(panel, 'Apply').click();
+
+      expect(stored().renderScale).toBe(0.75);
+    });
+
+    it('keeps the scale when the overall tier changes', async () => {
+      stored().renderScale = 0.5;
+      const { panel } = createPanel();
+
+      await change(selectsOf(panel)[0], 'ultra');
+      buttonLabelled(panel, 'Apply').click();
+
+      expect(stored().renderScale).toBe(0.5);
     });
   });
 

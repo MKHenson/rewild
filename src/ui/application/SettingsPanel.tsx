@@ -18,7 +18,9 @@ import {
   QualityAspect,
   QualityOverrides,
   RENDER_QUALITIES,
+  RENDER_SCALES,
   RenderQuality,
+  RenderScale,
 } from 'rewild-renderer/lib/utils/RenderQuality';
 import { getQualitySettings } from '../utils/getQualitySettings';
 import { VOLUME_SETTINGS, VolumeSetting } from 'rewild-audio';
@@ -34,6 +36,11 @@ type Props = {
 const qualityOptions = RENDER_QUALITIES.map((quality) => ({
   value: quality,
   label: quality.charAt(0).toUpperCase() + quality.slice(1),
+}));
+
+const scaleOptions = [...RENDER_SCALES].reverse().map((scale) => ({
+  value: String(scale),
+  label: `${Math.round(scale * 100)}%`,
 }));
 
 const themeOptions: { value: UiTheme; label: string }[] = [
@@ -155,6 +162,9 @@ export class SettingsPanel extends Component<Props> {
     const [overrides, setOverrides] = this.useState<QualityOverrides>({
       ...settings.overrides,
     });
+    const [renderScale, setRenderScale] = this.useState<RenderScale>(
+      settings.renderScale
+    );
     const [tabIndex, setTabIndex] = this.useState(0);
     const [uiTheme, setUiThemeState] = this.useState<UiTheme>(getUiTheme());
 
@@ -176,7 +186,9 @@ export class SettingsPanel extends Component<Props> {
     };
 
     const onApply = () => {
-      getQualitySettings().apply(level(), overrides());
+      const settings = getQualitySettings();
+      settings.apply(level(), overrides());
+      settings.renderScale = renderScale();
     };
 
     return () => {
@@ -206,6 +218,24 @@ export class SettingsPanel extends Component<Props> {
                 <Typography variant="light">
                   Sets every section below at once. Lower it if the game runs
                   poorly, then raise anything back that you want to keep.
+                </Typography>
+              </div>
+
+              <div class="section render-scale">
+                <Field label="Render Scale">
+                  <Select
+                    value={String(renderScale())}
+                    options={scaleOptions}
+                    onChange={(value) =>
+                      setRenderScale(Number(value) as RenderScale)
+                    }
+                  />
+                </Field>
+                <Typography variant="light">
+                  The resolution the world draws at, as a share of the window.
+                  Lower it if the game runs poorly. Menus and the HUD always
+                  draw at full resolution, and Render Quality does not change
+                  it.
                 </Typography>
               </div>
 

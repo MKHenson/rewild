@@ -73,10 +73,10 @@ export class SkyCompositePass implements IPostProcess {
    * intermediateTarget can be used as the bloom source.
    */
   initBlend(renderer: Renderer): void {
-    const { device, canvas } = renderer;
+    const { device } = renderer;
 
     this.intermediateTarget = device.createTexture({
-      size: [canvas.width, canvas.height, 1],
+      size: [renderer.sceneWidth, renderer.sceneHeight, 1],
       label: 'sky intermediate HDR',
       format: 'rgba16float',
       usage:
@@ -207,8 +207,6 @@ export class SkyCompositePass implements IPostProcess {
     const theta = degToRad(this.azimuth);
     const sunPosition = tempVec.setFromSphericalCoords(1, phi, theta);
 
-    const canvas = renderer.canvas;
-
     invViewProjectionMatrix
       .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
       .invert();
@@ -218,8 +216,8 @@ export class SkyCompositePass implements IPostProcess {
 
     uniformData.set(
       [
-        canvas.width,
-        canvas.height,
+        renderer.sceneWidth,
+        renderer.sceneHeight,
         renderer.totalDeltaTime,
         this.cloudiness,
         sunPosition.x,
@@ -244,10 +242,10 @@ export class SkyCompositePass implements IPostProcess {
 
   /** Blend sub-pass: sky HDR + clouds HDR → intermediateTarget (no tonemap). */
   renderBlend(renderer: Renderer): void {
-    const { device, canvas } = renderer;
+    const { device } = renderer;
 
-    blendData[0] = canvas.width;
-    blendData[1] = canvas.height;
+    blendData[0] = renderer.sceneWidth;
+    blendData[1] = renderer.sceneHeight;
     // The cloud pass only depth-gates below the cloud layer; above it, clouds are
     // marched full-screen and every texel is valid.
     blendData[2] = this.cameraAltitude < CLOUD_START ? 1.0 : 0.0;

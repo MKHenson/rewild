@@ -278,6 +278,8 @@ export class PerfPanel extends Component<Props> {
           .join(' ');
         lines.push(
           `canvas ${renderer.canvas.width}x${renderer.canvas.height} · ` +
+            `scene ${renderer.sceneWidth}x${renderer.sceneHeight} ` +
+            `(${Math.round(quality.renderScale * 100)}%) · ` +
             `quality ${quality.level}${pins ? ` (${pins})` : ''}`
         );
       }

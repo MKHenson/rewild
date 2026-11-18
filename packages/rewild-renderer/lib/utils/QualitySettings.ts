@@ -1,11 +1,14 @@
 import {
   DEFAULT_RENDER_QUALITY,
+  DEFAULT_RENDER_SCALE,
   isQualityAspect,
   isRenderQuality,
+  isRenderScale,
   QUALITY_ASPECTS,
   QualityAspect,
   QualityOverrides,
   RenderQuality,
+  RenderScale,
 } from './RenderQuality';
 
 /** localStorage key holding the chosen tier. */
@@ -13,6 +16,9 @@ const STORAGE_KEY = 'rewild.render.quality';
 
 /** localStorage key holding the per-aspect overrides, as a JSON object. */
 const OVERRIDES_STORAGE_KEY = 'rewild.render.quality.overrides';
+
+/** localStorage key holding the render scale. */
+const SCALE_STORAGE_KEY = 'rewild.render.scale';
 
 /**
  * The app-wide render-quality setting.
@@ -33,11 +39,28 @@ export class QualitySettings {
   private _level: RenderQuality;
   private _overrides: QualityOverrides;
   private _revision: number;
+  private _renderScale: RenderScale;
 
   constructor(fallback: RenderQuality = DEFAULT_RENDER_QUALITY) {
     this._level = readStoredQuality() ?? fallback;
     this._overrides = readStoredOverrides();
     this._revision = 0;
+    this._renderScale = readStoredScale() ?? DEFAULT_RENDER_SCALE;
+  }
+
+  /**
+   * Fraction of the CSS size the scene draws at. The quality level does not
+   * change it, and a change does not bump `revision`: the renderer resizes its
+   * scene targets on the next frame.
+   */
+  get renderScale(): RenderScale {
+    return this._renderScale;
+  }
+
+  set renderScale(value: RenderScale) {
+    if (value === this._renderScale) return;
+    this._renderScale = value;
+    writeStoredScale(value);
   }
 
   /**
@@ -119,6 +142,23 @@ export class QualitySettings {
    */
   hasChangedSince(builtRevision: number): boolean {
     return builtRevision !== this._revision;
+  }
+}
+
+function readStoredScale(): RenderScale | null {
+  try {
+    const stored = Number(localStorage.getItem(SCALE_STORAGE_KEY));
+    return isRenderScale(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredScale(scale: RenderScale): void {
+  try {
+    localStorage.setItem(SCALE_STORAGE_KEY, String(scale));
+  } catch {
+    // Storage full or blocked. The scale still applies for this session.
   }
 }
 
