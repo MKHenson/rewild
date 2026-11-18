@@ -154,6 +154,24 @@ fn glassBackdrop(p: vec2f) -> vec4f {
   return vec4f(clamp(matrix * color.rgb, vec3f(0.0), vec3f(color.a)), color.a);
 }
 
+// The white light that follows the pointer over a glass box, as on the DOM
+// modal. A sheen lies over the fill, and the rim brightens the border.
+// `effect.xy` is the light's place as a fraction of the box, and `effect.z`
+// its strength. A strength of 0 draws no light. `color` is premultiplied.
+fn glassLight(prim: Primitive, px: Pixel, color: vec4f) -> vec4f {
+  let strength = prim.effect.z;
+  if (strength <= 0.0) {
+    return color;
+  }
+  let d = distance(px.local, prim.effect.xy * prim.rect.zw);
+  // The DOM's 500 px gradient from 9 % white, gone at 60 %.
+  let sheen = 0.09 * strength * clamp(1.0 - d / 300.0, 0.0, 1.0);
+  // The DOM's 240 px gradient from 95 % white, gone at 70 %.
+  let rim = 0.95 * strength * clamp(1.0 - d / 168.0, 0.0, 1.0) * (1.0 - px.inner);
+  let lit = vec4f(sheen) + color * (1.0 - sheen);
+  return vec4f(rim) + lit * (1.0 - rim);
+}
+
 fn gaussian(x: f32, sigma: f32) -> f32 {
   return exp(-(x * x) / (2.0 * sigma * sigma)) / (2.5066283 * sigma);
 }

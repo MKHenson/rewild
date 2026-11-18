@@ -13,6 +13,8 @@ interface Props {
   onUnlock: () => void;
   onDeath: () => void;
   onQuit: () => void;
+  /** The game loaded, so its renderer's UI can take surfaces. */
+  onReady?: (gameManager: GameManager) => void;
 }
 
 @register('x-viewport-statemachine')
@@ -52,8 +54,10 @@ export class ViewportStateMachine extends Component<Props> {
       // init() swallows its own errors, so drop the overlay either way rather
       // than leaving the player staring at a shell that will never clear.
       setLoading(false);
-      if (initialized) window.requestAnimationFrame(onFrame);
-      else if (this.gameManager.loadError)
+      if (initialized) {
+        this.props.onReady?.(this.gameManager);
+        window.requestAnimationFrame(onFrame);
+      } else if (this.gameManager.loadError)
         toReturn.appendChild(
           <GameLoadError
             error={this.gameManager.loadError}

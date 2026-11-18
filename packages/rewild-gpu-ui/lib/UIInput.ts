@@ -219,7 +219,7 @@ export class UIInput {
     const result = this.send(target, new UIKeyboardEvent(type, init));
     if (result === 'prevented' || action === 'up') return result;
     // A listener can close the scope, as Escape closes a menu.
-    if (!scope.open) return result;
+    if (this.focusScope() !== scope) return result;
     return this.keyAction(scope, init) ? 'prevented' : result;
   }
 
@@ -441,7 +441,7 @@ export class UIInput {
   private onPointer = (e: PointerEvent): void => {
     const action = POINTER_ACTIONS[e.type as PointerEventType];
     const element = this.element;
-    if (!element || e.target !== element) {
+    if (!element || origin(e) !== element) {
       // The game's press can end over another element.
       if (action === 'up' || action === 'cancel')
         if (this.pointers.get(e.pointerId)?.game)
@@ -473,14 +473,15 @@ export class UIInput {
   };
 
   private onMouse = (e: MouseEvent): void => {
-    if (e.target !== this.element || document.pointerLockElement) return;
+    if (origin(e) !== this.element || document.pointerLockElement) return;
     const taken = e.type === 'mousemove' ? this.moveTaken : this.pressTaken;
     if (taken) e.stopPropagation();
   };
 
   private onWheel = (e: WheelEvent): void => {
     const element = this.element;
-    if (!element || e.target !== element || document.pointerLockElement) return;
+    if (!element || origin(e) !== element || document.pointerLockElement)
+      return;
     const page = element.getBoundingClientRect().height;
     const scale =
       e.deltaMode === WheelEvent.DOM_DELTA_LINE
@@ -504,7 +505,7 @@ export class UIInput {
 
   private onKey = (e: KeyboardEvent): void => {
     // Keys typed into the page's own controls stay theirs.
-    if (!this.takesKeysFrom(e.target)) return;
+    if (!this.takesKeysFrom(origin(e))) return;
     const result = this.key(e.type === 'keydown' ? 'down' : 'up', {
       ...modifiers(e),
       key: e.key,
@@ -525,6 +526,14 @@ export class UIInput {
     for (const [id, state] of this.pointers)
       if (state.type === 'mouse') this.pointerOut(id);
   };
+}
+
+/**
+ * The element the event started on. At the window, `target` is the outermost
+ * shadow host, and the game's canvas is in a shadow root.
+ */
+function origin(e: Event): EventTarget | null {
+  return e.composedPath()[0] ?? e.target;
 }
 
 function modifiers(e: MouseEvent | KeyboardEvent) {

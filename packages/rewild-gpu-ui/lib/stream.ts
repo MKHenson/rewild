@@ -294,15 +294,17 @@ function writeNode(
   // Opacity multiplies down the tree, so overlapping children of a faded
   // node fade one by one, not as a group as in CSS.
   const [ownOpacity] = animated(node, 'opacity', [style.opacity ?? 1], context);
-  const opacity = parentOpacity * ownOpacity;
-  if (opacity <= 0) return;
-
+  // A node at opacity 0 still records the transform it shows, so a node that
+  // fades in from 0 can also grow or slide in.
   const transform = animated(
     node,
     'transform',
     transformValue(style.transform),
     context
   );
+  const opacity = parentOpacity * ownOpacity;
+  if (opacity <= 0) return;
+
   const placement = placeNode(parentPlacement, node.rect, transform);
   const { scale } = placement;
   const rect = placeRect(node.rect, placement);

@@ -411,7 +411,7 @@ The meter is the first effect. `UIRenderer` registers it. Its parameters are the
 
 `transform` is applied when the node draws, after layout, the same as in CSS. It does not move other nodes, so a transition never runs layout again. The scale is uniform and about the centre of the box, so a rounded box stays a rounded box. The hit test follows the transformed box.
 
-A transition is `{ property, duration, easing, delay }`, with times in milliseconds, CSS's easing keywords, and `all` for the five properties. A change starts from the value the node shows, so a change in the middle of a transition turns round with no jump. A node that has not drawn yet jumps, as in CSS. Colours mix with premultiplied alpha. While a transition runs, its surface writes its stream on each frame, and `renderer.ui.animating` is true.
+A transition is `{ property, duration, easing, delay }`, with times in milliseconds, CSS's easing keywords, and `all` for the five properties. A change starts from the value the node shows, so a change in the middle of a transition turns round with no jump. A node that has not drawn yet jumps, as in CSS. A node at opacity 0 counts as drawn, so a node kept at opacity 0 can fade and grow in. Colours mix with premultiplied alpha. While a transition runs, its surface writes its stream on each frame, and `renderer.ui.animating` is true.
 
 Layout properties, such as `width` or `top`, do not transition. Each frame of such a transition would run layout.
 
@@ -447,6 +447,8 @@ Components are TypeScript classes that build a subtree, handle their own states,
 | `Switch`   | An on and off toggle, the same shape as the DOM's              | 3     |
 | `Field`    | A label, a control and an optional description in a row        | 3     |
 | `Divider`, `InfoBox` | A line, and a box of help text                       | 3     |
+
+A closed `Modal` stays in its surface at opacity 0, and its surface takes no input. So it draws nothing, and it fades and shrinks in when it opens, as the DOM modal does. Game over keeps its title and its options at opacity 0 for the same reason.
 
 A component takes plain values and callbacks. It does not know about stores. Game code in `src` binds a `Store` from `rewild-ui` to a component, so game state drives it the same way it drives the DOM.
 
@@ -703,7 +705,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: theme values from the document, light and dark. The backdrop blur from `sceneColorTarget` and glass rects. Box shadows, with an outset quad and the distance to the edge in the base shader, which effects can also use. `transform` and transitions.
   - Expect: in the inspector, a Mica glass panel next to a DOM glass panel over the same test image looks the same, in light and dark.
 
-- [ ] **10. The in-game menu and game over**
+- [x] **10. The in-game menu and game over**
 
   - Scope: `Label`, `Button`, `Modal`, `Stack`. The in-game menu and game over move to Mica. Settings still opens the DOM panel.
   - Expect: Escape opens the menu. Resume, Settings and Quit work by mouse, keyboard and gamepad.
