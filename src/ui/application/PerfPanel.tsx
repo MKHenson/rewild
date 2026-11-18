@@ -4,12 +4,17 @@ import { getActiveRenderer } from 'src/ui/utils/getActiveRenderer';
 
 interface Props {}
 
-/** Section order in the panel. Groups absent from a snapshot are skipped. */
+/**
+ * Section order in the panel. Groups absent from a snapshot are skipped, and
+ * groups not listed here come last, so a new group always shows.
+ */
 const GROUP_ORDER = [
   'frame',
   'gpu/scene',
+  'gpu/water',
   'gpu/sky',
   'gpu/post',
+  'gpu/ui',
   'cpu',
   'counts',
 ];
@@ -17,13 +22,23 @@ const GROUP_ORDER = [
 const GROUP_LABELS: Record<string, string> = {
   frame: 'frame',
   'gpu/scene': 'gpu · scene',
+  'gpu/water': 'gpu · water',
   'gpu/sky': 'gpu · sky',
   'gpu/post': 'gpu · post',
+  'gpu/ui': 'gpu · ui',
   cpu: 'cpu · render()',
   counts: 'counts',
 };
 
 const ms = (value: number) => value.toFixed(2);
+
+/** The groups in the views, in panel order. */
+const groupsOf = (views: MetricView[]): string[] => {
+  const present = new Set(views.map((view) => view.group));
+  const listed = GROUP_ORDER.filter((group) => present.has(group));
+  const rest = [...present].filter((group) => !GROUP_ORDER.includes(group));
+  return [...listed, ...rest];
+};
 
 /** Below this many frames in the window, every mean is a reading of a handful
  *  of frames and the panel says so rather than pretending otherwise. */
@@ -93,7 +108,7 @@ export class PerfPanel extends Component<Props> {
         else groups.set(view.group, [view]);
       }
 
-      for (const group of GROUP_ORDER) {
+      for (const group of groupsOf(views)) {
         const views = groups.get(group);
         if (!views || views.length === 0) continue;
 
@@ -289,7 +304,7 @@ export class PerfPanel extends Component<Props> {
       }
       lines.push(`verdict: ${lastVerdict || 'none'}`);
 
-      for (const group of GROUP_ORDER) {
+      for (const group of groupsOf(lastViews)) {
         const views = lastViews.filter((v) => v.group === group);
         if (views.length === 0) continue;
 

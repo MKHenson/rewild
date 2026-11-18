@@ -172,24 +172,29 @@ function createHud(ui: UIRenderer): Hud {
   // The gap above each bar is its top margin. A hidden stamina bar takes its
   // gap with it, so the oxygen bar moves down into its place.
   const health = new Meter({
+    name: 'health',
     style: { height: '5%', borderRadius: 20, margin: [10, 0, 0, 0] },
   });
   const hunger = new Meter({
+    name: 'hunger',
     fullColor: '#f2991a',
     emptyColor: '#8c3300',
     style: { height: '3%', borderRadius: 12, margin: [5, 0, 0, 0] },
   });
   const stamina = new Meter({
+    name: 'stamina',
     fullColor: '#73ccff',
     emptyColor: '#334d8c',
     style: { height: '1.5%', borderRadius: 8, margin: [10, 0, 0, 0] },
   });
   const oxygen = new Meter({
+    name: 'oxygen',
     fullColor: '#ebf5ff',
     emptyColor: '#8c1a73',
     style: { height: '1.5%', borderRadius: 8 },
   });
   const bars = new UINode({
+    name: 'bars',
     style: {
       position: 'absolute',
       left: '30%',
@@ -201,10 +206,11 @@ function createHud(ui: UIRenderer): Hud {
     },
   });
   // Holds the bars 3% of the screen off the bottom.
-  const foot = new UINode({ style: { height: '3%' } });
+  const foot = new UINode({ name: 'foot', style: { height: '3%' } });
   bars.append(oxygen, stamina, hunger, health, foot);
 
   const temperature = new Meter({
+    name: 'temperature',
     style: {
       position: 'absolute',
       left: `${_TEMPERATURE_BAR_X}%`,

@@ -43,6 +43,16 @@ export class UISurface {
   pixelRatio = 1;
   needsLayout = true;
   needsPaint = true;
+  /** Nodes in the tree, counted when the stream was last written. */
+  nodeCount = 0;
+  /** True when the last update laid out. */
+  laidOut = false;
+  /** True when the last update wrote the stream. */
+  wrote = false;
+  /** Milliseconds the last update spent on layout. */
+  layoutTime = 0;
+  /** Milliseconds the last update spent writing the stream. */
+  writeTime = 0;
   private overlay = false;
   private _focused: UINode | null = null;
   private _focusVisible = false;
@@ -173,8 +183,17 @@ export class UISurface {
       this.themeRevision = themeRevision;
       this.needsPaint = true;
     }
+    this.laidOut = this.wrote = false;
+    this.layoutTime = this.writeTime = 0;
     if (!this.needsLayout && !this.needsPaint) return false;
-    if (this.needsLayout) layoutTree(this.root, width, height);
+    let start = performance.now();
+    if (this.needsLayout) {
+      layoutTree(this.root, width, height);
+      const end = performance.now();
+      this.laidOut = true;
+      this.layoutTime = end - start;
+      start = end;
+    }
     const animating = writeTree(this.root, this.stream, {
       overlay: this.overlay,
       font: this._font,
@@ -184,14 +203,19 @@ export class UISurface {
       theme: this._theme,
       now,
     });
-    clearDirty(this.root);
+    this.nodeCount = clearDirty(this.root);
+    this.wrote = true;
+    this.writeTime = performance.now() - start;
     this.needsLayout = false;
     this.needsPaint = animating;
     return true;
   }
 }
 
-function clearDirty(node: UINode): void {
+/** Clears the dirty flags of the tree. Returns the number of nodes in it. */
+function clearDirty(node: UINode): number {
   node.dirty = Dirty.None;
-  for (const child of node.children) clearDirty(child);
+  let count = 1;
+  for (const child of node.children) count += clearDirty(child);
+  return count;
 }

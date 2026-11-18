@@ -138,7 +138,7 @@ class ExampleCard {
   }
 
   showLayout(show: boolean): void {
-    this.surface.showLayout = show;
+    this.renderer.showLayout = show;
     this.requestDraw();
   }
 
@@ -175,10 +175,12 @@ class ExampleCard {
       );
     }
     device.queue.submit([encoder.finish()]);
-    const calls = this.renderer.drawCalls;
+    const { drawCalls, nodes, primitives } = this.renderer.stats;
     this.micaCaption.textContent = `Mica · ${canvas.width} × ${
       canvas.height
-    } px at ${pixelRatio}x · ${calls} draw call${calls === 1 ? '' : 's'}`;
+    } px at ${pixelRatio}x · ${nodes} nodes · ${primitives} primitives · ${drawCalls} draw call${
+      drawCalls === 1 ? '' : 's'
+    }`;
   }
 
   dispose(): void {

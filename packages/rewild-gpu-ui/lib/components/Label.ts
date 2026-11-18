@@ -3,6 +3,8 @@ import { UIComponent, UINode } from '../UINode';
 
 export interface LabelOptions {
   text: string;
+  /** Names the node in debug output. Defaults to `label`. */
+  name?: string;
   style?: UIStyle;
 }
 
@@ -11,7 +13,11 @@ export class Label implements UIComponent {
   readonly node: UINode;
 
   constructor(options: LabelOptions) {
-    this.node = new UINode({ text: options.text, style: options.style });
+    this.node = new UINode({
+      name: options.name ?? 'label',
+      text: options.text,
+      style: options.style,
+    });
   }
 
   get text(): string {

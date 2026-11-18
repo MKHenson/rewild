@@ -34,6 +34,19 @@ export interface UISurfaceList {
   readonly surfaces: readonly UISurface[];
 }
 
+/** A pointer the input knows, and the node under it. */
+export interface UIPointerHit {
+  pointerId: number;
+  pointerType: UIPointerType;
+  /** The last position, in surface CSS pixels. */
+  x: number;
+  y: number;
+  /** The node the pointer hovers, or null. */
+  node: UINode | null;
+  /** True when the game took the press, so the UI ignores the pointer until it is up. */
+  game: boolean;
+}
+
 interface PointerState {
   type: UIPointerType;
   /** The last input of the pointer, for the leave events when it goes. */
@@ -231,6 +244,21 @@ export class UIInput {
       if (surface.input === 'all' && surface.open) return surface;
     }
     return null;
+  }
+
+  /** The pointers the input knows, each with the node under it. */
+  pointerHits(): UIPointerHit[] {
+    const hits: UIPointerHit[] = [];
+    for (const [pointerId, state] of this.pointers)
+      hits.push({
+        pointerId,
+        pointerType: state.type,
+        x: state.last.x,
+        y: state.last.y,
+        node: state.hover[0] ?? null,
+        game: state.game,
+      });
+    return hits;
   }
 
   /** Reads the gamepads once, as keys. Call it once per frame while the UI has the pad. */

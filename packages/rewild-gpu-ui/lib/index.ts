@@ -1,6 +1,7 @@
 export * from './canvasSize';
 export * from './color';
 export * from './components';
+export * from './debug';
 export * from './events';
 export * from './focus';
 export * from './font';

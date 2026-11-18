@@ -12,6 +12,26 @@ function tree() {
   return { surface, a, b, c };
 }
 
+describe('UISurface stats', () => {
+  it('counts the nodes and times only the work that ran', () => {
+    const { surface, a } = tree();
+    expect(surface.nodeCount).toBe(4);
+    expect(surface.layoutTime).toBeGreaterThanOrEqual(0);
+    expect(surface.update(100, 100)).toBe(false);
+    expect(surface.laidOut).toBe(false);
+    expect(surface.wrote).toBe(false);
+    expect(surface.layoutTime).toBe(0);
+    a.style.backgroundColor = '#ffffff';
+    surface.update(100, 100);
+    expect(surface.laidOut).toBe(false);
+    expect(surface.wrote).toBe(true);
+    a.append(new UINode());
+    surface.update(100, 100);
+    expect(surface.laidOut).toBe(true);
+    expect(surface.nodeCount).toBe(5);
+  });
+});
+
 describe('UINode tree', () => {
   it('appends children in order', () => {
     const parent = new UINode();

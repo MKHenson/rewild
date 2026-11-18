@@ -80,19 +80,27 @@ export class UIBackdrop {
     });
   }
 
-  /** Encodes the blur of `source`, which has `pixelRatio` pixels per CSS pixel. */
+  /**
+   * Encodes the blur of `source`, which has `pixelRatio` pixels per CSS pixel.
+   * `timestampWrites` brackets all the passes: the first pass writes its
+   * begin and the last pass writes its end.
+   */
   render(
     encoder: GPUCommandEncoder,
     source: UIBackdropSource,
-    pixelRatio: number
+    pixelRatio: number,
+    timestampWrites?: GPURenderPassTimestampWrites
   ): void {
     const { levels, offset } = blurSteps(GLASS_BLUR * pixelRatio);
     if (source.texture !== this.builtFor || levels !== this.builtLevels)
       this.build(source.texture, levels);
     this.writeParams(source, offset);
-    for (const pass of this.passes) {
+    const last = this.passes.length - 1;
+    for (let i = 0; i <= last; i++) {
+      const pass = this.passes[i];
       const render = encoder.beginRenderPass({
         label: 'ui-backdrop',
+        timestampWrites: timestampWrites && bracket(timestampWrites, i, last),
         colorAttachments: [
           { view: pass.target, loadOp: 'clear', storeOp: 'store' },
         ],
@@ -193,4 +201,27 @@ export class UIBackdrop {
     }
     this.device.queue.writeBuffer(this.params!, 0, data);
   }
+}
+
+/** The part of `writes` that pass `index` of `0..last` writes. */
+function bracket(
+  writes: GPURenderPassTimestampWrites,
+  index: number,
+  last: number
+): GPURenderPassTimestampWrites | undefined {
+  if (index !== 0 && index !== last) return undefined;
+  // The installed @webgpu/types describe an older form of this descriptor.
+  // Browsers take the object form.
+  const { querySet, beginningOfPassWriteIndex, endOfPassWriteIndex } =
+    writes as unknown as {
+      querySet: GPUQuerySet;
+      beginningOfPassWriteIndex?: number;
+      endOfPassWriteIndex?: number;
+    };
+  return {
+    querySet,
+    beginningOfPassWriteIndex:
+      index === 0 ? beginningOfPassWriteIndex : undefined,
+    endOfPassWriteIndex: index === last ? endOfPassWriteIndex : undefined,
+  } as unknown as GPURenderPassTimestampWrites;
 }

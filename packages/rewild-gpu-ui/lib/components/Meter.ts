@@ -9,6 +9,8 @@ export interface MeterOptions {
   fullColor?: HexColor;
   /** The fill when empty. A darker shade of it is the track. */
   emptyColor?: HexColor;
+  /** Names the node in debug output. Defaults to `meter`. */
+  name?: string;
   style?: UIStyle;
 }
 
@@ -24,6 +26,7 @@ export class Meter implements UIComponent {
 
   constructor(options: MeterOptions = {}) {
     this.node = new UINode({
+      name: options.name ?? 'meter',
       effect: 'meter',
       style: { borderWidth: 1, borderColor: '#1a1a1a', ...options.style },
     });

@@ -19,6 +19,8 @@ export interface StackOptions {
   /** A step of the spacing scale. Defaults to `m`. */
   gap?: UISpace;
   children?: UIChild[];
+  /** Names the node in debug output. Defaults to `stack`. */
+  name?: string;
   style?: UIStyle;
 }
 
@@ -28,6 +30,7 @@ export class Stack implements UIComponent {
 
   constructor(options: StackOptions = {}) {
     this.node = new UINode({
+      name: options.name ?? 'stack',
       style: {
         flexDirection: options.direction ?? 'column',
         gap: SPACE[options.gap ?? 'm'],

@@ -142,6 +142,7 @@ export class Renderer {
   // in view, 'refraction' times its copy, and 'water' the pass water and the
   // transparent meshes draw in.
   sceneGpuTimer: GpuPassTimer = new GpuPassTimer(this.metrics, 'gpu/scene');
+  uiGpuTimer: GpuPassTimer = new GpuPassTimer(this.metrics, 'gpu/ui');
 
   /** The opaque scene copied for water to refract, when water is in view. */
   readonly refraction = new RefractionCapture();
@@ -421,7 +422,7 @@ export class Renderer {
       'ao blur',
       'ao resolve',
       'refraction',
-      'water',
+      'water surface',
     ]);
     this.declareMetrics();
 
@@ -448,6 +449,11 @@ export class Renderer {
 
     this.ui = new UIRenderer(device, this.presentationFormat);
     this.ui.input.attach(canvas);
+    this.uiGpuTimer.init(device, ['ui-blur', 'ui-draw']);
+    this.ui.timestampWrites = {
+      blur: () => this.uiGpuTimer.writes('ui-blur'),
+      draw: () => this.uiGpuTimer.writes('ui-draw'),
+    };
     // esbuild.js defines the URLs, with a hash of each atlas in its name.
     const [font, icons] = await Promise.all([
       UIFont.load(device, process.env.UI_FONT_URL!),
@@ -483,6 +489,7 @@ export class Renderer {
     this.directionalShadowRenderer.dispose();
     this.spotLightShadowRenderer.dispose();
     this.sceneGpuTimer.dispose();
+    this.uiGpuTimer.dispose();
     this.refraction.dispose();
     for (const effect of this.frameEffects) effect.dispose();
     this.ambientOcclusion.dispose();
@@ -837,6 +844,16 @@ export class Renderer {
       group: 'cpu',
       order: 7,
     });
+    m.declare('cpu.uilayout', {
+      label: 'ui layout (in encode)',
+      group: 'cpu',
+      order: 8,
+    });
+    m.declare('cpu.uiwrite', {
+      label: 'ui stream (in encode)',
+      group: 'cpu',
+      order: 9,
+    });
 
     const count = 'count' as const;
     m.declare('counts.drawgroups', {
@@ -893,6 +910,39 @@ export class Renderer {
       kind: count,
       order: 8,
     });
+    m.declare('counts.uinodes', {
+      label: 'ui nodes',
+      group: 'counts',
+      kind: count,
+      order: 9,
+    });
+    m.declare('counts.uiprimitives', {
+      label: 'ui primitives',
+      group: 'counts',
+      kind: count,
+      order: 10,
+    });
+    m.declare('counts.uidraws', {
+      label: 'ui draw calls',
+      group: 'counts',
+      kind: count,
+      order: 11,
+    });
+  }
+
+  /**
+   * What the last UI render cost. Layout and stream writes run only on frames
+   * where the UI changed, so they are recorded only then and the panel shows
+   * how often they run.
+   */
+  private recordUIStats(): void {
+    const m = this.metrics;
+    const stats = this.ui.stats;
+    if (stats.layouts > 0) m.record('cpu.uilayout', stats.layoutTime);
+    if (stats.writes > 0) m.record('cpu.uiwrite', stats.writeTime);
+    m.record('counts.uinodes', stats.nodes);
+    m.record('counts.uiprimitives', stats.primitives);
+    m.record('counts.uidraws', stats.drawCalls);
   }
 
   /**
@@ -1198,7 +1248,7 @@ export class Renderer {
             depthLoadOp: 'load',
             depthStoreOp: 'store',
           },
-          timestampWrites: this.sceneGpuTimer.writes('water'),
+          timestampWrites: this.sceneGpuTimer.writes('water surface'),
         });
         this.renderGroupings(
           renderList,
@@ -1345,6 +1395,8 @@ export class Renderer {
         pixelRatio: canvas.clientWidth ? canvas.width / canvas.clientWidth : 1,
       });
       device.queue.submit([uiEncoder.finish()]);
+      this.uiGpuTimer.resolve();
+      this.recordUIStats();
 
       // Shadow debug atlas viewer — rendered on top of everything when active.
       this.directionalShadowRenderer.debugRenderer.render(this);

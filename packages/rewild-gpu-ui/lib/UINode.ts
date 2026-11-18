@@ -56,6 +56,8 @@ interface Listener {
 }
 
 export interface UINodeOptions {
+  /** Names the node in debug output, such as `printTree`. */
+  name?: string;
   style?: UIStyle;
   /**
    * Text drawn in the content box. The text sizes the node, and the node's
@@ -82,6 +84,8 @@ export class UINode {
   readonly style: UIStyle;
   readonly children: UINode[] = [];
   parent: UINode | null = null;
+  /** Names the node in debug output, such as `printTree`. It has no other use. */
+  name: string | null;
   /** The border box in surface CSS pixels, written by layout. */
   rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
   /** Resolved margin and padding in CSS pixels, written by layout. */
@@ -109,6 +113,7 @@ export class UINode {
     measureText(this, limit);
 
   constructor(options: UINodeOptions = {}) {
+    this.name = options.name ?? null;
     this.measure = options.measure ?? null;
     this._effect = options.effect ?? null;
     this._effectOutset = options.effectOutset ?? 0;
