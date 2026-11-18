@@ -103,10 +103,12 @@ fn transformVertex(
     );
   }
 
-  // The same viewer-distance band the scene pass applies, so the caster set and
-  // the drawn set are one set, tier for tier. Skipping it would shadow the
-  // ground from trees that are not there, and draw a whole 480m chunk three
-  // times over for the handful of instances actually in range.
+  // The tier's shadow band: the band the scene pass draws, except that the
+  // finest mesh casts nothing and the next mesh casts in its place from the
+  // viewer out. The caster set and the drawn set are one set of instances.
+  // Skipping the test would shadow the ground from trees that are not there,
+  // and draw a whole 480m chunk three times over for the handful of instances
+  // actually in range.
   let viewDistance = distance(instance.posScale.xyz, uniforms.viewer.xyz);
   if (viewDistance < uniforms.range.x || viewDistance >= uniforms.range.y) {
     output.Position = CULLED_POSITION;

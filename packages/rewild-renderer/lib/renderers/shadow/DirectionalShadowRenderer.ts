@@ -913,8 +913,8 @@ export class DirectionalShadowRenderer {
       .set(cameraWorld[12], cameraWorld[13], cameraWorld[14])
       .applyMatrix4(this._chunkInverse);
 
-    // The same viewer decides which cells the band can reach, so the caster
-    // set is the drawn set down to the run.
+    // The same viewer decides which cells the shadow band can reach, so the
+    // caster set is the shader's set down to the run.
     group.selectInstances(this._viewerLocal, null);
 
     const viewer = this._viewerLocal;
@@ -924,8 +924,8 @@ export class DirectionalShadowRenderer {
       data[16] = viewer.x;
       data[17] = viewer.y;
       data[18] = viewer.z;
-      data[20] = group.nearDistance;
-      data[21] = group.cullDistance;
+      data[20] = group.shadowNearDistance;
+      data[21] = group.shadowCullDistance;
       // Chunk transforms only translate, so the light's direction is the same
       // in chunk-local space as in the world.
       data[24] = this._lightDir.x;
@@ -937,8 +937,8 @@ export class DirectionalShadowRenderer {
       data[32] = viewer.x;
       data[33] = viewer.y;
       data[34] = viewer.z;
-      data[36] = group.nearDistance;
-      data[37] = group.cullDistance;
+      data[36] = group.shadowNearDistance;
+      data[37] = group.shadowCullDistance;
       data[38] = uniforms.cutout ? 1 : 0;
       // The same wind the scene pass reads this frame, so the shadow of a
       // leaf lands where the leaf is.

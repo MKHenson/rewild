@@ -842,11 +842,13 @@ export class TerrainChunk implements IComponent {
       renderer,
       terrainRenderer.scatterModels,
       instances,
-      terrainRenderer.scatterLodBias
+      terrainRenderer.scatterLodBias,
+      terrainRenderer.scatterDistanceScale
     );
     this.scatter.updateVisibility(
       this.viewerPosition,
-      terrainRenderer.scatterLodBias
+      terrainRenderer.scatterLodBias,
+      terrainRenderer.scatterDistanceScale
     );
     this.scatterVersion = version;
     this.scatterInputBuilt = inputVersion;
@@ -914,7 +916,11 @@ export class TerrainChunk implements IComponent {
     _groundPoint.set(viewerPos.x, 0, viewerPos.z);
     this.viewerGroundDistance = this.bounds.distanceToPoint(_groundPoint);
     this.viewerPosition.copy(eye);
-    this.scatter?.updateVisibility(eye, terrainRenderer.scatterLodBias);
+    this.scatter?.updateVisibility(
+      eye,
+      terrainRenderer.scatterLodBias,
+      terrainRenderer.scatterDistanceScale
+    );
 
     // A chunk that meshed before it came into range has no build left to carry
     // scatter. Latching is what lets a chunk still generate instances after

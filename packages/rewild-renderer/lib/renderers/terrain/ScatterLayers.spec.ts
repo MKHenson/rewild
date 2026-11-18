@@ -12,6 +12,8 @@ import {
   lodTierCount,
   lodTierFar,
   lodTierNear,
+  scatterCullDistance,
+  shadowTierBand,
   validateScatterLayers,
 } from './ScatterLayers';
 
@@ -371,6 +373,123 @@ describe('LOD tier bands', () => {
     expect(lodTierFar(layer(), 0, -2)).toBe(200);
     expect(lodTierFar(layer(), 0, 2)).toBe(200);
     expect(lodTierNear(layer(), 0, 2)).toBe(0);
+  });
+});
+
+describe('draw-distance scale', () => {
+  const chain = layer({
+    lodDistances: [40],
+    impostor: { fromDistance: 90, views: 8, tileSize: 128 },
+    cullDistance: 200,
+  });
+
+  function band(tier: number, scale: number): [number, number] {
+    return [
+      lodTierNear(chain, tier, 0, scale),
+      lodTierFar(chain, tier, 0, scale),
+    ];
+  }
+
+  it('scales every handover and the cull distance together', () => {
+    expect(band(0, 0.5)).toEqual([0, 20]);
+    expect(band(1, 0.5)).toEqual([20, 45]);
+    expect(band(2, 0.5)).toEqual([45, 100]);
+  });
+
+  it('draws the authored distances at scale 1', () => {
+    expect(band(1, 1)).toEqual([40, 90]);
+    expect(band(2, 1)).toEqual([90, 200]);
+  });
+
+  // The far sprites start where the chunks stop, so pulling the cull in would
+  // leave a ring with nothing in it.
+  it('keeps the cull distance of a layer that draws far sprites', () => {
+    const forest = layer({
+      lodDistances: [60],
+      impostor: { fromDistance: 400, views: 8, tileSize: 128 },
+      cullDistance: 3500,
+    });
+    expect(scatterCullDistance(forest, 0.5)).toBe(3500);
+    expect(lodTierNear(forest, 2, 0, 0.5)).toBe(200);
+    expect(lodTierFar(forest, 2, 0, 0.5)).toBe(3500);
+    expect(scatterCullDistance(chain, 0.5)).toBe(100);
+  });
+});
+
+describe('shadowTierBand', () => {
+  const chain = layer({
+    lodDistances: [40, 90],
+    impostor: { fromDistance: 150, views: 8, tileSize: 128 },
+    cullDistance: 200,
+  });
+
+  it('casts from mesh tier 1 out from the viewer in place of the model', () => {
+    expect(shadowTierBand(chain, 0)).toEqual([0, 0]);
+    expect(shadowTierBand(chain, 1)).toEqual([0, 90]);
+  });
+
+  // The impostor draws from 150m, but casts from 120m.
+  it('hands the shadow to the impostor at 120m when it draws further out', () => {
+    expect(shadowTierBand(chain, 2)).toEqual([90, 120]);
+    expect(shadowTierBand(chain, 3)).toEqual([120, 200]);
+  });
+
+  it('leaves the drawn bands as they are', () => {
+    expect(lodTierNear(chain, 3)).toBe(150);
+    expect(lodTierFar(chain, 2)).toBe(150);
+  });
+
+  it('casts a tree from mesh tier 1 to 120m, then from the impostor', () => {
+    const tree = layer({
+      lodDistances: [60],
+      impostor: { fromDistance: 400, views: 8, tileSize: 128 },
+      cullDistance: 3500,
+    });
+    expect(shadowTierBand(tree, 0)).toEqual([0, 0]);
+    expect(shadowTierBand(tree, 1)).toEqual([0, 120]);
+    expect(shadowTierBand(tree, 2)).toEqual([120, 3500]);
+  });
+
+  it('keeps an impostor handover nearer than 120m', () => {
+    const rock = layer({
+      lodDistances: [30],
+      impostor: { fromDistance: 80, views: 8, tileSize: 128 },
+      cullDistance: 200,
+    });
+    expect(shadowTierBand(rock, 1)).toEqual([0, 80]);
+    expect(shadowTierBand(rock, 2)).toEqual([80, 200]);
+  });
+
+  // A mesh band that lies wholly past 120m casts nothing once the impostor
+  // takes over.
+  it('takes a mesh tier past 120m off the shadow', () => {
+    const far = layer({
+      lodDistances: [40, 150],
+      impostor: { fromDistance: 300, views: 8, tileSize: 128 },
+      cullDistance: 500,
+    });
+    expect(shadowTierBand(far, 2)).toEqual([0, 0]);
+    expect(shadowTierBand(far, 3)).toEqual([120, 500]);
+  });
+
+  it('keeps a single-mesh layer on its mesh, not its impostor', () => {
+    const single = layer({
+      impostor: { fromDistance: 120, views: 8, tileSize: 128 },
+      cullDistance: 200,
+    });
+    expect(shadowTierBand(single, 0)).toEqual([0, 120]);
+    expect(shadowTierBand(single, 1)).toEqual([120, 200]);
+  });
+
+  it('follows the draw-distance scale', () => {
+    expect(shadowTierBand(chain, 1, 0, 0.5)).toEqual([0, 45]);
+  });
+
+  // A negative bias can leave mesh tier 1 with nothing to draw, and the model
+  // then has to keep casting or the near shadows go missing.
+  it('keeps the drawn bands when the bias leaves the floor tier nothing', () => {
+    expect(shadowTierBand(chain, 0, -3)).toEqual([0, 200]);
+    expect(shadowTierBand(chain, 1, -3)).toEqual([0, 0]);
   });
 });
 

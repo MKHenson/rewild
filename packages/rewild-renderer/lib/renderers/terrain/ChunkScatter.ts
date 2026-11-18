@@ -45,7 +45,8 @@ export class ChunkScatter {
     renderer: Renderer,
     models: ScatterModels,
     instances: ScatterInstances[],
-    lodBias: number
+    lodBias: number,
+    distanceScale = 1
   ): void {
     this.clear();
 
@@ -68,7 +69,8 @@ export class ChunkScatter {
               tier,
               lodBias,
               modelRadius(primitive.geometry, primitive.nodeMatrix),
-              this.appear
+              this.appear,
+              distanceScale
             )
           );
         }
@@ -89,7 +91,8 @@ export class ChunkScatter {
             tiers.length,
             lodBias,
             impostor.reach,
-            this.appear
+            this.appear,
+            distanceScale
           )
         );
     }
@@ -115,14 +118,19 @@ export class ChunkScatter {
    * Still per chunk rather than per instance.
    *
    * Also where each tier's distance band is refreshed from the layer table, so
-   * a LOD bias set at runtime reaches resident chunks on the next pass.
+   * a LOD bias or draw-distance scale set at runtime reaches resident chunks
+   * on the next pass.
    */
-  updateVisibility(viewerPosition: Vector3, lodBias: number): void {
+  updateVisibility(
+    viewerPosition: Vector3,
+    lodBias: number,
+    distanceScale = 1
+  ): void {
     this.lastViewerPosition.copy(viewerPosition);
     const origin = this.root.parent?.position;
 
     for (const layer of this.layers) {
-      layer.applyLodBias(lodBias);
+      layer.applyLodBias(lodBias, distanceScale);
 
       _bounds.copy(layer.localBounds);
       if (origin) _bounds.translate(origin);

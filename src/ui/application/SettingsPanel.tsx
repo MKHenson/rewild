@@ -104,6 +104,13 @@ const ASPECTS: Record<QualityAspect, { label: string; description: string }> = {
       'The haze that wavers over hot ground in the distance, in hot ' +
       'weather only. Off on Low; Medium uses a simpler ripple.',
   },
+  drawDistance: {
+    label: 'Draw Distance',
+    description:
+      'How far out trees, rocks and plants draw, and how soon they switch to ' +
+      'simpler models. Lower tiers save in the scene and in the shadows. ' +
+      'Distant forests stay on every tier.',
+  },
 };
 
 const VOLUMES: Record<VolumeSetting, { label: string; description: string }> = {

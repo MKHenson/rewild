@@ -30,6 +30,7 @@ import { generateSplatMap, sampleSplatMap } from './Splat';
 import { TERRAIN_MATERIALS } from './TerrainMaterials';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { terrainPatch } from './TerrainQuality';
+import { scatterDistanceScale } from './ScatterQuality';
 import type { TerrainPass } from '../../materials/TerrainPass';
 import { GroundSampler, createGroundSampler, sampleGround } from './Noise';
 import { ScatterModels } from './ScatterModels';
@@ -182,6 +183,9 @@ export class TerrainRenderer implements WaterQuerySource {
   // Whole tiers every scatter instance is pushed along its layer's LOD chain:
   // positive coarser, negative finer. Debug lever; 0 draws as authored.
   scatterLodBias = 0;
+  // Fraction of the authored scatter distances drawn, from the drawDistance
+  // quality. Read again every update, and a change re-runs visibility.
+  scatterDistanceScale = 1;
   // Tint scatter by LOD tier so handover distances can be seen rather than
   // argued about.
   scatterLodTint = false;
@@ -500,6 +504,13 @@ export class TerrainRenderer implements WaterQuerySource {
     this.shaftsTimer.init(renderer.device, ['shafts']);
     this.lensTimer = new GpuPassTimer(renderer.metrics, 'gpu/water');
     this.lensTimer.init(renderer.device, ['lens-frame', 'lens']);
+  }
+
+  private updateScatterDistanceScale(renderer: Renderer) {
+    const scale = scatterDistanceScale(renderer.quality.aspect('drawDistance'));
+    if (scale === this.scatterDistanceScale) return;
+    this.scatterDistanceScale = scale;
+    this._needsVisibilityUpdate = true;
   }
 
   /** Re-runs chunk and scatter visibility on the next update, without waiting
@@ -1189,6 +1200,7 @@ export class TerrainRenderer implements WaterQuerySource {
       return;
     }
     this.updateFarOnly(camera);
+    this.updateScatterDistanceScale(renderer);
     this.updateVisibility(renderer, camera);
     this.updatePatch(renderer, camera);
     this.updateChunkFades(renderer);
