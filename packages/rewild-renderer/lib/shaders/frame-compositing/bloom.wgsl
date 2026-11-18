@@ -106,7 +106,10 @@ fn cloudCoverage(uv: vec2f) -> f32 {
     // H reads the blend buffer and must consult depth; V reads the H output,
     // where alpha already carries that row's coverage.
     let validity = select(s.a, cloudCoverage(sampleUV), isH);
-    let w        = gaussW * validity;
+    // A NaN or Inf tap is skipped. The firefly clamp turns Inf into NaN
+    // (Inf x 0), and the temporal pass would then keep it for ever and spread
+    // it a kernel further every frame.
+    let w        = select(0.0, gaussW * validity, isFinite4(s));
 
     if (isH) {
       // Horizontal pass: only accumulate pixels above the bloom threshold.
@@ -151,6 +154,13 @@ fn cloudCoverage(uv: vec2f) -> f32 {
   return vec4f(result * scale, coverage);
 }
 
+
+// Tests the exponent bits, not `x != x`: fast-math compilers can fold a NaN
+// comparison away.
+fn isFinite4(v: vec4f) -> bool {
+  let exponent = bitcast<vec4u>(v) & vec4u(0x7f800000u);
+  return all(exponent != vec4u(0x7f800000u));
+}
 
 fn gaussian(x: f32, sigma: f32) -> f32 {
   return exp(-0.5 * x * x / (sigma * sigma));

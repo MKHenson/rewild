@@ -67,6 +67,16 @@ export class PerMeshTracker implements IMeshTracker {
       }
 
       uniform.prepare(renderer, camera, mesh.transform);
+      // prepare() flags a rebuild when a texture it samples was replaced. Do it
+      // before the bind: the old texture can already be destroyed, and a
+      // destroyed texture fails the whole submit.
+      if (uniform.requiresBuild) {
+        uniform.build(
+          renderer,
+          material.pipeline.getBindGroupLayout(uniform.group)
+        );
+        uniform.prepare(renderer, camera, mesh.transform);
+      }
       pass.setBindGroup(uniform.group, uniform.bindGroup);
     }
   }
