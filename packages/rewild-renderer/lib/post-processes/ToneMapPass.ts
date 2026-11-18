@@ -10,7 +10,7 @@ const uniformData = new Float32Array(4);
  *
  * Reads the HDR scene target (scene geometry, with sky, fog and god rays
  * already composited over it in HDR) plus the bloom highlights, applies
- * exposure, runs one ACES curve over the whole image and writes the swapchain.
+ * exposure, runs one ACES curve over the whole image and writes the frame target.
  *
  * ACES used to live inside the sky composite, where only the sky's own
  * contribution passed through it — terrain was never tonemapped, and the two
@@ -41,7 +41,7 @@ export class ToneMapPass {
       fragment: {
         entryPoint: 'fs',
         module,
-        // Writes the swapchain, so this is the one pass in the chain that stays
+        // Writes the frame target, so this is the one pass in the chain that stays
         // at the presentation format.
         targets: [{ format: presentationFormat }],
       },
@@ -57,7 +57,7 @@ export class ToneMapPass {
 
   /**
    * Binds the source textures, rebuilding only when either has actually been
-   * replaced. Both the scene target and the bloom target are recreated on canvas
+   * replaced. Both the scene target and the bloom target are recreated on scene
    * resize, so comparing identities here is cheaper than trying to order an
    * explicit rebind against those lifecycles.
    */

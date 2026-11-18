@@ -9,7 +9,7 @@ import { IRenderGroup } from '../types/IRenderGroup';
 import { Sky } from './core/Sky';
 import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
 import { initTerrainTextureArrays } from './renderers/terrain/TerrainTextureArrays';
-import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
+import { SceneSizeWatcher } from './utils/SceneSizeWatcher';
 import { RenderList } from './core/RenderList';
 import { RenderLayer } from './core/RenderLayer';
 import { Light } from './core/lights/Light';
@@ -33,6 +33,7 @@ import wasmUrl from '../../rewild-wasm/pkg/rewild_wasm_bg.wasm';
 import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowRenderer';
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
 import { FrameCompositor } from './post-processes/FrameCompositor';
+import { FrameUpscalePass } from './post-processes/FrameUpscalePass';
 import { RefractionCapture } from './renderers/water/RefractionCapture';
 import { HeatShimmer } from './post-processes/HeatShimmer';
 import { PortalLens } from './renderers/portal/PortalLens';
@@ -75,8 +76,9 @@ export class Renderer {
    * written — physical light units and IBL both depend on that headroom.
    *
    * Only the scene pass renders at this format. The sky composite, overlay,
-   * GUI and precipitation passes all draw straight to the swapchain and stay
-   * at `presentationFormat`, so any material used in those passes must too.
+   * GUI and precipitation passes all draw to the frame target or the swapchain
+   * and stay at `presentationFormat`, so any material used in those passes
+   * must too.
    */
   sceneColorFormat: GPUTextureFormat = 'rgba16float';
 
@@ -97,6 +99,15 @@ export class Renderer {
   canvas: HTMLCanvasElement;
   sampleCount = 1;
 
+  /**
+   * Size of the scene targets, in pixels: the canvas's CSS size times
+   * `quality.renderScale`. The canvas itself is sized by the device pixel
+   * ratio, so the UI draws sharp. Passes that draw the scene size themselves
+   * from these, not from the canvas.
+   */
+  sceneWidth = 1;
+  sceneHeight = 1;
+
   private context: GPUCanvasContext;
   disposed: boolean;
   /** HDR colour target the scene pass renders into. */
@@ -106,6 +117,8 @@ export class Renderer {
   private sceneIndirectView: GPUTextureView | undefined;
   /** Bloom + whole-frame tone curve; turns the HDR frame into the displayed image. */
   frameCompositor: FrameCompositor;
+  /** The tone-mapped frame, when the scene size differs from the canvas size. */
+  private readonly frameUpscale = new FrameUpscalePass();
   private initialized: boolean;
   private autoFrame: boolean;
 
@@ -164,7 +177,7 @@ export class Renderer {
   ui: UIRenderer;
   currentRenderList: RenderList;
   sky: Sky;
-  private canvasSizeWatcher: CanvasSizeWatcher;
+  private sceneSizeWatcher: SceneSizeWatcher;
   private renderGroups: IRenderGroup[];
   private overlayRenderGroups: IRenderGroup[];
 
@@ -353,9 +366,10 @@ export class Renderer {
     this.initialized = false;
     this.canvas = canvas;
 
-    this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
+    this.updateSceneSize();
+    this.sceneSizeWatcher = new SceneSizeWatcher(this);
 
-    this.camera = new PerspectiveCamera(65, canvas.width / canvas.height);
+    this.camera = new PerspectiveCamera(65, this.sceneWidth / this.sceneHeight);
     this.scene.addChild(this.camera.camera.transform);
     this.camera.camera.transform.position.set(0, 20, 50);
     this.camera.camera.lookAt(0, 0, 0);
@@ -473,6 +487,7 @@ export class Renderer {
     for (const effect of this.frameEffects) effect.dispose();
     this.ambientOcclusion.dispose();
     this.frameCompositor.dispose();
+    this.frameUpscale.dispose();
     this.disposed = true;
     this.initialized = false;
     this.sceneColorTexture?.destroy();
@@ -512,24 +527,54 @@ export class Renderer {
     }
   }
 
+  /** Sets `sceneWidth` and `sceneHeight` from the canvas's CSS size and the render scale. */
+  private updateSceneSize() {
+    const canvas = this.canvas;
+    const scale = this.quality.renderScale;
+    this.sceneWidth = Math.max(
+      1,
+      Math.round((canvas.clientWidth || canvas.width) * scale)
+    );
+    this.sceneHeight = Math.max(
+      1,
+      Math.round((canvas.clientHeight || canvas.height) * scale)
+    );
+  }
+
+  /**
+   * Where the tone map, rain, lightning and overlays draw: the frame texture
+   * when the scene is upscaled to the canvas, else the swapchain.
+   */
+  get frameView(): GPUTextureView {
+    return this.frameUpscale.view ?? this.getCurrentTextureView();
+  }
+
+  private get upscaling(): boolean {
+    return (
+      this.sceneWidth !== this.canvas.width ||
+      this.sceneHeight !== this.canvas.height
+    );
+  }
+
   resizeRenderTargets() {
     const device = this.device;
-    const canvas = this.canvas;
 
-    // If the canvas size changing we need to reallocate the render target.
-    // We also need to set the physical size of the canvas to match the computed size.
-    const currentWidth = canvas.width || 1;
-    const currentHeight = canvas.height || 1;
+    const currentWidth = this.sceneWidth;
+    const currentHeight = this.sceneHeight;
 
     if (this.sceneColorTexture !== undefined) {
       // Destroy the previous render target
       this.sceneColorTexture.destroy();
     }
 
-    this.camera.aspect = currentWidth / currentHeight;
+    const canvas = this.canvas;
+    this.camera.aspect =
+      canvas.clientWidth && canvas.clientHeight
+        ? canvas.clientWidth / canvas.clientHeight
+        : currentWidth / currentHeight;
     this.camera.updateProjectionMatrix();
 
-    // HDR colour target for the scene pass, sized to the canvas. TEXTURE_BINDING
+    // HDR colour target for the scene pass, at the scene size. TEXTURE_BINDING
     // is required so the output pass can read it back when transferring to the
     // swapchain.
     const sceneColorTexture = device.createTexture({
@@ -571,7 +616,7 @@ export class Renderer {
         GPUTextureUsage.TEXTURE_BINDING,
     });
 
-    // Bloom derives its target sizes from the canvas and reads the scene target,
+    // Bloom derives its target sizes from the scene size and reads the scene target,
     // so it is rebuilt here rather than once at startup. The tone map pipeline is
     // resolution-independent and rebinds itself when it sees a new texture.
     this.frameCompositor.init(this);
@@ -1027,10 +1072,12 @@ export class Renderer {
     );
     metrics.begin('cpu.encode');
 
-    // Gets the device render targets ready. Checks for things like canvas resize
-    if (this.canvasSizeWatcher.hasResized()) {
+    // The canvas or the render scale may have changed since the last frame.
+    this.updateSceneSize();
+    if (this.sceneSizeWatcher.hasResized()) {
       this.resizeRenderTargets();
     }
+    this.frameUpscale.prepare(this, this.upscaling);
 
     const device = this.device;
     const context = this.context;
@@ -1238,15 +1285,18 @@ export class Renderer {
       // Bloom + whole-frame tonemap. Runs after the composite has been submitted
       // because bloom reads the target that pass writes. This is the only place
       // HDR radiance becomes displayable colour.
-      this.frameCompositor.render(
-        this,
-        context.getCurrentTexture().createView()
-      );
+      const frameView = this.frameView;
+      this.frameCompositor.render(this, frameView);
 
-      // Render precipitation directly onto the canvas after the tonemap so
-      // particles are visible against both terrain and sky (not gated through fog alpha).
+      // Render precipitation onto the tone-mapped frame so particles are
+      // visible against both terrain and sky (not gated through fog alpha).
       this.sky.postRender(this);
 
+      // A screenshot reads the canvas, so it needs the frame on it before the
+      // overlays draw.
+      if (this.pendingScreenshots.length > 0 && this.frameUpscale.view) {
+        this.frameUpscale.render(this, this.getCurrentTextureView());
+      }
       this.flushScreenshots();
 
       // Overlay pass: renders on top of scene + sky with depth cleared
@@ -1258,7 +1308,7 @@ export class Renderer {
         const overlayPass = overlayEncoder.beginRenderPass({
           colorAttachments: [
             {
-              view: context.getCurrentTexture().createView(),
+              view: frameView,
               loadOp: 'load',
               storeOp: 'store',
             },
@@ -1274,6 +1324,10 @@ export class Renderer {
         this.renderGroupings(overlayRenderList, overlayPass, camera.camera);
         overlayPass.end();
         device.queue.submit([overlayEncoder.finish()]);
+      }
+
+      if (this.frameUpscale.view) {
+        this.frameUpscale.render(this, this.getCurrentTextureView());
       }
 
       // The UI draws over the finished frame. The canvas may be sized at a

@@ -33,7 +33,7 @@ interface SkyQualityTier {
   cloudMinSamples: number;
 
   /**
-   * Cloud render-target scale, as a fraction of canvas. The single biggest cost
+   * Cloud render-target scale, as a fraction of the scene size. The single biggest cost
    * lever in the sky: it is quadratic where sample counts are linear, and it
    * multiplies with them. The bilateral inherits it for free by sizing itself
    * from the cloud target.
@@ -299,7 +299,7 @@ export function cloudShaderDefines(quality: RenderQuality): ShaderDefines {
   };
 }
 
-/** Cloud render-target scale, as a fraction of canvas. */
+/** Cloud render-target scale, as a fraction of the scene size. */
 export function cloudResolutionScale(quality: RenderQuality): number {
   return TIERS[quality].cloudResolutionScale;
 }
@@ -355,7 +355,7 @@ export function bilateralSigmas(quality: RenderQuality): {
   return bilateralSigmasFor(TIERS[quality]);
 }
 
-/** God-ray render-target scale, as a fraction of canvas. */
+/** God-ray render-target scale, as a fraction of the scene size. */
 export function godRayScale(quality: RenderQuality): number {
   return TIERS[quality].godRayScale;
 }

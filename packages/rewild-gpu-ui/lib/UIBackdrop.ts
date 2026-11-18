@@ -3,7 +3,7 @@ import shader from './shaders/backdrop.wgsl';
 
 /** The image that glass blurs: what the UI draws over. */
 export interface UIBackdropSource {
-  /** The same size as the UI's target, in device pixels. */
+  /** Covers the UI's target. It can be smaller than the target, such as a scene drawn below the device pixel ratio. */
   texture: GPUTexture;
   /**
    * Set for an HDR source, such as the game's scene. The blur applies this
@@ -80,7 +80,7 @@ export class UIBackdrop {
     });
   }
 
-  /** Encodes the blur of `source` at the given device pixel ratio. */
+  /** Encodes the blur of `source`, which has `pixelRatio` pixels per CSS pixel. */
   render(
     encoder: GPUCommandEncoder,
     source: UIBackdropSource,

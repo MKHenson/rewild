@@ -171,8 +171,8 @@ export class MarineSnow {
     d[25] = s.size;
     d[26] = s.minPixels;
     d[27] = s.opacity;
-    const width = renderer.canvas.width || 1;
-    const height = renderer.canvas.height || 1;
+    const width = renderer.sceneWidth;
+    const height = renderer.sceneHeight;
     d[28] = width;
     d[29] = height;
     d[30] = (camera.projectionMatrix.elements[5] * height) / 2;

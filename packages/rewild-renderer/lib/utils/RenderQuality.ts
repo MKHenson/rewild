@@ -18,7 +18,7 @@ export const RENDER_QUALITIES: readonly RenderQuality[] = [
 
 /**
  * Tier used when nothing has been chosen. Not the highest: `ultra` renders the
- * clouds at full canvas resolution, which costs roughly twice the cloud pixels
+ * clouds at full scene resolution, which costs roughly twice the cloud pixels
  * of `high` and is a deliberate opt-in rather than a starting point.
  */
 export const DEFAULT_RENDER_QUALITY: RenderQuality = 'high';
@@ -28,6 +28,25 @@ export function isRenderQuality(value: unknown): value is RenderQuality {
   return (
     typeof value === 'string' &&
     (RENDER_QUALITIES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Fraction of the CSS size the scene draws at. The UI always draws at the
+ * device pixel ratio, whatever this is.
+ */
+export type RenderScale = 0.5 | 0.75 | 0.9 | 1;
+
+/** Every render scale, smallest first. */
+export const RENDER_SCALES: readonly RenderScale[] = [0.5, 0.75, 0.9, 1];
+
+export const DEFAULT_RENDER_SCALE: RenderScale = 1;
+
+/** Narrows an untrusted value, such as a stored setting, to a render scale. */
+export function isRenderScale(value: unknown): value is RenderScale {
+  return (
+    typeof value === 'number' &&
+    (RENDER_SCALES as readonly number[]).includes(value)
   );
 }
 

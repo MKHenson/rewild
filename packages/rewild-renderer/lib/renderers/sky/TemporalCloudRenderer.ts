@@ -221,10 +221,10 @@ export class TemporalCloudRenderer {
     // zeroed history and the clouds darken briefly.
     this.historyValid = false;
 
-    const { device, canvas } = renderer;
+    const { device } = renderer;
     this.device = device;
-    const w = Math.floor(canvas.width * this.resolutionScale);
-    const h = Math.floor(canvas.height * this.resolutionScale);
+    const w = Math.floor(renderer.sceneWidth * this.resolutionScale);
+    const h = Math.floor(renderer.sceneHeight * this.resolutionScale);
 
     // ── Shader module (self-contained: temporal shader + helpers) ──
     const module = device.createShaderModule({

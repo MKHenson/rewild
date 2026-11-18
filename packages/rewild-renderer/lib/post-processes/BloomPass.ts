@@ -100,15 +100,15 @@ export class BloomPass implements IPostProcess {
   init(renderer: Renderer): IPostProcess {
     this.dispose();
 
-    const { device, canvas } = renderer;
+    const { device } = renderer;
 
     const src = this.sourceTexture;
     if (!src)
       throw new Error('BloomPass: sourceTexture must be set before init()');
 
     const scale = bloomScale(this.quality);
-    this.bw = Math.max(1, Math.floor(canvas.width * scale));
-    this.bh = Math.max(1, Math.floor(canvas.height * scale));
+    this.bw = Math.max(1, Math.floor(renderer.sceneWidth * scale));
+    this.bh = Math.max(1, Math.floor(renderer.sceneHeight * scale));
     const { bw, bh } = this;
 
     // --- Gaussian bloom pipeline (passes 1 & 2) ---

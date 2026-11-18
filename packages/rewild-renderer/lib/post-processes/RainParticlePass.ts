@@ -116,7 +116,7 @@ export class RainParticlePass {
       ],
     });
 
-    // ── Render pipeline (outputs directly to swapchain / canvas) ──────────
+    // ── Render pipeline (outputs to the frame target) ──────────────────────
     const renderModule = device.createShaderModule({
       label: 'rain render shader',
       code:  rainRenderShader,
@@ -186,7 +186,7 @@ export class RainParticlePass {
     renderer.device.queue.submit([enc.finish()]);
   }
 
-  /** Render particles directly onto the canvas, after the sky compositor. */
+  /** Render particles onto the frame target, after the tone map. */
   render(renderer: Renderer, params: RainParticleParams): void {
     const ru = this.ru;
 
@@ -209,7 +209,7 @@ export class RainParticlePass {
     const enc  = renderer.device.createCommandEncoder();
     const pass = enc.beginRenderPass({
       colorAttachments: [{
-        view:    renderer.getCurrentTextureView(),
+        view:    renderer.frameView,
         loadOp:  'load',
         storeOp: 'store',
       }],

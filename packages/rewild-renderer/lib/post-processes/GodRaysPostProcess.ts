@@ -47,7 +47,7 @@ export class GodRaysPostProcess implements IPostProcess {
   intensityScale: number;
 
   /**
-   * Render-target size as a fraction of the canvas, read by init().
+   * Render-target size as a fraction of the scene size, read by init().
    *
    * Safe to push well below 1: the shafts are radial and low-frequency, the
    * march is jittered per pixel, and the output is additive HDR that the bloom
@@ -84,12 +84,15 @@ export class GodRaysPostProcess implements IPostProcess {
   }
 
   init(renderer: Renderer): IPostProcess {
-    const { device, canvas } = renderer;
+    const { device } = renderer;
 
-    const width = Math.max(1, Math.floor(canvas.width * this.resolutionScale));
+    const width = Math.max(
+      1,
+      Math.floor(renderer.sceneWidth * this.resolutionScale)
+    );
     const height = Math.max(
       1,
-      Math.floor(canvas.height * this.resolutionScale)
+      Math.floor(renderer.sceneHeight * this.resolutionScale)
     );
 
     const module = device.createShaderModule({
@@ -141,7 +144,7 @@ export class GodRaysPostProcess implements IPostProcess {
   }
 
   /**
-   * The depth texture is destroyed and recreated whenever the canvas resizes, so
+   * The depth texture is destroyed and recreated whenever the scene resizes, so
    * the bind group holding a view of it has to be rebuilt alongside it.
    */
   private createBindGroup(renderer: Renderer): void {
@@ -277,7 +280,7 @@ export class GodRaysPostProcess implements IPostProcess {
     const sunColorG = 0.4 + 0.6 * t;
     const sunColorB = 0.1 + 0.8 * t;
 
-    // Rebuild the bind group if the canvas resized out from under the depth texture.
+    // Rebuild the bind group if the scene resized out from under the depth texture.
     if (this.boundDepthTexture !== renderer.depthTexture) {
       this.createBindGroup(renderer);
     }
