@@ -18,6 +18,9 @@ import { Dirty, UINode } from './UINode';
  */
 export type UISurfaceInput = 'none' | 'nodes' | 'all';
 
+/** The most layouts in one update, when `onLayout` moves nodes. */
+const MAX_LAYOUTS = 3;
+
 export interface UISurfaceOptions {
   kind: 'screen';
   name: string;
@@ -53,6 +56,13 @@ export class UISurface {
   layoutTime = 0;
   /** Milliseconds the last update spent writing the stream. */
   writeTime = 0;
+  /**
+   * Called after each layout, before the stream is written. It can place a
+   * node from the sizes that layout gave, as a popup does next to its
+   * anchor. When it changes a layout property, the surface lays out again,
+   * up to a few times in one update.
+   */
+  onLayout: (() => void) | null = null;
   private overlay = false;
   private _focused: UINode | null = null;
   private _focusVisible = false;
@@ -188,7 +198,11 @@ export class UISurface {
     if (!this.needsLayout && !this.needsPaint) return false;
     let start = performance.now();
     if (this.needsLayout) {
-      layoutTree(this.root, width, height);
+      for (let i = 0; i < MAX_LAYOUTS && this.needsLayout; i++) {
+        this.needsLayout = false;
+        layoutTree(this.root, width, height);
+        this.onLayout?.();
+      }
       const end = performance.now();
       this.laidOut = true;
       this.layoutTime = end - start;

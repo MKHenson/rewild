@@ -1,4 +1,4 @@
-import { Button, Label, Modal, Stack } from '../../lib';
+import { Button, Label, Modal, Popup, Stack, UIStyle } from '../../lib';
 import { example } from '../registry';
 
 const part = 'Components';
@@ -87,6 +87,52 @@ example({
           }),
         ],
       })
+    );
+  },
+});
+
+example({
+  part,
+  name: 'Popups',
+  description:
+    'A popup opens next to its button and stays on screen: the buttons at the edges open it on the other side or move it in. Focus moves into the popup and back. A click outside, Escape or B closes it.',
+  log: true,
+  height: 260,
+  backdrop: true,
+  build: ({ surface, log, createSurface }) => {
+    surface.input = 'all';
+    const popup = new Popup(
+      { createSurface },
+      { onClose: () => log('closed') }
+    );
+    for (const label of ['Low', 'Medium', 'High'])
+      popup.append(
+        new Button({
+          label,
+          color: 'secondary',
+          onClick: () => {
+            log(`click ${label}`);
+            popup.close();
+          },
+        })
+      );
+    const anchor = (label: string, place: UIStyle) => {
+      const button = new Button({
+        label,
+        style: { position: 'absolute', ...place },
+        onClick: () => {
+          popup.open(button.node);
+          log(`opened from ${label}`);
+        },
+      });
+      return button;
+    };
+    surface.root.append(
+      anchor('Top left', { top: 8, left: 8 }),
+      anchor('Top right', { top: 8, right: 8 }),
+      anchor('Middle', { top: 110, left: '40%' }),
+      anchor('Bottom left', { bottom: 8, left: 8 }),
+      anchor('Bottom right', { bottom: 8, right: 8 })
     );
   },
 });

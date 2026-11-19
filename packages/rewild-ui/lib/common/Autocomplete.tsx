@@ -1,7 +1,6 @@
 import { Component, register } from '../Component';
 import { theme } from '../theme';
 import { underlineField } from './fieldStyle';
-import { glassSurface } from './glassStyle';
 
 export interface AutocompleteProps<T> {
   /** Returns the matches for a query. A reply that arrives after a newer query is dropped. */
@@ -214,8 +213,8 @@ const StyledAutocomplete = cssStylesheet(css`
     border-radius: 4px;
     border: 1px solid ${theme.colors.glassEdge};
     box-shadow: ${theme.colors.shadowShort2};
-    /* Mostly opaque: a dropdown opens over other text. */
-    ${glassSurface('85%')}
+    /* Opaque: glass is for modals and panels over the scene. */
+    background-color: ${theme.colors.surface};
     z-index: 10;
   }
 

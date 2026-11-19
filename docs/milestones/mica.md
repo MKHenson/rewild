@@ -441,6 +441,7 @@ Components are TypeScript classes that build a subtree, handle their own states,
 | `Button`   | Label, optional icon, states, focusable, `click`               | 2     |
 | `Modal`    | A glass panel on its own surface, with a dimmed backdrop. Escape and B close it | 2 |
 | `Stack`    | A flex column or row with a theme gap                          | 2     |
+| `Popup`    | A small panel next to a node, on its own surface. See Popups   | 3     |
 | `Tabs`     | A row of tabs that picks one panel                             | 3     |
 | `Select`   | A field that opens a list of options on a popup surface        | 3     |
 | `Slider`   | A track and a handle, with pointer capture and gamepad steps   | 3     |
@@ -451,6 +452,23 @@ Components are TypeScript classes that build a subtree, handle their own states,
 A closed `Modal` stays in its surface at opacity 0, and its surface takes no input. So it draws nothing, and it fades and shrinks in when it opens, as the DOM modal does. Game over keeps its title and its options at opacity 0 for the same reason.
 
 A component takes plain values and callbacks. It does not know about stores. Game code in `src` binds a `Store` from `rewild-ui` to a component, so game state drives it the same way it drives the DOM.
+
+### Popups
+
+A `Popup` is a small panel on its own surface, next to a node, such as the list of a `Select`. Its surface draws at order 2, over a modal at 1.
+
+```ts
+const popup = new Popup(renderer.ui, { placement: 'bottom', align: 'start' });
+popup.append(low, medium, high);
+button.onClick = () => popup.open(button.node);
+```
+
+- **Placing it.** `placement` is the side of the anchor (`bottom`, `top`, `right` or `left`), and `align` lines the popup up with the anchor's `start`, `center` or `end`. `offset` is the gap to the anchor, 4 px by default.
+- **On screen.** When the popup does not fit on its side and the other side has more room, it opens on the other side. Then it moves to stay `margin` in from each edge, 8 px by default. `placePopup` does this, from the anchor's rectangle and the panel's size.
+- **After layout.** The panel's size comes from layout, so the popup places itself in the surface's `onLayout`, and the surface lays out again. Layout gives an absolute box only the room right of its left edge, so a panel squeezed against the right edge lays out again from the left edge first. A surface lays out at most three times in one update.
+- **Closing.** A click outside, Escape or B closes the popup and calls `onClose`. The click outside does not reach the UI under it. `close()` closes it with no `onClose`.
+- **Focus.** While the popup is open, its surface takes all input, so it is the focus scope. Focus moves to its first focusable node, with the ring when the anchor's surface shows the ring. When it closes, focus goes back to the node that had it, or else to the anchor.
+- **Look.** The plain `surface` colour, a 1 px `glassEdge` border, a 4 px radius and a short shadow. It fades in and out over 150 ms. Glass is for modals and for panels over the scene. A popup over the scene can add it with `style: glassSurface()`.
 
 ### Settings
 
@@ -725,7 +743,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
 
 ### Stage 3: settings
 
-- [ ] **12. Popups**
+- [x] **12. Popups**
 
   - Scope: popup surfaces placed next to a node and kept on screen, closed by a click outside, Escape or B. Focus moves into the popup and back.
   - Expect: a test popup opens under a button, stays on screen at the edges, and closes with each of the three.
