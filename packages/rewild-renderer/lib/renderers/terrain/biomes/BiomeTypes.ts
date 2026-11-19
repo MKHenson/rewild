@@ -225,6 +225,39 @@ export interface BiomeParams {
   creatures?: BiomeCreatures[];
 }
 
+// A scatter rule in a sea biome. Every rule grows under water.
+export type SeaScatter = Omit<BiomeScatter, 'underwater'>;
+
+// One column of the sea's cells: a stretch of water by type, depth and shore
+// distance. Its weight is the product of its selectors; where zones overlap
+// they share the bed by those weights.
+export interface SeaZone {
+  name: string;
+  // Weighted by this palette type. Omitted ⇒ any water.
+  waterType?: WaterType['name'];
+  depth?: Selector; // metres of water from the bed to the surface
+  shore?: Selector; // metres to dry ground, up to SHORE_CAP
+}
+
+// The bed under the water. Land biomes still shape it.
+export interface SeaBiomeParams {
+  name: string;
+  /** Surfaces the bed, base first, with the same rules as a land biome's. */
+  layers: BiomeLayer[];
+  scatter?: SeaScatter[];
+  creatures?: BiomeCreatures[];
+}
+
+// Biomes under the water. cells[temperatureBand][zone] is an index into
+// `biomes`, with the land's temperature bands. Land biome rules keep the
+// waterline; across `handover` the sea biomes take the bed over from them.
+export interface SeaConfig {
+  handover: SelectorBand; // metres of water depth
+  zones: SeaZone[];
+  biomes: SeaBiomeParams[];
+  cells: number[][];
+}
+
 // One climate dimension (temperature or moisture): a low-frequency noise field
 // over world position, split into bands by `cuts`. Which biome a sample gets is
 // looked up from the (temperature band, moisture band) cell in ClimateConfig.
@@ -322,4 +355,6 @@ export interface ClimateConfig {
   lakes?: LakeConfig;
   biomes: BiomeParams[];
   cells: number[][];
+  /** Omitted ⇒ the land biomes run down to the bed. */
+  sea?: SeaConfig;
 }

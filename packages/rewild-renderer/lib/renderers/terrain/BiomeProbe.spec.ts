@@ -7,6 +7,8 @@ import {
 import { BiomeProbe, BiomeProbeTerrain } from './BiomeProbe';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { PaintMask, createPaintMask } from './PaintMask';
+import { createWaterQuerySample } from '../water/WaterQuery';
+import { LAKE_WATER, OCEAN_WATER, WaterType, getWaterTypeIndex } from './Water';
 
 const SEED = 31337;
 const SIZE = 241;
@@ -147,5 +149,52 @@ describe('BiomeProbe', () => {
       probe.probe(terrain, x, z);
       expect(sum(probe)).toBeCloseTo(1, 9);
     }
+  });
+});
+
+describe('BiomeProbe sea', () => {
+  const water = (depth: number, type: WaterType['name']) => {
+    const sample = createWaterQuerySample();
+    sample.wet = depth > 0;
+    sample.depth = depth;
+    sample.coverage = 1;
+    sample.shore = 100;
+    sample.typeWeights.fill(0);
+    sample.typeWeights[getWaterTypeIndex(DEFAULT_CLIMATE, type)] = 1;
+    return sample;
+  };
+
+  it('weighs nothing over dry ground', () => {
+    const probe = new BiomeProbe();
+    expect(probe.probeSea(makeTerrain(), 0, 0, water(0, OCEAN_WATER))).toBe(0);
+    expect(probe.seaWeightOf('open-ocean')).toBe(0);
+  });
+
+  it('puts a lake over the lake bed', () => {
+    const probe = new BiomeProbe();
+    expect(probe.probeSea(makeTerrain(), 0, 0, water(4, LAKE_WATER))).toBe(1);
+    expect(probe.seaWeightOf('lake-bed')).toBeCloseTo(1, 9);
+  });
+
+  it('puts deep ocean over the open ocean, anywhere', () => {
+    const probe = new BiomeProbe();
+    for (const [x, z] of POINTS) {
+      probe.probeSea(makeTerrain(), x, z, water(60, OCEAN_WATER));
+      expect(probe.seaWeightOf('open-ocean')).toBeCloseTo(1, 9);
+    }
+  });
+
+  it('grows kelp on cold shelves and coral on warm ones', () => {
+    const probe = new BiomeProbe();
+    const seen = new Set<string>();
+    for (const [x, z] of POINTS) {
+      probe.probeSea(makeTerrain(), x, z, water(8, OCEAN_WATER));
+      const kelp = probe.seaWeightOf('kelp-forest');
+      const coral = probe.seaWeightOf('coral-reef');
+      expect(kelp + coral).toBeCloseTo(1, 9);
+      if (kelp > 0.99) seen.add('kelp');
+      if (coral > 0.99) seen.add('coral');
+    }
+    expect(seen).toEqual(new Set(['kelp', 'coral']));
   });
 });

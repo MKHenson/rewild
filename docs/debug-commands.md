@@ -400,7 +400,8 @@ speeds the feet should keep in step with no slide.
 Spawning is registered in `CreatureDebugCommands.ts` and works in game only.
 
 ```js
-showCreatureSpawns(); // the spawner's state, biome weights at the player, and the nearest 20 planned groups
+showCreatureSpawns(); // the spawner's state, land and sea biome weights at the player, and the nearest 20 planned groups
+showSeaBiomes(); // the water at the player and the sea biome weights over it
 showCreatureSpawns(100); // more groups
 goToCreature(); // moves the player 4m from the nearest live creature, facing it along +Z
 goToCreature(3); // the fourth nearest

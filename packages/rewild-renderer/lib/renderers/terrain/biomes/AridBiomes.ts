@@ -1,5 +1,4 @@
 import type { BiomeParams } from './BiomeTypes';
-import { LAKE_WEED, SEABED } from './SharedRules';
 
 // The arid answer to MOUNTAIN: different rock, and sand drifting *up* against
 // the massif's feet where snow settles on peaks — hence the inverted band.
@@ -91,7 +90,6 @@ export const DESERT_MOUNTAIN: BiomeParams = {
       density: 0.05,
       slope: { from: 40, to: 15 },
     },
-    ...SEABED,
   ],
 };
 
@@ -173,8 +171,6 @@ export const DESERT: BiomeParams = {
       density: 0.04,
       slope: { from: 40, to: 15 },
     },
-    ...SEABED,
-    ...LAKE_WEED,
   ],
   // A pride that wanders the palms together.
   creatures: [
@@ -230,6 +226,4 @@ export const BEACH_SAND: BiomeParams = {
       height: { from: 0, to: 60 },
     },
   ],
-  // Shingle in the damp hollows, on the same height split the two sands use.
-  scatter: [...SEABED],
 };

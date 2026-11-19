@@ -77,21 +77,28 @@ describe('TerrainChunk reuse across LODs', () => {
 
   describe('hasSplatFor', () => {
     it('is false until a splat lands', () => {
-      expect(makeChunk().hasSplatFor(0)).toBe(false);
+      expect(makeChunk().hasSplatFor(0, 0)).toBe(false);
     });
 
     it('is true for the heights the splat was built from', () => {
       const chunk = makeChunk();
-      chunk.populateSplat(renderer, splat(), 0);
-      expect(chunk.hasSplatFor(0)).toBe(true);
+      chunk.populateSplat(renderer, splat(), 0, 0);
+      expect(chunk.hasSplatFor(0, 0)).toBe(true);
     });
 
     it('is false after a sculpt, until the next splat lands', () => {
       const chunk = makeChunk();
-      chunk.populateSplat(renderer, splat(), 0);
+      chunk.populateSplat(renderer, splat(), 0, 0);
       chunk.bumpHeightsVersion();
 
-      expect(chunk.hasSplatFor(chunk.heightsVersion)).toBe(false);
+      expect(chunk.hasSplatFor(chunk.heightsVersion, 0)).toBe(false);
+    });
+
+    it('is false after a water edit', () => {
+      const chunk = makeChunk();
+      chunk.populateSplat(renderer, splat(), 0, 0);
+      chunk.bumpWaterEditVersion();
+      expect(chunk.hasSplatFor(0, chunk.waterInputVersion)).toBe(false);
     });
   });
 

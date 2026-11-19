@@ -1,5 +1,5 @@
 import type { BiomeParams } from './BiomeTypes';
-import { LAKE_WEED, REEDS, SEABED, TUNA } from './SharedRules';
+import { REEDS } from './SharedRules';
 
 // Biome parameter table. Rows are data — adding a biome is a table edit.
 //
@@ -36,8 +36,6 @@ export const PLAIN: BiomeParams = {
       underwater: true,
     },
     REEDS,
-    ...LAKE_WEED,
-    ...SEABED,
     {
       layer: 'plains_01',
       density: 0.7,
@@ -70,10 +68,7 @@ export const PLAIN: BiomeParams = {
     },
   ],
   // Flocks of hens in the sward.
-  creatures: [
-    { creature: 'chicken', density: 0.3, group: [2, 5], spread: 5 },
-    TUNA,
-  ],
+  creatures: [{ creature: 'chicken', density: 0.3, group: [2, 5], spread: 5 }],
 };
 
 // Wooded ground — the plain's wet counterpart, taller and busier over a tighter
@@ -155,10 +150,8 @@ export const FOREST: BiomeParams = {
       underwater: true,
     },
     REEDS,
-    ...LAKE_WEED,
-    ...SEABED,
   ],
-  creatures: [{ creature: 'crow', density: 0.1, group: [1, 3] }, TUNA],
+  creatures: [{ creature: 'crow', density: 0.1, group: [1, 3] }],
 };
 
 export const MOUNTAIN: BiomeParams = {
@@ -327,7 +320,6 @@ export const MOUNTAIN: BiomeParams = {
       height: [{ from: 80, to: 50 }],
       slope: { from: 42, to: 20 },
     },
-    ...SEABED,
   ],
-  creatures: [{ creature: 'crow', density: 0.05, group: [1, 2] }, TUNA],
+  creatures: [{ creature: 'crow', density: 0.05, group: [1, 2] }],
 };

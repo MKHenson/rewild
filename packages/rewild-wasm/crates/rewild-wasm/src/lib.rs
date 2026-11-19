@@ -615,7 +615,8 @@ impl TerrainGenerator {
     /// Writes the inclusive texel window (`x0`, `y0`)–(`x1`, `y1`) of a chunk's
     /// splat map into `out`, which holds the whole map. `maskWeights` is the
     /// chunk's painted biome mask, if any, with its `maskSize` and `maskStep`.
-    /// See `terrain::SplatGenerator::generate`.
+    /// `shore` is its water map shore distance, if any, one texel every
+    /// `shoreStep` samples. See `terrain::SplatGenerator::generate`.
     #[allow(clippy::too_many_arguments)]
     pub fn splat(
         &self,
@@ -627,18 +628,29 @@ impl TerrainGenerator {
         mask_weights: Option<Vec<u8>>,
         mask_size: u32,
         mask_step: u32,
+        water_edit: Option<WaterEditData>,
+        shore: Option<Vec<u8>>,
+        shore_step: u32,
         x0: u32,
         y0: u32,
         x1: u32,
         y1: u32,
         out: &mut [u8],
-    ) {
+    ) -> Result<(), JsError> {
         let mask = mask_weights.as_deref().map(|weights| terrain::PaintMask {
             size: mask_size as usize,
             step: mask_step as f64,
             channels: weights.len() / (mask_size * mask_size) as usize,
             weights,
         });
+        let shore = match shore {
+            Some(texels) => {
+                let size = terrain::water::water_map_size(width as usize, shore_step as usize) as u32;
+                Some(owned_mask(texels, size, shore_step)?)
+            }
+            None => None,
+        };
+        let shore = shore.as_ref().map(OwnedMask::view);
         let region = terrain::Region {
             x0: x0 as usize,
             y0: y0 as usize,
@@ -646,15 +658,48 @@ impl TerrainGenerator {
             y1: y1 as usize,
         };
         self.splat.generate(
+            &self.heights,
             heights,
             width as usize,
             height as usize,
             offset_x,
             offset_y,
             mask.as_ref(),
+            water_edit.map(|e| e.0),
+            shore.as_ref(),
             region,
             out,
         );
+        Ok(())
+    }
+
+    /// The sea biomes at lake-space (u, v) over water `depth` metres from bed
+    /// to surface, into `weights`, one per sea biome; returns their sum, the
+    /// sea's share there. `typeWeights` are the water's weights over the water
+    /// palette, `shore` metres to dry ground. 0 for a climate with no sea.
+    #[wasm_bindgen(js_name = seaBiomesAt)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn sea_biomes_at(
+        &self,
+        u: f64,
+        v: f64,
+        depth: f64,
+        coverage: f64,
+        shore: f64,
+        type_weights: &[f64],
+        weights: &mut [f64],
+    ) -> f64 {
+        let climate = self.heights.climate();
+        let (Some(sea), Some(mut resolver)) = (&climate.sea, terrain::sea::SeaResolver::new(climate)) else {
+            return 0.0;
+        };
+        let water = terrain::sea::SeaWater { depth, coverage, shore, types: type_weights };
+        let temperature = self.heights.climate_at(u, v).temperature;
+        let share = resolver.resolve(sea, &climate.temperature, temperature, &water);
+        for (out, &w) in weights.iter_mut().zip(&resolver.weights) {
+            *out = w;
+        }
+        share
     }
 }
 

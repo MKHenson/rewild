@@ -11,12 +11,13 @@ export const MAX_SPLAT_LAYERS = 8;
 // each plane uploads straight from the same buffer.
 export const SPLAT_BYTES_PER_TEXEL = MAX_SPLAT_LAYERS;
 
-// The splat map's channel i. Biome order then layer order, then the coast's
-// materials, so adding a layer shifts later channels — which only matters once
-// splat maps are persisted.
+// The splat map's channel i. Biome order then layer order, then the sea
+// biomes', then the coast's materials, so adding a layer shifts later channels
+// — which only matters once splat maps are persisted.
 export function getClimatePalette(climate: ClimateConfig): string[] {
   const palette: string[] = [];
-  for (const biome of climate.biomes) {
+  const biomes = [...climate.biomes, ...(climate.sea?.biomes ?? [])];
+  for (const biome of biomes) {
     for (const layer of biome.layers) {
       if (!palette.includes(layer.material)) palette.push(layer.material);
     }

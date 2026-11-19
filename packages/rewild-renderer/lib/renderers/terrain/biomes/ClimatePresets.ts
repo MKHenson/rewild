@@ -7,6 +7,7 @@ import type {
   ContinentConfig,
   LakeConfig,
 } from './BiomeTypes';
+import { ARID_SEA, DEFAULT_SEA } from './SeaBiomes';
 import { FOREST, MOUNTAIN, PLAIN } from './TemperateBiomes';
 
 // Continents several times wider than a temperature band, so a coast runs past
@@ -90,7 +91,8 @@ export const ARID_COAST: CoastConfig = {
 
 // Temperature splits cold (mountain) from warm; moisture splits the warm half
 // into dry (plain) and wet (forest). Cold ignores moisture, which is what
-// sharing a biome across cells is for. Uses seven of the eight splat channels.
+// sharing a biome across cells is for. Its sea reuses the land's materials, as
+// the land and the coast fill all eight splat channels.
 export const DEFAULT_CLIMATE: ClimateConfig = {
   label: 'Default',
   weather: 'temperate',
@@ -119,6 +121,7 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
     [1], // mid  → FOREST
     [0], // warm → PLAIN
   ],
+  sea: DEFAULT_SEA,
 };
 
 // A world with no wet half. Same salts as the default, so the same seed lays
@@ -148,6 +151,7 @@ export const ARID_CLIMATE: ClimateConfig = {
     [1], // mid  → palm forest
     [0], // warm → dunes
   ],
+  sea: ARID_SEA,
 };
 
 // Game content: designed in code, never persisted. A world stores only which

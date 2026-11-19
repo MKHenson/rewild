@@ -213,8 +213,9 @@ export class LODMesh {
 
         // The splat and water maps are chunk-wide. Once the chunk holds them
         // for these heights and this water edit, a build for another LOD
-        // leaves them out. An edit raises a version, so they come back.
-        const skipSplat = this.chunk.hasSplatFor(version);
+        // leaves them out. An edit raises a version, so they come back. The
+        // sea biomes surface the bed by the water, so the splat follows it.
+        const skipSplat = this.chunk.hasSplatFor(version, waterInputVersion);
         const skipWater = this.chunk.waterIsCurrent(version, waterInputVersion);
         const neighbourWet = skipWater
           ? null
@@ -249,7 +250,7 @@ export class LODMesh {
           skipSplat,
           skipWater,
           shore:
-            skipWater && wantsScatter
+            skipWater && (wantsScatter || !skipSplat)
               ? this.chunk.water?.shore
               : undefined,
         });
@@ -275,7 +276,8 @@ export class LODMesh {
         // The splat map is chunk state shared by every LOD — hand it over and
         // let the chunk create or re-upload it as its version warrants.
         // Absent when this build skipped them. A null water map means dry.
-        if (splat) this.chunk.populateSplat(renderer, splat, version);
+        if (splat)
+          this.chunk.populateSplat(renderer, splat, version, waterInputVersion);
         if (
           water !== undefined &&
           this.chunk.populateWater(renderer, water, version, waterInputVersion)

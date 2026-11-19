@@ -59,6 +59,7 @@ fn climate(erosion: bool) -> ClimateConfig {
         lakes: None,
         biomes: vec![plain, mountain],
         cells: vec![vec![0], vec![1]],
+        sea: None,
     }
 }
 
@@ -240,7 +241,8 @@ mod splat {
     }
 
     fn splat(g: &SplatGenerator, heights: &[f32], mask: Option<&PaintMask>, region: Region, out: &mut [u8]) {
-        g.generate(heights, SIZE, SIZE, 128.0, -64.0, mask, region, out);
+        let ground = HeightGenerator::new(surfaced(), 4321.0, 2.0, 2.0).unwrap();
+        g.generate(&ground, heights, SIZE, SIZE, 128.0, -64.0, mask, None, None, region, out);
     }
 
     fn heights() -> Vec<f32> {
@@ -1748,5 +1750,221 @@ mod climate_rules {
             assert!((-1500.0..2500.0).contains(&sprite[0]) && (-2700.0..1300.0).contains(&sprite[1]));
         }
         assert_eq!(&sliced.sprites[0].instances, instances);
+    }
+}
+
+mod sea {
+    use super::lakes::{ground, lake_climate};
+    use super::*;
+    use crate::scatter::{Jitter, ScatterGenerator, ScatterLayer, ScatterRequest};
+    use crate::sea::{SeaResolver, SeaWater};
+    use crate::{Region, SplatGenerator, SplatSpec};
+
+    const SIZE: usize = 65;
+    const OCEAN: [f64; 4] = [1.0, 0.0, 0.0, 0.0];
+    const LAKE: [f64; 4] = [0.0, 1.0, 0.0, 0.0];
+
+    fn bed(name: &str, material: &str, scatter: Vec<ScatterRule>) -> SeaBiome {
+        SeaBiome {
+            name: name.into(),
+            layers: vec![Layer { material: material.into(), slope: None, height: None, noise: None }],
+            scatter,
+        }
+    }
+
+    fn zone(name: &str, water_type: Option<&str>, depth: Option<Band>) -> SeaZone {
+        SeaZone { name: name.into(), water_type: water_type.map(String::from), depth: depth.map(Selector::One), shore: None }
+    }
+
+    fn weed(density: f64) -> ScatterRule {
+        ScatterRule {
+            layer: "weed".into(),
+            density,
+            slope: None,
+            height: None,
+            noise: None,
+            water_depth: None,
+            shore: None,
+            water_type: None,
+            underwater: false,
+        }
+    }
+
+    /// Shallows and open water in the ocean, and a lake bed. Cold and warm
+    /// shallows differ; the open water and the lake bed are one biome each.
+    fn sea() -> SeaConfig {
+        SeaConfig {
+            handover: Band { from: 0.0, to: 1.0 },
+            zones: vec![
+                zone("shallows", Some("ocean"), Some(Band { from: 12.0, to: 8.0 })),
+                zone("open", Some("ocean"), Some(Band { from: 8.0, to: 12.0 })),
+                zone("lake", Some("lake"), None),
+            ],
+            biomes: vec![
+                bed("cold-shallows", "rock", vec![weed(0.8)]),
+                bed("warm-shallows", "sand", vec![weed(0.8)]),
+                bed("open", "mud", Vec::new()),
+                bed("lake-bed", "silt", Vec::new()),
+            ],
+            cells: vec![vec![0, 2, 3], vec![1, 2, 3]],
+        }
+    }
+
+    fn sea_climate(coast: f64) -> ClimateConfig {
+        let mut c = lake_climate();
+        c.lakes = None;
+        c.continent.as_mut().unwrap().coast = coast;
+        c.sea = Some(sea());
+        c
+    }
+
+    fn water(depth: f64, types: &[f64]) -> SeaWater<'_> {
+        SeaWater { depth, coverage: 1.0, shore: 50.0, types }
+    }
+
+    fn resolve(c: &ClimateConfig, temperature: f64, at: &SeaWater) -> (f64, Vec<f64>) {
+        let mut resolver = SeaResolver::new(c).unwrap();
+        let share = resolver.resolve(c.sea.as_ref().unwrap(), &c.temperature, temperature, at);
+        (share, resolver.weights.clone())
+    }
+
+    #[test]
+    fn weighs_nothing_above_the_water() {
+        let c = sea_climate(0.4);
+        assert_eq!(resolve(&c, 0.2, &water(0.0, &OCEAN)).0, 0.0);
+        assert_eq!(resolve(&c, 0.2, &water(-3.0, &OCEAN)).0, 0.0);
+        assert_eq!(resolve(&c, 0.2, &SeaWater { coverage: 0.0, ..water(4.0, &OCEAN) }).0, 0.0);
+    }
+
+    #[test]
+    fn takes_the_bed_over_across_the_handover() {
+        let c = sea_climate(0.4);
+        let (share, weights) = resolve(&c, 0.2, &water(0.5, &OCEAN));
+        assert!(share > 0.0 && share < 1.0);
+        assert!((weights.iter().sum::<f64>() - share).abs() < 1e-12);
+        assert_eq!(resolve(&c, 0.2, &water(2.0, &OCEAN)).0, 1.0);
+    }
+
+    #[test]
+    fn picks_the_biome_by_temperature_and_zone() {
+        let c = sea_climate(0.4);
+        let (_, cold) = resolve(&c, 0.1, &water(3.0, &OCEAN));
+        assert_eq!(cold, vec![1.0, 0.0, 0.0, 0.0]);
+        let (_, warm) = resolve(&c, 0.9, &water(3.0, &OCEAN));
+        assert_eq!(warm, vec![0.0, 1.0, 0.0, 0.0]);
+        let (_, open) = resolve(&c, 0.9, &water(20.0, &OCEAN));
+        assert_eq!(open, vec![0.0, 0.0, 1.0, 0.0]);
+        let (_, lake) = resolve(&c, 0.1, &water(3.0, &LAKE));
+        assert_eq!(lake, vec![0.0, 0.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn blends_zones_and_temperature_bands() {
+        let c = sea_climate(0.4);
+        let (_, zones) = resolve(&c, 0.1, &water(10.0, &OCEAN));
+        assert!(zones[0] > 0.0 && zones[2] > 0.0);
+        assert!((zones.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+        let (_, bands) = resolve(&c, 0.6, &water(3.0, &OCEAN));
+        assert!(bands[0] > 0.0 && bands[1] > 0.0);
+        assert!((bands.iter().sum::<f64>() - 1.0).abs() < 1e-12);
+        let half = [0.5, 0.5, 0.0, 0.0];
+        let (_, lagoon) = resolve(&c, 0.1, &water(3.0, &half));
+        assert!((lagoon[0] - 0.5).abs() < 1e-12 && (lagoon[3] - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn rejects_a_mis_shaped_cell_grid() {
+        let mut c = sea_climate(0.4);
+        c.sea.as_mut().unwrap().cells = vec![vec![0, 2, 3]];
+        assert!(HeightGenerator::new(c.clone(), 1.0, 0.0, 2.0).is_err());
+        c.sea.as_mut().unwrap().cells = vec![vec![0, 2], vec![1, 2]];
+        assert!(HeightGenerator::new(c.clone(), 1.0, 0.0, 2.0).is_err());
+        c.sea.as_mut().unwrap().cells = vec![vec![0, 2, 9], vec![1, 2, 3]];
+        assert!(HeightGenerator::new(c, 1.0, 0.0, 2.0).is_err());
+    }
+
+    fn land_layers(c: &mut ClimateConfig) {
+        for biome in c.biomes.iter_mut() {
+            biome.layers = vec![Layer { material: "grass".into(), slope: None, height: None, noise: None }];
+        }
+    }
+
+    fn spec() -> SplatSpec {
+        SplatSpec {
+            palette: ["grass", "rock", "sand", "mud", "silt"].map(String::from).to_vec(),
+            coast_materials: Vec::new(),
+        }
+    }
+
+    fn splat(c: ClimateConfig) -> Vec<u8> {
+        let g = ground(c.clone());
+        let heights = g.generate(SIZE, SIZE, 0.0, 0.0);
+        let s = SplatGenerator::new(c, &spec(), 9001.0, 0.0, 2.0).unwrap();
+        let mut out = vec![0u8; SIZE * SIZE * 8];
+        let region = Region { x0: 0, y0: 0, x1: SIZE - 1, y1: SIZE - 1 };
+        s.generate(&g, &heights, SIZE, SIZE, 0.0, 0.0, None, None, None, region, &mut out);
+        out
+    }
+
+    fn channel(out: &[u8], texel: usize, c: usize) -> u8 {
+        let plane = SIZE * SIZE * 4;
+        out[(c / 4) * plane + texel * 4 + c % 4]
+    }
+
+    #[test]
+    fn surfaces_the_open_ocean_with_its_bed() {
+        let mut c = sea_climate(2.0);
+        land_layers(&mut c);
+        let out = splat(c);
+        for texel in 0..SIZE * SIZE {
+            assert_eq!(channel(&out, texel, 3), 255, "texel {texel} is not mud");
+        }
+    }
+
+    #[test]
+    fn leaves_dry_ground_to_the_land() {
+        let mut c = sea_climate(-1.0);
+        land_layers(&mut c);
+        let with_sea = splat(c.clone());
+        c.sea = None;
+        assert_eq!(with_sea, splat(c));
+    }
+
+    fn library() -> Vec<ScatterLayer> {
+        vec![ScatterLayer {
+            name: "weed".into(),
+            footprint: 1.0,
+            jitter: Jitter { scale: Band { from: 1.0, to: 1.0 }, yaw: None, tilt: None },
+            align_to_normal: None,
+            y_offset: None,
+            collider: None,
+            far_sprites: false,
+        }]
+    }
+
+    fn placed(c: ClimateConfig) -> usize {
+        let g = ground(c.clone());
+        let heights = g.generate(SIZE, SIZE, 0.0, 0.0);
+        let s = ScatterGenerator::new(c, library(), 9001.0, 0.0, 2.0).unwrap();
+        s.generate(&g, &heights, SIZE, 0.0, 0.0, ScatterRequest::default()).unwrap().iter().map(|l| l.count).sum()
+    }
+
+    #[test]
+    fn grows_sea_rules_only_where_their_biome_is() {
+        let mut shallow = sea_climate(2.0);
+        shallow.sea.as_mut().unwrap().zones[0].depth = None;
+        shallow.sea.as_mut().unwrap().zones[1].depth = Some(Selector::One(Band { from: 1000.0, to: 1001.0 }));
+        assert!(placed(shallow) > 0);
+        assert_eq!(placed(sea_climate(2.0)), 0, "open water grows no weed");
+        let mut dry = sea_climate(-1.0);
+        dry.sea.as_mut().unwrap().zones[0].depth = None;
+        assert_eq!(placed(dry), 0, "dry ground grows no weed");
+    }
+
+    #[test]
+    fn rejects_an_unknown_sea_layer() {
+        let mut c = sea_climate(2.0);
+        c.sea.as_mut().unwrap().biomes[0].scatter = vec![ScatterRule { layer: "coral".into(), ..weed(0.5) }];
+        assert!(ScatterGenerator::new(c, library(), 9001.0, 0.0, 2.0).is_err());
     }
 }

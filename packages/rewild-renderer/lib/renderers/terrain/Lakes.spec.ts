@@ -7,6 +7,7 @@ import {
   DEFAULT_CONTINENT,
   DEFAULT_LAKES,
   PLAIN,
+  getClimatePalette,
   validateClimateLayers,
 } from './Biomes';
 import {
@@ -19,6 +20,7 @@ import {
 } from './Lakes';
 import { generateBiomeBlendedHeightMap } from './Noise';
 import { SCATTER_INSTANCE_STRIDE, scatterChunk } from './Scatter';
+import { generateSplatMap } from './Splat';
 import { buildWaterMap } from './WaterMap';
 import { LAKE_WATER, getWaterTypeIndex } from './Water';
 import { fromFloat16 } from '../../utils/float16';
@@ -146,13 +148,47 @@ describe('lake chunks', () => {
     expect(water.bodies.some((b) => b.id === OCEAN_BODY_ID)).toBe(false);
   });
 
+  it('surfaces the lake bed with its sea biome', () => {
+    const plain: ClimateConfig = {
+      ...INLAND,
+      biomes: [PLAIN],
+      cells: [[0], [0], [0]],
+    };
+    const bed = (climate: ClimateConfig) => {
+      const palette = getClimatePalette(climate);
+      const splat = generateSplatMap(
+        SIZE,
+        SIZE,
+        SEED,
+        offset,
+        climate,
+        heights
+      );
+      const texel = centre + centre * SIZE;
+      const plane = SIZE * SIZE * 4;
+      let total = 0;
+      for (const material of ['forest_leaves_02', 'aerial_rocks_01']) {
+        const c = palette.indexOf(material);
+        if (c >= 0) total += splat[(c >> 2) * plane + texel * 4 + (c & 3)];
+      }
+      return total;
+    };
+    expect(bed(plain)).toBeGreaterThanOrEqual(250);
+    expect(bed({ ...plain, sea: undefined })).toBe(0);
+  });
+
   it('keeps land scatter out of the lake and lets underwater scatter in', () => {
     const withRule = (rule: Partial<BiomeScatter>): ClimateConfig => {
       const biome: BiomeParams = {
         ...PLAIN,
         scatter: [{ layer: 'granite_01', density: 1, ...rule }],
       };
-      return { ...INLAND, biomes: [biome], cells: [[0], [0], [0]] };
+      return {
+        ...INLAND,
+        biomes: [biome],
+        cells: [[0], [0], [0]],
+        sea: undefined,
+      };
     };
     const lowest = (climate: ClimateConfig) => {
       let min = Infinity;

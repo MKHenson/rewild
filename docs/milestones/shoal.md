@@ -131,39 +131,52 @@ Depth and shore distance describe the sea well enough. The default continent has
 
 ## Sea biomes
 
-Land biomes are picked by temperature and moisture. Moisture means nothing under water, and a land biome on the coast should not decide what grows 30 m down. So under water gets its own biomes.
+Land biomes are picked by temperature and moisture. Moisture means nothing under water, and a land biome on the coast should not decide what grows 30 m down. So under water gets its own biomes, in `ClimateConfig.sea` (`biomes/SeaBiomes.ts`).
 
-- **Picked by temperature and zone.** Temperature is the same climate axis land uses, so a cold coast has a cold sea. Zone (from depth and shore distance) takes the place of moisture. The climate has a second grid of cells for the sea, like `cells` for land.
-- **What a sea biome owns.** The bed surface (sand, rock, mud, seagrass ground), scatter and creatures. It does not shape the ground. The continent and the land biomes still do that.
-- **Blending.** Sea biomes blend at their edges, the same as land biomes.
-- **Lakes.** A sea biome can be limited to a water type, so lakes get their own: weed beds, mud, trout.
-- **The waterline.** Land biome rules keep the edge of the water, such as reeds with `underwater: true`. Sea biomes take over below it.
-- **Rare things.** Scatter's `noise` selector already makes patches. A narrow band with a low density makes rare coral heads in a warm shelf.
+- **Picked by temperature and zone.** Temperature uses the land's bands, so a cold coast has a cold sea. Zones take the place of moisture: `sea.cells[temperatureBand][zone]` names the sea biome.
+- **Zones.** A zone is a water type with optional `depth` and `shore` selectors. Its weight is the product of them. Where zones overlap, they share the bed by those weights, so the zones should cover all water between them.
+- **Lakes.** A zone with `waterType: 'lake'` is the lake bed, so lakes get their own biome. A lagoon, which is part ocean and part lake, blends the two.
+- **What a sea biome owns.** The bed surface (`layers`, with the same rules as land layers), scatter and creatures. It does not shape the ground. The continent and the land biomes still do that.
+- **The waterline.** Land biome rules keep the edge of the water, such as reeds with `underwater: true`. Over `sea.handover` (0.3 to 1.5 m of water) the sea biomes take the bed over from the land layers and the beach.
+- **Blending.** Sea biomes blend across temperature cuts and zone overlaps, the same as land biomes.
+- **Rare things.** Scatter's `noise` selector makes patches. A narrow band with a low density makes rare outcrops.
+- **Materials.** Sea layers share the climate's eight splat channels. The default climate's land and coast fill all eight, so its sea reuses their sand, rock and leaf litter.
 
-| Sea biome       | Temperature | Zone             | Bed              | Grows               | Lives there                |
-| --------------- | ----------- | ---------------- | ---------------- | ------------------- | -------------------------- |
-| Seagrass meadow | Any         | Shallows         | Sand             | Seagrass            | Guppies, crabs             |
-| Kelp forest     | Cold, mild  | Shelf            | Rock             | Kelp                | Sardines, sharks           |
-| Coral reef      | Warm        | Shelf            | Sand, coral rock | Coral, rare coral   | Sardines, sharks           |
-| Sand flats      | Any         | Shelf, open      | Sand             | Little              | Crabs, tuna                |
-| Open ocean      | Any         | Open water       | Mud              | Nothing             | Tuna, orcas, jellyfish     |
-| The deep        | Any         | Deep             | Mud, rock        | Nothing             | Anglerfish                 |
-| Lake bed        | Any         | Lake water types | Mud, stones      | Weed                | Trout, guppies, crabs      |
+The default zones:
 
-Rules in a sea biome use the same shapes as land rules, with `depth` and `shore` selectors added to both scatter and creatures:
+| Zone     | Water | Depth     |
+| -------- | ----- | --------- |
+| Shallows | Ocean | 0 – 3 m   |
+| Shelf    | Ocean | 2 – 20 m  |
+| Slope    | Ocean | 16 – 35 m |
+| Open     | Ocean | 28 m +    |
+| Lake     | Lake  | Any       |
+
+| Sea biome       | Temperature | Zone     | Bed                 | Grows                           | Lives there |
+| --------------- | ----------- | -------- | ------------------- | ------------------------------- | ----------- |
+| Seagrass meadow | Any         | Shallows | Sand                | Seagrass, pebbles               |             |
+| Kelp forest     | Cold, mild  | Shelf    | Sand, rock patches  | Sugar, giant, boa and bull kelp |             |
+| Coral reef      | Warm        | Shelf    | Sand, reef rock     | Seagrass, rare rock outcrops    |             |
+| Sand flats      | Any         | Slope    | Sand                | Little                          | Tuna        |
+| Open ocean      | Any         | Open     | Sand                | Nothing                         | Tuna        |
+| Lake bed        | Any         | Lake     | Leaf litter, stones | Pondweed, weed                  |             |
+
+The arid climate has a warm sea throughout: coral on every shelf. Coral models do not exist yet; the reef grows rock outcrops until they do. The deep comes with Stage 4.
+
+Scatter rules in a sea biome use the same shapes as land rules. Every one grows under water, so it has no `underwater` flag:
 
 ```ts
 {
   name: 'kelp-forest',
-  layers: [{ material: 'rock' }],
-  scatter: [{ layer: 'kelp_01', density: 0.4, shore: [{ from: 10, to: 30 }, { from: 200, to: 150 }] }],
-  creatures: [{ creature: 'sardine', school: [80, 200], density: 0.2 }],
+  layers: [{ material: 'aerial_beach_01' }, { material: 'aerial_rocks_01', noise: { ... } }],
+  scatter: [{ layer: 'kelp_01', density: 0.45, shore: [{ from: 15, to: 30 }, { from: 220, to: 180 }] }],
+  creatures: [{ creature: 'sardine', density: 0.2 }],
 }
 ```
 
 The creature's own habitat still decides where it may move.
 
-**Where it runs.** The terrain worker picks sea biome weights per texel next to land biome weights, in Rust. Spawning reads them through the biome probe.
+**Where it runs.** In Rust, `SeaResolver` (`sea.rs`) turns the water at a point into sea biome weights. The splat reads the chunk's water and shore distance, so the worker builds the water map first, and a water edit rebuilds the splat. Scatter weighs sea rules by the same weights. The far map sees only the ocean, from the coast out. Spawning plans sea biome creatures like land ones, and reads their weights through `BiomeProbe.probeSea`. `showSeaBiomes()` prints the weights at the player.
 
 **Later.** Creatures that keep to a scatter asset, such as fish that stay in the kelp.
 
