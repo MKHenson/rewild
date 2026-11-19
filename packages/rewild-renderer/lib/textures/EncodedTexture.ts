@@ -57,11 +57,16 @@ export class EncodedTexture implements ITexture {
       [bitmap.width, bitmap.height]
     );
 
-    if (this.gpuTexture.mipLevelCount > 1)
-      renderer.mipmapGenerator.generateMips(device, this.gpuTexture);
-
     if (this.mimeType !== 'image/jpeg')
       this.alphaHistograms = imageAlphaHistograms(bitmap);
+
+    // Histograms exist only for an image with a translucent texel, which is
+    // the one a plain mip chain would fringe.
+    if (this.gpuTexture.mipLevelCount > 1) {
+      if (this.alphaHistograms)
+        renderer.mipmapGenerator.generateCoverageMips(device, this.gpuTexture);
+      else renderer.mipmapGenerator.generateMips(device, this.gpuTexture);
+    }
 
     // The copy is complete by the time the queue call returns, and a decoded
     // 4K bitmap is 64MB of pixels the GC has no reason to hurry over.

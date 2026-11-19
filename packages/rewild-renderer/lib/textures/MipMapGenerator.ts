@@ -1,15 +1,25 @@
 import mipmapShader from '../shaders/mipmap-generator.wgsl';
 
+/** Which fragment entry point a pipeline runs. See mipmap-generator.wgsl. */
+type MipPass = 'plain' | 'coverage' | 'fill';
+
+const ENTRY_POINTS: Record<MipPass, string> = {
+  plain: 'fs',
+  coverage: 'fsCoverage',
+  fill: 'fsFill',
+};
+
+const SINGLE_LAYER = { dimension: '2d', mipLevelCount: 1, arrayLayerCount: 1 };
+
 export class MipMapGenerator {
   module: GPUShaderModule | null;
-  pipelineByFormat: Partial<{ [key in GPUTextureFormat]: GPURenderPipeline }>;
   sampler: GPUSampler | null;
+  private pipelines = new Map<string, GPURenderPipeline>();
   private device: GPUDevice | null;
 
   constructor() {
     this.module = null;
     this.sampler = null;
-    this.pipelineByFormat = {};
     this.device = null;
   }
 
@@ -37,49 +47,82 @@ export class MipMapGenerator {
     baseArrayLayer = 0,
     timestamps?: GPURenderPassTimestampWrites
   ) {
-    // The module, sampler and pipelines all belong to the device that created
-    // them, so a new device invalidates every cached object.
-    if (this.device !== device) {
-      this.device = device;
-      this.module = null;
-      this.sampler = null;
-      this.pipelineByFormat = {};
-    }
+    const encoder = device.createCommandEncoder({ label: 'mip gen encoder' });
+    this.downsample(device, encoder, texture, baseArrayLayer, 'plain', timestamps);
+    device.queue.submit([encoder.finish()]);
+  }
 
-    const pipelines = this.pipelineByFormat;
-
-    if (!this.module) {
-      this.module = device.createShaderModule({
-        label: 'textured quad shaders for mip level generation',
-        code: mipmapShader,
-      });
-
-      this.sampler = device.createSampler({
-        minFilter: 'linear',
-      });
-    }
-
-    if (!pipelines[texture.format]) {
-      pipelines[texture.format] = device.createRenderPipeline({
-        label: 'mip level generator pipeline',
-        layout: 'auto',
-        vertex: {
-          module: this.module!,
-          entryPoint: 'vs',
-        },
-        fragment: {
-          module: this.module!,
-          entryPoint: 'fs',
-          targets: [{ format: texture.format }],
-        },
-      });
-    }
-
-    const pipeline = pipelines[texture.format]!;
-
+  /**
+   * Mips for a texture whose alpha is a cutout, such as foliage.
+   *
+   * The colour of a transparent texel is not defined by the image: an exporter
+   * leaves it black, white or anything else, and a premultiplied decode turns
+   * it black. Plain mips average it into every cutout edge, and so does the
+   * bilinear filter at draw time, at every level. The edge then gains a dark or
+   * pale fringe that grows with distance.
+   *
+   * So this pushes and then pulls. Down the chain, each level takes the colour
+   * of the visible texels under it only. Back up the chain, each level's
+   * transparent texels take the colour of the coarser level below, which by
+   * then holds the nearby visible colour. Every transparent texel, level 0
+   * included, ends up the colour of the cutout beside it, and its alpha is
+   * left as it was.
+   */
+  generateCoverageMips(device: GPUDevice, texture: GPUTexture) {
     const encoder = device.createCommandEncoder({
-      label: 'mip gen encoder',
+      label: 'coverage mip gen encoder',
     });
+    const levels = this.downsample(device, encoder, texture, 0, 'coverage');
+
+    const pipeline = this.pipeline(device, texture.format, 'fill');
+    for (let level = levels - 1; level >= 0; level--) {
+      const bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: this.sampler! },
+          {
+            binding: 1,
+            resource: texture.createView({
+              ...SINGLE_LAYER,
+              baseMipLevel: level + 1,
+            } as GPUTextureViewDescriptor),
+          },
+        ],
+      });
+
+      const pass = encoder.beginRenderPass({
+        label: 'coverage mip fill',
+        colorAttachments: [
+          {
+            view: texture.createView({
+              ...SINGLE_LAYER,
+              baseMipLevel: level,
+            } as GPUTextureViewDescriptor),
+            loadOp: 'load',
+            storeOp: 'store',
+          },
+        ],
+      });
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, bindGroup);
+      pass.draw(6);
+      pass.end();
+    }
+
+    device.queue.submit([encoder.finish()]);
+  }
+
+  /** Encodes levels 1..n from the level above each. Returns how many levels it
+   *  wrote. */
+  private downsample(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    texture: GPUTexture,
+    baseArrayLayer: number,
+    kind: 'plain' | 'coverage',
+    timestamps?: GPURenderPassTimestampWrites
+  ): number {
+    const pipeline = this.pipeline(device, texture.format, kind);
 
     let width = texture.width;
     let height = texture.height;
@@ -113,21 +156,23 @@ export class MipMapGenerator {
       width = Math.max(1, (width / 2) | 0);
       height = Math.max(1, (height / 2) | 0);
 
+      const source = texture.createView({
+        ...SINGLE_LAYER,
+        baseMipLevel,
+        baseArrayLayer,
+      } as GPUTextureViewDescriptor);
+      // The coverage pass reads texels with textureLoad, so its 'auto' layout
+      // has no sampler binding.
+      const entries: GPUBindGroupEntry[] =
+        kind === 'plain'
+          ? [
+              { binding: 0, resource: this.sampler! },
+              { binding: 1, resource: source },
+            ]
+          : [{ binding: 1, resource: source }];
       const bindGroup = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: this.sampler! },
-          {
-            binding: 1,
-            resource: texture.createView({
-              dimension: '2d',
-              baseMipLevel,
-              mipLevelCount: 1,
-              baseArrayLayer,
-              arrayLayerCount: 1,
-            }),
-          },
-        ],
+        entries,
       });
 
       ++baseMipLevel;
@@ -151,12 +196,10 @@ export class MipMapGenerator {
         colorAttachments: [
           {
             view: texture.createView({
-              dimension: '2d',
+              ...SINGLE_LAYER,
               baseMipLevel,
-              mipLevelCount: 1,
               baseArrayLayer,
-              arrayLayerCount: 1,
-            }),
+            } as GPUTextureViewDescriptor),
             loadOp: 'clear',
             storeOp: 'store',
           },
@@ -170,7 +213,67 @@ export class MipMapGenerator {
       pass.end();
     }
 
-    const commandBuffer = encoder.finish();
-    device.queue.submit([commandBuffer]);
+    return levels;
+  }
+
+  private pipeline(
+    device: GPUDevice,
+    format: GPUTextureFormat,
+    kind: MipPass
+  ): GPURenderPipeline {
+    // The module, sampler and pipelines all belong to the device that created
+    // them, so a new device invalidates every cached object.
+    if (this.device !== device) {
+      this.device = device;
+      this.module = null;
+      this.sampler = null;
+      this.pipelines.clear();
+    }
+
+    if (!this.module) {
+      this.module = device.createShaderModule({
+        label: 'textured quad shaders for mip level generation',
+        code: mipmapShader,
+      });
+
+      this.sampler = device.createSampler({
+        minFilter: 'linear',
+        magFilter: 'linear',
+      });
+    }
+
+    const key = `${format}:${kind}`;
+    let pipeline = this.pipelines.get(key);
+    if (pipeline) return pipeline;
+
+    // The fill writes colour only where this level is transparent:
+    // src * (1 - dst alpha) + dst * dst alpha, with dst alpha kept.
+    const blend: GPUBlendState | undefined =
+      kind === 'fill'
+        ? {
+            color: {
+              srcFactor: 'one-minus-dst-alpha',
+              dstFactor: 'dst-alpha',
+              operation: 'add',
+            },
+            alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+          }
+        : undefined;
+
+    pipeline = device.createRenderPipeline({
+      label: `mip level generator pipeline (${kind})`,
+      layout: 'auto',
+      vertex: {
+        module: this.module!,
+        entryPoint: 'vs',
+      },
+      fragment: {
+        module: this.module!,
+        entryPoint: ENTRY_POINTS[kind],
+        targets: [{ format, blend }],
+      },
+    });
+    this.pipelines.set(key, pipeline);
+    return pipeline;
   }
 }

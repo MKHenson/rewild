@@ -66,6 +66,25 @@ describe('texture template', () => {
     expect(litAndClear).toBeGreaterThan(0);
   });
 
+  // A mip deep enough to cover a cell in a few texels averages all of it, so a
+  // texel the dilation never reached still shows at a distance.
+  it('dilates colour across the whole of every leaf cell', () => {
+    const params = paramsFor();
+    const layout = atlasLayoutFor(params, null, []);
+    const cells = leafCellPixels(params.textureSize, layout.grid).slice(0, layout.cells);
+    const stride = leaves.width;
+
+    for (const rect of cells) {
+      let unlit = 0;
+      for (let y = rect.y; y < rect.y + rect.height; y++)
+        for (let x = rect.x; x < rect.x + rect.width; x++) {
+          const i = y * stride + x;
+          if (leaves.albedo[i * 3] + leaves.albedo[i * 3 + 1] + leaves.albedo[i * 3 + 2] === 0) unlit++;
+        }
+      expect(unlit).toBe(0);
+    }
+  });
+
 
 
   /**

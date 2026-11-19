@@ -43,13 +43,17 @@ export class BitmapTexture implements ITexture {
       [loader.maxWidth, loader.maxHeight]
     );
 
-    if (this.gpuTexture.mipLevelCount > 1) {
-      renderer.mipmapGenerator.generateMips(device, this.gpuTexture);
-    }
-
     // JPEG has no alpha to histogram.
     if (!/\.jpe?g$/i.test(this.src))
       this.alphaHistograms = imageAlphaHistograms(loader.images[0]);
+
+    // Histograms exist only for an image with a translucent texel, which is
+    // the one a plain mip chain would fringe.
+    if (this.gpuTexture.mipLevelCount > 1) {
+      if (this.alphaHistograms)
+        renderer.mipmapGenerator.generateCoverageMips(device, this.gpuTexture);
+      else renderer.mipmapGenerator.generateMips(device, this.gpuTexture);
+    }
 
     return this;
   }
