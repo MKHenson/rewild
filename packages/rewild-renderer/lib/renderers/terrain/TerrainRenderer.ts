@@ -1135,6 +1135,8 @@ export class TerrainRenderer implements WaterQuerySource {
             scatterMask: chunk.scatterMask,
             killSet: includeKilled ? null : chunk.scatterKills,
             seaLevel: chunk.seaLevel,
+            waterEdit: chunk.waterEdit,
+            shore: chunk.water?.shore ?? null,
           }
         );
 

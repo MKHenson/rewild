@@ -57,6 +57,9 @@ export interface BuildChunkMeshRequest {
   // edits, so this build leaves them out. Both are chunk-wide, not per LOD.
   skipSplat?: boolean;
   skipWater?: boolean;
+  // The chunk's resident shore distance, for scatter when skipWater leaves
+  // the water map out.
+  shore?: Uint8Array;
 }
 
 // One-sample apron ring so edge-vertex normals get a two-sided gradient that
@@ -246,19 +249,6 @@ export function buildChunkMesh(
   );
   lap('mesh');
 
-  // Derived from the same heights and climate the splat was, so an instance
-  // stands on the material its own rules selected for.
-  const scatter = request.scatter
-    ? scatterChunk(chunkSize, seed, worldOffset, climate, heights, {
-        biomeMask: request.biomeMask ?? null,
-        scatterMask: request.scatterMask ?? null,
-        killSet: request.scatterKills ?? null,
-        seaLevel,
-        waterEdit: request.waterEdit ?? null,
-      })
-    : [];
-  if (request.scatter) lap('scatter');
-
   // Built from the same heights, so a sculpted chunk's shore follows the edit.
   let water: WaterMap | null | undefined;
   if (!request.skipWater) {
@@ -274,6 +264,21 @@ export function buildChunkMesh(
     );
     lap('water');
   }
+
+  // Derived from the same heights and climate the splat was, so an instance
+  // stands on the material its own rules selected for.
+  const scatter = request.scatter
+    ? scatterChunk(chunkSize, seed, worldOffset, climate, heights, {
+        biomeMask: request.biomeMask ?? null,
+        scatterMask: request.scatterMask ?? null,
+        killSet: request.scatterKills ?? null,
+        seaLevel,
+        waterEdit: request.waterEdit ?? null,
+        shore: water ? water.shore : request.shore ?? null,
+      })
+    : [];
+  if (request.scatter) lap('scatter');
+
   if (timings) timings.total = performance.now() - started;
 
   return {

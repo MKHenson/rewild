@@ -206,6 +206,7 @@ pub struct ScatterRequestData {
     region: Option<terrain::scatter::SampleBox>,
     with_ids: bool,
     water_edit: Option<terrain::WaterEdit>,
+    shore: Option<OwnedMask>,
 }
 
 #[wasm_bindgen]
@@ -251,6 +252,13 @@ impl ScatterRequestData {
     #[wasm_bindgen(js_name = setWaterEdit)]
     pub fn set_water_edit(&mut self, edit: WaterEditData) {
         self.water_edit = Some(edit.0);
+    }
+
+    /// The chunk's water map shore distance, one texel every `step` samples.
+    #[wasm_bindgen(js_name = setShore)]
+    pub fn set_shore(&mut self, shore: Vec<u8>, size: u32, step: u32) -> Result<(), JsError> {
+        self.shore = Some(owned_mask(shore, size, step)?);
+        Ok(())
     }
 }
 
@@ -596,6 +604,7 @@ impl TerrainGenerator {
             region: request_data.region,
             with_ids: request_data.with_ids,
             water_edit: request_data.water_edit,
+            shore: request_data.shore.as_ref().map(OwnedMask::view),
         };
         self.scatter
             .generate(&self.heights, heights, chunk_size as usize, offset_x, offset_y, request)

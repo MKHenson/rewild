@@ -142,6 +142,8 @@ pub struct ScatterRule {
     pub noise: Option<NoiseSelector>,
     /// Metres below the water surface; negative is height above it.
     pub water_depth: Option<Selector>,
+    /// Metres to dry ground, up to `SHORE_CAP`. Grows only where water reaches.
+    pub shore: Option<Selector>,
     /// Grows only where this water type has weight.
     pub water_type: Option<String>,
     /// Grows under water. Otherwise the rule stops at the waterline.

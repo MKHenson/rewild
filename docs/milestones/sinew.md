@@ -300,13 +300,19 @@ Choose one entry for `habitat`:
 
 ```ts
 { type: 'land', slope: { from: 35, to: 30 }, waterDepth: { from: 0.3, to: 0.2 } }
-{ type: 'water', bedMargin: 0.4, surfaceMargin: 1, waterTypes: ['lake'] }
+{ type: 'water', bedMargin: 0.4, surfaceMargin: 1, depth: { from: 4, to: 6 }, waterTypes: ['ocean'] }
 { type: 'air', band: [15, 30], lookAhead: 3 }
 ```
 
 Land limits use the same `{ from, to }` bands as biome scatter rules. `slope: { from: 35, to: 30 }`
 means "fine below 30°, not allowed past 35°". Land can also limit `height`, in world metres.
-Water's `waterTypes` is optional; left out, any water will do.
+
+Water can limit `depth` (metres from the bed to the surface) and `shore` (metres to dry ground).
+`swim: { from: 'bed', band: [0.2, 2] }` keeps the creature near the bed, and `from: 'surface'` near
+the top. `waterTypes` is optional; left out, any water will do.
+
+Any habitat can set `spawnRadius` and `despawnRadius`. Water defaults to 60 m and 80 m, land and air
+to 120 m and 150 m.
 
 ---
 
@@ -385,8 +391,11 @@ creatures: [
   biome and they only appear in its water. Birds spawn in their height band.
 - **Groups move together.** The animals in a group share one home. When the home drifts, they
   wander after it, so a pride moves across the desert as one.
-- **Near the player only.** A group spawns when the player is within 120 m and despawns past
-  150 m. No more than 100 spawned creatures are alive at once.
+- **Rules can select on water.** A rule's `depth` and `shore` selectors limit where its groups
+  spawn, on top of the habitat.
+- **Near the player only.** A group spawns inside its habitat's spawn radius and despawns past its
+  despawn radius: 60 m and 80 m in water, 120 m and 150 m elsewhere. No more than 100 spawned
+  creatures are alive at once.
 
 **Files to look at:** `SpawnPlanner.ts`, `CreatureSpawner.ts`, `HerdHome.ts`.
 

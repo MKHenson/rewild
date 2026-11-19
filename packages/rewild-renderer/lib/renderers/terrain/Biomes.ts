@@ -63,6 +63,8 @@ export interface BiomeScatter {
   // Metres below the water surface; negative is height above it. Grows only
   // where water reaches, fading with its coverage.
   waterDepth?: Selector;
+  // Metres to dry ground, up to SHORE_CAP. Grows only where water reaches.
+  shore?: Selector;
   // Grows only where this palette type has weight, scaled by that weight.
   waterType?: WaterType['name'];
   // Grow under water. Otherwise a rule stops at the waterline. A rule with no
@@ -208,7 +210,8 @@ export interface Erosion {
 
 // Creatures a biome spawns near the player. Each chunk plans its spawns from the
 // seed, so it spawns the same creatures each time it loads. A spawn point must
-// pass the biome's weight there and the creature's habitat.
+// pass the biome's weight there, the rule's selectors and the creature's
+// habitat.
 export interface BiomeCreatures {
   creature: string; // creature template name
   density: number; // groups per hectare
@@ -216,6 +219,8 @@ export interface BiomeCreatures {
   spread?: number; // metres from the group's home its animals spawn
   drift?: number; // m/s the group's home drifts. Omitted ⇒ it stays put
   roam?: number; // metres from where it spawned the home may drift
+  depth?: Selector; // metres of water from the bed to the surface; 0 when dry
+  shore?: Selector; // metres to dry ground, up to SHORE_CAP; 0 when dry
 }
 
 export interface BiomeParams {
@@ -232,7 +237,7 @@ export interface BiomeParams {
   creatures?: BiomeCreatures[];
 }
 
-// Fish in any lake or sea the biome holds; the habitat keeps them to water.
+// Fish in any sea the biome holds; the habitat keeps them to open water.
 const TUNA: BiomeCreatures = {
   creature: 'tuna',
   density: 0.4,

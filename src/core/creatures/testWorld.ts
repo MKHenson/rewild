@@ -4,10 +4,12 @@ import { WaterQuerySample } from 'rewild-renderer';
 import { CreatureWorld } from './Habitat';
 import { ICreatureAnimator } from './MovementSystem';
 
-/** A stub world for specs: heights and water depth as functions of (x, z). */
+/** A stub world for specs: heights, water depth and shore distance as
+ *  functions of (x, z). */
 export class TestWorld implements CreatureWorld {
   height: (x: number, z: number) => number | null = () => 0;
   depth: (x: number, z: number) => number = () => 0;
+  shore: (x: number, z: number) => number = () => 0;
   /** Water type names by palette index. All the water is the first type. */
   palette: string[] = ['lake'];
   player: Vector3 | null = null;
@@ -24,6 +26,7 @@ export class TestWorld implements CreatureWorld {
     out.ground = ground;
     out.depth = depth;
     out.level = depth > 0 ? ground + depth : -Infinity;
+    out.shore = depth > 0 ? this.shore(x, z) : 0;
     out.typeWeights.fill(0);
     out.typeWeights[0] = 1;
     return true;

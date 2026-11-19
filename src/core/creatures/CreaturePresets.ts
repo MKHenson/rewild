@@ -1,8 +1,17 @@
 import { LocomotionSetName } from 'models';
 import { Selector, WaterType } from 'rewild-renderer';
 
+/** How near the player a habitat's creatures spawn. */
+export interface SpawnRangeSettings {
+  /** Metres from the player inside which a group spawns. Defaults by type. */
+  spawnRadius?: number;
+  /** Metres from the player past which a group despawns. Larger than
+   *  `spawnRadius`. Defaults by type. */
+  despawnRadius?: number;
+}
+
 /** Where a land creature may be. Selectors read as in biome scatter rules. */
-export interface LandHabitatSettings {
+export interface LandHabitatSettings extends SpawnRangeSettings {
   type: 'land';
   /** Degrees from horizontal. */
   slope?: Selector;
@@ -12,19 +21,32 @@ export interface LandHabitatSettings {
   waterDepth?: Selector;
 }
 
+/** Metres of water a creature keeps to, measured up from the bed or down
+ *  from the surface at rest. */
+export interface SwimBand {
+  from: 'bed' | 'surface';
+  band: [number, number];
+}
+
 /** Where a water creature may be. Heights are of its pivot. */
-export interface WaterHabitatSettings {
+export interface WaterHabitatSettings extends SpawnRangeSettings {
   type: 'water';
   /** Metres kept above the bed. */
   bedMargin: number;
   /** Metres kept below the surface at rest. */
   surfaceMargin: number;
+  /** Narrows the heights between the margins. Left out, it uses all of them. */
+  swim?: SwimBand;
+  /** Metres of water from the bed to the surface at rest. */
+  depth?: Selector;
+  /** Metres to dry ground, up to SHORE_CAP. */
+  shore?: Selector;
   /** Water type names it lives in. Any water when left out. */
   waterTypes?: WaterType['name'][];
 }
 
 /** Where a flying creature may be. */
-export interface AirHabitatSettings {
+export interface AirHabitatSettings extends SpawnRangeSettings {
   type: 'air';
   /** Lowest and highest metres above the ground or the water. */
   band: [number, number];
@@ -169,7 +191,15 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
         wander: { radius: 15, wait: [0, 0], actions: [] },
       },
     },
-    habitat: [{ type: 'water', bedMargin: 0.4, surfaceMargin: 1 }],
+    habitat: [
+      {
+        type: 'water',
+        bedMargin: 0.4,
+        surfaceMargin: 1,
+        depth: { from: 4, to: 6 },
+        waterTypes: ['ocean'],
+      },
+    ],
   },
   crow: {
     driver: 'clips',

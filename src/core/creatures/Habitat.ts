@@ -47,6 +47,13 @@ export interface Habitat {
   heightRange?(x: number, z: number, out: HeightRange): boolean;
 }
 
+/** Spawn radius on land and in the air, where the player sees far. */
+export const SPAWN_RADIUS = 120;
+export const DESPAWN_RADIUS = 150;
+/** Spawn radius under water, where the player sees tens of metres. */
+export const WATER_SPAWN_RADIUS = 60;
+export const WATER_DESPAWN_RADIUS = 80;
+
 /** Metres between the height samples that measure slope. */
 export const SLOPE_STEP = 0.5;
 /** Selector coverage above which a point passes. */
@@ -73,6 +80,36 @@ export function selectorCoverage(
   for (let i = 0; i < selector.length; i++)
     coverage *= bandCoverage(selector[i], value);
   return coverage;
+}
+
+/** The coverage of depth and shore selectors over `water`. Dry ground is 0 m
+ *  deep and 0 m from shore. */
+export function waterCoverage(
+  depth: Selector | undefined,
+  shore: Selector | undefined,
+  water: WaterQuerySample
+): number {
+  return (
+    selectorCoverage(depth, water.wet ? water.depth : 0) *
+    selectorCoverage(shore, water.wet ? water.shore : 0)
+  );
+}
+
+/** Metres from the player inside which a group spawns and past which it
+ *  despawns. */
+export interface SpawnRange {
+  spawn: number;
+  despawn: number;
+}
+
+/** The spawn range a habitat sets, or its type's default. */
+export function spawnRange(settings: HabitatSettings): SpawnRange {
+  const water = settings.type === 'water';
+  const spawn =
+    settings.spawnRadius ?? (water ? WATER_SPAWN_RADIUS : SPAWN_RADIUS);
+  const despawn =
+    settings.despawnRadius ?? (water ? WATER_DESPAWN_RADIUS : DESPAWN_RADIUS);
+  return { spawn, despawn: Math.max(despawn, spawn) };
 }
 
 export class LandHabitat implements Habitat {
@@ -145,7 +182,22 @@ export class WaterHabitat implements Habitat {
     if (!this.world.sampleWater(x, z, water) || !water.wet) return false;
     out.min = water.ground + settings.bedMargin;
     out.max = water.level - settings.surfaceMargin;
-    return out.min < out.max && this.typeAllowed();
+    const { swim } = settings;
+    if (swim) {
+      const [near, far] = swim.band;
+      if (swim.from === 'bed') {
+        out.min = Math.max(out.min, water.ground + near);
+        out.max = Math.min(out.max, water.ground + far);
+      } else {
+        out.min = Math.max(out.min, water.level - far);
+        out.max = Math.min(out.max, water.level - near);
+      }
+    }
+    return (
+      out.min < out.max &&
+      waterCoverage(settings.depth, settings.shore, water) > HABITAT_PASS &&
+      this.typeAllowed()
+    );
   }
 
   private typeAllowed(): boolean {

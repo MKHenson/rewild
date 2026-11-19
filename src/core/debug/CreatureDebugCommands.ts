@@ -1,8 +1,4 @@
-import {
-  DESPAWN_RADIUS,
-  SPAWN_RADIUS,
-  getCreatureSpawner,
-} from '../routing/CreatureSpawner';
+import { getCreatureSpawner } from '../routing/CreatureSpawner';
 
 /** Metres from a creature `goToCreature` puts the player. */
 const VISIT_DISTANCE = 4;
@@ -29,9 +25,9 @@ export function registerCreatureDebugCommands() {
         `${report.heightsLoaded ? 'loaded' : 'not loaded'}. ` +
         `${report.live} creatures live or loading, ${report.chunks} chunks ` +
         `planned, ${report.groups.length} groups. A chunk is planned once its ` +
-        `heights load. A group spawns when its home is within ${SPAWN_RADIUS}m ` +
-        `and despawns past ${DESPAWN_RADIUS}m, so idle groups further than ` +
-        `${SPAWN_RADIUS}m are out of range.`
+        `heights load. A group spawns when its home is within its habitat's ` +
+        `spawnRadius and despawns past its despawnRadius, so idle groups ` +
+        `further than spawnRadius are out of range.`
     );
     console.log('Biome weights at the player:', report.biomes);
     console.log('Planned groups, nearest first:');

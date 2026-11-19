@@ -1,5 +1,11 @@
-import { BiomeCreatures } from 'rewild-renderer';
-import { CreatureWorld, Habitat, HeightRange } from './Habitat';
+import { BiomeCreatures, createWaterQuerySample } from 'rewild-renderer';
+import {
+  CreatureWorld,
+  HABITAT_PASS,
+  Habitat,
+  HeightRange,
+  waterCoverage,
+} from './Habitat';
 
 /** Square metres in a hectare. */
 const HECTARE = 10000;
@@ -12,6 +18,7 @@ export const SPAWN_ID_PREFIX = 'spawn:';
 
 const TWO_PI = Math.PI * 2;
 const _range: HeightRange = { min: 0, max: 0 };
+const _water = createWaterQuerySample();
 
 /** The parts of a biome spawn planning reads. */
 export interface SpawnBiome {
@@ -51,6 +58,18 @@ function mix(hash: number, value: number): number {
   hash ^= hash >>> 13;
   hash = Math.imul(hash, 0xc2b2ae35);
   return hash ^ (hash >>> 16);
+}
+
+/** Whether the rule's depth and shore selectors pass at (x, z). */
+export function ruleAllows(
+  rule: BiomeCreatures,
+  world: CreatureWorld,
+  x: number,
+  z: number
+): boolean {
+  if (!rule.depth && !rule.shore) return true;
+  if (!world.sampleWater(x, z, _water)) _water.wet = false;
+  return waterCoverage(rule.depth, rule.shore, _water) > HABITAT_PASS;
 }
 
 function hashString(value: string): number {
@@ -121,6 +140,7 @@ export function planChunkSpawns(
         const size = min + Math.floor(random() * (max - min + 1));
 
         if (chance >= site.biomeWeight(biome.name, homeX, homeZ)) continue;
+        if (!ruleAllows(rule, world, homeX, homeZ)) continue;
         if (!habitat.canBe(homeX, homeZ)) continue;
 
         const members: PlannedCreature[] = [];
@@ -131,6 +151,7 @@ export function planChunkSpawns(
             const level = random();
             const x = homeX + Math.sin(angle) * distance;
             const z = homeZ + Math.cos(angle) * distance;
+            if (!ruleAllows(rule, world, x, z)) continue;
             if (!habitat.canBe(x, z)) continue;
 
             let y = world.sampleHeight(x, z) ?? 0;

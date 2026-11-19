@@ -46,6 +46,8 @@ interface TerrainWorkerRequest {
   // them out. See BuildChunkMeshRequest.
   skipSplat?: boolean;
   skipWater?: boolean;
+  // The chunk's resident shore distance, for scatter when skipWater.
+  shore?: Uint8Array;
 }
 
 export interface TerrainWorkerResponse {

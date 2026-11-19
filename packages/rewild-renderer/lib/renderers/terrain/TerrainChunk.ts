@@ -677,9 +677,11 @@ export class TerrainChunk implements IComponent {
     this.scatterInputVersion++;
   }
 
-  // Marks the water map stale after a neighbour's wet texels changed.
+  // Marks the water map and the instances stale after a neighbour's wet
+  // texels changed, since both read the shore distance.
   bumpShoreInputVersion() {
     this.shoreInputVersion++;
+    this.scatterInputVersion++;
   }
 
   // Everything besides the heights the water map is built from. Only rises.
