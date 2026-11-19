@@ -1,9 +1,8 @@
 import { loadActivity } from '../core/LoadActivity';
 
 // premultiplyAlpha 'none', because the default lets the platform choose, and
-// macOS decodes premultiplied. That zeroes the colour a texture keeps in its
-// transparent texels, and the mips then blend that black into every cutout
-// edge: a dark outline on foliage that grows with distance.
+// macOS decodes premultiplied. The cutout mips (MipMapGenerator's
+// generateCoverageMips) weight colour by alpha, so they need straight alpha.
 const BITMAP_OPTIONS: ImageBitmapOptions = {
   colorSpaceConversion: 'none',
   premultiplyAlpha: 'none',

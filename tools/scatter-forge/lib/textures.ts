@@ -481,62 +481,97 @@ function applyCurvature(canvas: Canvas, strength: number, tiles: boolean): void 
 }
 
 /**
- * Pushes leaf colour outward under the transparent texels. Without it the mip
- * chain averages the untouched background into every leaf edge, and the
- * silhouette gains a dark fringe that gets worse with distance.
+ * Pushes leaf colour outward under the transparent texels, across the whole
+ * cell. Without it the mip chain averages the untouched background into every
+ * leaf edge, and the silhouette gains a fringe that gets worse with distance.
+ * It has to reach the cell's edges: a mip deep enough to cover the cell in a
+ * few texels averages all of it.
+ *
+ * Fills ring by ring out from the opaque texels, each texel taking the mean of
+ * its filled 4-neighbours. Each ring is read from the rings before it only, so
+ * the order texels are visited in does not shift the colour.
  */
-function dilate(canvas: Canvas, rect: PixelRect, passes: number): void {
+function dilate(canvas: Canvas, rect: PixelRect): void {
   const { width: stride } = canvas;
-  const filled = new Uint8Array(rect.width * rect.height);
+  const { width, height } = rect;
+  const filled = new Uint8Array(width * height);
+  const queued = new Uint8Array(width * height);
 
-  for (let ly = 0; ly < rect.height; ly++)
-    for (let lx = 0; lx < rect.width; lx++)
-      filled[ly * rect.width + lx] = canvas.alpha[(rect.y + ly) * stride + (rect.x + lx)] > 0 ? 1 : 0;
+  for (let ly = 0; ly < height; ly++)
+    for (let lx = 0; lx < width; lx++)
+      filled[ly * width + lx] = canvas.alpha[(rect.y + ly) * stride + (rect.x + lx)] > 0 ? 1 : 0;
 
-  for (let pass = 0; pass < passes; pass++) {
-    const next = filled.slice();
-    let changed = 0;
+  const neighbours: [number, number][] = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
 
-    for (let ly = 0; ly < rect.height; ly++) {
-      for (let lx = 0; lx < rect.width; lx++) {
-        if (filled[ly * rect.width + lx]) continue;
-
-        let count = 0;
-        const sum: Rgb = [0, 0, 0];
-
-        const neighbours: [number, number][] = [
-          [-1, 0],
-          [1, 0],
-          [0, -1],
-          [0, 1],
-        ];
-
-        for (const [ox, oy] of neighbours) {
-          const nx = lx + ox;
-          const ny = ly + oy;
-          if (nx < 0 || ny < 0 || nx >= rect.width || ny >= rect.height) continue;
-          if (!filled[ny * rect.width + nx]) continue;
-
-          const j = (rect.y + ny) * stride + (rect.x + nx);
-          sum[0] += canvas.albedo[j * 3];
-          sum[1] += canvas.albedo[j * 3 + 1];
-          sum[2] += canvas.albedo[j * 3 + 2];
-          count++;
+  // The first ring: every clear texel beside an opaque one.
+  let ring: number[] = [];
+  for (let ly = 0; ly < height; ly++) {
+    for (let lx = 0; lx < width; lx++) {
+      const local = ly * width + lx;
+      if (filled[local]) continue;
+      for (const [ox, oy] of neighbours) {
+        const nx = lx + ox;
+        const ny = ly + oy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        if (filled[ny * width + nx]) {
+          ring.push(local);
+          queued[local] = 1;
+          break;
         }
-
-        if (!count) continue;
-
-        const i = (rect.y + ly) * stride + (rect.x + lx);
-        canvas.albedo[i * 3] = sum[0] / count;
-        canvas.albedo[i * 3 + 1] = sum[1] / count;
-        canvas.albedo[i * 3 + 2] = sum[2] / count;
-        next[ly * rect.width + lx] = 1;
-        changed++;
       }
     }
+  }
 
-    filled.set(next);
-    if (!changed) break;
+  while (ring.length) {
+    for (const local of ring) {
+      const lx = local % width;
+      const ly = (local - lx) / width;
+      let count = 0;
+      const sum: Rgb = [0, 0, 0];
+
+      for (const [ox, oy] of neighbours) {
+        const nx = lx + ox;
+        const ny = ly + oy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        if (filled[ny * width + nx] !== 1) continue;
+
+        const j = (rect.y + ny) * stride + (rect.x + nx);
+        sum[0] += canvas.albedo[j * 3];
+        sum[1] += canvas.albedo[j * 3 + 1];
+        sum[2] += canvas.albedo[j * 3 + 2];
+        count++;
+      }
+
+      const i = (rect.y + ly) * stride + (rect.x + lx);
+      canvas.albedo[i * 3] = sum[0] / count;
+      canvas.albedo[i * 3 + 1] = sum[1] / count;
+      canvas.albedo[i * 3 + 2] = sum[2] / count;
+    }
+
+    // Marked filled only once the whole ring has read its colour, so no texel
+    // in the ring reads another from the same ring.
+    for (const local of ring) filled[local] = 1;
+
+    const next: number[] = [];
+    for (const local of ring) {
+      const lx = local % width;
+      const ly = (local - lx) / width;
+      for (const [ox, oy] of neighbours) {
+        const nx = lx + ox;
+        const ny = ly + oy;
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+        const n = ny * width + nx;
+        if (filled[n] || queued[n]) continue;
+        queued[n] = 1;
+        next.push(n);
+      }
+    }
+    ring = next;
   }
 }
 
@@ -622,8 +657,10 @@ async function encode(path: string, data: Buffer, width: number, height: number,
   // Lossless throughout. The audit refuses lossy data maps because chroma
   // subsampling averages roughness and metallic across 2x2 blocks, and the
   // base colour's alpha is a cutout mask that must not be smeared either.
+  // `exact`, because lossless WebP otherwise rewrites the colour under fully
+  // transparent texels, which throws away the dilation.
   await sharp(data, { raw: { width, height, channels } })
-    .webp({ lossless: true, effort: 4, alphaQuality: 100 })
+    .webp({ lossless: true, effort: 4, alphaQuality: 100, exact: true })
     .toFile(path);
 }
 
@@ -697,7 +734,7 @@ function paintAccents(canvas: Canvas, params: Params, layout: AtlasLayout, accen
       const inner = insetRect(rect, gutter);
       const rng = createRng((params.seed ^ 0x2c7b91e5) + (offset + k) * 7919);
       compositeCluster(canvas, inner, source, clusterFor(rng, inner, source, 1, k));
-      dilate(canvas, rect, gutter * 3);
+      dilate(canvas, rect);
     }
   });
 }
@@ -720,7 +757,7 @@ export function buildLeafCanvas(params: Params, source: LeafSource | null = null
     });
 
     // No curvature pass, for the same reason the sourced bark skips it.
-    for (const rect of cells) dilate(canvas, rect, gutter * 3);
+    for (const rect of cells) dilate(canvas, rect);
     paintAccents(canvas, params, layout, accents);
     return canvas;
   }
@@ -734,8 +771,7 @@ export function buildLeafCanvas(params: Params, source: LeafSource | null = null
   // the leaf edge actually ends up with.
   applyCurvature(canvas, params.curvature, false);
 
-  // Reaches past the gutter, so the dilated colour survives several mip levels.
-  for (const rect of cells) dilate(canvas, rect, gutter * 3);
+  for (const rect of cells) dilate(canvas, rect);
   paintAccents(canvas, params, layout, accents);
 
   return canvas;
@@ -835,7 +871,7 @@ export function buildBladeCanvas(params: Params, source: LeafSource | null = nul
     });
 
     // No curvature pass, for the same reason the sourced bark skips it.
-    for (const rect of rects) dilate(canvas, rect, gutter * 3);
+    for (const rect of rects) dilate(canvas, rect);
     paintAccents(canvas, params, layout, accents);
     return canvas;
   }
@@ -849,7 +885,7 @@ export function buildBladeCanvas(params: Params, source: LeafSource | null = nul
   // noticed.
   rects.forEach((rect, index) => paintFoliageCell(canvas, params, insetRect(rect, gutter), index, bladeStyle));
   applyCurvature(canvas, params.curvature, false);
-  for (const rect of rects) dilate(canvas, rect, gutter * 3);
+  for (const rect of rects) dilate(canvas, rect);
   paintAccents(canvas, params, layout, accents);
 
   return canvas;
@@ -968,7 +1004,7 @@ export function buildFrondCanvas(params: Params, source: LeafSource | null = nul
       compositeCluster(canvas, inner, source, clusterFor(rng, inner, source, 1, index));
     });
 
-    for (const rect of rects) dilate(canvas, rect, gutter * 3);
+    for (const rect of rects) dilate(canvas, rect);
     paintAccents(canvas, params, layout, accents);
     return canvas;
   }
@@ -981,7 +1017,7 @@ export function buildFrondCanvas(params: Params, source: LeafSource | null = nul
     paintFoliageCell(canvas, params, columnPixels(insetRect(rect, gutter), params.cardAspect), index, frondStyle)
   );
   applyCurvature(canvas, params.curvature, false);
-  for (const rect of rects) dilate(canvas, rect, gutter * 3);
+  for (const rect of rects) dilate(canvas, rect);
   paintAccents(canvas, params, layout, accents);
 
   return canvas;
