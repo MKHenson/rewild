@@ -38,6 +38,7 @@ import {
   colliderFor,
   crownLayer,
   geometryEntry,
+  kelpLayer,
   pebbleLayer,
   rockLayer,
   scatterLayer,
@@ -47,6 +48,8 @@ import {
 } from './lib/templates.ts';
 import { buildClump, patchRadiusOf } from './lib/clump.ts';
 import { buildCrown } from './lib/crown.ts';
+import { buildKelp } from './lib/kelp.ts';
+import { buildKelpCanvases } from './lib/textures.ts';
 import { buildPebbleCluster, packPebbles } from './lib/pebbles.ts';
 import { buildRock, chartAtlas, chartOrigin, chartUv, crackMask, cubePoint, FACES, gutterOf, ROCK_CHART_COLUMNS, rockAtlas, rockChartPx, scoopOf, surfaceAt } from './lib/rock.ts';
 import { buildPebbleCanvases, buildStoneCanvas } from './lib/stone.ts';
@@ -1468,7 +1471,7 @@ describe('LOD tiers', () => {
   // An override a type never reads is the same silent no-op a stray key is.
   it('rejects a tier override that belongs to another type', () => {
     expect(() => parseConfig({ name: 't', lods: [{ distance: 40, cardSegments: 2 }] }, 'test.json')).toThrow(
-      /'cardSegments' applies to clump, crown, not to a tree's tier/
+      /'cardSegments' applies to clump, crown, kelp, not to a tree's tier/
     );
     expect(() =>
       parseConfig({ type: 'crown', name: 'c', lods: [{ distance: 40, leavesPerBranch: 2 }] }, 'test.json')
@@ -1770,7 +1773,7 @@ describe('crown', () => {
 
     // A crown is two lengths, not one height, so `height` is not its key.
     expect(() => parseConfig({ type: 'crown', name: 'a', height: 8 }, 'test.json')).toThrow(
-      /'height' applies to tree, clump, rock, pebble, not to type 'crown'/
+      /'height' applies to tree, clump, kelp, rock, pebble, not to type 'crown'/
     );
     expect(() => parseConfig({ type: 'crown', name: 'a', splits: 4 }, 'test.json')).toThrow(/applies to tree/);
     expect(() => parseConfig({ name: 'a', stemHeight: 4 }, 'test.json')).toThrow(
@@ -2027,6 +2030,124 @@ describe('crown', () => {
   });
 });
 
+describe('kelp', () => {
+  const kelpParams = (extra: RawConfig = {}): Params => resolveParams({ type: 'kelp', name: 'test-kelp', ...extra });
+  const build = (extra: RawConfig = {}) => buildKelp(kelpParams(extra), layoutAtlas(CROWN_CELLS_GENERATED, []));
+  const KELP_TEXTURES: GlbTextureSet = {
+    stipe: { baseColor: 'a_stipe_diff.webp', normal: 'a_stipe_nor.webp', arm: 'a_stipe_arm.webp' },
+    blade: { baseColor: 'a_blade_diff.webp', normal: 'a_blade_nor.webp', arm: 'a_blade_arm.webp' },
+  };
+
+  it('takes the card, wind and source keys, and none of the tree or crown', () => {
+    const kelp = kelpParams();
+    expect(kelp.out).toBe('assets/shared/nature/kelp');
+    expect(kelp.castShadow).toBe(false);
+    expect(kelp.impostor).toBeNull();
+    expect(kelp.alignToNormal).toBe(0);
+    expect(() => parseConfig({ type: 'kelp', name: 'a', stemHeight: 2 }, 'test.json')).toThrow(/applies to crown/);
+    expect(() => parseConfig({ type: 'kelp', name: 'a', splits: 2 }, 'test.json')).toThrow(/applies to tree/);
+    expect(() => parseConfig({ type: 'crown', name: 'a', stipes: 2 }, 'test.json')).toThrow(/'stipes' applies to kelp/);
+    expect(() => parseConfig({ type: 'kelp', name: 'a', lods: [{ distance: 20 }] }, 'test.json')).toThrow(/'lods'/);
+  });
+
+  it('rejects layouts, floats and ranges it does not know', () => {
+    expect(() => kelpParams({ bladeLayout: 'fan' })).toThrow(/bladeLayout must be one of along, tip, single/);
+    expect(() => kelpParams({ bladders: 'many' })).toThrow(/bladders must be one of none, blade, tip/);
+    expect(() => kelpParams({ stipes: 0 })).toThrow(/stipes must be within 1..24/);
+    expect(() => kelpParams({ height: 1, bladeLength: 2 })).toThrow(/must be shorter than height/);
+  });
+
+  it('ships a solid stalk piece and a cutout blade piece', () => {
+    const kelp = build();
+    expect(kelp.mesh.pieces.map((piece) => [piece.key, piece.cutout])).toEqual([
+      ['stipe', false],
+      ['blade', true],
+    ]);
+    expect(heightPieces('kelp')).toEqual([]);
+    expect(materialPieces('kelp')).toEqual([]);
+  });
+
+  it('grows blades by layout: along each stalk, a tuft at the top, or one each', () => {
+    expect(build({ stipes: 3, bladesPerStipe: 5, bladeLayout: 'along' }).metrics.blades).toBe(15);
+    expect(build({ stipes: 2, bladesPerStipe: 7, bladeLayout: 'tip' }).metrics.blades).toBe(14);
+    expect(build({ stipes: 4, bladesPerStipe: 7, bladeLayout: 'single' }).metrics.blades).toBe(4);
+  });
+
+  it('hangs a float on every blade, one on every stalk top, or none', () => {
+    expect(build({ stipes: 2, bladesPerStipe: 6, bladders: 'blade' }).metrics.bladders).toBe(12);
+    expect(build({ stipes: 3, bladeLayout: 'tip', bladders: 'tip', bladderRadius: 0.05 }).metrics.bladders).toBe(3);
+    expect(build({ bladders: 'none' }).metrics.bladders).toBe(0);
+  });
+
+  it('reaches its height with the tallest stalk, and stands on the bed', () => {
+    const kelp = build({ height: 5, bladeLength: 0.8, stipeLean: 0, stipeWander: 0 });
+    expect(kelp.metrics.stalk).toBeCloseTo(5, 1);
+    const { positions } = pieceOf(kelp.mesh, 'stipe');
+    let lowest = Infinity;
+    for (let i = 1; i < positions.length; i += 3) lowest = Math.min(lowest, positions[i]);
+    expect(lowest).toBeGreaterThan(-0.05);
+    expect(lowest).toBeLessThan(0.01);
+  });
+
+  it('ruffles the blade edges and leaves the midrib flat', () => {
+    const flat = build({ stipes: 1, bladesPerStipe: 1, bladeRuffle: 0, bladeTwist: 0, cardCurve: 0 });
+    const ruffled = build({ stipes: 1, bladesPerStipe: 1, bladeRuffle: 0.05, bladeTwist: 0, cardCurve: 0 });
+    const a = pieceOf(flat.mesh, 'blade').positions;
+    const b = pieceOf(ruffled.mesh, 'blade').positions;
+    let edge = 0;
+    let midrib = 0;
+    for (let v = 0; v < a.length / 3; v++) {
+      const moved = Math.hypot(a[v * 3] - b[v * 3], a[v * 3 + 1] - b[v * 3 + 1], a[v * 3 + 2] - b[v * 3 + 2]);
+      if (v % 3 === 1) midrib = Math.max(midrib, moved);
+      else edge = Math.max(edge, moved);
+    }
+    expect(midrib).toBeCloseTo(0, 6);
+    expect(edge).toBeGreaterThan(0.02);
+  });
+
+  it('bends from a rigid holdfast to free blade tips', () => {
+    const kelp = build({ stipes: 1, bladesPerStipe: 3 });
+    const { colors } = pieceOf(kelp.mesh, 'stipe');
+    const blades = pieceOf(kelp.mesh, 'blade').colors;
+    let stalkMin = Infinity;
+    for (let i = 0; i < colors.length; i += 4) stalkMin = Math.min(stalkMin, colors[i]);
+    let bladeMax = 0;
+    for (let i = 0; i < blades.length; i += 4) bladeMax = Math.max(bladeMax, blades[i]);
+    expect(stalkMin).toBe(0);
+    expect(bladeMax).toBeGreaterThan(0.8);
+  });
+
+  it('declares a water layer that folds at the surface unless told not to', () => {
+    const kelp = build();
+    const layer = kelpLayer(kelpParams(), kelp.metrics);
+    expect(layer.wind?.medium).toBe('water');
+    expect(layer.castShadow).toBe(false);
+    expect(layer.impostor).toBeUndefined();
+    expect(layer.collider).toBeUndefined();
+    expect(layer.waterCeiling).toBe(0.35);
+    expect(kelpLayer(kelpParams({ surfaceCanopy: false }), kelp.metrics).waterCeiling).toBeUndefined();
+  });
+
+  it('paints an opaque stalk tile and cut-out blade strips', () => {
+    const params = kelpParams({ textureSize: 256, barkTextureSize: 128 });
+    const canvases = buildKelpCanvases(params);
+    expect(Object.keys(canvases)).toEqual(['stipe', 'blade']);
+    expect(canvases.stipe.alpha.every((a) => a === 1)).toBe(true);
+    const blade = canvases.blade.alpha;
+    const covered = blade.filter((a) => a > 0.5).length / blade.length;
+    expect(covered).toBeGreaterThan(0.02);
+    expect(covered).toBeLessThan(0.6);
+  });
+
+  it('reproduces kelp byte for byte from the same seed', () => {
+    const a = writeGlb({ name: 'k', mesh: build({ seed: 9 }).mesh, textures: KELP_TEXTURES, alphaCutoff: 0.45 });
+    const b = writeGlb({ name: 'k', mesh: build({ seed: 9 }).mesh, textures: KELP_TEXTURES, alphaCutoff: 0.45 });
+    expect(a.equals(b)).toBe(true);
+    const gltf = readGltf(a);
+    expect(gltf.materials.map((material: { alphaMode: string }) => material.alphaMode)).toEqual(['OPAQUE', 'MASK']);
+  });
+});
+
 // A leaf grid is 1, 2 or 4 and always divided the image. A clump's is the
 // smallest square holding its stamps, so 3 and 5 are ordinary — and a
 // fractional rect lands on a non-integer index, where every canvas write is
@@ -2180,7 +2301,7 @@ describe('accents', () => {
       /'attach' applies to tree, not to a crown/
     );
     expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, depth: [0, 0.5] }] }, 't.json')).toThrow(
-      /'depth' applies to crown, not to a tree/
+      /'depth' applies to crown and kelp, not to a tree/
     );
     expect(() => parseConfig({ type: 'crown', name: 'a', accents: [{ ...spire, depth: [0.5, 0.2] }] }, 't.json')).toThrow(
       /0 <= from <= to <= 1/
@@ -2479,7 +2600,7 @@ describe('rock', () => {
       /'splits' applies to tree, not to type 'rock'/
     );
     expect(() => parseConfig({ type: 'rock', name: 'a', windAmplitude: 1 }, 'test.json')).toThrow(
-      /'windAmplitude' applies to tree, clump, crown, not to type 'rock'/
+      /'windAmplitude' applies to tree, clump, crown, kelp, not to type 'rock'/
     );
     expect(() => parseConfig({ name: 'a', scoops: 1 }, 'test.json')).toThrow(
       /'scoops' applies to rock, pebble, not to type 'tree'/

@@ -15,7 +15,7 @@
 // Deliberately free of imports, so the parameter table can reach it without a
 // cycle.
 
-export const FORGE_TYPES = ['tree', 'clump', 'crown', 'rock', 'pebble'] as const;
+export const FORGE_TYPES = ['tree', 'clump', 'crown', 'kelp', 'rock', 'pebble'] as const;
 
 export type ForgeType = (typeof FORGE_TYPES)[number];
 
@@ -61,6 +61,11 @@ export const PIECES: Record<ForgeType, readonly PieceSpec[]> = {
   crown: [
     { key: 'bark', cutout: false, height: true, material: true, needsStem: true },
     { key: 'frond', cutout: true, height: false, material: false },
+  ],
+  // Stalks, floats and holdfast on one opaque tile; the blades on cutout strips.
+  kelp: [
+    { key: 'stipe', cutout: false, height: false, material: false },
+    { key: 'blade', cutout: true, height: false, material: false },
   ],
   rock: [{ key: 'stone', cutout: false, height: true, material: true }],
   // A cluster is one draw of one material, whatever it holds: the pebbles

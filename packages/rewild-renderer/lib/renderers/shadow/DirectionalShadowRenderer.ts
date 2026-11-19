@@ -949,6 +949,7 @@ export class DirectionalShadowRenderer {
         world.elements[12],
         world.elements[14],
         wind.gustDrift,
+        wind.swellClock,
         data,
         44
       );

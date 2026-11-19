@@ -6,6 +6,7 @@ import type { ScatterImpostor } from 'rewild-renderer/lib/renderers/terrain/Scat
 import { LOOK, retiredKeys } from './look.ts';
 import { FORGE_TYPES, isForgeType, type ForgeType } from './pieces.ts';
 import { hashString } from './rng.ts';
+import { BLADDER_KINDS, BLADE_LAYOUTS } from './kelp-shapes.ts';
 
 type Default = string | number | boolean | readonly string[] | readonly LodTier[] | readonly AccentSpec[] | ScatterImpostor | null;
 
@@ -46,17 +47,18 @@ const CLUMP_ALIGN_TO_NORMAL = 0.6;
 const TREE = ['tree'] as const;
 const CLUMP = ['clump'] as const;
 const CROWN = ['crown'] as const;
+const KELP = ['kelp'] as const;
 const PEBBLE = ['pebble'] as const;
 /** The types grown from a 3D field: one stone, or a cluster of them. */
 const STONE = ['rock', 'pebble'] as const;
 /** The types that grow a bark tube. */
 const WOODY = ['tree', 'crown'] as const;
 /** The types whose cutout is a segmented card. */
-const CARDED = ['clump', 'crown'] as const;
+const CARDED = ['clump', 'crown', 'kelp'] as const;
 /** The types whose `height` is a finished height. A crown is two lengths instead. */
-const SIZED = ['tree', 'clump', 'rock', 'pebble'] as const;
+const SIZED = ['tree', 'clump', 'kelp', 'rock', 'pebble'] as const;
 /** The types that ship a cutout piece, and so read the wind and the foliage keys. */
-const LEAFY = ['tree', 'clump', 'crown'] as const;
+const LEAFY = ['tree', 'clump', 'crown', 'kelp'] as const;
 /** The types that coarsen with distance rather than culling. */
 const TIERED = ['tree', 'crown', 'rock', 'pebble'] as const;
 
@@ -180,7 +182,7 @@ export const PARAM_SPEC = {
   type: { type: 'string', default: 'tree', help: `Structure to grow: ${FORGE_TYPES.join(' | ')}. Picks the generator, not the species.` },
   name: { type: 'string', default: null, help: 'Model id. Names the .glb and the geometry template.' },
   textureSet: { type: 'string', default: null, help: 'Texture set to write or reference. Defaults to name. Share one across variants.' },
-  bark: { type: 'list', default: [], help: 'Folder under sources/bark the bark tile comes from, as folder or folder/set. Empty generates it.', texture: true, types: WOODY },
+  bark: { type: 'list', default: [], help: 'Folder under sources/bark the bark tile comes from, as folder or folder/set. Empty generates it.', texture: true, types: [...WOODY, 'kelp'] },
   leaves: { type: 'list', default: [], help: 'Folders under sources/leaves whose stamps fill the leaf image. Empty generates it.', texture: true, types: TREE },
   out: {
     type: 'string',
@@ -188,6 +190,7 @@ export const PARAM_SPEC = {
     byType: {
       clump: 'assets/shared/nature/clumps',
       crown: 'assets/shared/nature/crowns',
+      kelp: 'assets/shared/nature/kelp',
       rock: 'assets/shared/nature/rocks',
       pebble: 'assets/shared/nature/pebbles',
     },
@@ -199,8 +202,8 @@ export const PARAM_SPEC = {
   height: {
     type: 'number',
     default: 12,
-    byType: { clump: 0.35, rock: 1.2, pebble: 0.3 },
-    help: 'Finished height in metres. A tree normalises its skeleton to it; a clump sizes its cards to reach it; a rock is this tall before its relief, and so is the largest pebble of a cluster.',
+    byType: { clump: 0.35, kelp: 4, rock: 1.2, pebble: 0.3 },
+    help: 'Finished height in metres. A tree normalises its skeleton to it; a clump sizes its cards to reach it; kelp reaches it with its tallest stalk and blade; a rock is this tall before its relief, and so is the largest pebble of a cluster.',
     // A rock's image is baked off its surface, so its size is in the image.
     texture: STONE,
     types: SIZED,
@@ -248,18 +251,18 @@ export const PARAM_SPEC = {
   leafAspect: { type: 'number', default: 0.85, help: 'Leaf card width as a fraction of its height.', types: TREE },
   leafAngle: { type: 'number', default: 55, help: 'Degrees a leaf card turns away from its branch. 0 lies along it, 90 stands out square.', types: TREE },
   leafFrom: { type: 'number', default: 0.15, help: 'Fraction along a tip branch that leaves start at.', types: TREE },
-  leafNormalMode: { type: 'string', default: 'canopy', help: 'card | canopy | up. How leaf and frond normals are authored. On a crown, canopy is the rosette normal normalLean shapes.', types: WOODY },
+  leafNormalMode: { type: 'string', default: 'canopy', byType: { kelp: 'card' }, help: 'card | canopy | up. How leaf and frond normals are authored. On a crown, canopy is the rosette normal normalLean shapes.', types: [...WOODY, 'kelp'] },
   leafAlphaCutoff: { type: 'number', default: 0.45, byType: { clump: 0.4 }, help: 'glTF alphaCutoff on every cutout piece.', types: LEAFY },
 
-  blades: { type: 'list', default: [], help: 'Folders under sources/clump whose stamps fill the blade atlas. Empty generates them.', texture: true, types: CLUMP },
+  blades: { type: 'list', default: [], help: 'Folders whose stamps fill the blade atlas: under sources/clump for a clump, sources/kelp for kelp. Empty generates them.', texture: true, types: [...CLUMP, 'kelp'] },
   tuftsPerModel: { type: 'int', default: 1, help: 'Tufts grown into one model. Above 1 the model is a patch, and the placer resolves one candidate for all of them.', types: CLUMP },
   patchRadius: { type: 'number', default: 0, help: 'Metres the tuft bases are spread over. 0 derives it from the tuft count and height. Ignored at tuftsPerModel 1.', types: CLUMP },
   cardsPerTuft: { type: 'int', default: 5, help: 'Cards radiating from one tuft. The knob to reach for before footprint.', types: CLUMP },
-  cardSegments: { type: 'int', default: 3, byType: { crown: 5 }, help: 'Divisions up a card. Wind bends it as a curve rather than tipping it as a plank.', types: CARDED },
+  cardSegments: { type: 'int', default: 3, byType: { crown: 5, kelp: 10 }, help: 'Divisions up a card. Wind bends it as a curve rather than tipping it as a plank.', types: CARDED },
   cardLean: { type: 'number', default: 18, help: 'Degrees a card leans outward from upright over its length.', types: CLUMP },
-  cardCurve: { type: 'number', default: 26, byType: { crown: 80 }, help: 'Degrees a card bows over its own length, on top of the lean.', types: CARDED },
+  cardCurve: { type: 'number', default: 26, byType: { crown: 80, kelp: 15 }, help: 'Degrees a card bows over its own length, on top of the lean.', types: CARDED },
   cardSpread: { type: 'number', default: 0.22, help: 'How far card bases sit from the tuft centre, as a fraction of height.', types: CLUMP },
-  cardAspect: { type: 'number', default: 1, byType: { crown: 0.3 }, help: 'Card width as a fraction of its height. A crown, and a clump with blades listed, cut their texture strips to the same shape.', texture: ['crown', 'clump'], types: CARDED },
+  cardAspect: { type: 'number', default: 1, byType: { crown: 0.3, kelp: 0.18 }, help: 'Card width as a fraction of its height. A crown, and a clump with blades listed, cut their texture strips to the same shape.', texture: ['crown', 'clump', 'kelp'], types: CARDED },
   normalLean: { type: 'number', default: 0.45, byType: { crown: 0.6 }, help: 'How far every normal leans outward from straight up. 0 faces the whole tuft at the sky.', types: CARDED },
 
   fronds: { type: 'list', default: [], help: 'Folders under sources/fronds whose stamps fill the frond atlas. Empty generates them.', texture: true, types: CROWN },
@@ -272,6 +275,41 @@ export const PARAM_SPEC = {
   frondVariance: { type: 'number', default: 20, help: 'Random degrees added to each frond angle: the spread between young fronds standing up and old ones hanging.', types: CROWN },
   frondSpan: { type: 'number', default: 0, help: 'Fraction of the stem, down from its top, the fronds attach along. 0 puts every frond at the top; the lowest hang most.', types: CROWN },
   frondWidth: { type: 'number', default: 1, help: 'Frond card width multiplier that leaves the texture alone. Below 1 squeezes the frond art thinner; above 1 spreads it wider.', types: CROWN },
+
+  stipes: { type: 'int', default: 6, help: 'Stalks rising from one holdfast, 1..24. Giant kelp has many; bull kelp one.', types: KELP },
+  stipeSpread: { type: 'number', default: 0.03, help: 'How far apart the stalk bases sit, as a fraction of height.', types: KELP },
+  stipeRadius: { type: 'number', default: 0.012, help: 'Stalk radius at the base, in metres.', types: KELP },
+  stipeTaper: { type: 'number', default: 0.6, help: 'Stalk radius at the top as a fraction of the base, 0..1.', types: KELP },
+  stipeLean: { type: 'number', default: 16, help: 'Degrees the stalks fan out from upright by their tops.', types: KELP },
+  stipeWander: { type: 'number', default: 0.45, help: 'Metres a stalk sways off a straight line by its top, so it reads as soft rather than a pole.', types: KELP },
+  stipeHeights: { type: 'number', default: 0.35, help: 'How much shorter than the tallest the other stalks may be, 0..0.9. Gives an uneven top.', types: KELP },
+  stipeSides: { type: 'int', default: 6, help: 'Sides of a stalk tube, 3..16.', types: KELP },
+  stipeSegments: { type: 'int', default: 16, help: 'Rings up each stalk, 2..64. More bend the stalk smoothly under the swell and at the surface.', types: KELP },
+  holdfastRadius: { type: 'number', default: 0.12, help: 'Metres the holdfast fingers reach over the bed. 0 grows none.', types: KELP },
+  holdfastFingers: { type: 'int', default: 9, help: 'Fingers of the holdfast, 0..32.', types: KELP },
+  holdfastHeight: { type: 'number', default: 0.06, help: 'Metres the holdfast mounds before the stalks leave it.', types: KELP },
+  bladeLayout: { type: 'string', default: 'along', help: 'along | tip | single. Blades up the stalk (giant kelp), a tuft streaming from the top (bull kelp), or one wide blade on a short stalk (sugar kelp).', types: KELP },
+  bladesPerStipe: { type: 'int', default: 12, help: 'Blades on each stalk at along, and in the tuft at tip. single grows one.', types: KELP },
+  bladeSpan: { type: 'number', default: 0.85, help: 'Fraction of the stalk, down from its top, the blades leave along. Read at along alone.', types: KELP },
+  bladeLength: { type: 'number', default: 0.8, help: 'Longest blade in metres, base to tip along its curve. The rest fall short of it.', types: KELP },
+  bladeWidth: { type: 'number', default: 1, help: 'Blade card width multiplier that leaves the texture alone. The card is bladeLength x cardAspect wide before it.', types: KELP },
+  bladeAngle: { type: 'number', default: 35, help: 'Degrees a blade leaves its stalk at. Blades high on a stalk stand closer to it.', types: KELP },
+  bladeTwist: { type: 'number', default: 70, help: 'Degrees a blade twists about its own length by its tip, so it is never a flat card from the side.', types: KELP },
+  bladeRuffle: { type: 'number', default: 0.02, help: 'Metres the blade edges ruffle out of its plane. The midrib stays flat.', types: KELP },
+  bladeRuffleWaves: { type: 'int', default: 6, help: 'Ruffles along each edge, 0..32. The edges run in opposite phase.', types: KELP },
+  bladeAlternate: { type: 'flag', default: false, help: 'Blades swap sides up the stalk instead of spiralling round it.', types: KELP },
+  bladders: { type: 'string', default: 'blade', help: 'none | blade | tip. A float at the base of every blade (giant kelp), or one bulb at the top of each stalk (bull kelp).', types: KELP },
+  bladderRadius: { type: 'number', default: 0.018, help: 'Float radius in metres. A tip bulb wants several times a blade float.', types: KELP },
+  surfaceCanopy: { type: 'flag', default: true, help: 'Fold whatever reaches the water surface along it, so tall kelp spreads into a canopy rather than poking out.', types: KELP },
+  surfaceMargin: { type: 'number', default: 0.35, help: 'Metres under the surface at rest the canopy lies at.', types: KELP },
+  kelpTint: { type: 'string', default: '#5b4a1f', help: 'Generated blade colour at the base, six digit hex.', texture: true, types: KELP },
+  kelpTipTint: { type: 'string', default: '#9c8232', help: 'Generated blade colour at the tip, six digit hex.', texture: true, types: KELP },
+  stipeTint: { type: 'string', default: '#4a3c19', help: 'Generated stalk, float and holdfast colour, six digit hex.', texture: true, types: KELP },
+  colourVariance: { type: 'number', default: 0.15, help: 'How far generated blades and patches differ in tone and hue, 0..1.', texture: true, types: KELP },
+  midrib: { type: 'number', default: 0.3, help: 'Strength of the line down the middle of a generated blade, 0..1. 0 for species without one.', texture: true, types: KELP },
+  corrugation: { type: 'number', default: 0.5, help: 'Blistered bumps across a generated blade, in its colour and normal map, 0..1.', texture: true, types: KELP },
+  fray: { type: 'number', default: 0.3, help: 'How torn the tips and edges of a generated blade are, 0..1.', texture: true, types: KELP },
+  epiphytes: { type: 'number', default: 0.2, help: 'Pale crusts of growth on the older part of a generated blade, 0..1.', texture: true, types: KELP },
 
   width: { type: 'number', default: 0, help: 'Metres across the stone along x, before its relief. On a cluster it is the largest pebble, and the rest scale with it. 0 derives it from height.', texture: true, types: STONE },
   depth: { type: 'number', default: 0, help: 'Metres across the stone along z, before its relief. On a cluster it is the largest pebble, and the rest scale with it. 0 derives it from height.', texture: true, types: STONE },
@@ -356,7 +394,7 @@ export const PARAM_SPEC = {
   bendCurve: {
     type: 'number',
     default: 1.6,
-    byType: { clump: 1 },
+    byType: { clump: 1, kelp: 1.8 },
     help: 'Exponent shaping COLOR_0.r. Higher keeps the base rigid for longer. A blade bends along its whole length, so a clump wants 1.',
     types: LEAFY,
   },
@@ -364,24 +402,24 @@ export const PARAM_SPEC = {
   accents: { type: 'accents', default: [], help: 'Cards hung plumb off the model, off their own stamps under sources/accents: [{ stamps, count, pitch, length, variance?, aspect?, segments?, planes?, sizeVariance?, curve?, flutter?, attach?, depth?, normals? }]. Spires at pitch 0, fruit and skirts at 180.', texture: true, types: LEAFY },
   lods: { type: 'tiers', default: [], help: 'Coarser tiers, nearest first: [{ distance, radialSegments?, barkLevels?, leavesPerBranch?, leafScale?, cardSegments?, subdivisions? }]. Each override must be a key of the type.', types: TIERED },
 
-  windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.', byType: { clump: 0.18 }, types: LEAFY },
-  windFrequency: { type: 'number', default: 0.45, help: 'ScatterWind frequency for the emitted layer.', byType: { clump: 1.1 }, types: LEAFY },
-  windFlutter: { type: 'number', default: 0.35, help: 'ScatterWind flutter for the emitted layer.', byType: { clump: 0.7 }, types: LEAFY },
-  cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50, rock: 800, pebble: 60 } },
-  castShadow: { type: 'flag', default: true, byType: { clump: false, crown: null, pebble: false }, help: 'Draw the emitted layer into the shadow maps. A clump and a pebble cluster default off, because a shadow that small costs a draw to resolve into nothing; a crown casts while it has a stem.' },
+  windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer. On kelp it is the swell rather than the wind.', byType: { clump: 0.18, kelp: 1.2 }, types: LEAFY },
+  windFrequency: { type: 'number', default: 0.45, help: 'ScatterWind frequency for the emitted layer.', byType: { clump: 1.1, kelp: 0.18 }, types: LEAFY },
+  windFlutter: { type: 'number', default: 0.35, help: 'ScatterWind flutter for the emitted layer.', byType: { clump: 0.7, kelp: 0.2 }, types: LEAFY },
+  cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50, kelp: 120, rock: 800, pebble: 60 } },
+  castShadow: { type: 'flag', default: true, byType: { clump: false, crown: null, kelp: false, pebble: false }, help: 'Draw the emitted layer into the shadow maps. A clump and a pebble cluster default off, because a shadow that small costs a draw to resolve into nothing; a crown casts while it has a stem.' },
   foliage: { type: 'flag', default: true, help: 'Shade the cutout piece as foliage: no specular, with transmission. Off shades it as a standard metallic-roughness surface.', types: LEAFY },
   foliageNormalMap: { type: 'flag', default: false, help: 'With foliage, light the cutout through its normal map as well. One more texture fetch per pixel, for large plants seen up close.', types: LEAFY },
   collider: { type: 'flag', default: true, help: 'Stop the player at the trunk, with a capsule measured off it. Off emits no collider, for a plant low enough to walk through: heather and gorse stop nobody, and a waist-high bush that does reads as a wall.', types: WOODY },
-  impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null, pebble: null, rock: { fromDistance: 120, views: 8, tileSize: 128 } }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
+  impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null, kelp: null, pebble: null, rock: { fromDistance: 120, views: 8, tileSize: 128 } }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint in metres. 0 derives it from the model. The most expensive number here: candidates go as 1/footprint squared.', byType: { clump: 0.7 } },
   yOffset: { type: 'number', default: 0, help: 'Metres added to the ScatterLayer yOffset, on top of any sink the model derives. Negative sinks the model into the ground.' },
-  alignToNormal: { type: 'number', default: 0, byType: { clump: CLUMP_ALIGN_TO_NORMAL, crown: null, rock: 1, pebble: 1 }, help: 'ScatterLayer alignToNormal, 0..1: how far each copy is laid onto the slope. 0 stands upright, 1 lies flush with the ground. A crown with a stem stands upright and one without takes the clump default. A wide clump patch wants 1, or its downhill rim floats.' },
+  alignToNormal: { type: 'number', default: 0, byType: { clump: CLUMP_ALIGN_TO_NORMAL, crown: null, kelp: 0, rock: 1, pebble: 1 }, help: 'ScatterLayer alignToNormal, 0..1: how far each copy is laid onto the slope. 0 stands upright, 1 lies flush with the ground. A crown with a stem stands upright and one without takes the clump default. A wide clump patch wants 1, or its downhill rim floats.' },
   scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75, rock: 0.6, pebble: 0.7 }, help: 'Lower bound of the emitted scale jitter.' },
   scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3, rock: 1.6, pebble: 1.4 } },
 
-  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048, pebble: 128 }, help: "Edge of the square texture template, and the long edge of the bark one; an authored bark keeps its shape and is reduced to fit. A clump or frond atlas holds every stamp, so it starts larger. A stone's chart is half this edge: a rock is one block of six charts, and a cluster is one block per pebble, so a pebble's charts are small and there are many.", texture: true },
-  barkTextureSize: { type: 'int', default: 0, help: 'Long edge of the bark map in pixels, so the bark and the leaf atlas can differ. 0 follows textureSize.', texture: true, types: WOODY },
-  barkAspect: { type: 'int', default: 2, help: 'How many times taller than wide the bark map is, and how many circumferences of branch one tile covers. 1 is square.', texture: true, types: WOODY },
+  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048, kelp: 1024, pebble: 128 }, help: "Edge of the square texture template, and the long edge of the bark one; an authored bark keeps its shape and is reduced to fit. A clump or frond atlas holds every stamp, so it starts larger. A stone's chart is half this edge: a rock is one block of six charts, and a cluster is one block per pebble, so a pebble's charts are small and there are many.", texture: true },
+  barkTextureSize: { type: 'int', default: 0, help: 'Long edge of the bark map in pixels, so the bark and the leaf atlas can differ. 0 follows textureSize.', texture: true, types: [...WOODY, 'kelp'] },
+  barkAspect: { type: 'int', default: 2, help: 'How many times taller than wide the bark map is, and how many circumferences of branch one tile covers. 1 is square.', texture: true, types: [...WOODY, 'kelp'] },
   preview: { type: 'int', default: 0, help: 'Write a shaded preview PNG at this pixel size. 0 writes none.' },
   previewAngles: { type: 'int', default: 4, help: 'Views in that preview: 4 lays quarter turns out 2x2, 1 writes the three-quarter view alone at this size, for a single screenshot.' },
   skipTextures: { type: 'flag', default: false, help: 'Reuse an existing texture set rather than writing one.' },
@@ -562,7 +600,8 @@ function parseAccent(entry: unknown, source: string, modelType: ForgeType): Acce
     if (raw[key] === undefined || raw[key] === null) throw new Error(`${source} needs '${key}'.`);
 
   if ('attach' in raw && modelType !== 'tree') throw new Error(`${source} key 'attach' applies to tree, not to a ${modelType}.`);
-  if ('depth' in raw && modelType !== 'crown') throw new Error(`${source} key 'depth' applies to crown, not to a ${modelType}.`);
+  if ('depth' in raw && modelType !== 'crown' && modelType !== 'kelp')
+    throw new Error(`${source} key 'depth' applies to crown and kelp, not to a ${modelType}.`);
 
   const stamps = raw.stamps;
   if (!Array.isArray(stamps) || !stamps.length || !stamps.every((name) => typeof name === 'string'))
@@ -658,7 +697,7 @@ export function toConfig(params: Params): Record<string, unknown> {
     saved.accents = params.accents.map(({ attach, depth, ...rest }) => ({
       ...rest,
       ...(params.type === 'tree' ? { attach } : {}),
-      ...(params.type === 'crown' && depth ? { depth } : {}),
+      ...((params.type === 'crown' || params.type === 'kelp') && depth ? { depth } : {}),
     }));
 
   return saved;
@@ -860,7 +899,7 @@ function validate(params: Params): void {
   if (params.textureSize < 128 || (params.textureSize & (params.textureSize - 1)) !== 0)
     throw new Error('textureSize must be a power of two of at least 128.');
 
-  if (params.type === 'tree' || params.type === 'crown') {
+  if (params.type === 'tree' || params.type === 'crown' || params.type === 'kelp') {
     if (params.barkTextureSize !== 0 && (params.barkTextureSize < 128 || (params.barkTextureSize & (params.barkTextureSize - 1)) !== 0))
       throw new Error('barkTextureSize must be a power of two of at least 128, or 0 to follow textureSize.');
     validateBarkShape(params);
@@ -868,6 +907,7 @@ function validate(params: Params): void {
 
   if (params.type === 'clump') validateClump(params);
   else if (params.type === 'crown') validateCrown(params);
+  else if (params.type === 'kelp') validateKelp(params);
   else if (params.type === 'rock') validateRock(params);
   else validateTree(params);
 
@@ -937,6 +977,49 @@ function validateCrown(params: Params): void {
     throw new Error(`frondSpan must be within 0..1, got ${params.frondSpan}.`);
 
   if (!(params.frondWidth > 0)) throw new Error(`frondWidth must be positive, got ${params.frondWidth}.`);
+
+  validateLeafNormalMode(params);
+  validateCards(params);
+}
+
+function validateKelp(params: Params): void {
+  const within = (key: keyof Params, low: number, high: number) => {
+    const value = params[key] as number;
+    if (!(value >= low && value <= high)) throw new Error(`${String(key)} must be within ${low}..${high}, got ${value}.`);
+  };
+  const positive = (key: keyof Params) => {
+    if (!((params[key] as number) > 0)) throw new Error(`${String(key)} must be positive, got ${params[key]}.`);
+  };
+
+  within('stipes', 1, 24);
+  within('stipeSpread', 0, 1);
+  positive('stipeRadius');
+  within('stipeTaper', 0.05, 1);
+  within('stipeLean', 0, 80);
+  within('stipeWander', 0, Infinity);
+  within('stipeHeights', 0, 0.9);
+  within('stipeSides', 3, 16);
+  within('stipeSegments', 2, 64);
+  within('holdfastRadius', 0, Infinity);
+  within('holdfastFingers', 0, 32);
+  within('holdfastHeight', 0, Infinity);
+  within('bladesPerStipe', 1, 64);
+  within('bladeSpan', 0, 1);
+  positive('bladeLength');
+  positive('bladeWidth');
+  within('bladeAngle', -90, 120);
+  within('bladeRuffle', 0, Infinity);
+  within('bladeRuffleWaves', 0, 32);
+  positive('bladderRadius');
+  within('surfaceMargin', 0, Infinity);
+  for (const key of ['colourVariance', 'midrib', 'corrugation', 'fray', 'epiphytes'] as const) within(key, 0, 1);
+
+  if (!(BLADE_LAYOUTS as readonly string[]).includes(params.bladeLayout))
+    throw new Error(`bladeLayout must be one of ${BLADE_LAYOUTS.join(', ')}, got '${params.bladeLayout}'.`);
+  if (!(BLADDER_KINDS as readonly string[]).includes(params.bladders))
+    throw new Error(`bladders must be one of ${BLADDER_KINDS.join(', ')}, got '${params.bladders}'.`);
+  if (params.bladeLength >= params.height)
+    throw new Error(`bladeLength ${params.bladeLength} must be shorter than height ${params.height}: the stalk carries it.`);
 
   validateLeafNormalMode(params);
   validateCards(params);
@@ -1279,7 +1362,9 @@ export function textureKeys(type: ForgeType): (keyof typeof PARAM_SPEC)[] {
 export function sameTexture(a: Params, b: Params): boolean {
   const seen = (params: Params, key: keyof typeof PARAM_SPEC): unknown =>
     key === 'accents'
-      ? params.accents.map((accent) => (params.type === 'crown' || params.type === 'clump' ? [accent.stamps, accent.aspect] : accent.stamps))
+      ? params.accents.map((accent) =>
+          params.type === 'crown' || params.type === 'clump' || params.type === 'kelp' ? [accent.stamps, accent.aspect] : accent.stamps
+        )
       : params[key];
   return a.type === b.type && textureKeys(a.type).every((key) => JSON.stringify(seen(a, key)) === JSON.stringify(seen(b, key)));
 }

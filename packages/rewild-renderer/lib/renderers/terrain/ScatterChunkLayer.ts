@@ -395,9 +395,11 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
       world[12],
       world[14],
       wind.gustDrift,
+      wind.swellClock,
       uniforms,
       60
     );
+    uniforms[68] = this.layer.waterCeiling ?? 0;
 
     renderer.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);
   }

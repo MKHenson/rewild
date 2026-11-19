@@ -19,6 +19,7 @@ import type { ScatterLayer } from 'rewild-renderer/lib/renderers/terrain/Scatter
 import { writeGlb } from './lib/glb.ts';
 import { buildClump, type ClumpMetrics } from './lib/clump.ts';
 import { buildCrown, type CrownMetrics } from './lib/crown.ts';
+import { buildKelp, type KelpMetrics } from './lib/kelp.ts';
 import { boundsOf, buildMesh, totalTriangles, type BarkTile, type ForgeMesh } from './lib/mesh.ts';
 import { heightPieces, materialPieces, pieceKeys } from './lib/pieces.ts';
 import {
@@ -51,6 +52,7 @@ import {
   loadBarkSource,
   loadClumpSource,
   loadFrondSource,
+  loadKelpSource,
   loadLeafSource,
   widestAspect,
   type BarkSource,
@@ -62,6 +64,7 @@ import {
   clumpLayer,
   crownLayer,
   geometryEntry,
+  kelpLayer,
   materialEntries,
   pebbleLayer,
   rockLayer,
@@ -74,6 +77,7 @@ import {
 import {
   buildClumpCanvases,
   buildCrownCanvases,
+  buildKelpCanvases,
   buildTreeCanvases,
   readSetManifest,
   textureFileNames,
@@ -95,6 +99,8 @@ interface Grown {
   metrics: ClumpMetrics | null;
   /** What a crown's report is measured off. */
   crown: CrownMetrics | null;
+  /** What kelp's report is measured off. */
+  kelp?: KelpMetrics;
   /** The field a rock was grown from, which its bake reads too. */
   rock: Rock | null;
   /** The pebbles a cluster was packed from, and the blocks their bakes read. */
@@ -281,6 +287,8 @@ async function loadSources(params: Params): Promise<Sources> {
     case 'rock':
     case 'pebble':
       return { barkSource: null, leafSource: null, accentSources };
+    case 'kelp':
+      return { barkSource: await loadBarkSource(params.bark), leafSource: await loadKelpSource(params.blades), accentSources };
     case 'crown':
       return {
         barkSource: hasStem(params) ? await loadBarkSource(params.bark) : null,
@@ -365,6 +373,20 @@ function grow(params: Params, layout: AtlasLayout, bark: BarkTile | null): Grown
     };
   }
 
+  if (params.type === 'kelp') {
+    const kelp = buildKelp(params, layout, bark);
+    return {
+      mesh: kelp.mesh,
+      skeleton: null,
+      metrics: null,
+      crown: null,
+      kelp: kelp.metrics,
+      rock: null,
+      cluster: null,
+      layer: kelpLayer(params, kelp.metrics),
+    };
+  }
+
   if (params.type === 'rock') {
     const rock = buildRock(params);
     return { mesh: rock.mesh, skeleton: null, metrics: null, crown: null, rock, cluster: null, layer: rockLayer(params, rock) };
@@ -402,6 +424,7 @@ function paint(
 ): Canvases {
   if (params.type === 'clump') return buildClumpCanvases(params, leafSource, accentSources);
   if (params.type === 'crown') return buildCrownCanvases(params, hasStem(params), barkSource, leafSource, accentSources);
+  if (params.type === 'kelp') return buildKelpCanvases(params, barkSource, leafSource, accentSources);
   if (params.type === 'rock') return buildRockCanvases(params, rock!.field);
   if (params.type === 'pebble') return buildPebbleCanvases(params, cluster!);
   return buildTreeCanvases(params, barkSource, leafSource, accentSources);
@@ -688,6 +711,12 @@ function describeSources({ params, barkSource, leafSource, accentSources, layout
         ...describeFronds(params, leafSource, layout),
         ...accents,
       ];
+    case 'kelp':
+      return [
+        describeBark(params, barkSource).replace('  bark    ', '  stipe   '),
+        ...describeFronds(params, leafSource, layout).map((line) => line.replace('  fronds  ', '  blades  ')),
+        ...accents,
+      ];
     default:
       return [describeBark(params, barkSource), ...describeLeaves(params, leafSource, layout), ...accents];
   }
@@ -700,7 +729,14 @@ function lowestLimb(skeleton: Skeleton): number {
 }
 
 /** The second line of the report: what the model measures, by type. */
-function describeShape({ params, skeleton, metrics, crown, rock, cluster }: Built): string {
+function describeShape({ params, skeleton, metrics, crown, kelp, rock, cluster }: Built): string {
+  if (kelp)
+    return (
+      `  height ${kelp.height.toFixed(2)}m, ${kelp.stipes} stalk${kelp.stipes === 1 ? '' : 's'} up to ${kelp.stalk.toFixed(2)}m, ` +
+      `${kelp.blades} blades (${params.bladeLayout}), ${kelp.bladders} floats, spread ${kelp.spread.toFixed(2)}m` +
+      (params.surfaceCanopy ? `, folds ${params.surfaceMargin}m under the surface` : '')
+    );
+
   if (cluster) {
     const span = cluster.metrics.spread * 2;
     return (

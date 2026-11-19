@@ -65,10 +65,62 @@ fn gustField(world: vec2f, drift: vec2f) -> f32 {
     0.2 * windNoise(e * 6.3 + vec2f(-71.0, 23.0));
 }
 
+// Under water: the swell surges a plant back and forth along the wind's line
+// rather than leaning it one way. Each spot on the bed takes its own phase from
+// a fixed field, so neighbours a few metres apart are out of step. The field
+// never moves: a phase from position along the wind would sweep as the wind
+// turns, and at hundreds of metres out that speeds the whole forest up. Up a
+// plant the phase lags with its bend weight, so the tip trails the base and the
+// stalk whips in an S rather than tipping as a rod. A slow drift across the
+// line, from the same field the wind reads, keeps a forest from swaying in
+// lockstep.
+const SWELL_LENGTH = 12.0;
+const SWELL_SPREAD = 1.5;
+const SWELL_LAG = 2.6;
+
+fn scatterSwellOffset(
+  wind: vec4f,
+  params: vec4f,
+  origin: vec4f,
+  weights: vec4f,
+  instancePhase: f32,
+  scale: f32,
+  chunkPosition: vec3f
+) -> vec3f {
+  let bend = weights.r;
+  let amplitude = params.x * (0.45 + 0.55 * wind.z) * scale;
+  if (bend * amplitude <= 0.0) {
+    return vec3f(0.0);
+  }
+
+  let along = vec3f(wind.x, 0.0, wind.y);
+  let across = vec3f(-wind.y, 0.0, wind.x);
+  let t = params.w - 1.0;
+  let world = chunkPosition.xz + origin.xy;
+  let arrival = windNoise(world / SWELL_LENGTH) * SWELL_SPREAD;
+  let drift = windNoise(world / GUST_LENGTH + vec2f(t * 0.02, 0.0)) - 0.5;
+
+  let phase =
+    t * params.y * WIND_TAU - arrival * WIND_TAU - bend * SWELL_LAG + 0.3 * instancePhase * WIND_TAU;
+  let surge = amplitude * bend * sin(phase);
+  var offset = along * surge + across * (amplitude * bend * drift * 0.6);
+  // The blades ride up a little at each end of the surge, as they lift in it.
+  offset.y += amplitude * bend * 0.15 * abs(sin(phase));
+
+  let flutter = params.z * amplitude * bend * weights.b;
+  if (flutter > 0.0) {
+    let ft = t * params.y * WIND_TAU * 2.3 + (weights.g + weights.a) * WIND_TAU;
+    offset += across * (flutter * sin(ft)) + vec3f(0.0, flutter * 0.5 * cos(ft * 1.21), 0.0);
+  }
+
+  return offset;
+}
+
 // `wind`: xy = world-space direction the air moves, z = strength 0..1, w =
 // the wind clock in full-wind seconds. `params`: x = metres of sway at bend 1
 // in full wind, y = sway cycles per full-wind second, z = flutter as a
-// fraction of the sway. `origin` xy is the drawing chunk's world xz, so the
+// fraction of the sway, w = 0 in air, else 1 plus the swell clock, which hands
+// the vertex to scatterSwellOffset. `origin` xy is the drawing chunk's world xz, so the
 // field is sampled in world space and crosses chunk borders without a seam,
 // and zw is the metres the gust field has drifted (WindState.gustDrift);
 // `chunkPosition` is the vertex after its instance transform.
@@ -81,6 +133,9 @@ fn scatterWindOffset(
   scale: f32,
   chunkPosition: vec3f
 ) -> vec3f {
+  if (params.w >= 1.0) {
+    return scatterSwellOffset(wind, params, origin, weights, instancePhase, scale, chunkPosition);
+  }
   let bend = weights.r * weights.r;
   let amplitude = params.x * wind.z * scale;
   if (bend * amplitude <= 0.0) {

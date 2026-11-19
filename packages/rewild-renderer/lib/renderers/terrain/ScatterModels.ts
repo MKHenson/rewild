@@ -132,6 +132,10 @@ function buildTier(
       `Scatter layer '${layer.name}' model '${layer.geometryId}' LOD ${tier} has no drawable primitives.`
     );
 
+  // Every piece folds, the stalks with the blades, or they part at the surface.
+  if (layer.waterCeiling !== undefined)
+    for (const piece of built) piece.pass.waterCeiling = true;
+
   // These flags name the cutout piece, so a model with none of one has
   // quietly ignored them. The symptom is half a canopy going black, a long
   // way from whatever was actually changed.

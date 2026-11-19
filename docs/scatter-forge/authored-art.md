@@ -147,6 +147,9 @@ a larger source image.
 
 `depthMetres` is optional in both.
 
+Kelp art goes under `sources/kelp/` and follows the same rules as frond art. See
+[Kelp](kelp.md#kelp-art).
+
 ## Colour-only art
 
 The `cardinal-flower-01` template uses a `fronds` folder that holds only three `-diff` images. The

@@ -6,6 +6,7 @@ import {
   getClimatePalette,
 } from './Biomes';
 import { generateSplatMap } from './Splat';
+import { LAKE, OCEAN } from './Water';
 
 // The layer rules themselves are unit tested with the Rust splat generator
 // (terrain crate, `layer_weights`). These pin what the shipped mountain table
@@ -27,6 +28,7 @@ const ONLY_MOUNTAIN: ClimateConfig = {
   moisture: { scale: 1000, seedSalt: 2, cuts: [], blendHalfWidth: 0.1 },
   biomes: [MOUNTAIN],
   cells: [[0]],
+  water: [OCEAN, LAKE],
 };
 const PALETTE = getClimatePalette(ONLY_MOUNTAIN);
 const MATERIALS = MOUNTAIN.layers.map((layer) => layer.material);

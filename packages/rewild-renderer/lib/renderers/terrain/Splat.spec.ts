@@ -11,6 +11,7 @@ import {
 import { generateBiomeBlendedHeightMap } from './Noise';
 import { generateSplatMap, sampleSplatMap } from './Splat';
 import { createPaintMask, PaintMask } from './PaintMask';
+import { LAKE, OCEAN } from './Water';
 
 const SIZE = 32;
 const SEED = 1234;
@@ -41,6 +42,7 @@ function climateOfOneBiome(biomeIndex: number): ClimateConfig {
     // below — matches DEFAULT_CLIMATE's even though only one cell is reachable.
     biomes: [PLAIN, FOREST, MOUNTAIN],
     cells: [[biomeIndex]],
+    water: [OCEAN, LAKE],
   };
 }
 
