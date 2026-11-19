@@ -32,6 +32,32 @@ describe('UISurface stats', () => {
   });
 });
 
+describe('UISurface onLayout', () => {
+  it('lays out again when it moves a node, a few times at most', () => {
+    const { surface, a } = tree();
+    a.style.position = 'absolute';
+    let calls = 0;
+    surface.onLayout = () => {
+      calls++;
+      a.style.left = a.rect.x + 10;
+    };
+    surface.update(100, 100);
+    expect(calls).toBe(3);
+    expect(a.rect.x).toBe(20);
+    expect(surface.needsLayout).toBe(false);
+  });
+
+  it('lays out once when it moves nothing', () => {
+    const { surface, a } = tree();
+    let calls = 0;
+    surface.onLayout = () => calls++;
+    a.style.width = 20;
+    surface.update(100, 100);
+    expect(calls).toBe(1);
+    expect(a.rect.width).toBe(20);
+  });
+});
+
 describe('UINode tree', () => {
   it('appends children in order', () => {
     const parent = new UINode();

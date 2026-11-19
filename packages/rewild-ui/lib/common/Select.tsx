@@ -1,7 +1,6 @@
 import { Icon } from './Icon';
 import { Component, register } from '../Component';
 import { theme } from '../theme';
-import { glassSurface } from './glassStyle';
 import { underlineField } from './fieldStyle';
 
 type OptionType = { value: string; label: string };
@@ -267,8 +266,8 @@ const StyledOptions = cssStylesheet(css`
     /* Matches the control it drops out of. */
     border-radius: 4px;
     cursor: pointer;
-    /* Mostly opaque: a dropdown opens over other text. */
-    ${glassSurface('85%')}
+    /* Opaque: glass is for modals and panels over the scene. */
+    background-color: ${theme.colors.surface};
     border: 1px solid ${theme.colors.glassEdge};
     box-shadow: ${theme.colors.shadowShort2};
     /* A long list scrolls rather than running off the viewport. x stays hidden
