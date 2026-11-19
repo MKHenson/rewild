@@ -11,6 +11,7 @@ pub mod lakes;
 pub mod mesh;
 pub mod paint;
 pub mod scatter;
+pub mod sea;
 pub mod splat;
 pub mod water;
 

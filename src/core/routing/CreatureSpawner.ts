@@ -1,6 +1,6 @@
 import { IResource } from 'models';
 import { Vector3 } from 'rewild-common';
-import { resolveClimatePreset } from 'rewild-renderer';
+import { createWaterQuerySample, resolveClimatePreset } from 'rewild-renderer';
 import { BiomeProbe } from 'rewild-renderer/lib/renderers/terrain/BiomeProbe';
 import { Container, IAsset } from 'rewild-routing';
 import { getCreaturePreset } from '../creatures/CreaturePresets';
@@ -32,6 +32,7 @@ const CHECK_INTERVAL = 0.5;
 const CHUNK_KEY_RANGE = 32768;
 
 const UP = new Vector3(0, 1, 0);
+const _water = createWaterQuerySample();
 
 let active: CreatureSpawner | null = null;
 
@@ -76,6 +77,10 @@ export interface SpawnerReport {
   playerChunk: string | null;
   heightsLoaded: boolean;
   biomes: Record<string, number>;
+  /** The sea biomes over the water at the player; empty when dry. */
+  seaBiomes: Record<string, number>;
+  /** The water at the player, as the sea biomes read it. Null when dry. */
+  water: { depth: number; shore: number; coverage: number } | null;
   live: number;
   chunks: number;
   groups: SpawnGroupReport[];
@@ -122,6 +127,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
   private data: StateMachineData | null = null;
   private world: CreatureWorld | null = null;
   private biomes: readonly SpawnBiome[] = [];
+  private seaBiomes = new Set<string>();
   private readonly chunks = new Map<number, SpawnGroup[]>();
   private readonly live: SpawnGroup[] = [];
   private readonly habitats = new Map<string, Habitat | null>();
@@ -153,9 +159,12 @@ export class CreatureSpawner extends Container implements SpawnSite {
     if (!data?.gameManager) return;
     this.data = data;
     this.world = createCreatureWorld(data);
-    this.biomes = resolveClimatePreset(
+    const climate = resolveClimatePreset(
       data.renderer.terrainRenderer.climatePreset
-    ).biomes;
+    );
+    const sea = climate.sea?.biomes ?? [];
+    this.biomes = [...climate.biomes, ...sea];
+    this.seaBiomes = new Set(sea.map((b) => b.name));
     this.timer = 0;
     active = this;
   }
@@ -187,8 +196,15 @@ export class CreatureSpawner extends Container implements SpawnSite {
   }
 
   biomeWeight(name: string, x: number, z: number): number {
-    if (!this.data) return 0;
-    this.probe.probe(this.data.renderer.terrainRenderer, x, z);
+    const { data, world } = this;
+    if (!data || !world) return 0;
+    const terrain = data.renderer.terrainRenderer;
+    if (this.seaBiomes.has(name)) {
+      if (!world.sampleWater(x, z, _water)) return 0;
+      this.probe.probeSea(terrain, x, z, _water);
+      return this.probe.seaWeightOf(name);
+    }
+    this.probe.probe(terrain, x, z);
     return this.probe.weightOf(name);
   }
 
@@ -223,6 +239,8 @@ export class CreatureSpawner extends Container implements SpawnSite {
       playerChunk: null,
       heightsLoaded: false,
       biomes: {},
+      seaBiomes: {},
+      water: null,
       live: this.count,
       chunks: this.chunks.size,
       groups: [],
@@ -238,6 +256,19 @@ export class CreatureSpawner extends Container implements SpawnSite {
     for (let i = 0; i < count; i++)
       report.biomes[climate.biomes[this.probe.biomes![i]].name] =
         this.probe.weights![i];
+    if (world.sampleWater(player.x, player.z, _water) && _water.wet) {
+      report.water = {
+        depth: Math.round(_water.depth * 10) / 10,
+        shore: Math.round(_water.shore),
+        coverage: Math.round(_water.coverage * 100) / 100,
+      };
+      this.probe.probeSea(terrain, player.x, player.z, _water);
+      const seaBiomes = climate.sea?.biomes ?? [];
+      for (let i = 0; i < seaBiomes.length; i++) {
+        const weight = this.probe.seaWeights![i];
+        if (weight > 0) report.seaBiomes[seaBiomes[i].name] = weight;
+      }
+    }
 
     this.chunks.forEach((groups, key) => {
       const cx = Math.floor(key / (CHUNK_KEY_RANGE * 2)) - CHUNK_KEY_RANGE;

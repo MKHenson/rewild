@@ -68,6 +68,7 @@ describe('FarMapBuilder', () => {
       temperature: { ...DEFAULT_CLIMATE.temperature, cuts: [] },
       biomes: [FOREST, PLAIN, MOUNTAIN],
       cells: [[0]],
+      sea: undefined,
     };
     const palette = getClimatePalette(forestOnly);
     const forest = new Set(FOREST.layers.map((l) => palette.indexOf(l.material)));
@@ -86,6 +87,7 @@ describe('FarMapBuilder', () => {
       temperature: { ...DEFAULT_CLIMATE.temperature, cuts: [] },
       biomes: [MOUNTAIN, PLAIN, FOREST],
       cells: [[0]],
+      sea: undefined,
     };
     const snow = getClimatePalette(mountainOnly).indexOf('snow_field_aerial');
     const builder = new FarMapBuilder(SEED, mountainOnly, 0, 0, 64000, 32);

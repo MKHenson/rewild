@@ -24,6 +24,46 @@ pub struct ClimateConfig {
     pub biomes: Vec<Biome>,
     /// `cells[temperatureBand][moistureBand]` is an index into `biomes`.
     pub cells: Vec<Vec<i64>>,
+    /// Biomes under the water. Without it the land biomes run to the bed.
+    pub sea: Option<SeaConfig>,
+}
+
+/// Biomes under the water, picked by temperature and zone.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SeaConfig {
+    /// Metres of water over which the sea biomes take the bed from the land's.
+    pub handover: Band,
+    pub zones: Vec<SeaZone>,
+    pub biomes: Vec<SeaBiome>,
+    /// `cells[temperatureBand][zone]` is an index into `biomes`.
+    pub cells: Vec<Vec<i64>>,
+}
+
+/// One column of the sea's cells. Its weight is the product of its selectors,
+/// shared out with the other zones there.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SeaZone {
+    pub name: String,
+    /// Weighted by this water type. Without it, any water.
+    pub water_type: Option<String>,
+    /// Metres of water from the bed to the surface.
+    pub depth: Option<Selector>,
+    /// Metres to dry ground, up to `SHORE_CAP`.
+    pub shore: Option<Selector>,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SeaBiome {
+    pub name: String,
+    /// Surfaces the bed, base first.
+    #[serde(default, deserialize_with = "or_default")]
+    pub layers: Vec<Layer>,
+    /// What grows on the bed. Every rule grows under water.
+    #[serde(default, deserialize_with = "or_default")]
+    pub scatter: Vec<ScatterRule>,
 }
 
 #[derive(Deserialize, Clone, Debug)]

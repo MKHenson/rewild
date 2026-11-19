@@ -689,5 +689,5 @@ fn validate(climate: &ClimateConfig) -> Result<(), String> {
             }
         }
     }
-    Ok(())
+    crate::sea::validate(climate)
 }

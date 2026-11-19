@@ -31,6 +31,7 @@ function climateFor(
     coast,
     biomes: [biome],
     cells: [[0]],
+    sea: undefined,
   };
 }
 

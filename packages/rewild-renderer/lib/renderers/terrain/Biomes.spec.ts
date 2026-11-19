@@ -7,6 +7,7 @@ import {
   MOUNTAIN,
   resolveClimatePreset,
   validateBiomeScatter,
+  validateClimateLayers,
 } from './Biomes';
 
 function climateWithScatter(scatter: BiomeScatter[]): ClimateConfig {
@@ -71,5 +72,62 @@ describe('validateBiomeScatter', () => {
           climateWithScatter([{ layer: 'granite_pebble_01', density }])
         )
       ).toThrow(/density .* must be within/);
+  });
+});
+
+describe('sea biomes', () => {
+  const sea = DEFAULT_CLIMATE.sea!;
+
+  it('accepts the shipped presets', () => {
+    for (const climate of Object.values(CLIMATE_PRESETS))
+      expect(() => validateClimateLayers(climate)).not.toThrow();
+  });
+
+  it('rejects cells that do not follow the temperature bands and zones', () => {
+    const rows: ClimateConfig = {
+      ...DEFAULT_CLIMATE,
+      sea: { ...sea, cells: sea.cells.slice(1) },
+    };
+    expect(() => validateClimateLayers(rows)).toThrow(/temperature rows/);
+    const zones: ClimateConfig = {
+      ...DEFAULT_CLIMATE,
+      sea: { ...sea, zones: sea.zones.slice(1) },
+    };
+    expect(() => validateClimateLayers(zones)).toThrow(/zone entries/);
+    const index: ClimateConfig = {
+      ...DEFAULT_CLIMATE,
+      sea: { ...sea, cells: sea.cells.map((row) => row.map(() => 99)) },
+    };
+    expect(() => validateClimateLayers(index)).toThrow(/out of range/);
+  });
+
+  it('rejects a sea biome named like a land biome', () => {
+    const climate: ClimateConfig = {
+      ...DEFAULT_CLIMATE,
+      sea: {
+        ...sea,
+        biomes: sea.biomes.map((b, i) =>
+          i === 0 ? { ...b, name: DEFAULT_CLIMATE.biomes[0].name } : b
+        ),
+      },
+    };
+    expect(() => validateClimateLayers(climate)).toThrow(/shares its name/);
+  });
+
+  it('rejects a zone whose water type the palette lacks', () => {
+    const climate: ClimateConfig = {
+      ...DEFAULT_CLIMATE,
+      water: DEFAULT_CLIMATE.water!.filter((type) => type.name !== 'lake'),
+      lakes: undefined,
+    };
+    expect(() => validateClimateLayers(climate)).toThrow(/Sea zone 'lake'/);
+  });
+
+  it('rejects a handover that does not deepen', () => {
+    const climate: ClimateConfig = {
+      ...DEFAULT_CLIMATE,
+      sea: { ...sea, handover: { from: 2, to: 1 } },
+    };
+    expect(() => validateClimateLayers(climate)).toThrow(/handover/);
   });
 });

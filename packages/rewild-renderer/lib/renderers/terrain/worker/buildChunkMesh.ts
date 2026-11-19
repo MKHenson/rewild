@@ -57,8 +57,8 @@ export interface BuildChunkMeshRequest {
   // edits, so this build leaves them out. Both are chunk-wide, not per LOD.
   skipSplat?: boolean;
   skipWater?: boolean;
-  // The chunk's resident shore distance, for scatter when skipWater leaves
-  // the water map out.
+  // The chunk's resident shore distance, for the splat and scatter when
+  // skipWater leaves the water map out.
   shore?: Uint8Array;
 }
 
@@ -124,10 +124,10 @@ export interface BuildChunkMeshResult {
 // The stages of one build, in the order they run.
 export type ChunkMeshStage =
   | 'heights'
+  | 'water'
   | 'splat'
   | 'mesh'
   | 'scatter'
-  | 'water'
   | 'total';
 
 // Milliseconds each stage took. A stage that did not run has no entry.
@@ -216,10 +216,28 @@ export function buildChunkMesh(
   }
   lap('heights');
 
+  // Built from the same heights, so a sculpted chunk's shore follows the edit.
+  let water: WaterMap | null | undefined;
+  if (!request.skipWater) {
+    water = buildWaterMap(
+      chunkSize,
+      seed,
+      worldOffset,
+      climate,
+      seaLevel,
+      heights,
+      request.waterEdit ?? null,
+      request.neighbourWet ?? null
+    );
+    lap('water');
+  }
+  const shore = water ? water.shore : request.shore ?? null;
+
   // Per-biome material weights, derived from the same climate model that shaped
   // the heights plus each biome's slope/height layer rules, with any painted
-  // biome mask displacing the climate's choice. Derived rather than stored, so
-  // it is correct for generated and sculpted chunks alike.
+  // biome mask displacing the climate's choice, and the sea biomes under the
+  // water. Derived rather than stored, so it is correct for generated and
+  // sculpted chunks alike.
   let splat: Uint8Array | undefined;
   if (!request.skipSplat) {
     splat = generateSplatMap(
@@ -229,7 +247,12 @@ export function buildChunkMesh(
       worldOffset,
       climate,
       heights,
-      { biomeMask: request.biomeMask ?? null, seaLevel }
+      {
+        biomeMask: request.biomeMask ?? null,
+        seaLevel,
+        waterEdit: request.waterEdit ?? null,
+        shore,
+      }
     );
     lap('splat');
   }
@@ -249,22 +272,6 @@ export function buildChunkMesh(
   );
   lap('mesh');
 
-  // Built from the same heights, so a sculpted chunk's shore follows the edit.
-  let water: WaterMap | null | undefined;
-  if (!request.skipWater) {
-    water = buildWaterMap(
-      chunkSize,
-      seed,
-      worldOffset,
-      climate,
-      seaLevel,
-      heights,
-      request.waterEdit ?? null,
-      request.neighbourWet ?? null
-    );
-    lap('water');
-  }
-
   // Derived from the same heights and climate the splat was, so an instance
   // stands on the material its own rules selected for.
   const scatter = request.scatter
@@ -274,7 +281,7 @@ export function buildChunkMesh(
         killSet: request.scatterKills ?? null,
         seaLevel,
         waterEdit: request.waterEdit ?? null,
-        shore: water ? water.shore : request.shore ?? null,
+        shore,
       })
     : [];
   if (request.scatter) lap('scatter');

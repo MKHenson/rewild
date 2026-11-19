@@ -17,6 +17,7 @@ use crate::config::{Band, ClimateConfig, CoastConfig, ScatterRule};
 use crate::grid::{gradient_at, nearest_index, sample_bilinear, slope_at};
 use crate::lakes::{field_origin, lake_to_world};
 use crate::paint::{ActiveBiomes, PaintMask};
+use crate::sea::{SeaResolver, SeaWater};
 use crate::splat::{band_coverage, coast_weights, selector_coverage};
 use crate::water::{WaterEdit, WaterPoint, WaterSampler};
 use crate::HeightGenerator;
@@ -253,7 +254,12 @@ struct LayerRules {
     rule: Vec<Option<usize>>,
     /// Per biome, the water type its rule asks for.
     water_type: Vec<Option<usize>>,
+    /// The same two per sea biome.
+    sea_rule: Vec<Option<usize>>,
+    sea_water_type: Vec<Option<usize>>,
     any: bool,
+    /// Any sea biome grows the layer.
+    sea_any: bool,
     /// The densest of the rules.
     max_density: f64,
 }
@@ -265,6 +271,8 @@ pub struct ScatterGenerator {
     rules: Vec<LayerRules>,
     /// Per biome, per rule, its noise field's offset.
     noise: Vec<Vec<Option<(f64, f64)>>>,
+    /// The same per sea biome.
+    sea_noise: Vec<Vec<Option<(f64, f64)>>>,
     simplex: Simplex,
     field: ClimateField,
     seed: i32,
@@ -282,37 +290,61 @@ impl ScatterGenerator {
         meters_per_sample: f64,
     ) -> Result<Self, String> {
         let biomes = climate.biomes.len();
+        let sea_biomes = climate.sea.as_ref().map_or(&[][..], |s| &s.biomes[..]);
         let mut rules: Vec<LayerRules> = (0..layers.len())
-            .map(|_| LayerRules { rule: vec![None; biomes], water_type: vec![None; biomes], any: false, max_density: 0.0 })
+            .map(|_| LayerRules {
+                rule: vec![None; biomes],
+                water_type: vec![None; biomes],
+                sea_rule: vec![None; sea_biomes.len()],
+                sea_water_type: vec![None; sea_biomes.len()],
+                any: false,
+                sea_any: false,
+                max_density: 0.0,
+            })
             .collect();
-        let mut noise = Vec::with_capacity(biomes);
+        let slot_of = |biome: &str, rule: &ScatterRule| {
+            layers
+                .iter()
+                .position(|l| l.name == rule.layer)
+                .ok_or_else(|| format!("Biome '{biome}' grows unknown scatter layer '{}'.", rule.layer))
+        };
+        let water_type_of = |rule: &ScatterRule| {
+            rule.water_type.as_ref().and_then(|name| climate.water.iter().position(|w| &w.name == name))
+        };
+        let noise_of = |scatter: &[ScatterRule]| -> Vec<Option<(f64, f64)>> {
+            scatter
+                .iter()
+                .map(|rule| {
+                    rule.noise.as_ref().map(|n| {
+                        let mut rng = ParkMiller::new(seed + n.seed_salt);
+                        let x = rng.offset();
+                        (x, rng.offset())
+                    })
+                })
+                .collect()
+        };
+
         for (b, biome) in climate.biomes.iter().enumerate() {
             for (r, rule) in biome.scatter.iter().enumerate() {
-                let slot = layers
-                    .iter()
-                    .position(|l| l.name == rule.layer)
-                    .ok_or_else(|| format!("Biome '{}' grows unknown scatter layer '{}'.", biome.name, rule.layer))?;
-                let layer = &mut rules[slot];
+                let layer = &mut rules[slot_of(&biome.name, rule)?];
                 layer.rule[b] = Some(r);
-                layer.water_type[b] =
-                    rule.water_type.as_ref().and_then(|name| climate.water.iter().position(|w| &w.name == name));
+                layer.water_type[b] = water_type_of(rule);
                 layer.any = true;
                 layer.max_density = layer.max_density.max(rule.density);
             }
-            noise.push(
-                biome
-                    .scatter
-                    .iter()
-                    .map(|rule| {
-                        rule.noise.as_ref().map(|n| {
-                            let mut rng = ParkMiller::new(seed + n.seed_salt);
-                            let x = rng.offset();
-                            (x, rng.offset())
-                        })
-                    })
-                    .collect(),
-            );
         }
+        for (b, biome) in sea_biomes.iter().enumerate() {
+            for (r, rule) in biome.scatter.iter().enumerate() {
+                let layer = &mut rules[slot_of(&biome.name, rule)?];
+                layer.sea_rule[b] = Some(r);
+                layer.sea_water_type[b] = water_type_of(rule);
+                layer.any = true;
+                layer.sea_any = true;
+                layer.max_density = layer.max_density.max(rule.density);
+            }
+        }
+        let noise = climate.biomes.iter().map(|b| noise_of(&b.scatter)).collect();
+        let sea_noise = sea_biomes.iter().map(|b| noise_of(&b.scatter)).collect();
         Ok(Self {
             field: ClimateField::new(seed, &climate),
             simplex: Simplex::new(seed),
@@ -320,6 +352,7 @@ impl ScatterGenerator {
             layers,
             rules,
             noise,
+            sea_noise,
             seed: to_int32(seed),
             sea_level,
             meters_per_sample,
@@ -332,12 +365,16 @@ impl ScatterGenerator {
     }
 
     /// A rule's noise field at lake space (`u`, `v`), 0 to 1; 0 for a rule
-    /// without one.
-    fn rule_noise(&self, biome: usize, rule: usize, u: f64, v: f64) -> f64 {
-        match (self.noise[biome][rule], &self.climate.biomes[biome].scatter[rule].noise) {
+    /// without one. `offset` is its field's offset.
+    fn noise_at(&self, offset: Option<(f64, f64)>, rule: &ScatterRule, u: f64, v: f64) -> f64 {
+        match (offset, &rule.noise) {
             (Some((ox, oy)), Some(n)) => (self.simplex.noise((u + ox) / n.scale, (v - oy) / n.scale) + 1.0) * 0.5,
             _ => 0.0,
         }
+    }
+
+    fn rule_noise(&self, biome: usize, rule: usize, u: f64, v: f64) -> f64 {
+        self.noise_at(self.noise[biome][rule], &self.climate.biomes[biome].scatter[rule], u, v)
     }
 
     /// Layer `slot`'s density at lake space (`u`, `v`) seen from past the
@@ -443,9 +480,10 @@ impl ScatterGenerator {
             shore: request.shore.as_ref(),
         };
         let mut active = ActiveBiomes::new(climate, chunk.biome_mask);
+        let mut sea = SeaResolver::new(climate);
         let mut results = Vec::new();
         for slot in slots {
-            let layer = self.place(&chunk, slot, &mut active)?;
+            let layer = self.place(&chunk, slot, &mut active, &mut sea)?;
             if layer.count > 0 {
                 results.push(layer);
             }
@@ -454,7 +492,13 @@ impl ScatterGenerator {
     }
 
     /// One layer's instances in `chunk`.
-    fn place(&self, chunk: &Chunk, slot: usize, active: &mut ActiveBiomes) -> Result<LayerInstances, String> {
+    fn place(
+        &self,
+        chunk: &Chunk,
+        slot: usize,
+        active: &mut ActiveBiomes,
+        sea: &mut Option<SeaResolver>,
+    ) -> Result<LayerInstances, String> {
         let climate = &self.climate;
         let layer = &self.layers[slot];
         let rules = &self.rules[slot];
@@ -530,7 +574,8 @@ impl ScatterGenerator {
                 let mut density = 0.0;
                 if rules.any {
                     let (wx, wy) = (sx + chunk.origin.0, sy + chunk.origin.1);
-                    active.resolve(climate, &chunk.grid.at(wx, wy), chunk.biome_mask, sx, sy);
+                    let values = chunk.grid.at(wx, wy);
+                    active.resolve(climate, &values, chunk.biome_mask, sx, sy);
                     let mut water: Option<(WaterPoint, f64)> = None;
                     for b in 0..active.count {
                         let biome = active.biomes[b];
@@ -558,6 +603,30 @@ impl ScatterGenerator {
                         density += active.weights[b]
                             * rule_density
                             * rule_water(rule, point.level - height, point.coverage, type_weight, beach, shore);
+                    }
+
+                    if let (true, Some(resolver), Some(sea)) = (rules.sea_any, sea.as_mut(), &climate.sea) {
+                        let point = water.map_or_else(|| chunk.water.sample(sx, sy), |(point, _)| point);
+                        let depth = point.level - height;
+                        let shore = chunk.shore.map_or(0.0, |mask| mask.sample_channel(0, sx, sy) * 255.0);
+                        let at = SeaWater { depth, coverage: point.coverage, shore, types: &point.types };
+                        if resolver.resolve(sea, &climate.temperature, values.temperature, &at) > 0.0 {
+                            for (b, biome) in sea.biomes.iter().enumerate() {
+                                let weight = resolver.weights[b];
+                                let Some(r) = rules.sea_rule[b].filter(|_| weight > 0.0) else {
+                                    continue;
+                                };
+                                let rule = &biome.scatter[r];
+                                let noise = self.noise_at(self.sea_noise[b][r], rule, wx, wy);
+                                let type_weight =
+                                    rules.sea_water_type[b].map_or(1.0, |t| point.types.get(t).copied().unwrap_or(0.0));
+                                density += weight
+                                    * rule_density(rule, height, slope, noise)
+                                    * type_weight
+                                    * selector_coverage(rule.water_depth.as_ref(), depth)
+                                    * selector_coverage(rule.shore.as_ref(), shore);
+                            }
+                        }
                     }
                 }
 

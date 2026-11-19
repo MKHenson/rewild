@@ -5,8 +5,11 @@ import {
   SPLAT_BYTES_PER_TEXEL,
   validateClimateLayers,
 } from './Biomes';
+import { waterEditData } from './Lakes';
 import { PaintMask } from './PaintMask';
 import { terrainGenerator } from './TerrainGenerator';
+import type { WaterEdit } from './WaterEdit';
+import { WATER_MAP_STEP } from './WaterMap';
 
 /** An inclusive texel window of a chunk's splat map. */
 export interface SplatRegion {
@@ -33,6 +36,13 @@ export interface SplatOptions {
   region?: SplatRegion;
   /** World height of the sea, which the beach bands are measured from. */
   seaLevel?: number;
+  /** The chunk's authored water, blended over the generated. The sea biomes
+   *  surface the bed wherever water stands. */
+  waterEdit?: WaterEdit | null;
+  /** The chunk's water map shore distance (WaterMap.shore), read by sea
+   *  zones with a `shore` selector. Without it every point is 0 m from
+   *  shore. */
+  shore?: Uint8Array | null;
 }
 
 /**
@@ -124,6 +134,9 @@ export function generateSplatMap(
     biomeMask?.weights,
     biomeMask?.size ?? 0,
     biomeMask?.step ?? 0,
+    waterEditData(options?.waterEdit ?? null),
+    options?.shore,
+    WATER_MAP_STEP,
     rx0,
     ry0,
     rx1,

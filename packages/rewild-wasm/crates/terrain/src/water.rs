@@ -55,7 +55,7 @@ impl NeighbourWet<'_> {
 // blends to sea water at the shore.
 const LAGOON_BLEND_FROM: f64 = 0.2;
 
-const OCEAN_WATER: &str = "ocean";
+pub(crate) const OCEAN_WATER: &str = "ocean";
 const LAKE_WATER: &str = "lake";
 
 // Planes of a water edit's mask. See `WaterEdit.ts`.

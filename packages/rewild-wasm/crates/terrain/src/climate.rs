@@ -52,13 +52,13 @@ impl BiomeBlend {
 /// The band an axis value falls in, and the smoothstep blend into the next
 /// band inside a cut's transition zone. `b == a` with weight 0 outside one.
 #[derive(Clone, Copy, Default)]
-struct AxisBands {
-    a: usize,
-    b: usize,
-    weight: f64,
+pub(crate) struct AxisBands {
+    pub a: usize,
+    pub b: usize,
+    pub weight: f64,
 }
 
-fn resolve_axis(value: f64, axis: &ClimateAxis) -> AxisBands {
+pub(crate) fn resolve_axis(value: f64, axis: &ClimateAxis) -> AxisBands {
     let cuts = &axis.cuts;
     let half = axis.blend_half_width;
 

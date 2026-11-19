@@ -13,7 +13,7 @@ use crate::climate::ClimateSample;
 use crate::grid::{nearest_index, sample_bilinear, slope_at};
 use crate::lakes::{lake_to_world, world_to_lake};
 use crate::scatter::{FarSample, LakeRect};
-use crate::splat::{SplatGenerator, MAX_SPLAT_LAYERS};
+use crate::splat::{SplatGenerator, SplatScratch, MAX_SPLAT_LAYERS};
 use crate::water::to_f16;
 use crate::{HeightGenerator, ScatterGenerator};
 
@@ -151,12 +151,12 @@ impl FarMap {
     /// Builds up to `rows` more rows; returns whether the map is complete.
     pub fn build(&mut self, ground: &HeightGenerator, splat: &SplatGenerator, scatter: &ScatterGenerator, rows: usize) -> bool {
         let end = self.total_rows().min(self.next_row.saturating_add(rows));
-        let mut layer_weights = vec![0.0; splat.max_layers()];
+        let mut scratch = splat.scratch();
         let meters_per_sample = ground.meters_per_sample();
         while self.next_row < end {
             match self.pass(self.next_row) {
                 Pass::Ground(j) => self.sample_ground_row(ground, j),
-                Pass::Weights(j) => self.write_weights_row(splat, j, &mut layer_weights),
+                Pass::Weights(j) => self.write_weights_row(splat, j, &mut scratch),
                 Pass::Sprites(j) => self.place_sprite_row(scatter, j, meters_per_sample),
             }
             self.next_row += 1;
@@ -178,7 +178,7 @@ impl FarMap {
         }
     }
 
-    fn write_weights_row(&mut self, splat: &SplatGenerator, j: usize, layer_weights: &mut [f64]) {
+    fn write_weights_row(&mut self, splat: &SplatGenerator, j: usize, scratch: &mut SplatScratch) {
         let grid = self.grid;
         let n = grid.texels;
         let second_plane = n * n * 4;
@@ -187,7 +187,7 @@ impl FarMap {
             let slope = slope_at(&self.samples.heights, n, n, i, j, grid.step);
             self.samples.slopes[t] = slope as f32;
             let height = self.samples.heights[t] as f64;
-            let channels = splat.far_texel(&self.samples.climate[t], height, slope, layer_weights);
+            let channels = splat.far_texel(&self.samples.climate[t], height, slope, scratch);
             for c in 0..4 {
                 self.weights[t * 4 + c] = (channels[c] * 255.0).round() as u8;
                 self.weights[second_plane + t * 4 + c] = (channels[c + 4] * 255.0).round() as u8;

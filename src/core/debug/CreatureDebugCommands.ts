@@ -30,12 +30,36 @@ export function registerCreatureDebugCommands() {
         `further than spawnRadius are out of range.`
     );
     console.log('Biome weights at the player:', report.biomes);
+    if (report.water)
+      console.log('Sea biome weights at the player:', report.seaBiomes);
     console.log('Planned groups, nearest first:');
     console.table(report.groups.slice(0, limit));
     console.log(
       'Live creatures, nearest first. y should match ground for land creatures:'
     );
     console.table(report.creatures.slice(0, limit));
+  };
+
+  (window as any).showSeaBiomes = () => {
+    const spawner = getCreatureSpawner();
+    if (!spawner) {
+      console.log(
+        'showSeaBiomes() — no spawner is mounted. It reads the water in game, on a level with terrain.'
+      );
+      return;
+    }
+    const { water, seaBiomes } = spawner.describe();
+    if (!water) {
+      console.log('showSeaBiomes() — the player is not over water.');
+      return;
+    }
+    const share = Object.values(seaBiomes).reduce((a, b) => a + b, 0);
+    console.log(
+      `showSeaBiomes() — ${water.depth} m deep, ${water.shore} m from shore, ` +
+        `coverage ${water.coverage}. The sea biomes hold ${share.toFixed(2)} ` +
+        `of the bed; the land biome under them holds the rest.`
+    );
+    console.table(seaBiomes);
   };
 
   (window as any).goToCreature = (index = 0, creature?: string) => {

@@ -1020,6 +1020,8 @@ export class TerrainRenderer implements WaterQuerySource {
         out: chunk.splatData,
         region: window,
         seaLevel: chunk.seaLevel,
+        waterEdit: chunk.waterEdit,
+        shore: chunk.water?.shore,
       }
     );
 

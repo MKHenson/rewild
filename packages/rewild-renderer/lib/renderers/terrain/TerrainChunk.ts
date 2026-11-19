@@ -174,8 +174,10 @@ export class TerrainChunk implements IComponent {
   private chunkWater: ChunkWater | null = null;
   // Terrain LOD the chunk last chose, which the water grid follows.
   private targetLod: number;
-  // The heightsVersion the splat's contents were built from.
+  // The heightsVersion plus the waterInputVersion the splat's contents were
+  // built from, and that waterInputVersion.
   private splatVersion = -1;
+  private splatInputBuilt = 0;
   // The chunk's painted biome mask, or null when nothing has been painted here.
   // Feeds splat generation only — paint says what the ground is made of, sculpt
   // says what shape it is (see generateSplatMap).
@@ -704,25 +706,38 @@ export class TerrainChunk implements IComponent {
     );
   }
 
-  // The resident splat map was built from the heights at `version`, so a build
-  // can leave the splat out. Paint patches the resident splat in place (see
-  // TerrainRenderer.refreshChunkSplat), so it never makes the splat stale here.
-  hasSplatFor(version: number): boolean {
-    return this.splatData !== null && this.splatVersion >= version;
+  // The resident splat map was built from the heights at `version` and the
+  // water inputs at `inputVersion`, so a build can leave the splat out. Paint
+  // patches the resident splat in place (see TerrainRenderer.refreshChunkSplat),
+  // so it never makes the splat stale here.
+  hasSplatFor(version: number, inputVersion: number): boolean {
+    return (
+      this.splatData !== null &&
+      this.splatVersion >= version + inputVersion &&
+      this.splatInputBuilt === inputVersion
+    );
   }
 
-  // Adopts a worker-built splat map for the heights at `version`. Creates the
-  // GPU texture on first call, then re-uploads in place for later edits: the
-  // GPUTexture object stays stable across a sculpt stroke, so LOD bind groups
-  // built against it stay valid and no per-stamp texture is allocated.
+  // Adopts a worker-built splat map for the heights at `version` and the water
+  // inputs at `inputVersion`, ordered by their sum as populateWater is. Creates
+  // the GPU texture on first call, then re-uploads in place for later edits:
+  // the GPUTexture object stays stable across a sculpt stroke, so LOD bind
+  // groups built against it stay valid and no per-stamp texture is allocated.
   //
   // Data older than what the texture already holds is ignored, so a slow LOD
   // build that started before an edit cannot overwrite it with pre-edit texels.
   // Equal versions are also ignored: sibling LODs of a chunk produce identical
   // texels, so the first one there wins and the rest are redundant uploads.
-  populateSplat(renderer: Renderer, data: Uint8Array, version: number) {
-    if (this.splatTexture && version <= this.splatVersion) return;
-    this.splatVersion = version;
+  populateSplat(
+    renderer: Renderer,
+    data: Uint8Array,
+    version: number,
+    inputVersion: number
+  ) {
+    if (this.splatTexture && version + inputVersion <= this.splatVersion)
+      return;
+    this.splatVersion = version + inputVersion;
+    this.splatInputBuilt = inputVersion;
     // Retained whole so a paint stroke can rewrite a window of it in place.
     this.splatData = data;
 
@@ -920,6 +935,7 @@ export class TerrainChunk implements IComponent {
     this.splatTextureExt = null;
     this.splatData = null;
     this.splatVersion = -1;
+    this.splatInputBuilt = 0;
     this.generatedRing = null;
     this.chunkWater?.dispose();
     this.chunkWater = null;
