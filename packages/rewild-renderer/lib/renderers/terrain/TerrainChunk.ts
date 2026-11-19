@@ -110,6 +110,9 @@ export class TerrainChunk implements IComponent {
   // stroke or a pluck makes the instances stale exactly as a sculpt does.
   private scatterInputBuilt = -1;
   private scatterRequested = false;
+  // Set while a brush stroke runs: the instances stay as they are and are
+  // placed once when the stroke ends, not on every build.
+  scatterHeld = false;
   // Latches once the chunk comes within range of any layer. Separate from the
   // distance itself because a chunk meshes at the LOD threshold it crosses —
   // 200m for LOD 0 — which is further out than anything scatters, so a build
@@ -857,7 +860,8 @@ export class TerrainChunk implements IComponent {
   // Read-only, so the frame loop can ask for a rebuild without latching the
   // request flag out from under the build that will service it.
   scatterIsStale(version: number): boolean {
-    if (!this.scatterWanted || this.scatterRequested) return false;
+    if (!this.scatterWanted || this.scatterRequested || this.scatterHeld)
+      return false;
     return (
       this.scatterVersion !== version ||
       this.scatterInputBuilt !== this.scatterInputVersion

@@ -117,6 +117,7 @@ export class TerrainSculptController {
       maxZ: -Infinity,
       maxRadius: 0,
     };
+    this.renderer.terrainRenderer.beginBrushStroke();
     // First stamp at a nominal frame's worth of time so a click sculpts too.
     this.stamp(point, 1 / 60);
   }
@@ -141,7 +142,10 @@ export class TerrainSculptController {
   async endStroke(): Promise<void> {
     const stroke = this.stroke;
     this.stroke = null;
-    if (!stroke || stroke.touched.size === 0) return;
+    if (!stroke) return;
+    const terrain = this.renderer.terrainRenderer;
+    terrain.endBrushStroke();
+    if (stroke.touched.size === 0) return;
 
     const level = projectStore.levelRef;
     if (!level) {
@@ -151,7 +155,6 @@ export class TerrainSculptController {
       return;
     }
 
-    const terrain = this.renderer.terrainRenderer;
     const size = terrain.mapChunkSizeLod;
     await Promise.all(
       [...stroke.touched.values()].map((t) =>

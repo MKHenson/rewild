@@ -228,6 +228,7 @@ export class TerrainWaterBrushController {
     };
     if (type === 'add' && !this.pickAddTarget(stroke, point)) return;
     this.stroke = stroke;
+    this.renderer.terrainRenderer.beginBrushStroke();
     // First stamp at a nominal frame's worth of time so a click paints too.
     this.stamp(stroke, point, 1 / 60);
   }
@@ -257,6 +258,7 @@ export class TerrainWaterBrushController {
     const stroke = this.stroke;
     this.stroke = null;
     if (!stroke) return;
+    this.renderer.terrainRenderer.endBrushStroke();
     const level = projectStore.levelRef;
     const rules = this.renderer.terrainRenderer.waterRules;
 
@@ -604,6 +606,7 @@ export class TerrainWaterBrushController {
       return true;
     });
     this.stroke = stroke;
+    this.renderer.terrainRenderer.beginBrushStroke();
   }
 
   private moveLevel(stroke: LevelStroke, screenY: number) {

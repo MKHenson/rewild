@@ -46,6 +46,9 @@ interface TerrainWorkerRequest {
   // them out. See BuildChunkMeshRequest.
   skipSplat?: boolean;
   skipWater?: boolean;
+  // The chunk's mesh is current, so the build leaves it out. See
+  // BuildChunkMeshRequest.
+  skipMesh?: boolean;
   // The chunk's resident shore distance, for scatter when skipWater.
   shore?: Uint8Array;
 }

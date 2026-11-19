@@ -203,13 +203,15 @@ export class LODMesh {
         // An unedited chunk that has been generated once sends its heights
         // with the generator's cached ring instead, the exact field generation
         // would produce, so no later LOD pays to generate it again.
-        const apron =
-          this.chunk.heightsAreEdited && knownHeights
-            ? renderer.terrainRenderer.buildApron(
-                knownHeights,
-                this.chunk.coord
-              )
-            : this.chunk.cachedApron() ?? undefined;
+        // The mesh already matches these heights, so this build only brings
+        // the water, splat and scatter up to date. It needs no apron.
+        const meshCurrent = swapping && this.builtVersion === version;
+
+        const apron = meshCurrent
+          ? undefined
+          : this.chunk.heightsAreEdited && knownHeights
+          ? renderer.terrainRenderer.buildApron(knownHeights, this.chunk.coord)
+          : this.chunk.cachedApron() ?? undefined;
 
         // The splat and water maps are chunk-wide. Once the chunk holds them
         // for these heights and this water edit, a build for another LOD
@@ -249,6 +251,7 @@ export class LODMesh {
           neighbourWet: neighbourWet ?? undefined,
           skipSplat,
           skipWater,
+          skipMesh: meshCurrent,
           shore:
             skipWater && (wantsScatter || !skipSplat)
               ? this.chunk.water?.shore
@@ -304,6 +307,14 @@ export class LODMesh {
           );
         }
 
+        // Only the water, splat and scatter changed: the mesh stays, so no
+        // collider or scene rebuild follows, and only the water fields over
+        // the chunk are redrawn.
+        if (meshCurrent) {
+          renderer.terrainRenderer.refreshWaterFields(this.chunk);
+          continue;
+        }
+
         const oldMesh = swapping ? this.mesh : null;
 
         const geometry = new Geometry();
@@ -357,61 +368,60 @@ export class LODMesh {
           }
         }
 
-        const terrainPass = new TerrainPass();
-        if (this.lod === 0) {
-          terrainPass.patchSamples = this.chunkSize;
-          terrainPass.patchMetresPerSample = TERRAIN_METERS_PER_SAMPLE;
-        }
-        const uniforms = terrainPass.terrainUniforms;
-        uniforms.splatSampler = renderer.samplerManager.get('linear-clamped');
-        uniforms.splatTexture = this.chunk.splatTexture!.gpuTexture;
-        uniforms.splatTextureExt = this.chunk.splatTextureExt!.gpuTexture;
-        uniforms.albedoView = renderer.textureManager
-          .get(TERRAIN_ALBEDO_ARRAY)
-          .gpuTexture.createView({ dimension: '2d-array' });
-        uniforms.normalView = renderer.textureManager
-          .get(TERRAIN_NORMAL_ARRAY)
-          .gpuTexture.createView({ dimension: '2d-array' });
-        uniforms.armView = renderer.textureManager
-          .get(TERRAIN_ARM_ARRAY)
-          .gpuTexture.createView({ dimension: '2d-array' });
-        uniforms.heightView = renderer.textureManager
-          .get(TERRAIN_HEIGHT_ARRAY)
-          .gpuTexture.createView({ dimension: '2d-array' });
-        // Which material each splat channel means, and how to sample it.
-        // (Gloss now rides in these per-layer params, not a global shininess.)
-        uniforms.layers = getClimateLayerParams(
-          resolveClimatePreset(this.climatePreset)
-        );
-        // The terrain's UV runs 0..1 across a chunk, so one UV unit is the
-        // chunk's span in metres. The biplanar projection needs that to express
-        // world height in the same units as the horizontal axes.
-        uniforms.uvPerMetre =
-          1 / ((this.chunkSize - 1) * TERRAIN_METERS_PER_SAMPLE);
-        uniforms.chunkU = this.chunk.coord.x;
-        uniforms.chunkV = -this.chunk.coord.y;
-        this.chunk.bindWater(uniforms);
-
-        const newMesh = new Mesh(geometry, terrainPass);
-        newMesh.transform.matrixAutoUpdate = false;
-        newMesh.transform.updateMatrix();
-        this.mesh = newMesh;
-        this.chunk.transform.addChild(newMesh.transform);
-        // This mesh arrives mid-frame from a worker; until the next render
-        // pass its matrixWorld is identity, which would place the chunk's
-        // geometry at the world origin. A pointer-event raycast landing in
-        // that window (e.g. the orbit controller's terrain clamp) would hit
-        // phantom terrain, so compute the world matrix immediately.
-        newMesh.transform.updateWorldMatrix(true, false);
-
         if (oldMesh) {
-          // Keep whatever visibility the old mesh had so the swap is
-          // invisible; the next visibility update re-evaluates it anyway.
-          newMesh.visible = oldMesh.visible;
-          newMesh.transform.visible = oldMesh.transform.visible;
+          // A re-mesh keeps the grid, so the mesh, its transform and its pass
+          // stay and only the geometry changes. The scene's structure is
+          // untouched, so the scene BVH refits one box instead of rebuilding.
           oldMesh.geometry.dispose();
-          oldMesh.material.dispose();
-          oldMesh.transform.removeFromParent();
+          oldMesh.geometry = geometry;
+          renderer.sceneBVH?.markObjectMoved(oldMesh.transform);
+        } else {
+          const terrainPass = new TerrainPass();
+          if (this.lod === 0) {
+            terrainPass.patchSamples = this.chunkSize;
+            terrainPass.patchMetresPerSample = TERRAIN_METERS_PER_SAMPLE;
+          }
+          const uniforms = terrainPass.terrainUniforms;
+          uniforms.splatSampler = renderer.samplerManager.get('linear-clamped');
+          uniforms.splatTexture = this.chunk.splatTexture!.gpuTexture;
+          uniforms.splatTextureExt = this.chunk.splatTextureExt!.gpuTexture;
+          uniforms.albedoView = renderer.textureManager
+            .get(TERRAIN_ALBEDO_ARRAY)
+            .gpuTexture.createView({ dimension: '2d-array' });
+          uniforms.normalView = renderer.textureManager
+            .get(TERRAIN_NORMAL_ARRAY)
+            .gpuTexture.createView({ dimension: '2d-array' });
+          uniforms.armView = renderer.textureManager
+            .get(TERRAIN_ARM_ARRAY)
+            .gpuTexture.createView({ dimension: '2d-array' });
+          uniforms.heightView = renderer.textureManager
+            .get(TERRAIN_HEIGHT_ARRAY)
+            .gpuTexture.createView({ dimension: '2d-array' });
+          // Which material each splat channel means, and how to sample it.
+          // (Gloss now rides in these per-layer params, not a global shininess.)
+          uniforms.layers = getClimateLayerParams(
+            resolveClimatePreset(this.climatePreset)
+          );
+          // The terrain's UV runs 0..1 across a chunk, so one UV unit is the
+          // chunk's span in metres. The biplanar projection needs that to express
+          // world height in the same units as the horizontal axes.
+          uniforms.uvPerMetre =
+            1 / ((this.chunkSize - 1) * TERRAIN_METERS_PER_SAMPLE);
+          uniforms.chunkU = this.chunk.coord.x;
+          uniforms.chunkV = -this.chunk.coord.y;
+          this.chunk.bindWater(uniforms);
+
+          const newMesh = new Mesh(geometry, terrainPass);
+          newMesh.transform.matrixAutoUpdate = false;
+          newMesh.transform.updateMatrix();
+          this.mesh = newMesh;
+          this.chunk.transform.addChild(newMesh.transform);
+          // This mesh arrives mid-frame from a worker; until the next render
+          // pass its matrixWorld is identity, which would place the chunk's
+          // geometry at the world origin. A pointer-event raycast landing in
+          // that window (e.g. the orbit controller's terrain clamp) would hit
+          // phantom terrain, so compute the world matrix immediately.
+          newMesh.transform.updateWorldMatrix(true, false);
         }
 
         this.builtVersion = version;
