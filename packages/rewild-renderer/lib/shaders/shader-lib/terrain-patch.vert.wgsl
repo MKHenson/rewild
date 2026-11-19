@@ -43,13 +43,19 @@ fn patchBaseSurface(x: f32, z: f32) -> PatchBase {
   return out;
 }
 
-// Metres the surface sits below the base along its normal: each layer's
-// carved height through the same no-tile taps and height-aware blend the
-// fragment shader shades with, so the geometry is the relief on show. Taps
-// read the mip whose texels match the vertex spacing.
-fn patchRelief(uv: vec2f, normal: vec3f) -> f32 {
+// Height in the relief volume that rests on the base mesh. Relief above it
+// rises from the base and relief below sinks, so objects placed on the base
+// mesh sit on the average surface rather than on its peaks.
+const RELIEF_REST_HEIGHT: f32 = 0.5;
+
+// The surface along the base normal in .x (metres, + up), and its depth below
+// the relief volume's top in .y: each layer's height through the same no-tile
+// taps and height-aware blend the fragment shader shades with, so the geometry
+// is the relief on show. Taps read the mip whose texels match the vertex
+// spacing.
+fn patchRelief(uv: vec2f, normal: vec3f) -> vec2f {
   if (terrainParams.uvPerMetre <= 0.0) {
-    return 0.0;
+    return vec2f(0.0);
   }
 
   let weightsRawLo = textureSampleLevel(splatMap, splatSampler, uv, 0.0);
@@ -62,6 +68,7 @@ fn patchRelief(uv: vec2f, normal: vec3f) -> f32 {
   let texels = f32(textureDimensions(heightArray).x);
   let spacing = terrainParams.patchGrid.z;
 
+  var offsets = array<f32, 8>();
   var depths = array<f32, 8>();
   var scores = array<f32, 8>();
   var layerActive = array<f32, 8>();
@@ -87,7 +94,10 @@ fn patchRelief(uv: vec2f, normal: vec3f) -> f32 {
     let lod = log2(max(spacing * layer.uvScale * terrainParams.uvPerMetre * texels, 1.0));
 
     let k = textureSampleLevel(
-      noiseTexture, seamlessSampler, scaledUV * terrainParams.noiseScale, 0.0
+      noiseTexture,
+      seamlessSampler,
+      (uv + terrainParams.chunkUV) * layer.uvScale * terrainParams.noiseScale,
+      0.0
     ).x;
     let index = k * 8.0;
     let i = floor(index);
@@ -105,7 +115,9 @@ fn patchRelief(uv: vec2f, normal: vec3f) -> f32 {
     }
 
     let metresPerTileUV = 1.0 / (layer.uvScale * terrainParams.uvPerMetre);
-    depths[slot] = (height - 1.0) * layer.heightScale * (1.0 - sideWeight) * metresPerTileUV;
+    let volume = layer.heightScale * (1.0 - sideWeight) * metresPerTileUV;
+    offsets[slot] = (height - RELIEF_REST_HEIGHT) * volume;
+    depths[slot] = (1.0 - height) * volume;
     weightFade[slot] = smoothstep(WEIGHT_EPSILON, WEIGHT_FADE_END, weight);
     let score = weight + (height - 0.5);
     scores[slot] = score;
@@ -117,7 +129,7 @@ fn patchRelief(uv: vec2f, normal: vec3f) -> f32 {
 
   let blendDepth = max(blendDepthSum / max(blendDepthWeight, 1e-4), 1e-4);
   let cutoff = maxScore - blendDepth;
-  var depth = 0.0;
+  var relief = vec2f(0.0);
   var contributionSum = 0.0;
   for (var slot = 0u; slot < SPLAT_SLOTS; slot++) {
     if (layerActive[slot] == 0.0) {
@@ -125,10 +137,10 @@ fn patchRelief(uv: vec2f, normal: vec3f) -> f32 {
     }
     let t = clamp((scores[slot] - cutoff) / blendDepth, 0.0, 1.0);
     let contribution = t * t * (3.0 - 2.0 * t) * weightFade[slot];
-    depth += contribution * depths[slot];
+    relief += contribution * vec2f(offsets[slot], depths[slot]);
     contributionSum += contribution;
   }
-  return select(0.0, depth / contributionSum, contributionSum > 1e-6);
+  return select(vec2f(0.0), relief / contributionSum, contributionSum > 1e-6);
 }
 
 @vertex
@@ -143,11 +155,11 @@ fn vsPatch(
 
   let patchView = terrainParams.patchView;
   let fade = 1.0 - smoothstep(patchView.z, patchView.w, distance(vec2f(x, z), patchView.xy));
-  var relief = 0.0;
+  var relief = vec2f(0.0);
   if (fade > 0.0) {
     relief = patchRelief(ground.uv, ground.normal) * fade;
   }
-  let displacement = ground.normal * relief;
+  let displacement = ground.normal * relief.x;
   let position = ground.position + displacement;
 
   var output: VertexOutput;
@@ -159,6 +171,6 @@ fn vsPatch(
   output.normal = uniforms.normalMatrix * ground.normal;
   output.objectNormal = ground.normal;
   output.objectHeight = position.y;
-  output.reliefDepth = max(-relief, 0.0);
+  output.reliefDepth = max(relief.y, 0.0);
   return output;
 }

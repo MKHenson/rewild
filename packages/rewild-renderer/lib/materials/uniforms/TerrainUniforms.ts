@@ -14,6 +14,7 @@ import { TerrainPatchPlacement } from '../../renderers/terrain/TerrainPatch';
 //   heightBlendDepth f32             offset 12  (4 bytes)
 //   uvPerMetre       f32             offset 16  (4 bytes)
 //   fade             f32             offset 20  (4 bytes)
+//   chunkUV          vec2f           offset 24  (8 bytes)
 //   layers           array<vec4f,32> offset 32  (512 bytes)
 //   water            vec4f           offset 544 (16 bytes)
 //   waterExtinction  array<vec4f,4>  offset 560 (64 bytes)
@@ -22,7 +23,7 @@ import { TerrainPatchPlacement } from '../../renderers/terrain/TerrainPatch';
 //   patchView        vec4f           offset 656 (16 bytes)
 //
 // `layers` starts at 32 because a uniform array of vec4f needs 16-byte
-// alignment, and the six scalars above spill into a second row. Four vec4f
+// alignment. Four vec4f
 // per splat channel, MAX_SPLAT_LAYERS channels:
 //   [slot*4    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
 //   [slot*4 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
@@ -136,6 +137,12 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   // would tile the vertical axis at the wrong rate, and no projection at all is
   // better than a confidently wrong one. LODMesh sets it from the real chunk.
   uvPerMetre: number = 0;
+
+  // The chunk's UV origin in a UV space continuous across chunks: (coord.x,
+  // -coord.y). The no-tile noise is keyed off it so neighbouring chunks pick
+  // the same offset regions along their shared edge.
+  chunkU: number = 0;
+  chunkV: number = 0;
 
   // How far the chunk has faded in over the horizon ring, 0 to 1.
   private _fade: number = 1;
@@ -261,6 +268,8 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     data[3] = this.heightBlendDepth;
     data[4] = this.uvPerMetre;
     data[5] = this._fade;
+    data[6] = this.chunkU;
+    data[7] = this.chunkV;
 
     // Channels the palette does not use keep weight 0 in the splat, so the
     // shader's epsilon skips them — but zero them anyway so a stale layer can
@@ -379,6 +388,8 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     this.noiseScale = source.noiseScale;
     this.heightBlendDepth = source.heightBlendDepth;
     this.uvPerMetre = source.uvPerMetre;
+    this.chunkU = source.chunkU;
+    this.chunkV = source.chunkV;
     this._fade = source._fade;
     this.layers = source.layers;
     this._albedoView = source._albedoView;
