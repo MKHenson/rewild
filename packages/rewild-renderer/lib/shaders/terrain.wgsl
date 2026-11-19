@@ -103,6 +103,9 @@ struct TerrainParams {
   uvPerMetre      : f32,
   // How far the chunk has faded in over the horizon ring, 0 to 1.
   fade            : f32,
+  // The chunk's origin in UV continuous across chunks; fragUV + chunkUV keys
+  // the no-tile noise so neighbours agree along their shared edge.
+  chunkUV         : vec2f,
   // Packed TerrainLayer, four vec4f per splat channel (SPLAT_SLOTS channels):
   //   [slot*4    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
   //   [slot*4 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
@@ -667,6 +670,10 @@ fn fs(
   let sideFlip = select(-1.0, 1.0, select(nWorld.z, nWorld.x, useZAxis) > 0.0);
   let heightUV = objectHeight * terrainParams.uvPerMetre;
   let sideUV = vec2f(sideFlip * select(fragUV.x, fragUV.y, useZAxis), heightUV);
+  let sideChunkUV = vec2f(
+    sideFlip * select(terrainParams.chunkUV.x, terrainParams.chunkUV.y, useZAxis),
+    0.0
+  );
   // Selected from derivatives already taken, never differentiated *after* the
   // select: the choice flips where |nx| equals |nz|, and a derivative across
   // that flip is a spike that picks a mip from nowhere.
@@ -761,7 +768,7 @@ fn fs(
     // of them is a visible seam. Scaling with the tile keeps the technique
     // correct from uvScale 1 to 25, and quietly turns it off (one region per
     // chunk) when the texture is so stretched there is no repeat to hide.
-    let noiseUV = scaledUV * terrainParams.noiseScale;
+    let noiseUV = (fragUV + terrainParams.chunkUV) * layer.uvScale * terrainParams.noiseScale;
     let noiseDdx = ddx * terrainParams.noiseScale;
     let noiseDdy = ddy * terrainParams.noiseScale;
     let k = textureSampleGrad(
@@ -864,7 +871,7 @@ fn fs(
       let sideK = textureSampleGrad(
         noiseTexture,
         seamlessSampler,
-        sideScaled * terrainParams.noiseScale,
+        (sideUV + sideChunkUV) * layer.uvScale * terrainParams.noiseScale,
         sideDdx * terrainParams.noiseScale,
         sideDdy * terrainParams.noiseScale
       ).x;
