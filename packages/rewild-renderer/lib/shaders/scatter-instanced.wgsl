@@ -25,6 +25,8 @@ const HAS_FOLIAGE_NORMAL_MAP: bool = ${ HAS_FOLIAGE_NORMAL_MAP };
 // is displaced by it before projection. Set for a layer with a wind block whose
 // model carries COLOR_0.
 const HAS_WIND: bool = ${ HAS_WIND };
+// The layer folds at the water surface: see foldAtCeiling.
+const HAS_WATER_CEILING: bool = ${ HAS_WATER_CEILING };
 
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
@@ -67,6 +69,8 @@ struct Uniforms {
   // xy = the chunk's world origin, so the wind field is read in world space;
   // zw = metres the gust field has drifted.
   windOrigin : vec4f,
+  // x = metres under the water surface at rest the layer folds at.
+  ceiling : vec4f,
 }
 
 // One distinct colour per LOD tier for the debug tint, the far tiers warmest.
@@ -170,6 +174,48 @@ const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 @group(3) @binding(15) var waterLevelMap: texture_2d<f32>;
 @group(3) @binding(16) var waterOpticsMap: texture_2d<f32>;
 
+// Metres over which a rising plant eases into the fold, so the stalk curves
+// over rather than kinking.
+const CEILING_KNEE = 0.3;
+// Metres the folded canopy undulates by, so overlapping blades sit at
+// different depths instead of fighting for one.
+const CEILING_RIPPLE = 0.04;
+
+// What rises past the water ceiling over an instance lies over along it, in
+// one direction per instance, by as far as it rose. One direction keeps every
+// blade's shape: its rise turns into run along the surface, so nothing
+// stretches. The level is read at the root, so a whole plant folds at one
+// height. Where the camera's water field does not reach, or no water covers
+// the root, nothing folds. Applied after the sway, so a swaying canopy stays
+// under too. `w` is how far the vertex has folded, 0 to 1, which turns its
+// normal toward the sky.
+fn foldAtCeiling(chunkPosition: vec3f, root: vec3f, margin: f32, spin: f32) -> vec4f {
+  let unfolded = vec4f(chunkPosition, 0.0);
+  if (iblParams.water.z <= 0.0) {
+    return unfolded;
+  }
+  let world = root.xz + uniforms.windOrigin.xy;
+  let water = waterLevelAt((world - iblParams.water.xy) / iblParams.water.z);
+  if (water.y <= 0.0) {
+    return unfolded;
+  }
+  let ceiling = water.x - margin;
+  // A soft minimum of the height and the ceiling: what it trims is the excess,
+  // a softplus of the height over the ceiling. Relative, so no exp sees a
+  // world height and underflows.
+  let k = CEILING_KNEE;
+  let over = chunkPosition.y - ceiling;
+  let excess = max(over, 0.0) + k * log(1.0 + exp(-abs(over) / k));
+  let kept = chunkPosition.y - excess;
+  if (excess <= 1e-4) {
+    return unfolded;
+  }
+  let run = vec2f(cos(spin), sin(spin)) * excess;
+  let fold = smoothstep(0.0, CEILING_KNEE, excess);
+  let ripple = CEILING_RIPPLE * (1.0 + sin(excess * 5.0 + spin * 3.0)) * fold;
+  return vec4f(chunkPosition.x + run.x, kept - ripple, chunkPosition.z + run.y, fold);
+}
+
 // The standard quaternion sandwich, which is cheaper than building a rotation
 // matrix per vertex and is why the instance carries a quaternion at all.
 fn rotateByQuat(q: vec4f, v: vec3f) -> vec3f {
@@ -214,6 +260,18 @@ fn transformVertex(
     );
   }
 
+  var folded = 0.0;
+  if (HAS_WATER_CEILING) {
+    let fold = foldAtCeiling(
+      chunkPosition,
+      instance.posScale.xyz,
+      uniforms.ceiling.x,
+      instance.params.x * 6.28318530718
+    );
+    chunkPosition = fold.xyz;
+    folded = fold.w;
+  }
+
   let mvPosition = uniforms.modelViewMatrix * vec4f(chunkPosition, 1.0);
 
   // Per instance, not per chunk. The chunk-level cull can only drop a whole
@@ -250,7 +308,12 @@ fn transformVertex(
     uniforms.modelViewMatrix[1].xyz,
     uniforms.modelViewMatrix[2].xyz
   );
-  let worldNormal = rotateByQuat(instance.rotation, node3 * normal);
+  var worldNormal = rotateByQuat(instance.rotation, node3 * normal);
+  // A blade laid along the surface faces the sky, from whichever side it showed.
+  if (folded > 0.0) {
+    let sky = vec3f(0.0, select(-1.0, 1.0, worldNormal.y >= 0.0), 0.0);
+    worldNormal = normalize(mix(worldNormal, sky, folded));
+  }
   output.normal = normalize(modelView3 * worldNormal);
 
   let worldTangent = rotateByQuat(instance.rotation, node3 * tangent.xyz);

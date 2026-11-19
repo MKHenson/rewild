@@ -546,6 +546,17 @@ export async function loadClumpSource(
 }
 
 /**
+ * Kelp blade stamps: one whole blade or frond per cell, standing the way a
+ * frond does, sized by `lengthMetres`.
+ */
+export async function loadKelpSource(
+  names: string[],
+  root: string = sourceRoot()
+): Promise<LeafSource | null> {
+  return loadStampSource(names, root, 'kelp', 'lengthMetres', 'kelp blade');
+}
+
+/**
  * Frond stamps: one whole frond per cell, base at the bottom-middle and tip at
  * the top, the way a clump stamp stands. `lengthMetres` because that is what
  * a frond has, and it decides how stamps of different lengths share an atlas.
@@ -759,11 +770,12 @@ export function atlasLayoutFor(params: Params, host: LeafSource | null, accents:
   const cells =
     params.type === 'clump'
       ? clumpAtlas(host).cells
-      : params.type === 'crown'
+      : params.type === 'crown' || params.type === 'kelp'
       ? crownAtlas(host).cells
       : leafGrid(host, params.leafSize, params.leafGrid) ** 2;
   const accentCells = accents.map((source) => source.stamps.length);
-  if (params.type !== 'crown' && !(params.type === 'clump' && host)) return layoutAtlas(cells, accentCells);
+  if (params.type !== 'crown' && params.type !== 'kelp' && !(params.type === 'clump' && host))
+    return layoutAtlas(cells, accentCells);
 
   // Strips of the cards that sample them.
   const aspects = [

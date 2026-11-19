@@ -18,6 +18,7 @@ import type { ScatterLayer } from 'rewild-renderer/lib/renderers/terrain/Scatter
 import type { ClumpMetrics } from './clump.ts';
 import type { ClusterMetrics } from './pebbles.ts';
 import type { Crown } from './crown.ts';
+import type { KelpMetrics } from './kelp.ts';
 import { IMPOSTOR_DEFAULT, impostorDistance, type Params } from './params.ts';
 import type { Rock } from './rock.ts';
 import type { Skeleton } from './skeleton.ts';
@@ -238,6 +239,38 @@ export function crownLayer(params: Params, crown: Crown): ScatterLayer {
   return {
     ...clumpLayer(params, { height: crown.metrics.height, spread: crown.metrics.spread, patchRadius: 0, tufts: 1 }),
     authoredNormals: params.leafNormalMode !== 'card',
+  };
+}
+
+/**
+ * Kelp's layer: upright, sunk a little into the bed so the holdfast grips it,
+ * walked through, swayed by the swell rather than the wind, and folded at the
+ * surface when it reaches it.
+ *
+ * **No impostor and no shadow.** A kelp forest is out of sight under water
+ * long before a billboard would pay for itself, and the water carries the
+ * light through caustics rather than shadows.
+ */
+export function kelpLayer(params: Params, metrics: KelpMetrics): ScatterLayer {
+  return {
+    name: params.name.replace(/-/g, '_'),
+    geometryId: params.name,
+    cullDistance: params.cullDistance,
+    jitter: { scale: { from: params.scaleMin, to: params.scaleMax }, yaw: { from: 0, to: 360 }, tilt: 6 },
+    alignToNormal: params.alignToNormal,
+    yOffset: round(params.yOffset - params.holdfastHeight * 0.3, 3),
+    footprint: params.footprint > 0 ? params.footprint : round(Math.max(0.4, metrics.spread * 0.9), 1),
+    wind: {
+      amplitude: params.windAmplitude,
+      frequency: params.windFrequency,
+      flutter: params.windFlutter,
+      medium: 'water',
+    },
+    authoredNormals: params.leafNormalMode !== 'card',
+    foliage: params.foliage,
+    ...(params.foliageNormalMap ? { foliageNormalMap: true } : {}),
+    castShadow: false,
+    ...(params.surfaceCanopy ? { waterCeiling: params.surfaceMargin } : {}),
   };
 }
 

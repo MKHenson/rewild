@@ -20,6 +20,9 @@ const CLOUD_TREND_RATE = 0.2;
 const FRONT_LEAD_SECONDS = 60;
 /** The most the far upwind sky leans from the cloudiness overhead. */
 const FRONT_REACH = 0.25;
+/** Share of full speed the swell clock keeps in a flat calm: the sea never
+ *  quite stops moving, though the air does. */
+const SWELL_CALM = 0.35;
 
 /**
  * The wind as the things it moves read it, resolved once at the top of the
@@ -41,6 +44,9 @@ export class WindState {
   readonly vec = new Float32Array([-1, 0, 0, 0]);
   /** Metres the foliage gust field has blown downwind. */
   readonly gustDrift = new Float32Array(2);
+  /** Seconds the swell has run, faster in a strong wind and never stopped:
+   *  what water plants sway to. */
+  swellClock = 0;
   /** How far the cumulus deck has drifted, along windDirection (the way its
    *  field is sampled), in cloud space. */
   readonly cloudDrift = new Float32Array(2);
@@ -88,6 +94,7 @@ export class WindState {
     }
 
     vec[3] += deltaSeconds * vec[2];
+    this.swellClock += deltaSeconds * (SWELL_CALM + (1 - SWELL_CALM) * vec[2]);
     this.gustDrift[0] += vec[0] * vec[2] * GUST_SPEED * deltaSeconds;
     this.gustDrift[1] += vec[1] * vec[2] * GUST_SPEED * deltaSeconds;
 

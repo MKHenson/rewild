@@ -111,7 +111,8 @@ sink a model further on every slope, use `yOffset`.
 
 ### Wind
 
-Trees, clumps and crowns move in the wind. Rocks and pebbles do not.
+Trees, clumps, crowns and kelp move in the wind. Rocks and pebbles do not. Kelp moves with the swell
+instead. See [Water plants](#water-plants).
 
 | Key | Default | What it does |
 | --- | ------- | ------------ |
@@ -130,6 +131,22 @@ The tool writes the wind weights into the model's vertex colours (`COLOR_0`):
 | A | The leaf phase. One random value for each leaf card. |
 
 Because the vertex colours hold wind data, they cannot hold a colour tint.
+
+### Water plants
+
+Two layer keys are for plants that grow under water. The tool writes both for [kelp](kelp.md).
+
+- **`wind.medium: "water"`** sways the plant with the swell instead of the wind. It surges back and
+  forth along the wind's line, and the tip trails the base. The swell keeps moving on a calm day.
+- **`waterCeiling`** is the depth under the surface at rest that the plant cannot grow past. The part
+  that would rise higher lies over along that depth instead, as far as it would have risen, in one direction per
+  plant. So one model makes
+  a surface canopy in shallow water and stands free in deep water. Only the near mesh folds, so a
+  layer with `waterCeiling` must set `castShadow: false` and have no impostor.
+
+A biome rule for a water plant uses the water selectors: `underwater: true`, `waterDepth`, `shore`
+(metres to dry ground) and `waterType`. Reeds and pondweed name the `lake` type, so they grow only
+around lakes. Kelp and seagrass name `ocean`.
 
 ## LOD tiers
 

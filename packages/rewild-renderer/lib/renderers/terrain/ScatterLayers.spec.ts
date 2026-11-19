@@ -15,6 +15,7 @@ import {
   scatterCullDistance,
   shadowTierBand,
   validateScatterLayers,
+  writeScatterWindParams,
 } from './ScatterLayers';
 
 // The validator reads the module table, so a case swaps one row in.
@@ -267,6 +268,61 @@ describe('validateScatterLayers', () => {
       { wind: { amplitude: 1, frequency: 1, flutter: -0.1 } },
       /wind flutter must not be negative/
     );
+  });
+});
+
+describe('water plants', () => {
+  const swell = { amplitude: 0.5, frequency: 0.2, flutter: 0.1 };
+
+  it('accepts a layer that sways with the swell', () => {
+    withLayers({ test: layer({ wind: { ...swell, medium: 'water' } }) }, () =>
+      expect(() => validateScatterLayers()).not.toThrow()
+    );
+  });
+
+  it('rejects an unknown medium', () => {
+    expectInvalid(
+      { wind: { ...swell, medium: 'mud' as 'water' } },
+      /medium must be air or water/
+    );
+  });
+
+  it('accepts a water layer that folds at the surface', () => {
+    withLayers(
+      {
+        test: layer({
+          wind: { ...swell, medium: 'water' },
+          waterCeiling: 0.2,
+          castShadow: false,
+        }),
+      },
+      () => expect(() => validateScatterLayers()).not.toThrow()
+    );
+  });
+
+  it('rejects a fold on a layer that casts a shadow or has an impostor', () => {
+    expectInvalid({ waterCeiling: 0.2 }, /needs castShadow false and no impostor/);
+    expectInvalid(
+      {
+        waterCeiling: 0.2,
+        castShadow: false,
+        cullDistance: 300,
+        impostor: { fromDistance: 100, views: 4, tileSize: 64 },
+      },
+      /needs castShadow false and no impostor/
+    );
+  });
+
+  it('rejects a negative ceiling', () => {
+    expectInvalid({ waterCeiling: -1, castShadow: false }, /must not be negative/);
+  });
+
+  it('hands the swell clock to the shader for water and nothing for air', () => {
+    const out = new Float32Array(8);
+    writeScatterWindParams({ ...swell, medium: 'water' }, 0, 0, [0, 0], 12, out, 0);
+    expect(out[3]).toBe(13);
+    writeScatterWindParams(swell, 0, 0, [0, 0], 12, out, 0);
+    expect(out[3]).toBe(0);
   });
 });
 

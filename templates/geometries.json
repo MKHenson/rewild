@@ -221,5 +221,33 @@
   "first-person-arms": {
     "type": "gltf",
     "url": "models/first-person-arms.glb"
+  },
+  "kelp-01": {
+    "type": "gltf",
+    "url": "nature/kelp/kelp-giant/kelp-01.glb"
+  },
+  "kelp-bull-01": {
+    "type": "gltf",
+    "url": "nature/kelp/kelp-bull/kelp-bull-01.glb"
+  },
+  "kelp-sugar-01": {
+    "type": "gltf",
+    "url": "nature/kelp/kelp-sugar/kelp-sugar-01.glb"
+  },
+  "kelp-boa-01": {
+    "type": "gltf",
+    "url": "nature/kelp/kelp-boa/kelp-boa-01.glb"
+  },
+  "pondweed-01": {
+    "type": "gltf",
+    "url": "nature/water-plants/pondweed/pondweed-01.glb"
+  },
+  "seagrass-01": {
+    "type": "gltf",
+    "url": "nature/water-plants/seagrass/seagrass-01.glb"
+  },
+  "seagrass-02": {
+    "type": "gltf",
+    "url": "nature/water-plants/seagrass/seagrass-02.glb"
   }
 }

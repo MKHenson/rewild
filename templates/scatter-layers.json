@@ -188,7 +188,7 @@
     "jitter": {
       "scale": {
         "from": 0.8,
-        "to": 1.0
+        "to": 1
       },
       "yaw": {
         "from": 0,
@@ -220,7 +220,7 @@
     "jitter": {
       "scale": {
         "from": 0.8,
-        "to": 1.0
+        "to": 1
       },
       "yaw": {
         "from": 0,
@@ -1694,5 +1694,207 @@
     "foliage": true,
     "foliageNormalMap": true,
     "castShadow": false
+  },
+  "kelp_01": {
+    "name": "kelp_01",
+    "geometryId": "kelp-01",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.7,
+        "to": 1.3
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "alignToNormal": 0,
+    "yOffset": -0.018,
+    "footprint": 1.2,
+    "wind": {
+      "amplitude": 1.2,
+      "frequency": 0.18,
+      "flutter": 0.2,
+      "medium": "water"
+    },
+    "authoredNormals": false,
+    "foliage": true,
+    "castShadow": false,
+    "waterCeiling": 0.35
+  },
+  "kelp_bull_01": {
+    "name": "kelp_bull_01",
+    "geometryId": "kelp-bull-01",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 1.2
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "alignToNormal": 0,
+    "yOffset": -0.018,
+    "footprint": 1.5,
+    "wind": {
+      "amplitude": 1.5,
+      "frequency": 0.15,
+      "flutter": 0.2,
+      "medium": "water"
+    },
+    "authoredNormals": false,
+    "foliage": true,
+    "castShadow": false,
+    "waterCeiling": 0.35
+  },
+  "kelp_sugar_01": {
+    "name": "kelp_sugar_01",
+    "geometryId": "kelp-sugar-01",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.75,
+        "to": 1.25
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "alignToNormal": 0,
+    "yOffset": -0.018,
+    "footprint": 0.8,
+    "wind": {
+      "amplitude": 0.6,
+      "frequency": 0.2,
+      "flutter": 0.2,
+      "medium": "water"
+    },
+    "authoredNormals": false,
+    "foliage": true,
+    "castShadow": false
+  },
+  "kelp_boa_01": {
+    "name": "kelp_boa_01",
+    "geometryId": "kelp-boa-01",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.75,
+        "to": 1.25
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "alignToNormal": 0,
+    "yOffset": -0.018,
+    "footprint": 1.2,
+    "wind": {
+      "amplitude": 1.2,
+      "frequency": 0.17,
+      "flutter": 0.2,
+      "medium": "water"
+    },
+    "authoredNormals": false,
+    "foliage": true,
+    "castShadow": false,
+    "waterCeiling": 0.35
+  },
+  "pondweed_01": {
+    "name": "pondweed_01",
+    "geometryId": "pondweed-01",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.7,
+        "to": 1.2
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "alignToNormal": 0,
+    "yOffset": 0,
+    "footprint": 0.6,
+    "wind": {
+      "amplitude": 0.7,
+      "frequency": 0.25,
+      "flutter": 0.2,
+      "medium": "water"
+    },
+    "authoredNormals": false,
+    "foliage": true,
+    "castShadow": false,
+    "waterCeiling": 0.15
+  },
+  "seagrass_01": {
+    "name": "seagrass_01",
+    "geometryId": "seagrass-01",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.7,
+        "to": 1.3
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "alignToNormal": 0,
+    "yOffset": 0,
+    "footprint": 0.4,
+    "wind": {
+      "amplitude": 0.9,
+      "frequency": 0.3,
+      "flutter": 0.35,
+      "medium": "water"
+    },
+    "authoredNormals": false,
+    "foliage": true,
+    "castShadow": false,
+    "waterCeiling": 0.08
+  },
+  "seagrass_02": {
+    "name": "seagrass_02",
+    "geometryId": "seagrass-02",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.7,
+        "to": 1.3
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "alignToNormal": 0,
+    "yOffset": 0,
+    "footprint": 0.4,
+    "wind": {
+      "amplitude": 0.9,
+      "frequency": 0.3,
+      "flutter": 0.35,
+      "medium": "water"
+    },
+    "authoredNormals": false,
+    "foliage": true,
+    "castShadow": false,
+    "waterCeiling": 0.08
   }
 }

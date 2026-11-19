@@ -26,6 +26,7 @@ import { clusterFor, compositeCluster } from './cluster.ts';
 import { fbm, signedFbm, warp } from './noise.ts';
 import { createRng, type Rng } from './rng.ts';
 import { barkCanvasSize, barkTextureSize, type Params } from './params.ts';
+import { paintKelpBlade, paintStipe } from './kelp-paint.ts';
 
 /** The atlas as float channels, before any of it is quantised or encoded. */
 export interface Canvas {
@@ -1013,10 +1014,13 @@ export function buildFrondCanvas(params: Params, source: LeafSource | null = nul
 
   // Painted into the column the card samples, inset like a blade's cell so the
   // base is not sliced off at the gutter.
-  rects.forEach((rect, index) =>
-    paintFoliageCell(canvas, params, columnPixels(insetRect(rect, gutter), params.cardAspect), index, frondStyle)
-  );
-  applyCurvature(canvas, params.curvature, false);
+  rects.forEach((rect, index) => {
+    const column = columnPixels(insetRect(rect, gutter), params.cardAspect);
+    if (params.type === 'kelp') paintKelpBlade(canvas, params, column, index);
+    else paintFoliageCell(canvas, params, column, index, frondStyle);
+  });
+  // Kelp art carries its own shading; the curvature pass would muddy the gold.
+  if (params.type !== 'kelp') applyCurvature(canvas, params.curvature, false);
   for (const rect of rects) dilate(canvas, rect);
   paintAccents(canvas, params, layout, accents);
 
@@ -1034,6 +1038,23 @@ export function buildTreeCanvases(
   accents: LeafSource[] = []
 ): Canvases {
   return { bark: buildBarkCanvas(params, bark), leaf: buildLeafCanvas(params, leaves, accents) };
+}
+
+/** Kelp's images: the stalk tile, authored or generated, and the blade strips. */
+export function buildKelpCanvases(
+  params: Params,
+  stipe?: BarkSource | null,
+  blades?: LeafSource | null,
+  accents: LeafSource[] = []
+): Canvases {
+  let stalk: Canvas;
+  if (stipe) stalk = buildBarkCanvas(params, stipe);
+  else {
+    const { width, height } = barkCanvasSize(params);
+    stalk = createCanvas(width, height, params.bumpStrength * 0.5);
+    paintStipe(stalk, params);
+  }
+  return { stipe: stalk, blade: buildFrondCanvas(params, blades, accents) };
 }
 
 /** A crown's images: the frond atlas, and bark only while there is a stem to wear it. */

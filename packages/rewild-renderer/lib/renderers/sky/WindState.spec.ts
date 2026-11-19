@@ -51,6 +51,16 @@ describe('WindState', () => {
     expect(wind.vec[3]).toBeCloseTo(0.9);
   });
 
+  it('runs the swell clock in a calm, and faster in a wind', () => {
+    const wind = new WindState();
+    wind.update(1, 0, 0, 0, 2);
+    const calm = wind.swellClock;
+    expect(calm).toBeGreaterThan(0);
+    expect(calm).toBeLessThan(2);
+    wind.update(1, 0, 1, 0, 2);
+    expect(wind.swellClock - calm).toBeCloseTo(2);
+  });
+
   it('carries the gust field downwind at the strength', () => {
     const wind = new WindState();
     wind.update(1, 0, 0.5, 0, 2);

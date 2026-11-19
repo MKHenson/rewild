@@ -21,6 +21,7 @@ birch are the same type with different keys.
 | `tree`  | A trunk that branches, with leaf cards on the outer branches. This is the default type. | Oak, birch, poplar, shrubs and conifers | [Trees](tree.md) |
 | `clump` | Cards that come out of one point on the ground. It has no stem. | Grass, clover, wildflowers, reeds | [Clumps](clump.md) |
 | `crown` | One stem with a ring of long, curved cards at the top. The stem can be 0m tall. | Palms, ferns, cycads | [Crowns](crown.md) |
+| `kelp`  | Stalks from a holdfast on the bed, with ribbon blades and floats. It sways with the swell and folds at the surface. | Giant, bull, sugar and feather boa kelp | [Kelp](kelp.md) |
 | `rock`  | One solid stone with a baked texture. It has no cards. | Boulders, cobbles | [Rocks](rock.md) |
 | `pebble` | Many small stones in one model. | Pebbles, gravel, scree | [Pebbles](pebble.md) |
 

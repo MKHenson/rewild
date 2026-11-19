@@ -45,6 +45,10 @@ export interface ScatterWind {
   /** Per-leaf flutter as a fraction of `amplitude` in full wind, gated by
    *  COLOR_0.b. */
   flutter: number;
+  /** What moves the layer. `air` leans with the wind and its gusts. `water`
+   *  surges back and forth with the swell, slower, the tip lagging the base,
+   *  and never quite still on a calm day. Defaults to `air`. */
+  medium?: 'air' | 'water';
 }
 
 /**
@@ -52,20 +56,23 @@ export interface ScatterWind {
  * rigid layer, which the wind pipeline is never compiled for anyway — followed
  * by `windOrigin`: the drawing chunk's world xz, so the wind field is read in
  * world space and crosses chunk borders without a seam, then the gust field's
- * drift (WindState.gustDrift).
+ * drift (WindState.gustDrift). `windParams.w` is 0 for air, and 1 plus the
+ * swell clock (WindState.swellClock) for water, so every pass that sways a
+ * layer sways it the same way.
  */
 export function writeScatterWindParams(
   wind: ScatterWind | null | undefined,
   originX: number,
   originZ: number,
   gustDrift: ArrayLike<number>,
+  swellClock: number,
   out: Float32Array,
   offset: number
 ): void {
   out[offset] = wind ? wind.amplitude : 0;
   out[offset + 1] = wind ? wind.frequency : 0;
   out[offset + 2] = wind ? wind.flutter : 0;
-  out[offset + 3] = 0;
+  out[offset + 3] = wind?.medium === 'water' ? 1 + swellClock : 0;
   out[offset + 4] = originX;
   out[offset + 5] = originZ;
   out[offset + 6] = gustDrift[0];
@@ -124,6 +131,14 @@ export interface ScatterLayer {
   /** Draw the layer into the shadow maps. Defaults to true. Off for ground
    *  cover whose shadow is a flicker of blade-sized texels under itself. */
   castShadow?: boolean;
+  /**
+   * Metres under the water surface at rest past which the plant cannot grow.
+   * What reaches it folds over and spreads along it, so tall kelp forms a
+   * canopy rather than poking out. Omit for plants that stop short of the
+   * surface or grow on land. Only the near mesh folds: give such a layer no
+   * impostor and no shadow.
+   */
+  waterCeiling?: number;
 }
 
 /** The farthest any terrain chunk reaches: the last detail level's distance
@@ -450,6 +465,11 @@ function validateWind(layer: ScatterLayer, wind: ScatterWind): void {
     throw new Error(
       `Scatter layer '${layer.name}' wind flutter must not be negative (0 disables it).`
     );
+
+  if (wind.medium !== undefined && wind.medium !== 'air' && wind.medium !== 'water')
+    throw new Error(
+      `Scatter layer '${layer.name}' wind medium must be air or water, got '${wind.medium}'.`
+    );
 }
 
 /**
@@ -535,5 +555,16 @@ export function validateScatterLayers(
       validateImpostor(layer, layer.impostor, lastLodDistance);
     if (layer.collider) validateCollider(layer, layer.collider);
     if (layer.wind) validateWind(layer, layer.wind);
+
+    if (layer.waterCeiling !== undefined) {
+      if (!(layer.waterCeiling >= 0))
+        throw new Error(
+          `Scatter layer '${layer.name}' waterCeiling must not be negative.`
+        );
+      if (layer.impostor || layer.castShadow !== false)
+        throw new Error(
+          `Scatter layer '${layer.name}' folds at the water surface in its mesh alone, so it needs castShadow false and no impostor.`
+        );
+    }
   }
 }

@@ -23,8 +23,8 @@ const lightingGroup = 2;
 const environmentGroup = 3;
 
 // projMatrix + modelViewMatrix + nodeMatrix + band + debug + wind + windParams
-// + windOrigin.
-export const SCATTER_UNIFORM_BYTES = 64 * 3 + 80;
+// + windOrigin + ceiling.
+export const SCATTER_UNIFORM_BYTES = 64 * 3 + 96;
 
 // posScale + rotation + params, matching ScatterInstance in the shader.
 export const SCATTER_GPU_STRIDE = 12;
@@ -88,12 +88,30 @@ export class ScatterInstancedPass extends StandardPassBase {
     this.invalidatePipeline();
   }
 
+  private _waterCeiling = false;
+
+  /** Whether the layer folds at the water surface (ScatterLayer.waterCeiling).
+   *  Compiles the variant that reads the water level per vertex. */
+  get waterCeiling(): boolean {
+    return this._waterCeiling;
+  }
+
+  set waterCeiling(value: boolean) {
+    if (value === this._waterCeiling) return;
+    this._waterCeiling = value;
+    this.invalidatePipeline();
+  }
+
   protected bindsVertexColors(): boolean {
     return this._wind !== null || super.bindsVertexColors();
   }
 
   protected shaderDefines(): ShaderDefines {
-    return { ...super.shaderDefines(), HAS_WIND: this._wind !== null };
+    return {
+      ...super.shaderDefines(),
+      HAS_WIND: this._wind !== null,
+      HAS_WATER_CEILING: this._waterCeiling,
+    };
   }
 
   protected invalidatePipeline(): void {
