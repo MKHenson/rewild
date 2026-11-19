@@ -291,4 +291,22 @@ describe('buildChunkMesh reuse across LODs', () => {
 
     expect(lean.scatter).toEqual(full.scatter);
   });
+
+  it('leaves out the mesh when asked, and builds the rest as before', () => {
+    const full = buildChunkMesh({ ...baseRequest, lod: 0, scatter: true });
+    const lean = buildChunkMesh({
+      ...baseRequest,
+      lod: 0,
+      apron: cachedApron(),
+      scatter: true,
+      skipMesh: true,
+    });
+
+    expect(lean.vertices.length).toBe(0);
+    expect(lean.indices.length).toBe(0);
+    expect(lean.splat).toEqual(full.splat);
+    expect(lean.water).toEqual(full.water);
+    expect(lean.scatter).toEqual(full.scatter);
+    expect(lean.heights).toEqual(full.heights);
+  });
 });

@@ -115,6 +115,13 @@ export function widenProjection(projection: Matrix4, margin: number): void {
 }
 
 // A projection's scale on one axis is 1 / tan(half the view angle).
+const holdChunkScatter = (chunk: TerrainChunk) => {
+  chunk.scatterHeld = true;
+};
+const releaseChunkScatter = (chunk: TerrainChunk) => {
+  chunk.scatterHeld = false;
+};
+
 function widenScale(scale: number, margin: number): number {
   const half = Math.atan(1 / Math.abs(scale));
   const widened = Math.min(half + margin, Math.PI / 2 - 0.01);
@@ -191,6 +198,11 @@ export class TerrainRenderer implements WaterQuerySource {
   scatterLodTint = false;
   private onChunkLoadedDelegate: (event: TerrainChunkEvent) => void;
   private _needsVisibilityUpdate: boolean = false;
+  // Set between beginBrushStroke and endBrushStroke, so chunks that load
+  // during a stroke hold their scatter with the rest.
+  private brushStroke = false;
+  // Chunks whose wet texels changed during the stroke, as "cx,cy".
+  private readonly wetDuringStroke = new Set<string>();
   // Captured in init(); background mesh refreshes (edits) need it outside the
   // update() call path.
   private renderer: Renderer | null = null;
@@ -505,11 +517,19 @@ export class TerrainRenderer implements WaterQuerySource {
   /** Marks the water of the chunks around `coord` stale after its wet texels
    *  changed, so their shore distances read them. */
   wetChanged(coord: Vector2): void {
+    if (this.brushStroke) {
+      this.wetDuringStroke.add(`${coord.x},${coord.y}`);
+      return;
+    }
+    this.bumpNeighbourShores(coord.x, coord.y);
+  }
+
+  private bumpNeighbourShores(cx: number, cy: number): void {
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++)
         if (dx !== 0 || dy !== 0)
           this.terrainChunks
-            .get(`${coord.x + dx},${coord.y + dy}`)
+            .get(`${cx + dx},${cy + dy}`)
             ?.bumpShoreInputVersion();
   }
 
@@ -551,6 +571,13 @@ export class TerrainRenderer implements WaterQuerySource {
    *  for the camera to move. */
   requestVisibilityUpdate(): void {
     this._needsVisibilityUpdate = true;
+  }
+
+  /** Redraws the water fields over a chunk whose water changed while its
+   *  mesh stayed. */
+  refreshWaterFields(chunk: TerrainChunk): void {
+    this._needsVisibilityUpdate = true;
+    this.invalidateWaterFields(chunk);
   }
 
   private onChunkLoaded(event: TerrainChunkEvent) {
@@ -719,6 +746,7 @@ export class TerrainRenderer implements WaterQuerySource {
           this.seaLevel
         );
 
+        newChunk.scatterHeld = this.brushStroke;
         newChunk.dispatcher.add(this.onChunkLoadedDelegate);
         newChunk.visible = false;
         renderer.scene.addChild(newChunk.transform);
@@ -964,6 +992,25 @@ export class TerrainRenderer implements WaterQuerySource {
     chunk.setHeights(heights);
     if (this.renderer) chunk.refreshMeshes(this.renderer);
     return true;
+  }
+
+  // Defers what a brush stroke's rebuilds need not show while it runs: every
+  // chunk's scatter, and the neighbours' shore distances. Both catch up once
+  // in endBrushStroke instead of on every rebuild.
+  beginBrushStroke(): void {
+    this.brushStroke = true;
+    this.terrainChunks.forEach(holdChunkScatter);
+  }
+
+  endBrushStroke(): void {
+    this.brushStroke = false;
+    this.terrainChunks.forEach(releaseChunkScatter);
+    for (const key of this.wetDuringStroke) {
+      const comma = key.indexOf(',');
+      this.bumpNeighbourShores(+key.slice(0, comma), +key.slice(comma + 1));
+    }
+    this.wetDuringStroke.clear();
+    this.requestVisibilityUpdate();
   }
 
   // Rebuilds one chunk's meshes from its current in-memory heights after they

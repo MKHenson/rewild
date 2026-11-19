@@ -97,4 +97,24 @@ describe('wetChanged', () => {
       ['-1,-1', '-1,0', '-1,1', '0,-1', '0,1', '1,-1', '1,0', '1,1'].sort()
     );
   });
+
+  it('waits for a brush stroke to end, then marks them once', () => {
+    const terrain = new TerrainRenderer();
+    const chunks = (terrain as any).terrainChunks as Map<string, unknown>;
+    let bumps = 0;
+    for (let y = -1; y <= 1; y++)
+      for (let x = -1; x <= 1; x++)
+        chunks.set(`${x},${y}`, {
+          scatterHeld: false,
+          bumpShoreInputVersion: () => bumps++,
+        });
+
+    terrain.beginBrushStroke();
+    terrain.wetChanged(new Vector2(0, 0));
+    terrain.wetChanged(new Vector2(0, 0));
+    expect(bumps).toBe(0);
+
+    terrain.endBrushStroke();
+    expect(bumps).toBe(8);
+  });
 });

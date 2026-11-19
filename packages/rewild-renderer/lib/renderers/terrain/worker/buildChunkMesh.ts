@@ -57,9 +57,24 @@ export interface BuildChunkMeshRequest {
   // edits, so this build leaves them out. Both are chunk-wide, not per LOD.
   skipSplat?: boolean;
   skipWater?: boolean;
+  // The chunk's mesh already matches these heights, as after a water edit or
+  // a neighbour's shore change, so the build leaves the mesh out and returns
+  // empty arrays for it.
+  skipMesh?: boolean;
   // The chunk's resident shore distance, for the splat and scatter when
   // skipWater leaves the water map out.
   shore?: Uint8Array;
+}
+
+// Fresh per build: the worker transfers the result's buffers, which detaches
+// them.
+function emptyMesh() {
+  return {
+    vertices: new Float32Array(0),
+    uvs: new Float32Array(0),
+    normals: new Float32Array(0),
+    indices: new Uint32Array(0),
+  };
 }
 
 // One-sample apron ring so edge-vertex normals get a two-sided gradient that
@@ -263,14 +278,16 @@ export function buildChunkMesh(
   // chunks stay seam-free at any scale. meshHeights/meshApron carry the apron
   // (two-sided seamless normals) for unedited chunks, or the bare heights
   // (one-sided edges) for edited ones.
-  const mesh = generateTerrainMesh(
-    meshHeights,
-    chunkSize,
-    lod,
-    TERRAIN_METERS_PER_SAMPLE,
-    meshApron
-  );
-  lap('mesh');
+  const mesh = request.skipMesh
+    ? emptyMesh()
+    : generateTerrainMesh(
+        meshHeights,
+        chunkSize,
+        lod,
+        TERRAIN_METERS_PER_SAMPLE,
+        meshApron
+      );
+  if (!request.skipMesh) lap('mesh');
 
   // Derived from the same heights and climate the splat was, so an instance
   // stands on the material its own rules selected for.

@@ -55,6 +55,9 @@ export class TerrainPass implements IMaterialPass {
   readonly patchPlacement = new TerrainPatchPlacement();
   private patch: TerrainPass | null = null;
   private patchSurface: GPUBuffer | null = null;
+  // The chunk geometry patchSurface was written from. A re-mesh swaps the
+  // chunk's geometry in place, so the surface is rewritten when it changes.
+  private patchSurfaceFrom: Geometry | null = null;
   private patchCopiedFrom: GPUBindGroup | null = null;
   private patchTracked = false;
   private patchWritten = false;
@@ -87,6 +90,7 @@ export class TerrainPass implements IMaterialPass {
     this.patch = null;
     this.patchSurface?.destroy();
     this.patchSurface = null;
+    this.patchSurfaceFrom = null;
   }
 
   /**
@@ -345,7 +349,15 @@ export class TerrainPass implements IMaterialPass {
         geometry,
         chunk.patchSamples
       );
+      this.patchSurfaceFrom = geometry;
       this.terrainUniforms.patchSurface = this.patchSurface;
+    } else if (this.patchSurfaceFrom !== geometry) {
+      renderer.device.queue.writeBuffer(
+        this.patchSurface,
+        0,
+        packPatchSurface(geometry, chunk.patchSamples)
+      );
+      this.patchSurfaceFrom = geometry;
     }
 
     const source = chunk.terrainUniforms;
@@ -386,6 +398,20 @@ function buildPatchSurface(
   geometry: Geometry,
   samples: number
 ): GPUBuffer {
+  const data = packPatchSurface(geometry, samples);
+  const buffer = device.createBuffer({
+    label: 'terrain patch surface',
+    size: data.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+  });
+  device.queue.writeBuffer(buffer, 0, data);
+  return buffer;
+}
+
+function packPatchSurface(
+  geometry: Geometry,
+  samples: number
+): Float32Array<ArrayBuffer> {
   const count = samples * samples;
   const vertices = geometry.vertices!;
   const normals = geometry.normals!;
@@ -396,11 +422,5 @@ function buildPatchSurface(
     data[i * 4 + 2] = normals[i * 3 + 1];
     data[i * 4 + 3] = normals[i * 3 + 2];
   }
-  const buffer = device.createBuffer({
-    label: 'terrain patch surface',
-    size: data.byteLength,
-    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(buffer, 0, data);
-  return buffer;
+  return data;
 }
