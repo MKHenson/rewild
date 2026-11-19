@@ -412,8 +412,8 @@ visible and its movement mode. A land creature's `y` should match `ground`. The 
 each group's `drift` speed and how far its home has `drifted` from where it spawned.
 
 A chunk is planned once its heights load. No groups in a loaded chunk means the biome weights or the
-habitats rejected every home. A group stays `idle` until its home is within 120m, `loading` while
-its creatures build, and `failed` when building them threw.
+habitats rejected every home. A group stays `idle` until its home is within its `spawnRadius`,
+`loading` while its creatures build, and `failed` when building them threw.
 
 See [Sinew](./milestones/sinew.md).
 

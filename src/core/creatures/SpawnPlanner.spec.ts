@@ -168,6 +168,38 @@ describe('planChunkSpawns', () => {
       }
   });
 
+  it('spawns only where the rule depth and shore selectors pass', () => {
+    const { world, site, biomes, plan } = setup([]);
+    site.habitats.tuna = new WaterHabitat(
+      { type: 'water', bedMargin: 0.5, surfaceMargin: 0.5 },
+      world
+    );
+    biomes[0].creatures = [
+      {
+        creature: 'tuna',
+        density: 5,
+        depth: { from: 4, to: 6 },
+        shore: { from: 60, to: 40 },
+      },
+    ];
+    world.height = (x) => (x > 0 ? -10 : -3);
+    world.depth = (x) => (x > 0 ? 10 : 3);
+    world.shore = (_x, z) => (z > 0 ? 20 : 100);
+
+    const groups = plan();
+    expect(groups.length).toBeGreaterThan(0);
+    for (const group of groups)
+      for (const m of group.members) {
+        expect(m.x).toBeGreaterThan(0);
+        expect(m.z).toBeGreaterThan(0);
+      }
+  });
+
+  it('treats dry ground as no depth and no shore distance', () => {
+    const { plan } = setup([{ ...CHICKENS, depth: { from: 1, to: 2 } }]);
+    expect(plan()).toEqual([]);
+  });
+
   it('skips rules whose creature has no habitat', () => {
     const { plan } = setup([{ ...CHICKENS, creature: 'dodo' }]);
     expect(plan()).toEqual([]);

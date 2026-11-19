@@ -7,8 +7,11 @@ import {
   AirHabitat,
   HeightRange,
   LandHabitat,
+  WATER_DESPAWN_RADIUS,
+  WATER_SPAWN_RADIUS,
   WaterHabitat,
   createHabitat,
+  spawnRange,
 } from './Habitat';
 import { TestWorld } from './testWorld';
 
@@ -112,6 +115,96 @@ describe('WaterHabitat', () => {
 
     world.palette = ['lake'];
     expect(new WaterHabitat(ocean, world).canBe(0, 0)).toBe(false);
+  });
+
+  it('keeps over the depths it allows', () => {
+    const world = new TestWorld();
+    const open = new WaterHabitat(
+      { ...WATER, depth: { from: 4, to: 6 } },
+      world
+    );
+    world.depth = () => 3;
+    expect(open.canBe(0, 0)).toBe(false);
+    world.depth = () => 8;
+    expect(open.canBe(0, 0)).toBe(true);
+  });
+
+  it('keeps inside the shore distances it allows', () => {
+    const world = new TestWorld();
+    world.depth = () => 4;
+    const shallows = new WaterHabitat(
+      { ...WATER, shore: { from: 25, to: 15 } },
+      world
+    );
+    world.shore = () => 5;
+    expect(shallows.canBe(0, 0)).toBe(true);
+    world.shore = () => 40;
+    expect(shallows.canBe(0, 0)).toBe(false);
+    expect(shallows.stranded(0, 0)).toBe(true);
+  });
+
+  it('swims in a band up from the bed', () => {
+    const world = new TestWorld();
+    world.height = () => -10;
+    world.depth = () => 10;
+    const habitat = new WaterHabitat(
+      { ...WATER, swim: { from: 'bed', band: [0.2, 2] } },
+      world
+    );
+    expect(habitat.heightRange(0, 0, range)).toBe(true);
+    expect(range.min).toBeCloseTo(-9.5);
+    expect(range.max).toBeCloseTo(-8);
+  });
+
+  it('swims in a band down from the surface', () => {
+    const world = new TestWorld();
+    world.height = () => -10;
+    world.depth = () => 10;
+    const habitat = new WaterHabitat(
+      { ...WATER, swim: { from: 'surface', band: [1, 3] } },
+      world
+    );
+    expect(habitat.heightRange(0, 0, range)).toBe(true);
+    expect(range.min).toBeCloseTo(-3);
+    expect(range.max).toBeCloseTo(-1);
+  });
+
+  it('cannot be where its swim band and margins do not overlap', () => {
+    const world = new TestWorld();
+    world.height = () => -2;
+    world.depth = () => 2;
+    const habitat = new WaterHabitat(
+      { ...WATER, swim: { from: 'bed', band: [0, 0.4] } },
+      world
+    );
+    expect(habitat.canBe(0, 0)).toBe(false);
+  });
+});
+
+describe('spawnRange', () => {
+  it('spawns water creatures nearer than land and air ones', () => {
+    const water = spawnRange({ type: 'water', bedMargin: 0, surfaceMargin: 0 });
+    expect(water).toEqual({
+      spawn: WATER_SPAWN_RADIUS,
+      despawn: WATER_DESPAWN_RADIUS,
+    });
+    expect(spawnRange(LAND).spawn).toBeGreaterThan(water.spawn);
+  });
+
+  it('takes the radii a habitat sets, despawning no nearer than it spawns', () => {
+    expect(
+      spawnRange({
+        type: 'water',
+        bedMargin: 0,
+        surfaceMargin: 0,
+        spawnRadius: 120,
+        despawnRadius: 150,
+      })
+    ).toEqual({ spawn: 120, despawn: 150 });
+    expect(spawnRange({ ...LAND, spawnRadius: 200 })).toEqual({
+      spawn: 200,
+      despawn: 200,
+    });
   });
 });
 

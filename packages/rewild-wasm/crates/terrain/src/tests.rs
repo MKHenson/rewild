@@ -1152,6 +1152,7 @@ mod scatter {
             height: None,
             noise: None,
             water_depth: None,
+            shore: None,
             water_type: None,
             underwater: false,
         }
@@ -1269,17 +1270,17 @@ mod scatter {
         #[test]
         fn keeps_a_rule_out_of_the_water_unless_it_grows_underwater() {
             let plain = rule("rock", 1.0);
-            assert_eq!(rule_water(&plain, 2.0, 1.0, 1.0, 0.0), 0.0);
-            assert_eq!(rule_water(&ScatterRule { underwater: true, ..plain.clone() }, 2.0, 1.0, 1.0, 0.0), 1.0);
-            assert_eq!(rule_water(&plain, 2.0, 0.0, 1.0, 0.0), 1.0);
+            assert_eq!(rule_water(&plain, 2.0, 1.0, 1.0, 0.0, 0.0), 0.0);
+            assert_eq!(rule_water(&ScatterRule { underwater: true, ..plain.clone() }, 2.0, 1.0, 1.0, 0.0, 0.0), 1.0);
+            assert_eq!(rule_water(&plain, 2.0, 0.0, 1.0, 0.0, 0.0), 1.0);
         }
 
         #[test]
         fn thins_only_a_rule_without_water_conditions_by_the_beach() {
             let plain = rule("rock", 1.0);
-            assert_eq!(rule_water(&plain, -1.0, 1.0, 1.0, 0.75), 0.25);
+            assert_eq!(rule_water(&plain, -1.0, 1.0, 1.0, 0.75, 0.0), 0.25);
             let shore = ScatterRule { water_depth: Some(Selector::One(Band { from: -4.0, to: -2.0 })), ..plain };
-            assert_eq!(rule_water(&shore, -1.0, 1.0, 1.0, 0.75), 1.0);
+            assert_eq!(rule_water(&shore, -1.0, 1.0, 1.0, 0.75, 0.0), 1.0);
         }
 
         #[test]
@@ -1289,13 +1290,26 @@ mod scatter {
                 water_depth: Some(Selector::One(Band { from: 1.0, to: 3.0 })),
                 ..rule("weed", 1.0)
             };
-            assert_eq!(rule_water(&shelf, 0.5, 1.0, 1.0, 0.0), 0.0);
-            assert_eq!(rule_water(&shelf, 4.0, 1.0, 1.0, 0.0), 1.0);
-            assert_eq!(rule_water(&shelf, 4.0, 0.5, 1.0, 0.0), 0.5);
-            assert_eq!(rule_water(&shelf, 4.0, 0.0, 1.0, 0.0), 0.0);
+            assert_eq!(rule_water(&shelf, 0.5, 1.0, 1.0, 0.0, 0.0), 0.0);
+            assert_eq!(rule_water(&shelf, 4.0, 1.0, 1.0, 0.0, 0.0), 1.0);
+            assert_eq!(rule_water(&shelf, 4.0, 0.5, 1.0, 0.0, 0.0), 0.5);
+            assert_eq!(rule_water(&shelf, 4.0, 0.0, 1.0, 0.0, 0.0), 0.0);
             let lake = ScatterRule { water_type: Some("lake".into()), ..rule("reed", 1.0) };
-            assert_eq!(rule_water(&lake, -1.0, 1.0, 0.0, 0.0), 0.0);
-            assert_eq!(rule_water(&lake, -1.0, 1.0, 0.5, 0.0), 0.5);
+            assert_eq!(rule_water(&lake, -1.0, 1.0, 0.0, 0.0, 0.0), 0.0);
+            assert_eq!(rule_water(&lake, -1.0, 1.0, 0.5, 0.0, 0.0), 0.5);
+        }
+
+        #[test]
+        fn grows_by_shore_distance_only_in_the_water() {
+            let kelp = ScatterRule {
+                underwater: true,
+                shore: Some(Selector::All(vec![Band { from: 10.0, to: 30.0 }, Band { from: 200.0, to: 150.0 }])),
+                ..rule("kelp", 1.0)
+            };
+            assert_eq!(rule_water(&kelp, 4.0, 1.0, 1.0, 0.0, 5.0), 0.0);
+            assert_eq!(rule_water(&kelp, 4.0, 1.0, 1.0, 0.0, 60.0), 1.0);
+            assert_eq!(rule_water(&kelp, 4.0, 1.0, 1.0, 0.0, 240.0), 0.0);
+            assert_eq!(rule_water(&kelp, 4.0, 0.0, 1.0, 0.0, 60.0), 0.0);
         }
 
         #[test]
@@ -1698,6 +1712,7 @@ mod climate_rules {
                 height: None,
                 noise: None,
                 water_depth: None,
+                shore: None,
                 water_type: None,
                 underwater: false,
             }];

@@ -4,7 +4,14 @@ import { resolveClimatePreset } from 'rewild-renderer';
 import { BiomeProbe } from 'rewild-renderer/lib/renderers/terrain/BiomeProbe';
 import { Container, IAsset } from 'rewild-routing';
 import { getCreaturePreset } from '../creatures/CreaturePresets';
-import { CreatureWorld, Habitat, createHabitat } from '../creatures/Habitat';
+import {
+  CreatureWorld,
+  DESPAWN_RADIUS,
+  Habitat,
+  SpawnRange,
+  createHabitat,
+  spawnRange,
+} from '../creatures/Habitat';
 import { DEFAULT_ROAM, HerdHome } from '../creatures/HerdHome';
 import {
   PlannedCreature,
@@ -17,10 +24,6 @@ import { TemplateLoader } from '../TemplateLoader';
 import { Creature, createCreatureWorld } from './Creature';
 import { StateMachineData } from './Types';
 
-/** Metres from the player inside which a group spawns, measured to its origin. */
-export const SPAWN_RADIUS = 120;
-/** Metres from the player past which a group despawns, measured to its origin. */
-export const DESPAWN_RADIUS = 150;
 /** Spawned creatures alive at once, at most. */
 export const MAX_SPAWNED = 100;
 /** Seconds between spawn checks. */
@@ -44,6 +47,9 @@ export interface SpawnGroupReport {
   members: number;
   state: string;
   distance: number;
+  /** Metres inside which it spawns and past which it despawns. */
+  spawnRadius: number;
+  despawnRadius: number;
   /** m/s the home drifts. */
   drift: number;
   /** Metres the home has drifted from where the group spawned. */
@@ -85,7 +91,11 @@ class SpawnGroup {
   generation = 0;
   readonly home: HerdHome;
 
-  constructor(readonly plan: PlannedGroup, habitat: Habitat) {
+  constructor(
+    readonly plan: PlannedGroup,
+    habitat: Habitat,
+    readonly range: SpawnRange
+  ) {
     const { rule } = plan;
     this.home = new HerdHome(
       plan.homeX,
@@ -115,6 +125,10 @@ export class CreatureSpawner extends Container implements SpawnSite {
   private readonly chunks = new Map<number, SpawnGroup[]>();
   private readonly live: SpawnGroup[] = [];
   private readonly habitats = new Map<string, Habitat | null>();
+  private readonly ranges = new Map<string, SpawnRange>();
+  /** Metres from the player chunks are planned to: the furthest despawn
+   *  radius of any habitat seen. */
+  private reach = DESPAWN_RADIUS;
   private readonly probe = new BiomeProbe();
   private readonly player = new Vector3();
   private timer = 0;
@@ -189,11 +203,13 @@ export class CreatureSpawner extends Container implements SpawnSite {
     habitat = null;
     if (!template?.preset)
       console.warn(`Spawn rule creature '${creature}' is not a creature.`);
-    else
-      habitat = createHabitat(
-        getCreaturePreset(template.preset).habitat,
-        this.world
-      );
+    else {
+      const settings = getCreaturePreset(template.preset).habitat;
+      habitat = createHabitat(settings, this.world);
+      const range = spawnRange(settings[0]);
+      this.ranges.set(creature, range);
+      this.reach = Math.max(this.reach, range.despawn);
+    }
     this.habitats.set(creature, habitat);
     return habitat;
   }
@@ -235,6 +251,8 @@ export class CreatureSpawner extends Container implements SpawnSite {
           distance: Math.round(
             Math.hypot(group.plan.homeX - player.x, group.plan.homeZ - player.z)
           ),
+          spawnRadius: group.range.spawn,
+          despawnRadius: group.range.despawn,
           drift: group.home.speed,
           drifted:
             Math.round(
@@ -288,10 +306,11 @@ export class CreatureSpawner extends Container implements SpawnSite {
     if (!span) return;
 
     this.span = span;
-    this.nearX0 = Math.round((player.x - DESPAWN_RADIUS) / span);
-    this.nearX1 = Math.round((player.x + DESPAWN_RADIUS) / span);
-    this.nearZ0 = Math.round((player.z - DESPAWN_RADIUS) / span);
-    this.nearZ1 = Math.round((player.z + DESPAWN_RADIUS) / span);
+    const { reach } = this;
+    this.nearX0 = Math.round((player.x - reach) / span);
+    this.nearX1 = Math.round((player.x + reach) / span);
+    this.nearZ0 = Math.round((player.z - reach) / span);
+    this.nearZ1 = Math.round((player.z + reach) / span);
     this.chunks.forEach(this.dropIfFar);
 
     for (let cx = this.nearX0; cx <= this.nearX1; cx++)
@@ -336,25 +355,30 @@ export class CreatureSpawner extends Container implements SpawnSite {
       world
     );
     const groups = plans.map(
-      (plan) => new SpawnGroup(plan, this.habitat(plan.rule.creature)!)
+      (plan) =>
+        new SpawnGroup(
+          plan,
+          this.habitat(plan.rule.creature)!,
+          this.ranges.get(plan.rule.creature)!
+        )
     );
     this.chunks.set(key, groups);
     return groups;
   }
 
   private updateGroup(group: SpawnGroup): void {
-    const { plan } = group;
+    const { plan, range } = group;
     const distance = Math.hypot(
       plan.homeX - this.player.x,
       plan.homeZ - this.player.z
     );
     if (group.state === 'idle') {
       if (
-        distance < SPAWN_RADIUS &&
+        distance < range.spawn &&
         this.count + plan.members.length <= MAX_SPAWNED
       )
         this.spawn(group);
-    } else if (group.state !== 'failed' && distance > DESPAWN_RADIUS)
+    } else if (group.state !== 'failed' && distance > range.despawn)
       this.despawn(group);
   }
 
@@ -461,6 +485,8 @@ export class CreatureSpawner extends Container implements SpawnSite {
     this.chunks.forEach(this.despawnAll);
     this.chunks.clear();
     this.habitats.clear();
+    this.ranges.clear();
+    this.reach = DESPAWN_RADIUS;
   }
 
   private readonly despawnAll = (groups: SpawnGroup[]): void => {

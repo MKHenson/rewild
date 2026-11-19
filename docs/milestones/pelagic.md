@@ -254,6 +254,8 @@ Scatter rules know about water:
 - `waterDepth` grows it only in a range of depths. A negative value means "above the water", for
   example reeds on a bank.
 - `waterType` grows it only in one kind of water, for example reeds only in lakes.
+- `shore` grows it only in a range of metres from dry ground, for example kelp off the coast. It
+  reads the water map's shore distance.
 
 Water you edit counts too, so reeds follow a shore you have changed.
 

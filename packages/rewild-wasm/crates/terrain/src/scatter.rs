@@ -98,6 +98,9 @@ pub struct ScatterRequest<'a> {
     /// Fill `LayerInstances::ids`.
     pub with_ids: bool,
     pub water_edit: Option<WaterEdit>,
+    /// The chunk's water map shore distance: one channel of metres, up to
+    /// `SHORE_CAP`. Without it every point is 0 m from shore.
+    pub shore: Option<PaintMask<'a>>,
 }
 
 /// One layer's instances in a chunk.
@@ -133,17 +136,26 @@ pub fn rule_density(rule: &ScatterRule, height: f64, slope: f64, noise: f64) -> 
         * rule.noise.as_ref().map_or(1.0, |n| band_coverage(&n.band, noise))
 }
 
+/// Whether a rule grows by the water: depth, shore distance or water type.
+pub fn has_water_condition(rule: &ScatterRule) -> bool {
+    rule.water_depth.is_some() || rule.shore.is_some() || rule.water_type.is_some()
+}
+
 /// The share of a rule's density its water conditions allow. `depth` is
 /// metres below the surface, `coverage` the water there, `type_weight` the
-/// weight of the rule's water type (1 with none) and `beach` the coast's share.
-pub fn rule_water(rule: &ScatterRule, depth: f64, coverage: f64, type_weight: f64, beach: f64) -> f64 {
+/// weight of the rule's water type (1 with none), `beach` the coast's share
+/// and `shore` metres to dry ground.
+pub fn rule_water(rule: &ScatterRule, depth: f64, coverage: f64, type_weight: f64, beach: f64, shore: f64) -> f64 {
     if depth > 0.0 && coverage > 0.0 && !rule.underwater {
         return 0.0;
     }
-    if rule.water_depth.is_none() && rule.water_type.is_none() {
+    if !has_water_condition(rule) {
         return if rule.underwater { 1.0 } else { 1.0 - beach };
     }
-    coverage * type_weight * selector_coverage(rule.water_depth.as_ref(), depth)
+    coverage
+        * type_weight
+        * selector_coverage(rule.water_depth.as_ref(), depth)
+        * selector_coverage(rule.shore.as_ref(), shore)
 }
 
 type Quaternion = [f64; 4];
@@ -348,7 +360,7 @@ impl ScatterGenerator {
                 continue;
             };
             let rule = &climate.biomes[biome].scatter[r];
-            if rule.underwater || rule.water_depth.is_some() || rule.water_type.is_some() {
+            if rule.underwater || has_water_condition(rule) {
                 continue;
             }
             let noise = self.rule_noise(biome, r, u, v);
@@ -428,6 +440,7 @@ impl ScatterGenerator {
             kills: request.kills,
             region: request.region,
             with_ids: request.with_ids,
+            shore: request.shore.as_ref(),
         };
         let mut active = ActiveBiomes::new(climate, chunk.biome_mask);
         let mut results = Vec::new();
@@ -538,9 +551,13 @@ impl ScatterGenerator {
                             (point, beach)
                         });
                         let type_weight = rules.water_type[biome].map_or(1.0, |t| point.types.get(t).copied().unwrap_or(0.0));
+                        let shore = match (&rule.shore, chunk.shore) {
+                            (Some(_), Some(mask)) => mask.sample_channel(0, sx, sy) * 255.0,
+                            _ => 0.0,
+                        };
                         density += active.weights[b]
                             * rule_density
-                            * rule_water(rule, point.level - height, point.coverage, type_weight, beach);
+                            * rule_water(rule, point.level - height, point.coverage, type_weight, beach, shore);
                     }
                 }
 
@@ -609,4 +626,5 @@ struct Chunk<'c> {
     kills: &'c [u32],
     region: Option<SampleBox>,
     with_ids: bool,
+    shore: Option<&'c PaintMask<'c>>,
 }

@@ -248,6 +248,10 @@ export class LODMesh {
           neighbourWet: neighbourWet ?? undefined,
           skipSplat,
           skipWater,
+          shore:
+            skipWater && wantsScatter
+              ? this.chunk.water?.shore
+              : undefined,
         });
 
         // Cache the heightfield on the chunk so later LODs, snapshot writes,

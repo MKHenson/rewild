@@ -3,11 +3,12 @@ import { ScatterRequestData } from '../../../../rewild-wasm/pkg/rewild_wasm';
 import { ClimateConfig } from './Biomes';
 import { waterEditData } from './Lakes';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
-import { PaintMask } from './PaintMask';
+import { PaintMask, paintMaskSize } from './PaintMask';
 import { getScatterLayerOrder } from './ScatterLayers';
 import { ScatterKillSet } from './ScatterKillSet';
 import { terrainGenerator } from './TerrainGenerator';
 import type { WaterEdit } from './WaterEdit';
+import { WATER_MAP_STEP } from './WaterMap';
 
 // Per-chunk scatter placement: which instances of which layer stand where.
 // Placed in Rust (crates/terrain/src/scatter.rs).
@@ -73,6 +74,9 @@ export interface ScatterChunkOptions {
   seaLevel?: number;
   /** The chunk's authored water, blended over the generated. */
   waterEdit?: WaterEdit | null;
+  /** The chunk's water map shore distance (WaterMap.shore), read by rules
+   *  with a `shore` selector. Without it every point is 0 m from shore. */
+  shore?: Uint8Array | null;
 }
 
 /**
@@ -111,6 +115,13 @@ export function scatterChunk(
   request.setWithIds(options?.withIds === true);
   const edit = waterEditData(options?.waterEdit ?? null);
   if (edit) request.setWaterEdit(edit);
+  const shore = options?.shore;
+  if (shore)
+    request.setShore(
+      shore,
+      paintMaskSize(chunkSize, WATER_MAP_STEP),
+      WATER_MAP_STEP
+    );
 
   const built = terrainGenerator(seed, climate, options?.seaLevel ?? 0).scatter(
     heights,
