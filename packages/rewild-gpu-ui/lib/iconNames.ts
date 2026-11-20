@@ -23,9 +23,11 @@ function lucideNames<const T extends readonly string[]>(
  */
 export const UI_ICON_NAMES = lucideNames([
   'chevron-down',
+  'circle-alert',
   'info',
   'play',
   'settings',
+  'triangle-alert',
   'x',
 ]);
 

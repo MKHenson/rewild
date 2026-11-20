@@ -2,7 +2,9 @@ import { RGBA, resolveColor } from './color';
 import type { Bounds, UIFont } from './font';
 import type { UIIcons } from './icons';
 import { innerBox } from './layout';
+import { isScrollContainer, SCROLLBAR_SIZE, scrollbars } from './scroll';
 import {
+  clipsContent,
   cornerRadii,
   Sides,
   UIBoxShadow,
@@ -344,7 +346,7 @@ function writeNode(
 
   const outerClip = clip;
   const outerRadii = clipRadii;
-  if (style.overflow === 'hidden') {
+  if (clipsContent(style)) {
     // Nested clips keep only the innermost corner radii.
     clip = intersect(clip, placeRect(innerBox(node), placement));
     clipRadii = radii.map((r) => Math.max(0, r - borderWidth)) as Radii;
@@ -373,10 +375,43 @@ function writeNode(
     );
   for (const child of node.children)
     writeNode(child, stream, context, clip, clipRadii, opacity, placement);
+  if (isScrollContainer(node))
+    writeScrollbars(node, stream, context, clip, clipRadii, opacity, placement);
   // The ring draws over the node's children, and its parent's clip cuts it,
   // as with a CSS outline.
   if (node === context.focus)
     writeFocusRing(stream, context, box, outerClip, outerRadii);
+}
+
+/** The thumb of each scrollbar, in its gutter. It is brighter while a mouse hovers it, and more while the pointer drags it. */
+function writeScrollbars(
+  node: UINode,
+  stream: PrimitiveStream,
+  context: WriteContext,
+  clip: Rect,
+  clipRadii: Radii,
+  opacity: number,
+  placement: Placement
+): void {
+  for (const bar of scrollbars(node)) {
+    const axis = bar.vertical ? 'y' : 'x';
+    const alpha =
+      node.scrollbarDrag === axis
+        ? THUMB_DRAG_ALPHA
+        : node.scrollbarHover === axis
+        ? THUMB_HOVER_ALPHA
+        : THUMB_ALPHA;
+    const [r, g, b, a] = resolveColor(SCROLLBAR_COLOR, context.theme);
+    const radius = (SCROLLBAR_SIZE / 2) * placement.scale;
+    stream.pushRect({
+      rect: placeRect(bar.thumb, placement),
+      clip,
+      clipRadii,
+      radii: [radius, radius, radius, radius],
+      fill: [r, g, b, a * alpha],
+      opacity,
+    });
+  }
 }
 
 /** A node's box as it draws, on the surface. */
@@ -464,6 +499,10 @@ function scaleRadii(radii: Radii, scale: number): Radii {
  */
 const FOCUS_RING_WIDTH = 2;
 const FOCUS_RING_COLOR: UIColor = 'primary400';
+const SCROLLBAR_COLOR: UIColor = 'onSurfaceLight';
+const THUMB_ALPHA = 0.5;
+const THUMB_HOVER_ALPHA = 0.75;
+const THUMB_DRAG_ALPHA = 0.9;
 
 function writeFocusRing(
   stream: PrimitiveStream,
@@ -625,7 +664,7 @@ function writeOverlay(node: UINode, stream: PrimitiveStream): void {
   const inside = innerBox(node);
   writeStrips(stream, inside, node.padding, PADDING_COLOR);
   stream.pushRect({ rect, border: BOX_COLOR, borderWidth: 1 });
-  if (node.style.overflow === 'hidden')
+  if (clipsContent(node.style))
     stream.pushRect({ rect: inside, border: CLIP_COLOR, borderWidth: 1 });
   for (const child of node.children) writeOverlay(child, stream);
 }

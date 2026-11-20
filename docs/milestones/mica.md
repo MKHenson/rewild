@@ -223,7 +223,7 @@ The theme values, not the CSS. The DOM's components keep their styles as CSS tex
 | Group      | Properties                                                                                                  | Stage |
 | ---------- | ----------------------------------------------------------------------------------------------------------- | ----- |
 | Layout     | `display` (`flex`, `none`), `position` (`relative`, `absolute`), `top` `right` `bottom` `left`, `width` `height`, `minWidth` `maxWidth` `minHeight` `maxHeight`, `padding`, `margin`, `flexDirection`, `flexWrap`, `gap`, `flexGrow` `flexShrink` `flexBasis`, `justifyContent`, `alignItems`, `alignSelf` | 1 |
-| Box        | `backgroundColor`, `borderColor`, `borderWidth`, `borderRadius` (per corner), `opacity`, `overflow` (`visible`, `hidden`) | 1 |
+| Box        | `backgroundColor`, `borderColor`, `borderWidth`, `borderRadius` (per corner), `opacity`, `overflow` (`visible`, `hidden`, and `scroll` from Stage 3) | 1 |
 | Text       | `color`, `fontSize`, `fontWeight`, `lineHeight`, `textAlign`, `whiteSpace`, `textOverflow` (`ellipsis`)       | 2 |
 | Effects    | `boxShadow` (outer and inset, a list), `backdrop` (`glass`), `transform` (`x`, `y` and a uniform `scale`), `transition` (colours, opacity, `transform`) | 2 |
 | Input      | `pointerEvents` (`auto`, `none`), `focusable`                                                                 | 2 |
@@ -242,6 +242,21 @@ A flex subset in TypeScript, written to CSS semantics so its output can be check
 - **Defaults.** Each node is a flex container with `box-sizing: border-box`. `flexDirection` is `row`, `flexShrink` is 1 and `alignItems` is `stretch`, as in CSS. Min sizes are 0: there is no automatic minimum size from the content. The DOM mirror in the inspector sets `min-width: 0` and `min-height: 0` to match.
 - **Absolute nodes** are placed in the padding box of their parent. With no inset on an axis, a node goes where it would go as the only flex item.
 - **Browser rules.** Layout follows Chrome where the spec leaves room: a percentage height resolves only against a definite height, and a container sized by its content uses each item's content width only when the item's grow or shrink factor lets it move off its flex basis.
+
+### Scrolling
+
+A node with `overflow: 'scroll'` is a scroll container. It clips the same as `hidden`, and its content scrolls on each axis where it is larger than the node.
+
+- **Layout.** The items of a scroll container do not shrink, so they overflow it. In CSS, the automatic minimum size does this. Mica has none, so the rule is in the scroll container. The DOM mirror sets `flex-shrink: 0` on its items to match.
+- **The content size.** `scrollWidth` and `scrollHeight` are the far edge of the children, with their margins and the end padding. A child's own overflow does not count. Give a child its content size, for example with `alignSelf: 'flex-start'`, to scroll across it.
+- **Moving.** `scrollLeft`, `scrollTop`, `scrollTo` and `scrollBy` clamp to the content. Layout places the children, then moves them by the scroll. A scroll after that moves the children's rectangles again, with no layout, and the surface writes its stream. So each rectangle is where its node shows, and the hit test, focus moves and popups need no change.
+- **Wheel.** Scrolling is the default action of a `wheel` event. The nearest scroll container that can move scrolls by the delta. Shift turns a vertical wheel into a horizontal one. A listener can prevent it. A wheel over a scroll container at its end does not scroll the page, as with CSS `overscroll-behavior: contain`.
+- **Touch.** A touch that moves 8 px on an axis its scroll container scrolls drags the content. The node under the touch gets `pointercancel` and no click. A node that captured the pointer, such as a slider, keeps it.
+- **Scrollbars.** A thumb 6 px wide on each axis that overflows, inside the right or bottom edge, in `onSurfaceLight` at 50 %. It is at 75 % while a mouse hovers it and 90 % while a pointer drags it. The mouse can drag it, and a press on the track off the thumb pages. The scrollbar takes the press, so the content gets no events.
+- **Gutters.** Each scrollbar has a 10 px gutter that the content does not go into: on the right for a vertical bar and at the bottom for a horizontal one. Layout adds the gutter to the padding only on an axis that overflows. The node's own padding goes inside the gutter, as with CSS `scrollbar-gutter`. When a pass adds or removes a gutter, the tree is laid out again, up to three passes. So a parent that sizes to its content includes the gutter.
+- **Redraws.** A scrollbar drag, hover or page and a touch pan send no events. `UIInput.onRedraw` tells an owner that draws only on input, such as the inspector, to draw again.
+- **Focus.** Focus from a key or the gamepad scrolls the node into view, with a 4 px margin for the focus ring, after the surface's next layout. Focus from a pointer does not scroll. `node.scrollIntoView()` does it by hand.
+- **The right stick.** It scrolls at up to 1,200 px a second, on a curve, with a dead zone of 0.2. It sends a `wheel` to the focused node. The nearest scroll container round that node scrolls, or else the first one in the focus scope that can move. So the stick scrolls a settings panel while focus is on its tab.
 
 ### Checking it
 
@@ -348,6 +363,7 @@ The look-at ray and the XR controller give the same thing: a ray. The surface tu
 - **The focus scope.** Focus lives on the topmost open surface that takes all input. Each surface keeps its own focused node, so focus goes back to the menu when a popup over it closes. Keys go to the focused node, or to the scope's root, and bubble.
 - **Tab order.** Tab and Shift+Tab move through the focusable nodes in tree order. They wrap, so focus stays in the scope.
 - **Spatial moves.** The d-pad, the left stick and the arrow keys move focus to the nearest focusable node in that direction, by rectangle. A candidate must start past the focused box's edge. Its score is its gap along the move plus five times its gap across it, so a node in line wins over a nearer one to the side. With nothing focused, a move focuses the first node.
+- **Scrolling.** The right stick scrolls, and focus from a key or the d-pad scrolls into view. See Scrolling.
 - **Actions.** Enter or A clicks the focused node. A held key does not click again. Escape or B has no action of its own: a modal or popup listens for the `Escape` key down and closes. Tab, the arrows and Enter are default actions, so a `keydown` listener can prevent them.
 - **The gamepad.** `GamepadReader` turns a pad with the standard mapping into keys: A is `Enter`, B is `Escape`, and the d-pad and the left stick are the arrow keys. The event's `code` names the control, such as `GamepadA` or `GamepadStickLeft`. The d-pad and the stick repeat while held, after 400 ms and then every 100 ms. The stick points past 0.5 on its stronger axis and stops below 0.3.
 - **Who reads the pad.** A pad has no events, so the UI cannot stop a press before the game sees it. One owner reads the pads once per frame and gives them to one side. In the game, that owner is `Gamepad` in `src/core/input`, and `GameManager` routes it. While a focus scope is open, the pad goes to `ui.input.readGamepads`. Otherwise the player reads it. When the UI gets the pad, `syncGamepads` takes the controls already down as held, so a press that began in play does not act in the UI. The inspector reads the pads itself, for the card whose canvas has focus.
@@ -469,6 +485,29 @@ button.onClick = () => popup.open(button.node);
 - **Closing.** A click outside, Escape or B closes the popup and calls `onClose`. The click outside does not reach the UI under it. `close()` closes it with no `onClose`.
 - **Focus.** While the popup is open, its surface takes all input, so it is the focus scope. Focus moves to its first focusable node, with the ring when the anchor's surface shows the ring. When it closes, focus goes back to the node that had it, or else to the anchor.
 - **Look.** The plain `surface` colour, a 1 px `glassEdge` border, a 4 px radius and a short shadow. It fades in and out over 150 ms. Glass is for modals and for panels over the scene. A popup over the scene can add it with `style: glassSurface()`.
+
+### Form controls
+
+The form controls copy the look of the DOM controls in `rewild-ui`. Each one works with a mouse, the keys and a gamepad. The gamepad's d-pad and left stick act as the arrow keys, so a control that uses an arrow takes it from focus moves.
+
+```ts
+const quality = new Select(renderer.ui, { options, value: 'high', onChange });
+const volume = new Slider({ value: 80, onChange, onChangeComplete });
+menu.append(
+  new Field({ label: 'Render Quality', control: quality, description: 'Sets each section.' }),
+  new Field({ label: 'Master', control: volume })
+);
+```
+
+- **Values.** Each control takes a value and an `onChange`. `onChange` runs only for input from the player. A value set from outside, such as `select.value = 'low'`, changes the control with no `onChange`, so a store can drive it.
+- **Disabled.** A disabled control fades, takes no input and no focus. A disabled `Select` closes its list.
+- **`Switch`.** A click, Enter, Space or A turns it. Off is an outlined track and on is a filled one. The thumb slides with a `transform` transition.
+- **`Slider`.** A press moves the thumb to the press, and the drag follows the pointer off the track until it is up, with pointer capture. Left and right step the value, Home and End go to the ends, and Page Up and Page Down take ten steps. Up and down do not step, as they do in the DOM, so on a gamepad they move focus between the rows of a form. `onChangeComplete` runs when a drag ends and after each key.
+- **`Select`.** A click, Enter or A opens its list on a `Popup` under it, as wide as the field. Focus goes to the chosen option. The arrows move between options, and a click, Enter or A picks one. A click outside, Escape or B closes the list with no change. Focus then goes back to the field. A list taller than 256 px, the DOM's `16rem`, scrolls, and it opens scrolled to the chosen option. Mica has no rotation, so the arrow does not turn while the list is open.
+- **`Tabs`.** A row of tabs over the panels, or a column beside them. Only the open tab takes focus. The arrows along the tabs open the next tab and move focus to it. They wrap and skip disabled tabs. The arrows across the tabs move focus into the panel. Hidden panels stay in the tree with `display: 'none'`, so their controls keep their state. Each panel is a scroll container.
+- **`Field`.** A label in a column of fixed width, 200 px by default, then the control, with the description under the control. The control's column stretches a `Select` or a `Slider`. A `Switch` keeps its width.
+- **`Divider` and `InfoBox`.** A 1 px line in `onSurfaceBorder`. A neutral box with an icon, an optional title and text, and the variant's colour as a bar down the left edge.
+- **Lines with no border.** Mica has one border width for all sides. The field's bottom line and the info box's bar are inset shadows, so they add no size. The tab line is a 2 px node at the edge of the tab.
 
 ### Settings
 
@@ -607,7 +646,7 @@ npm run ui-inspector
 ```
 
 - **Served** by esbuild, the same as the game, from its own entry and HTML page. It does not load the game, a level or the editor.
-- **The list.** On the left, the parts of Mica to check: layout, boxes, text, icons, meters, buttons, focus, glass, and later the form controls and world surfaces.
+- **The list.** On the left, the parts of Mica to check: layout, boxes, text, icons, meters, buttons, focus, glass, scrolling, form controls, and later world surfaces.
 - **The examples.** A click on a part loads its examples on the right, drawn by Mica on a WebGPU canvas. An example is a small function that builds a tree.
 - **Side by side.** A layout example also draws as DOM elements with the same styles, next to the Mica version. The two must match.
 - **Tools.** The layout overlay, a light and dark theme switch, and a device pixel ratio switch.
@@ -748,10 +787,10 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: popup surfaces placed next to a node and kept on screen, closed by a click outside, Escape or B. Focus moves into the popup and back.
   - Expect: a test popup opens under a button, stays on screen at the edges, and closes with each of the three.
 
-- [ ] **13. Form controls**
+- [x] **13. Form controls**
 
-  - Scope: `Tabs`, `Select`, `Slider`, `Switch`, `Field`, `Divider`, `InfoBox`, each with mouse, keyboard and gamepad input.
-  - Expect: each control works with the gamepad alone. The slider follows a drag off its track.
+  - Scope: `Tabs`, `Select`, `Slider`, `Switch`, `Field`, `Divider`, `InfoBox`, each with mouse, keyboard and gamepad input. Scrolling: `overflow: 'scroll'`, the wheel, touch, scrollbars, focus into view and the right stick.
+  - Expect: each control works with the gamepad alone. The slider follows a drag off its track. A long tab panel and a long select list scroll with each input.
 
 - [ ] **14. Settings in the game**
 

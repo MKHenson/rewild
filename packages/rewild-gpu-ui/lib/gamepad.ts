@@ -33,6 +33,11 @@ const DPAD_RIGHT = 15;
 const STICK_ON = 0.5;
 const STICK_OFF = 0.3;
 
+/** The right stick's axes in the standard mapping, and the tilt it ignores. */
+const RIGHT_X = 2;
+const RIGHT_Y = 3;
+const RIGHT_DEAD_ZONE = 0.2;
+
 /** The repeat time of a synced control, which never repeats. */
 const SYNCED = Infinity;
 
@@ -103,7 +108,8 @@ const CONTROLS: Control[] = [
 
 /**
  * Turns gamepads into key presses. A is Enter, B is Escape, and the d-pad and
- * the left stick are the arrow keys. Only pads with the standard mapping
+ * the left stick are the arrow keys. The right stick is not a key: read it
+ * with `rightStick`. Only pads with the standard mapping
  * count. Call `update` once per frame.
  */
 export class GamepadReader {
@@ -160,8 +166,31 @@ export class GamepadReader {
     }
   }
 
+  /**
+   * The right stick's tilt on each axis, from -1 to 1, with the dead zone
+   * cut out, so a stick at rest gives 0. With more than one pad, the pad
+   * tilted most counts. The stick is not a key: it scrolls.
+   */
+  rightStick(pads: readonly (GamepadState | null)[]): { x: number; y: number } {
+    let best = { x: 0, y: 0 };
+    for (const pad of pads) {
+      if (!pad || pad.mapping !== 'standard') continue;
+      const x = deadZone(pad.axes[RIGHT_X] ?? 0);
+      const y = deadZone(pad.axes[RIGHT_Y] ?? 0);
+      if (Math.hypot(x, y) > Math.hypot(best.x, best.y)) best = { x, y };
+    }
+    return best;
+  }
+
   /** Forgets every held control, with no up. */
   reset(): void {
     this.held.clear();
   }
+}
+
+/** Cuts out the dead zone and scales the rest back to the full range. */
+function deadZone(value: number): number {
+  const size = Math.abs(value);
+  if (size <= RIGHT_DEAD_ZONE) return 0;
+  return (Math.sign(value) * (size - RIGHT_DEAD_ZONE)) / (1 - RIGHT_DEAD_ZONE);
 }

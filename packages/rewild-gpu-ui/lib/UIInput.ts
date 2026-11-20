@@ -16,8 +16,18 @@ import {
   nextInTabOrder,
 } from './focus';
 import { GamepadReader } from './gamepad';
-import { hitTest } from './hitTest';
-import type { UINode } from './UINode';
+import { hitTest, insideRounded } from './hitTest';
+import { innerBox } from './layout';
+import {
+  firstScroller,
+  isScrollContainer,
+  maxScroll,
+  Scrollbar,
+  scrollbars,
+  scrollerFor,
+  scrollForThumb,
+} from './scroll';
+import { Dirty, Rect, UINode } from './UINode';
 import type { UISurface } from './UISurface';
 
 /**
@@ -59,6 +69,14 @@ interface PointerState {
   taken: boolean;
   /** The game took the press, so the UI ignores the pointer until it is up. */
   game: boolean;
+  /** Where a touch went down, and the scroll container it can drag, until it drags or lifts. */
+  pan: { node: UINode; x: number; y: number } | null;
+  /** True once a touch drags its scroll container. It sends no more events. */
+  panning: boolean;
+  /** The scrollbar the pointer drags, and where on the thumb it holds it. */
+  bar: { node: UINode; vertical: boolean; grab: number } | null;
+  /** The scroll container whose scrollbar a mouse hovers, or null. */
+  barHover: UINode | null;
 }
 
 type PointerEventType =
@@ -92,6 +110,14 @@ const MOUSE_POINTER_ID = 1;
 const LINE_HEIGHT = 16;
 /** The pointer id of a click from a key or a gamepad. */
 const KEY_POINTER_ID = -1;
+/** CSS pixels a touch moves before it drags its scroll container in place of its node. */
+const PAN_SLOP = 8;
+/** CSS pixels round a scrollbar that a press still takes, as the bar is thin. */
+const SCROLLBAR_GRAB = 3;
+/** CSS pixels per second that the right stick scrolls at full tilt. */
+const STICK_SCROLL_SPEED = 1200;
+/** The longest frame the right stick scrolls for, in milliseconds, so a stall does not jump. */
+const STICK_MAX_FRAME = 50;
 
 const ARROWS: Record<string, FocusDirection> = {
   ArrowUp: 'up',
@@ -123,7 +149,11 @@ export interface UIInputAttachOptions {
  * arrow keys move it to the nearest node in that direction, and Enter clicks
  * the focused node.
  *
- * A gamepad acts as these keys: see `GamepadReader`. The input does not read
+ * Scrolling is the default action of a wheel: the nearest scroll container
+ * that can move scrolls. A touch that drags past a few pixels scrolls its
+ * container in place of its node, and a press on a scrollbar drags it.
+ *
+ * A gamepad acts as these keys: see `GamepadReader`. Its right stick scrolls. The input does not read
  * the pads itself. Their owner reads them once per frame and gives them to
  * `readGamepads` while the UI has the pad, so the UI and the game never both
  * act on one press.
@@ -131,6 +161,12 @@ export interface UIInputAttachOptions {
 export class UIInput {
   /** Called after each event the input sends. */
   onDispatch: ((event: UIEvent) => void) | null = null;
+  /**
+   * Called when the input changes what the UI draws but sends no event: a
+   * scrollbar drag, hover or page, and a touch pan. An owner that draws only
+   * on input draws again here.
+   */
+  onRedraw: (() => void) | null = null;
   private pointers = new Map<number, PointerState>();
   private element: HTMLElement | null = null;
   private touchAction = '';
@@ -139,6 +175,8 @@ export class UIInput {
   private moveTaken = false;
   private pageKeys = true;
   private gamepads = new GamepadReader();
+  /** The time of the last gamepad read, for the right stick's scroll. */
+  private lastPadTime: number | null = null;
 
   constructor(private source: UISurfaceList) {}
 
@@ -158,6 +196,10 @@ export class UIInput {
         down: null,
         taken: false,
         game: false,
+        pan: null,
+        panning: false,
+        bar: null,
+        barHover: null,
       };
       this.pointers.set(id, state);
     }
@@ -167,6 +209,7 @@ export class UIInput {
       return 'passed';
     }
     if (action === 'cancel') return this.cancel(state, init);
+    if (state.bar || state.panning) return this.drag(state, action, init);
 
     const target = this.captured(id) ?? this.pick(init.x, init.y);
     this.hover(state, target, init);
@@ -176,8 +219,14 @@ export class UIInput {
         state.game = true;
         return 'passed';
       }
-      state.down = target;
       state.taken = true;
+      // A press on a scrollbar drags it, and sends no events.
+      if (this.pressScrollbar(state, target, init)) return 'prevented';
+      state.down = target;
+      if (state.type === 'touch') {
+        const node = scrollerFor(target, 1, 1) ?? scrollerFor(target, -1, -1);
+        state.pan = node && { node, x: init.x, y: init.y };
+      }
       const result = this.send(target, new UIPointerEvent('pointerdown', init));
       // A press focuses its nearest focusable node, as in the DOM, unless a
       // listener prevents it.
@@ -186,6 +235,7 @@ export class UIInput {
     }
 
     if (action === 'move') {
+      if (this.startPan(state, init)) return 'prevented';
       const result = target
         ? this.send(target, new UIPointerEvent('pointermove', init))
         : 'passed';
@@ -204,6 +254,7 @@ export class UIInput {
     this.releaseCapture(id);
     state.down = null;
     state.taken = false;
+    state.pan = null;
     if (state.type === 'mouse') {
       this.hover(state, this.pick(init.x, init.y), init);
     } else {
@@ -214,10 +265,24 @@ export class UIInput {
     return result;
   }
 
-  /** Sends a wheel to the node under the pointer. */
+  /**
+   * Sends a wheel to the node under the pointer. Then, unless a listener
+   * prevents it, the nearest scroll container that can move scrolls by the
+   * delta. Shift turns a vertical wheel into a horizontal one.
+   */
   wheel(init: UIWheelInit): UIInputResult {
     const target = this.captured(init.pointerId) ?? this.pick(init.x, init.y);
-    return target ? this.send(target, new UIWheelEvent(init)) : 'passed';
+    if (!target) return 'passed';
+    const result = this.send(target, new UIWheelEvent(init));
+    if (result === 'prevented') return result;
+    let { deltaX: dx, deltaY: dy } = init;
+    if (init.shiftKey && dx === 0) [dx, dy] = [dy, 0];
+    if (scrollerFor(target, dx, dy)?.scrollBy(dx, dy)) return 'prevented';
+    // A scroll container at its end keeps the wheel, so the page does not
+    // scroll, as with CSS `overscroll-behavior: contain`. A browser gives a
+    // whole trackpad gesture to the page when its first event is not
+    // prevented, so this also holds a gesture that starts at an end.
+    return insideScroller(target) ? 'prevented' : result;
   }
 
   /**
@@ -261,9 +326,47 @@ export class UIInput {
     return hits;
   }
 
-  /** Reads the gamepads once, as keys. Call it once per frame while the UI has the pad. */
+  /**
+   * Reads the gamepads once, as keys. Call it once per frame while the UI
+   * has the pad. The right stick scrolls: see `stickScroll`.
+   */
   readGamepads(pads: readonly (Gamepad | null)[], now: number): void {
     this.gamepads.update(pads, now, (action, init) => this.key(action, init));
+    const frame = Math.min(STICK_MAX_FRAME, now - (this.lastPadTime ?? now));
+    this.lastPadTime = now;
+    const stick = this.gamepads.rightStick(pads);
+    if (frame > 0 && (stick.x || stick.y)) {
+      // A curve, so a small tilt scrolls slowly.
+      const speed = (v: number) =>
+        v * Math.abs(v) * STICK_SCROLL_SPEED * (frame / 1000);
+      this.stickScroll(speed(stick.x), speed(stick.y));
+    }
+  }
+
+  /**
+   * Scrolls the focus scope by a delta in CSS pixels, as the right stick
+   * does. It sends a wheel to the focused node, or else to the scope's root.
+   * Unless a listener prevents it, the nearest scroll container round the
+   * node scrolls, or else the first one in the scope that can move.
+   */
+  stickScroll(dx: number, dy: number): UIInputResult {
+    const scope = this.focusScope();
+    if (!scope) return 'passed';
+    const target = scope.focused ?? scope.root;
+    const { x, y, width, height } = target.rect;
+    const event = new UIWheelEvent({
+      pointerId: KEY_POINTER_ID,
+      pointerType: '',
+      x: x + width / 2,
+      y: y + height / 2,
+      deltaX: dx,
+      deltaY: dy,
+    });
+    if (this.send(target, event) === 'prevented') return 'prevented';
+    const scroller =
+      scrollerFor(target, dx, dy) ?? firstScroller(scope.root, dx, dy);
+    scroller?.scrollBy(dx, dy);
+    return 'prevented';
   }
 
   /**
@@ -398,6 +501,108 @@ export class UIInput {
     );
   }
 
+  /**
+   * Starts a drag when the press is on a scrollbar of the target or of one
+   * of its scroll containers. A press on the track, off the thumb, pages
+   * towards the press. Returns true when the scrollbar took the press.
+   */
+  private pressScrollbar(
+    state: PointerState,
+    target: UINode,
+    init: UIPointerInit
+  ): boolean {
+    if ((init.button ?? 0) !== 0) return false;
+    const at = scrollbarAt(target, init.x, init.y);
+    if (!at) return false;
+    const { node, bar } = at;
+    const along = bar.vertical ? init.y : init.x;
+    const [thumbStart, thumbLength] = bar.vertical
+      ? [bar.thumb.y, bar.thumb.height]
+      : [bar.thumb.x, bar.thumb.width];
+    if (along >= thumbStart && along < thumbStart + thumbLength) {
+      state.bar = {
+        node,
+        vertical: bar.vertical,
+        grab: along - thumbStart,
+      };
+      node.scrollbarDrag = bar.vertical ? 'y' : 'x';
+      node.markDirty(Dirty.Paint);
+    } else {
+      pageScroll(node, bar, along < thumbStart ? -1 : 1);
+    }
+    this.onRedraw?.();
+    return true;
+  }
+
+  /**
+   * Starts dragging a touch's scroll container, once the touch moves past
+   * the slop on an axis the container scrolls. A node that captured the
+   * pointer, such as a slider, keeps it. The node under the touch gets
+   * `pointercancel`, and no click.
+   */
+  private startPan(state: PointerState, init: UIPointerInit): boolean {
+    const pan = state.pan;
+    if (!pan || this.captured(init.pointerId)) return false;
+    const max = maxScroll(pan.node);
+    const dx = init.x - pan.x;
+    const dy = init.y - pan.y;
+    if (
+      !(max.x > 0 && Math.abs(dx) > PAN_SLOP) &&
+      !(max.y > 0 && Math.abs(dy) > PAN_SLOP)
+    )
+      return false;
+    const down = state.down;
+    if (down) this.send(down, new UIPointerEvent('pointercancel', init));
+    state.down = null;
+    state.panning = true;
+    this.hover(state, null, init);
+    return this.drag(state, 'move', init) !== 'passed';
+  }
+
+  /** A move, an up or a cancel of a pointer that drags a scrollbar or pans. */
+  private drag(
+    state: PointerState,
+    action: UIPointerAction,
+    init: UIPointerInit
+  ): UIInputResult {
+    const { bar, pan } = state;
+    if (action === 'move') {
+      if (bar) {
+        const scrollbar = scrollbars(bar.node).find(
+          (b) => b.vertical === bar.vertical
+        );
+        if (scrollbar) {
+          const along = bar.vertical ? init.y : init.x;
+          const scroll = scrollForThumb(bar.node, scrollbar, along - bar.grab);
+          if (bar.vertical) bar.node.scrollTop = scroll;
+          else bar.node.scrollLeft = scroll;
+        }
+      } else if (pan) {
+        // The content follows the finger.
+        pan.node.scrollBy(pan.x - init.x, pan.y - init.y);
+        pan.x = init.x;
+        pan.y = init.y;
+      }
+      this.onRedraw?.();
+      return 'prevented';
+    }
+    if (bar) {
+      bar.node.scrollbarDrag = null;
+      bar.node.markDirty(Dirty.Paint);
+      this.onRedraw?.();
+    }
+    state.bar = null;
+    state.pan = null;
+    state.panning = false;
+    state.taken = false;
+    if (state.type === 'mouse') {
+      if (action === 'up') this.hover(state, this.pick(init.x, init.y), init);
+    } else {
+      this.pointers.delete(init.pointerId);
+    }
+    return 'prevented';
+  }
+
   private captured(pointerId: number): UINode | null {
     for (const surface of this.source.surfaces) {
       const node = surface.pointerCaptures.get(pointerId);
@@ -416,6 +621,10 @@ export class UIInput {
 
   private cancel(state: PointerState, init: UIPointerInit): UIInputResult {
     const id = init.pointerId;
+    if (state.bar || state.panning) {
+      this.drag(state, 'cancel', init);
+      return 'taken';
+    }
     const target = this.captured(id) ?? state.hover[0] ?? null;
     if (target) this.send(target, new UIPointerEvent('pointercancel', init));
     this.releaseCapture(id);
@@ -433,6 +642,7 @@ export class UIInput {
     target: UINode | null,
     init: UIPointerInit
   ): void {
+    this.hoverScrollbar(state, target, init);
     const next: UINode[] = [];
     for (let node = target; node; node = node.parent) next.push(node);
     const prev = state.hover;
@@ -443,6 +653,32 @@ export class UIInput {
     for (let i = next.length - 1; i >= 0; i--)
       if (!prev.includes(next[i]))
         this.send(next[i], new UIPointerEvent('pointerenter', init));
+  }
+
+  /** Lights the scrollbar under a mouse, as the DOM does. */
+  private hoverScrollbar(
+    state: PointerState,
+    target: UINode | null,
+    init: UIPointerInit
+  ): void {
+    const at =
+      target && state.type === 'mouse'
+        ? scrollbarAt(target, init.x, init.y)
+        : null;
+    const node = at?.node ?? null;
+    const axis = at ? (at.bar.vertical ? 'y' : 'x') : null;
+    const prev = state.barHover;
+    if (prev === node && (!node || node.scrollbarHover === axis)) return;
+    if (prev) {
+      prev.scrollbarHover = null;
+      prev.markDirty(Dirty.Paint);
+    }
+    if (node) {
+      node.scrollbarHover = axis;
+      node.markDirty(Dirty.Paint);
+    }
+    state.barHover = node;
+    this.onRedraw?.();
   }
 
   private send(target: UINode, event: UIEvent): UIInputResult {
@@ -571,6 +807,49 @@ function modifiers(e: MouseEvent | KeyboardEvent) {
     metaKey: e.metaKey,
     shiftKey: e.shiftKey,
   };
+}
+
+/** The rect with `SCROLLBAR_GRAB` more on each side. */
+function grown(rect: Rect): Rect {
+  return {
+    x: rect.x - SCROLLBAR_GRAB,
+    y: rect.y - SCROLLBAR_GRAB,
+    width: rect.width + 2 * SCROLLBAR_GRAB,
+    height: rect.height + 2 * SCROLLBAR_GRAB,
+  };
+}
+
+/** True when the node or one of its ancestors is a scroll container with content to scroll. */
+function insideScroller(node: UINode): boolean {
+  for (let n: UINode | null = node; n; n = n.parent) {
+    const max = maxScroll(n);
+    if (max.x > 0 || max.y > 0) return true;
+  }
+  return false;
+}
+
+/** The scrollbar at a point, on the target or on one of its scroll containers, the nearest first. */
+function scrollbarAt(
+  target: UINode,
+  x: number,
+  y: number
+): { node: UINode; bar: Scrollbar } | null {
+  for (let node: UINode | null = target; node; node = node.parent) {
+    if (!isScrollContainer(node)) continue;
+    const bar = scrollbars(node).find((b) =>
+      insideRounded(x, y, grown(b.track), [0, 0, 0, 0])
+    );
+    if (bar) return { node, bar };
+  }
+  return null;
+}
+
+/** Scrolls by most of the view, towards `direction`, as a press on a scrollbar's track does. */
+function pageScroll(node: UINode, bar: Scrollbar, direction: 1 | -1): void {
+  const box = innerBox(node);
+  const step = direction * 0.9 * (bar.vertical ? box.height : box.width);
+  if (bar.vertical) node.scrollBy(0, step);
+  else node.scrollBy(step, 0);
 }
 
 function commonAncestor(a: UINode, b: UINode): UINode | null {

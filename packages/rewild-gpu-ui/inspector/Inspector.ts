@@ -90,6 +90,7 @@ class ExampleCard {
     canvasElement.tabIndex = 0;
     this.renderer.input.attach(canvasElement, { pageKeys: false });
     this.renderer.input.onDispatch = () => requestDraw();
+    this.renderer.input.onRedraw = () => requestDraw();
     this.surface = this.renderer.createSurface({
       kind: 'screen',
       name: example.name,
