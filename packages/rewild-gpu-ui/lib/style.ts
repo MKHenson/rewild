@@ -144,8 +144,12 @@ export interface UIStyle {
   transform?: UITransform;
   /** One transition, or one per property. */
   transition?: UITransition | UITransition[];
-  /** `hidden` clips the node's text and its children to the inside of the border. */
-  overflow?: 'visible' | 'hidden';
+  /**
+   * `hidden` clips the node's text and its children to the inside of the
+   * border. `scroll` clips the same, and the content can scroll on each axis
+   * where it is larger than the node. See `UINode.scrollTo`.
+   */
+  overflow?: 'visible' | 'hidden' | 'scroll';
 
   /** The text colour. Passes down to children. Defaults to white, for text over the game. */
   color?: UIColor;
@@ -218,6 +222,7 @@ const LAYOUT_KEYS = new Set<keyof UIStyle>([
   'alignItems',
   'alignSelf',
   'borderWidth',
+  'overflow',
   'fontSize',
   'fontWeight',
   'lineHeight',
@@ -230,6 +235,11 @@ const LAYOUT_KEYS = new Set<keyof UIStyle>([
  */
 export function affectsNoDrawing(key: keyof UIStyle): boolean {
   return key === 'pointerEvents' || key === 'focusable' || key === 'transition';
+}
+
+/** True when the node clips its text and its children, as `hidden` and `scroll` do. */
+export function clipsContent(style: UIStyle): boolean {
+  return style.overflow === 'hidden' || style.overflow === 'scroll';
 }
 
 /** True when a change to the property can move or resize boxes. */

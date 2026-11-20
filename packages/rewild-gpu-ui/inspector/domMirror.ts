@@ -79,6 +79,9 @@ function mirrorNode(
 function applyStyle(element: HTMLElement, node: UINode): void {
   const css = element.style;
   setStyle(css, node.style);
+  // Items in a Mica scroll container do not shrink. In the DOM, the
+  // automatic minimum size does that, which the mirror sets to 0.
+  if (node.parent?.style.overflow === 'scroll') css.flexShrink = '0';
   // Text in a block, so it starts at the top left of the content box as in
   // Mica, and `text-overflow` applies.
   if (node.text !== null && css.display !== 'none') css.display = 'block';
@@ -127,7 +130,7 @@ function setStyle(css: CSSStyleDeclaration, style: UIStyle): void {
     ? `translate(${t.x ?? 0}px, ${t.y ?? 0}px) scale(${t.scale ?? 1})`
     : '';
   css.transition = transition(style.transition);
-  css.overflow = style.overflow ?? '';
+  css.overflow = style.overflow === 'scroll' ? 'auto' : style.overflow ?? '';
   css.color = color(style.color);
   css.fontSize = style.fontSize === undefined ? '' : `${style.fontSize}px`;
   css.fontWeight = style.fontWeight ?? '';

@@ -6,6 +6,7 @@ import type {
   UIColor,
   UIStyle,
 } from './style';
+import { clipsContent } from './style';
 import type { Rect, UINode } from './UINode';
 
 /**
@@ -242,7 +243,7 @@ export function placeText(
   // The line box centres the font's ascender and descender, as CSS does.
   const halfLeading = (layout.lineHeight - (descender - ascender) * size) / 2;
   const ellipsis =
-    style.textOverflow === 'ellipsis' && node.style.overflow === 'hidden';
+    style.textOverflow === 'ellipsis' && clipsContent(node.style);
   const glyphs: PlacedGlyph[] = [];
 
   const place = (unicode: number, penX: number, baseline: number) => {

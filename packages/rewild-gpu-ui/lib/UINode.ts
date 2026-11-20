@@ -6,6 +6,7 @@ import {
   UIListenerOptions,
 } from './events';
 import type { UIIconName } from './iconNames';
+import { maxScroll, scrollIntoView, translateChildren } from './scroll';
 import type { EffectParams } from './stream';
 import { affectsLayout, affectsNoDrawing, Sides, UIStyle } from './style';
 import { measureText } from './text';
@@ -104,6 +105,23 @@ export class UINode {
   readonly effectParams: EffectParams = [0, 0, 0, 0];
   /** The running transitions and the values last drawn, or null before the first transition. */
   transitions: NodeTransitions | null = null;
+  /**
+   * The size of a scroll container's content, from the inside of its
+   * border, written by layout. See `overflow: 'scroll'`.
+   */
+  scrollWidth = 0;
+  scrollHeight = 0;
+  /**
+   * The axes where a scroll container has a scrollbar, so its padding keeps
+   * a gutter clear: `y` on the right, `x` at the bottom. Written by layout.
+   */
+  scrollGutters = { x: false, y: false };
+  /** The scrollbar the pointer drags, for the stream to light it, or null. */
+  scrollbarDrag: 'x' | 'y' | null = null;
+  /** The scrollbar a mouse hovers, for the stream to light it, or null. */
+  scrollbarHover: 'x' | 'y' | null = null;
+  private _scrollLeft = 0;
+  private _scrollTop = 0;
   private _effect: string | null;
   private _effectOutset: number;
   private _text: string | null = null;
@@ -194,6 +212,71 @@ export class UINode {
     if (value === this._effectOutset) return;
     this._effectOutset = value;
     this.markDirty(Dirty.Paint);
+  }
+
+  /** How far a scroll container's content is scrolled to the left, in CSS pixels. */
+  get scrollLeft(): number {
+    return this._scrollLeft;
+  }
+
+  set scrollLeft(value: number) {
+    this.scrollTo(value, this._scrollTop);
+  }
+
+  /** How far a scroll container's content is scrolled up, in CSS pixels. */
+  get scrollTop(): number {
+    return this._scrollTop;
+  }
+
+  set scrollTop(value: number) {
+    this.scrollTo(this._scrollLeft, value);
+  }
+
+  /**
+   * Scrolls the content to an offset, clamped to the size the last layout
+   * gave. The children move with no layout, and the surface draws again.
+   * Returns true when the content moved.
+   */
+  scrollTo(left: number, top: number): boolean {
+    const max = maxScroll(this);
+    const x = Math.min(max.x, Math.max(0, left));
+    const y = Math.min(max.y, Math.max(0, top));
+    const dx = x - this._scrollLeft;
+    const dy = y - this._scrollTop;
+    if (dx === 0 && dy === 0) return false;
+    this._scrollLeft = x;
+    this._scrollTop = y;
+    translateChildren(this, -dx, -dy);
+    this.markDirty(Dirty.Paint);
+    return true;
+  }
+
+  scrollBy(dx: number, dy: number): boolean {
+    return this.scrollTo(this._scrollLeft + dx, this._scrollTop + dy);
+  }
+
+  /**
+   * Scrolls the node's scroll containers to show it, after the surface's
+   * next layout. A node that takes focus from a key or the gamepad does this.
+   */
+  scrollIntoView(): void {
+    const surface = this.surface;
+    if (surface) surface.reveal(this);
+    else scrollIntoView(this);
+  }
+
+  /**
+   * Clamps the scroll to the content size layout gave, and moves the
+   * children, which layout placed with no scroll, by it.
+   */
+  applyScroll(width: number, height: number): void {
+    this.scrollWidth = width;
+    this.scrollHeight = height;
+    const max = maxScroll(this);
+    this._scrollLeft = Math.min(max.x, this._scrollLeft);
+    this._scrollTop = Math.min(max.y, this._scrollTop);
+    if (this._scrollLeft || this._scrollTop)
+      translateChildren(this, -this._scrollLeft, -this._scrollTop);
   }
 
   /**

@@ -6,13 +6,17 @@ import {
   Sides,
   UIStyle,
 } from './style';
+import { contentSize, isScrollContainer, withGutters } from './scroll';
 import { MeasureFunction, Rect, UINode } from './UINode';
 
 /**
  * Flex layout, written to CSS semantics so a browser can check it. Every node
  * is a flex container with `box-sizing: border-box`. Min sizes default to 0:
  * there is no automatic minimum size from the content. Absolute nodes are
- * placed in the padding box of their parent.
+ * placed in the padding box of their parent. The items of a scroll container
+ * do not shrink, so they overflow it and it scrolls. A scroll container
+ * keeps a gutter clear for each scrollbar it has, so a pass that adds or
+ * removes one lays the tree out again.
  */
 
 interface Size {
@@ -62,14 +66,26 @@ interface Item {
 
 const EPSILON = 1e-3;
 
+/**
+ * The most passes for one layout. A gutter can make content overflow on the
+ * other axis, so a second pass can add the second gutter.
+ */
+const MAX_PASSES = 3;
+
 /** Measured sizes per node, for one layout pass. */
 let cache = new Map<UINode, Map<string, Size>>();
+/** True when a scroll container gained or lost a gutter in this pass. */
+let guttersChanged = false;
 
 /** Places each node of the tree in surface CSS pixels. */
 export function layoutTree(root: UINode, width: number, height: number): void {
-  cache = new Map();
-  root.rect = { x: 0, y: 0, width, height };
-  layoutNode(root, width, height, { width, height }, { width, height }, true);
+  for (let pass = 0; pass < MAX_PASSES; pass++) {
+    cache = new Map();
+    guttersChanged = false;
+    root.rect = { x: 0, y: 0, width, height };
+    layoutNode(root, width, height, { width, height }, { width, height }, true);
+    if (!guttersChanged) break;
+  }
   cache = new Map();
 }
 
@@ -88,7 +104,7 @@ export function innerBox(node: UINode): Rect {
 function rules(node: UINode, cb: Base): Rules {
   const s = node.style;
   const border = s.borderWidth ?? 0;
-  const padding = resolveEdges(s.padding, cb.width);
+  const padding = withGutters(node, resolveEdges(s.padding, cb.width));
   const margin = resolveEdges(s.margin, cb.width);
   const extra = {
     width: padding[1] + padding[3] + 2 * border,
@@ -218,11 +234,27 @@ function layoutNode(
   if (place) {
     node.padding = r.padding;
     layoutAbsolute(node, r.padding);
+    if (isScrollContainer(node)) {
+      const size = contentSize(node);
+      setGutters(node, size);
+      node.applyScroll(size.width, size.height);
+    }
   }
   return {
     width: width ?? content.width + r.extra.width,
     height: height ?? content.height + r.extra.height,
   };
+}
+
+/** Gives a scroll container a gutter on each axis its content overflows. */
+function setGutters(node: UINode, content: Size): void {
+  const box = innerBox(node);
+  const x = content.width > box.width + EPSILON;
+  const y = content.height > box.height + EPSILON;
+  const gutters = node.scrollGutters;
+  if (gutters.x === x && gutters.y === y) return;
+  node.scrollGutters = { x, y };
+  guttersChanged = true;
 }
 
 function measureContent(
@@ -262,6 +294,7 @@ function layoutFlex(
   const cross: Axis = row ? 'height' : 'width';
   let mainSize = inner[main];
   let crossSize = inner[cross];
+  const scrolls = isScrollContainer(node);
 
   const items: Item[] = [];
   for (const child of node.children) {
@@ -288,7 +321,9 @@ function layoutFlex(
       rules: r,
       align,
       grow: child.style.flexGrow ?? 0,
-      shrink: child.style.flexShrink ?? 1,
+      // Items in a scroll container keep their size and overflow it, as
+      // CSS items do with their automatic minimum size.
+      shrink: scrolls ? 0 : child.style.flexShrink ?? 1,
       base: basis,
       hypothetical: clamp(r, main, basis),
       knownCross,

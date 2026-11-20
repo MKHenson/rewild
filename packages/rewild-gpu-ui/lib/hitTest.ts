@@ -1,6 +1,6 @@
 import { innerBox } from './layout';
 import { fitRadii, intersect } from './stream';
-import { cornerRadii } from './style';
+import { clipsContent, cornerRadii } from './style';
 import {
   drawnTransform,
   IDENTITY,
@@ -15,7 +15,7 @@ type Radii = [number, number, number, number];
 /**
  * The topmost node at a point in surface CSS pixels, or null. It tests the
  * same shapes the stream draws: each box with its corner radius and its
- * transform, inside the clip of its `overflow: 'hidden'` parents. Layout
+ * transform, inside the clip of its parents that clip, with `overflow`. Layout
  * must have run.
  */
 export function hitTest(root: UINode, x: number, y: number): UINode | null {
@@ -41,7 +41,7 @@ function hitNode(
 
   let childClip = clip;
   let childRadii = clipRadii;
-  if (style.overflow === 'hidden') {
+  if (clipsContent(style)) {
     // Nested clips keep only the innermost corner radii, as the stream does.
     const borderWidth = (style.borderWidth ?? 0) * scale;
     const inside = placeRect(innerBox(node), placement);

@@ -3,6 +3,7 @@ import { canFocus } from './focus';
 import type { UIFont } from './font';
 import type { UIIcons } from './icons';
 import { layoutTree } from './layout';
+import { scrollIntoView } from './scroll';
 import { PrimitiveStream, writeTree } from './stream';
 import type { UITheme } from './theme';
 import { Dirty, UINode } from './UINode';
@@ -64,6 +65,8 @@ export class UISurface {
    */
   onLayout: (() => void) | null = null;
   private overlay = false;
+  /** The node to scroll into view after the next layout, or null. */
+  private revealing: UINode | null = null;
   private _focused: UINode | null = null;
   private _focusVisible = false;
   private _font: UIFont | null = null;
@@ -155,12 +158,23 @@ export class UISurface {
       this._focusVisible = visible;
       this.needsPaint = true;
     }
+    // Focus from a key or the gamepad scrolls the node into view.
+    if (node && visible) this.reveal(node);
     if (node === old) return true;
     this._focused = node;
     this.needsPaint = true;
     old?.dispatchEvent(new UIFocusEvent('blur', node));
     node?.dispatchEvent(new UIFocusEvent('focus', old));
     return true;
+  }
+
+  /**
+   * Scrolls the node's scroll containers to show it, in the next update,
+   * after layout. See `UINode.scrollIntoView`.
+   */
+  reveal(node: UINode): void {
+    this.revealing = node;
+    this.needsPaint = true;
   }
 
   /** True when the root shows. A surface that is not open takes no input. */
@@ -208,6 +222,9 @@ export class UISurface {
       this.layoutTime = end - start;
       start = end;
     }
+    const revealing = this.revealing;
+    this.revealing = null;
+    if (revealing?.surface === this) scrollIntoView(revealing);
     const animating = writeTree(this.root, this.stream, {
       overlay: this.overlay,
       font: this._font,
