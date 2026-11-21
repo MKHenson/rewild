@@ -105,6 +105,10 @@
           "templateId": "tuna"
         },
         {
+          "name": "Trout",
+          "templateId": "trout"
+        },
+        {
           "name": "Crow",
           "templateId": "crow"
         },

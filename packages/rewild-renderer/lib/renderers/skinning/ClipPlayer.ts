@@ -20,6 +20,9 @@ const _q = new Float32Array(4);
  */
 export class ClipPlayer implements PoseSlotData {
   readonly clips: GltfClip[];
+  /** Rewrites a due slot from the rest pose even with no clip, so procedural
+   *  layers have a fresh pose to build on each time. */
+  alwaysPose = false;
 
   private readonly poses: PoseStore;
   private readonly clipByName = new Map<string, number>();
@@ -166,7 +169,8 @@ export class ClipPlayer implements PoseSlotData {
         total += weight[i];
       }
 
-      if (!active || (due !== null && due[slot] === 0)) continue;
+      if (!active && !this.alwaysPose) continue;
+      if (due !== null && due[slot] === 0) continue;
       wrote[slot] = 1;
       posed++;
       poses.markPoseChanged(slot);

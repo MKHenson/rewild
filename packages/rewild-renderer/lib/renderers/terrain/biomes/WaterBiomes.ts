@@ -1,3 +1,4 @@
+// The biomes under water, ocean and lake: their zones, beds, plants and creatures.
 import { LAKE_WATER, OCEAN_WATER } from '../Water';
 import type {
   BiomeCreatures,
@@ -10,9 +11,17 @@ import type {
 // Fish in open water; the habitat keeps them off the bed.
 export const TUNA: BiomeCreatures = {
   creature: 'tuna',
-  density: 0.4,
-  group: [1, 3],
+  density: 25,
+  group: [1, 6],
   spread: 6,
+};
+
+// Lake fish, alone or in twos and threes.
+export const TROUT: BiomeCreatures = {
+  creature: 'trout',
+  density: 25,
+  group: [1, 3],
+  spread: 3,
 };
 
 // Depth bands of the ocean, each handing over to the next across a few metres.
@@ -206,6 +215,7 @@ export function lakeBed(silt: string, stones: string): SeaBiomeParams {
     name: 'lake-bed',
     layers: rockySand(silt, stones, 0.3),
     scatter: [...LAKE_WEED, BED_PEBBLES],
+    creatures: [TROUT],
   };
 }
 

@@ -29,7 +29,7 @@ use it.
 - **Heads and feet react to the world.** A head turns to look at the player, and feet reach down
   to the ground on a slope.
 - **Biomes spawn creatures**, alone or in groups. The same place always has the same animals.
-- **Up to 100 creatures** are alive at once. Far ones animate less often, to save time.
+- **Far creatures animate less often**, to save time.
 
 ---
 
@@ -394,8 +394,8 @@ creatures: [
 - **Rules can select on water.** A rule's `depth` and `shore` selectors limit where its groups
   spawn, on top of the habitat.
 - **Near the player only.** A group spawns inside its habitat's spawn radius and despawns past its
-  despawn radius: 60 m and 80 m in water, 120 m and 150 m elsewhere. No more than 100 spawned
-  creatures are alive at once.
+  despawn radius: 60 m and 80 m in water, 120 m and 150 m elsewhere. There is no cap on how many
+  are alive; density and spawn radius decide it.
 
 **Files to look at:** `SpawnPlanner.ts`, `CreatureSpawner.ts`, `HerdHome.ts`.
 

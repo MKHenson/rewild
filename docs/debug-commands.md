@@ -417,6 +417,7 @@ Spawning is registered in `CreatureDebugCommands.ts` and works in game only.
 ```js
 showCreatureSpawns(); // the spawner's state, land and sea biome weights at the player, and the nearest 20 planned groups
 showSeaBiomes(); // the water at the player and the sea biome weights over it
+showCreaturesNear(); // placed and spawned creatures within 30m: water depth, mode, habitat, stranded
 showCreatureSpawns(100); // more groups
 goToCreature(); // moves the player 4m from the nearest live creature, facing it along +Z
 goToCreature(3); // the fourth nearest

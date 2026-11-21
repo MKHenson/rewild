@@ -210,6 +210,10 @@
     "type": "gltf",
     "url": "models/tuna.glb"
   },
+  "trout": {
+    "type": "gltf",
+    "url": "models/trout.glb"
+  },
   "crow": {
     "type": "gltf",
     "url": "models/crow.glb"

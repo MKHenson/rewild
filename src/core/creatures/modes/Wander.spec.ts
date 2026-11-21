@@ -223,3 +223,61 @@ describe('Wander', () => {
     });
   });
 });
+
+describe('Wander with hold', () => {
+  const HOLD: WanderSettings = {
+    radius: 5,
+    wait: [6, 6],
+    actions: [],
+    hold: { drift: 1.5, every: [1, 1], speed: 0.3 },
+  };
+
+  function holding() {
+    const wander = new Wander(HOLD);
+    const system = new MovementSystem(
+      SETTINGS,
+      { canBe: () => true },
+      new TestWorld(),
+      [wander],
+      null,
+      rolls()
+    );
+    system.place(10, 0, 10, 0);
+    for (let i = 0; i < 400 && wander.phase !== 'wait'; i++)
+      system.update(0.05);
+    return { wander, system };
+  }
+
+  it('drifts round the spot it waits at, and keeps near it', () => {
+    const { wander, system } = holding();
+    expect(wander.phase).toBe('wait');
+    const spotX = wander.holdX;
+    const spotZ = wander.holdZ;
+
+    let farthest = 0;
+    let moved = 0;
+    let lastX = system.x;
+    let lastZ = system.z;
+    for (let i = 0; i < 100; i++) {
+      system.update(0.05);
+      farthest = Math.max(
+        farthest,
+        Math.hypot(system.x - spotX, system.z - spotZ)
+      );
+      moved += Math.hypot(system.x - lastX, system.z - lastZ);
+      lastX = system.x;
+      lastZ = system.z;
+    }
+
+    expect(wander.phase).toBe('wait');
+    expect(moved).toBeGreaterThan(0.1);
+    expect(farthest).toBeLessThan(HOLD.hold!.drift + 0.5);
+  });
+
+  it('moves on once the wait is over', () => {
+    const { wander, system } = holding();
+    for (let i = 0; i < 125; i++) system.update(0.05);
+
+    expect(wander.phase).toBe('walk');
+  });
+});

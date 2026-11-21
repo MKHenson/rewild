@@ -12,7 +12,7 @@ Shoal is the next step from Sinew. Sinew gave creatures a body, clip animation, 
 
 - **Where they live**: ocean zones by depth and distance from shore, used by biome rules for creatures and for plants such as kelp and coral.
 - **How they swim**: procedural swim motion, so no fish needs a swim clip.
-- **How they move together**: schools at counts far past Sinew's 100.
+- **How they move together**: schools of hundreds of fish.
 - **Life and death**: health, damage and death, for creatures and the player.
 - **The first player tool**: a spear, and an inventory to hold what it catches.
 
@@ -55,9 +55,9 @@ These test assets shape the work. Mat makes them in Blender.
 
 **Anglerfish.** It hangs still in the dark with its lure glowing, and moves in short slow bursts. See The deep.
 
-**Trout and tuna.** Same driver, different presets and habitats. Tuna keep moving, as a group. Trout are loners: each one picks a spot, hovers there with small fin and tail corrections, then moves on. A new mode, Hold, does this. Wander's wait can become Hold for any fish.
+**Trout and tuna.** Same driver, different presets and habitats. Tuna keep moving, as a group. Trout are loners: each one picks a spot, hovers there with small fin and tail corrections, then moves on. Wander's `hold` does this: through each wait the fish keeps to its spot with small drifts, and the swim driver gives it the hover gait. Any fish can use it.
 
-**Guppies.** Lone fish, not a school. Each is an ordinary creature with Wander and Evade, a fast turn rate and quick bursts, so it darts away from the player and settles a few metres off. They use the shader swim, so they have no CPU pose, but they count toward Sinew's 100. **Sardines** are the school.
+**Guppies.** Lone fish, not a school. Each is an ordinary creature with Wander and Evade, a fast turn rate and quick bursts, so it darts away from the player and settles a few metres off. They use the shader swim, so they have no CPU pose, but each is still a full creature. **Sardines** are the school.
 
 ---
 
@@ -73,7 +73,7 @@ These test assets shape the work. Mat makes them in Blender.
 | Spawning      | Per biome, groups per hectare. `TUNA` is in every biome's rule list. 120 m spawn      | Rules cannot target depth or shore. Under water you see far less than 120 m |
 | Stranding     | A fish on land plays `idle` and stays still                                           | It should flop and die                                                     |
 | Health        | The player has health. Creatures have none                                            | Nothing can hurt a creature, and no creature can hurt the player          |
-| Budget        | 100 creatures, each with a full CPU pose                                              | A school of 200 sardines does not fit                                      |
+| Budget        | Each creature has a full CPU pose                                                     | A school of 200 sardines would cost 200 poses                              |
 
 ---
 
@@ -90,7 +90,7 @@ These test assets shape the work. Mat makes them in Blender.
 | 3D movement      | Water creatures get pitch, limited per preset. Player distance in modes is 3D for water creatures                                                                                       |
 | Swim driver      | A `swim` driver next to `clips`. Clips stay optional, for actions such as a bite or a tail slap                                                                                          |
 | School fish      | Drawn with a shader wave and no skeleton. Spine and fin weights are painted in Blender as vertex colours                                                                                  |
-| Schools          | One object with members in flat arrays, not creatures. Own budget, apart from Sinew's 100. Starting number: 1,000 members                                                                |
+| Schools          | One object with members in flat arrays, not creatures. Own budget, apart from lone creatures. Starting number: 1,000 members                                                                |
 | Health           | One health model for creatures and the player. Damage has a source, so a creature knows who hurt it                                                                                      |
 | Death            | No death clip. A dead creature rolls belly up, its body goes limp and it sinks or floats. It despawns after a time or when far away. See Death                                          |
 | Out of the water | Each preset says what a stranded creature does: flail, hold a pose, or play a clip. See Out of the water                                                                                 |
@@ -131,7 +131,7 @@ Depth and shore distance describe the sea well enough. The default continent has
 
 ## Sea biomes
 
-Land biomes are picked by temperature and moisture. Moisture means nothing under water, and a land biome on the coast should not decide what grows 30 m down. So under water gets its own biomes, in `ClimateConfig.sea` (`biomes/SeaBiomes.ts`).
+Land biomes are picked by temperature and moisture. Moisture means nothing under water, and a land biome on the coast should not decide what grows 30 m down. So under water gets its own biomes, in `ClimateConfig.sea` (`biomes/WaterBiomes.ts`).
 
 - **Picked by temperature and zone.** Temperature uses the land's bands, so a cold coast has a cold sea. Zones take the place of moisture: `sea.cells[temperatureBand][zone]` names the sea biome.
 - **Zones.** A zone is a water type with optional `depth` and `shore` selectors. Its weight is the product of them. Where zones overlap, they share the bed by those weights, so the zones should cover all water between them.
@@ -176,7 +176,7 @@ Scatter rules in a sea biome use the same shapes as land rules. Every one grows 
 
 The creature's own habitat still decides where it may move.
 
-**Where it runs.** In Rust, `SeaResolver` (`sea.rs`) turns the water at a point into sea biome weights. The splat reads the chunk's water and shore distance, so the worker builds the water map first, and a water edit rebuilds the splat. Scatter weighs sea rules by the same weights. The far map sees only the ocean, from the coast out. Spawning plans sea biome creatures like land ones, and reads their weights through `BiomeProbe.probeSea`. `showSeaBiomes()` prints the weights at the player.
+**Where it runs.** In Rust, `SeaResolver` (`sea.rs`) turns the water at a point into sea biome weights. The splat reads the chunk's water and shore distance, so the worker builds the water map first, and a water edit rebuilds the splat. Scatter weighs sea rules by the same weights. The far map sees only the ocean, from the coast out. Spawning plans sea biome creatures like land ones, and reads their weights through `BiomeProbe.probeSea`, without the handover's fade, since the creature's habitat decides how shallow it lives. `showSeaBiomes()` prints the weights at the player.
 
 **Later.** Creatures that keep to a scatter asset, such as fish that stay in the kelp.
 
@@ -384,7 +384,7 @@ The default ocean floor is 45 m down, which is not deep or dark enough. Stage 4 
 ## Spawning
 
 - **Rules in sea biomes**, with depth and shore selectors. See Sea biomes.
-- **Schools.** A rule's `school` field gives a member count. School rules use the school budget, not Sinew's 100.
+- **Schools.** A rule's `school` field gives a member count. School rules use the school budget.
 - **Distance.** Each habitat sets its spawn radius. Under water the player sees tens of metres, so fish spawn at about 60 m and despawn at about 80 m. Orcas use the normal radius, since the player sees them from the shore.
 - **No popping.** Spawn outside the fog edge, unless the player moves fast.
 

@@ -1,5 +1,5 @@
 import { LocomotionSetName } from 'models';
-import { Selector, WaterType } from 'rewild-renderer';
+import { ChainShape, Selector, WaterType } from 'rewild-renderer';
 
 /** How near the player a habitat's creatures spawn. */
 export interface SpawnRangeSettings {
@@ -67,6 +67,16 @@ export interface WanderAction {
   weight: number;
 }
 
+/** How a creature keeps station through a wait, as a hovering fish does. */
+export interface HoldSettings {
+  /** Metres from the spot it drifts to, at most. */
+  drift: number;
+  /** Seconds between drifts, picked at random in this range. */
+  every: [number, number];
+  /** m/s it drifts at. */
+  speed: number;
+}
+
 export interface WanderSettings {
   /** Metres from home a target may be. */
   radius: number;
@@ -76,6 +86,8 @@ export interface WanderSettings {
   actions: WanderAction[];
   /** Picks each point further round home, so the creature circles it. */
   circle?: boolean;
+  /** Holds the spot through each wait with small drifts, instead of stopping. */
+  hold?: HoldSettings;
 }
 
 export interface SeekSettings {
@@ -85,6 +97,9 @@ export interface SeekSettings {
   release: number;
   /** Locomotion set used while in control. */
   locomotion?: LocomotionSetName;
+  /** m/s the player must move at before it notices them, so a still player
+   *  can come close. Left out, it notices a still player too. */
+  startle?: number;
 }
 
 export interface MovementSettings {
@@ -98,6 +113,9 @@ export interface MovementSettings {
   acceleration: number;
   /** m/s it never slows below inside its habitat. */
   cruiseSpeed?: number;
+  /** Seconds its speed takes to fall by about two thirds as it coasts, as
+   *  water drags on a fish. Left out, it slows at `acceleration`. */
+  glide?: number;
   /** m/s it changes height at. Left out, it stands on the ground. */
   climbSpeed?: number;
   /** Radians it rolls at its full turn rate. */
@@ -135,9 +153,51 @@ export interface FootIKSettings {
   roll?: number;
 }
 
+/** Beats then glides in turn while cruising. */
+export interface BurstSettings {
+  /** Tail beats in each burst, picked at random in this range. */
+  beats: [number, number];
+  /** Seconds of each glide, picked at random in this range. */
+  coast: [number, number];
+}
+
+/**
+ * How the swim driver bends the spine. `stiff` and `wavelength` shape the
+ * wave along the template's `bones.spine`.
+ */
+export interface SwimSettings extends ChainShape {
+  /** Radians the tail swings either side while cruising. */
+  amplitude: number;
+  /** Metres it moves for each tail beat, about 0.7 of its body length. */
+  stride: number;
+  /** Tail beats a second while it hovers. */
+  hoverBeat: number;
+  /** Tail beats a second at most, bursts and escapes included. */
+  maxBeat: number;
+  /** Radians the spine curves from front to back, at most. It curves to lie
+   *  along the arc it swims. */
+  turnCurve: number;
+  /** Left out, it beats steadily while cruising. */
+  burst?: BurstSettings;
+  /** Radians the body snaps into a C as it starts to flee. Left out, it does not. */
+  escape?: number;
+  /** An action played as it starts to flee, and by chance as a burst starts. */
+  dash?: DashSettings;
+}
+
+export interface DashSettings {
+  /** The action it plays. The template's `clips` maps it to a clip, else the
+   *  clip of that name. */
+  meaning: string;
+  /** Chance, 0 to 1, it plays as a burst starts. */
+  chance: number;
+}
+
 /** A creature's settings. A template names one with `preset`. */
 export interface CreaturePreset {
-  driver: 'clips';
+  /** `swim` needs `swim` and the template's `bones.spine`. */
+  driver: 'clips' | 'swim';
+  swim?: SwimSettings;
   movement: MovementSettings;
   /** Needs the template's `bones.lookAt`. Left out, the head follows clips. */
   lookAt?: LookAtSettings;
@@ -178,17 +238,32 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
     ],
   },
   tuna: {
-    driver: 'clips',
+    driver: 'swim',
+    swim: {
+      stiff: 0.15,
+      wavelength: 1.1,
+      head: 0.12,
+      amplitude: 0.5,
+      stride: 0.8,
+      hoverBeat: 0.8,
+      maxBeat: 3,
+      turnCurve: 0.9,
+      burst: { beats: [3, 6], coast: [0.4, 1] },
+      escape: 1.2,
+      dash: { meaning: 'dash', chance: 0.2 },
+    },
     movement: {
       walkSpeed: 1.6,
       runSpeed: 3.2,
       turnRate: 1.2,
       acceleration: 1.5,
       cruiseSpeed: 1,
+      glide: 1.5,
       climbSpeed: 0.6,
       pitch: 0.4,
       modes: {
         wander: { radius: 15, wait: [0, 0], actions: [] },
+        evade: { radius: 3, release: 7, startle: 0.5 },
       },
     },
     habitat: [
@@ -198,6 +273,51 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
         surfaceMargin: 1,
         depth: { from: 4, to: 6 },
         waterTypes: ['ocean'],
+      },
+    ],
+  },
+  trout: {
+    driver: 'swim',
+    swim: {
+      stiff: 0.1,
+      wavelength: 1,
+      head: 0.15,
+      amplitude: 0.55,
+      stride: 0.3,
+      hoverBeat: 0.6,
+      maxBeat: 4,
+      turnCurve: 1,
+      burst: { beats: [2, 4], coast: [0.5, 1.5] },
+      escape: 1.3,
+      dash: { meaning: 'dash', chance: 0.25 },
+    },
+    movement: {
+      walkSpeed: 0.4,
+      runSpeed: 2.5,
+      turnRate: 3,
+      acceleration: 3,
+      glide: 0.8,
+      climbSpeed: 0.3,
+      pitch: 0.35,
+      modes: {
+        wander: {
+          radius: 6,
+          wait: [4, 12],
+          actions: [],
+          hold: { drift: 0.6, every: [1.5, 4], speed: 0.15 },
+        },
+        evade: { radius: 3, release: 6, startle: 0.5 },
+      },
+    },
+    habitat: [
+      {
+        type: 'water',
+        bedMargin: 0.08,
+        surfaceMargin: 0.12,
+        depth: { from: 0.3, to: 0.45 },
+        waterTypes: ['lake'],
+        spawnRadius: 35,
+        despawnRadius: 40,
       },
     ],
   },

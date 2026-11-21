@@ -17,7 +17,10 @@ const CIRCLE_INNER = 0.7;
 
 type Phase = 'pick' | 'walk' | 'wait';
 
-/** Walks to points near home, waits at each, and plays an action while it waits. */
+/**
+ * Walks to points near home, waits at each, and plays an action while it
+ * waits. With `hold`, it keeps station through the wait, drifting a little.
+ */
 export class Wander implements IMovementMode {
   readonly name = 'wander';
   phase: Phase = 'pick';
@@ -28,6 +31,11 @@ export class Wander implements IMovementMode {
   timer = 0;
   /** The action playing in this wait. */
   action: string | null = null;
+  /** The spot a holding wait keeps to. */
+  holdX = 0;
+  holdZ = 0;
+  /** Seconds to the next drift of a holding wait. */
+  driftTimer = 0;
 
   private readonly settings: WanderSettings;
   private readonly radius: number;
@@ -70,7 +78,8 @@ export class Wander implements IMovementMode {
     }
 
     if (this.phase === 'wait') {
-      system.halt();
+      if (this.settings.hold) this.hold(dt, system);
+      else system.halt();
       this.timer -= dt;
       if (this.timer <= 0) {
         this.stopAction(system);
@@ -86,6 +95,8 @@ export class Wander implements IMovementMode {
       targetZ: this.targetZ,
       targetLevel: this.targetLevel,
       timer: this.timer,
+      holdX: this.holdX,
+      holdZ: this.holdZ,
     };
   }
 
@@ -101,6 +112,26 @@ export class Wander implements IMovementMode {
     if (typeof state.targetLevel === 'number')
       this.targetLevel = state.targetLevel;
     if (typeof state.timer === 'number') this.timer = state.timer;
+    if (typeof state.holdX === 'number') this.holdX = state.holdX;
+    if (typeof state.holdZ === 'number') this.holdZ = state.holdZ;
+  }
+
+  /** Keeps near the spot, now and then drifting a little way off it. */
+  private hold(dt: number, system: MovementSystem): void {
+    const { drift, every, speed } = this.settings.hold!;
+    this.driftTimer -= dt;
+    if (this.driftTimer > 0) {
+      if (system.arrived) system.halt();
+      return;
+    }
+
+    const { random } = system;
+    this.driftTimer = every[0] + random() * (every[1] - every[0]);
+    const angle = random() * Math.PI * 2;
+    const distance = drift * Math.sqrt(random());
+    const x = this.holdX + Math.sin(angle) * distance;
+    const z = this.holdZ + Math.cos(angle) * distance;
+    if (system.habitat.canBe(x, z)) system.steerTo(x, z, speed);
   }
 
   /** Whether the point has been out of reach for too long. Turning on the spot does not count. */
@@ -127,6 +158,12 @@ export class Wander implements IMovementMode {
     if (circle && this.circleSign === 0)
       this.circleSign = random() < 0.5 ? -1 : 1;
 
+    // Outside its habitat with none of it near, it settles for passable points.
+    const { habitat } = system;
+    let passable = false;
+    let passX = 0;
+    let passZ = 0;
+
     for (let i = 0; i < PICK_ATTEMPTS; i++) {
       const angle = circle
         ? Math.atan2(system.x - system.homeX, system.z - system.homeZ) +
@@ -138,21 +175,41 @@ export class Wander implements IMovementMode {
       const x = system.homeX + Math.sin(angle) * distance;
       const z = system.homeZ + Math.cos(angle) * distance;
       if (Math.hypot(x - system.x, z - system.z) < MIN_WANDER_STEP) continue;
-      if (!system.habitat.canBe(x, z)) continue;
-      this.targetX = x;
-      this.targetZ = z;
-      this.targetLevel = random();
-      this.closest = Infinity;
-      this.stalled = 0;
+      if (!habitat.canBe(x, z)) {
+        if (!passable && habitat.canPass?.(x, z)) {
+          passable = true;
+          passX = x;
+          passZ = z;
+        }
+        continue;
+      }
+      this.setTarget(x, z, random());
       return true;
     }
-    return false;
+
+    if (!passable || habitat.canBe(system.x, system.z)) return false;
+    this.setTarget(passX, passZ, random());
+    return true;
+  }
+
+  private setTarget(x: number, z: number, level: number): void {
+    this.targetX = x;
+    this.targetZ = z;
+    this.targetLevel = level;
+    this.closest = Infinity;
+    this.stalled = 0;
   }
 
   private startWait(system: MovementSystem, mayAct = true): void {
     const [min, max] = this.settings.wait;
     this.phase = 'wait';
     this.timer = min + system.random() * (max - min);
+    this.holdX = system.x;
+    this.holdZ = system.z;
+    const hold = this.settings.hold;
+    this.driftTimer = hold
+      ? hold.every[0] + system.random() * (hold.every[1] - hold.every[0])
+      : 0;
     if (!mayAct) return;
     const meaning = this.pickAction(system.random());
     if (meaning && system.animator?.play(meaning, true)) this.action = meaning;

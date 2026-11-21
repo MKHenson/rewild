@@ -265,6 +265,8 @@ declare module 'models' {
       /** Each leg for foot IK, parent first: the upper and lower bones it
        *  bends, the bone they carry, then optionally down to the foot. */
       legs?: string[][];
+      /** The spine bones the swim driver bends, parent first, head to tail. */
+      spine?: string[];
     };
   }
 

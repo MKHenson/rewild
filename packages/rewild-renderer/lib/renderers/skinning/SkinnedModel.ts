@@ -4,6 +4,7 @@ import { GltfModel, GltfNode, GltfPrimitive } from '../../core/GltfLoader';
 import { Geometry } from '../../geometry/Geometry';
 import { SkinnedInstancedPass } from '../../materials/SkinnedInstancedPass';
 import { createStandardPass } from '../../managers/MaterialManager';
+import { ChainLayer } from './ChainLayer';
 import { ClipPlayer } from './ClipPlayer';
 import { FootIKLayer } from './FootIKLayer';
 import { LookAtLayer } from './LookAtLayer';
@@ -27,6 +28,7 @@ export interface SkinnedPrimitive {
 export class SkinnedModel {
   readonly poses: PoseStore;
   readonly player: ClipPlayer;
+  readonly chain: ChainLayer;
   readonly lookAt: LookAtLayer;
   readonly footIK: FootIKLayer;
   readonly schedule: PoseSchedule;
@@ -51,6 +53,7 @@ export class SkinnedModel {
     this.poses = new PoseStore(model.skeleton);
     this.schedule = new PoseSchedule(this.poses);
     this.player = new ClipPlayer(this.poses, model.clips);
+    this.chain = new ChainLayer(this.poses, this.player);
     this.lookAt = new LookAtLayer(this.poses, this.player);
     this.footIK = new FootIKLayer(this.poses, this.player);
 
@@ -72,6 +75,7 @@ export class SkinnedModel {
    */
   update(dt: number, x: number, y: number, z: number): number {
     const posed = this.player.update(dt, this.schedule.plan(dt, x, y, z));
+    this.chain.apply();
     this.lookAt.apply();
     this.footIK.apply();
     this.poses.update();

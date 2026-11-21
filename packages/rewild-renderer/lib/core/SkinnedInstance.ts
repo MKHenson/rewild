@@ -1,5 +1,6 @@
 import { Matrix4, Vector3 } from 'rewild-common';
 import { Renderer } from '../Renderer';
+import { ChainShape } from '../renderers/skinning/ChainLayer';
 import { SkinnedModel } from '../renderers/skinning/SkinnedModel';
 import { SkinnedMesh } from './SkinnedMesh';
 import { Transform } from './Transform';
@@ -109,6 +110,30 @@ export class SkinnedInstance {
    */
   jointMatrix(joint: number, out: Matrix4): Matrix4 {
     return this.model.poses.jointModelMatrix(this.slot, joint, out);
+  }
+
+  /** Names the bones the body wave bends, parent first. One chain per model. */
+  setChain(bones: string[], shape: ChainShape): void {
+    this.model.chain.setChain(bones, shape);
+  }
+
+  /** The chain's rest length in model space. 0 without a chain. */
+  get chainLength(): number {
+    return this.model.chain.length;
+  }
+
+  /**
+   * Bends the chain over the clips. `phase` and `amplitude` in radians;
+   * `curve` in radians from the first bone to the last, positive turning
+   * the front toward +X. Weight 0 skips it.
+   */
+  setChainWave(
+    phase: number,
+    amplitude: number,
+    curve: number,
+    weight: number
+  ): void {
+    this.model.chain.set(this.slot, phase, amplitude, curve, weight);
   }
 
   /** Names the bones look-at turns, parent first. One chain per model. */

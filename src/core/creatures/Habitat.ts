@@ -40,6 +40,9 @@ export interface Habitat {
   /** Seconds of travel ahead to check `heightRange` for rising ground. */
   readonly lookAhead?: number;
   canBe(x: number, z: number): boolean;
+  /** Where it may move while outside its habitat, finding its way back. Left
+   *  out, anywhere. */
+  canPass?(x: number, z: number): boolean;
   /** Whether the point is the wrong medium, where the creature stays still. */
   stranded?(x: number, z: number): boolean;
   /** The heights over a point into `out`; false where there are none. Left
@@ -170,13 +173,25 @@ export class WaterHabitat implements Habitat {
   ) {}
 
   canBe(x: number, z: number): boolean {
+    return (
+      this.heightRange(x, z, this.range) &&
+      waterCoverage(this.settings.depth, this.settings.shore, this.water) >
+        HABITAT_PASS &&
+      this.typeAllowed()
+    );
+  }
+
+  canPass(x: number, z: number): boolean {
     return this.heightRange(x, z, this.range);
   }
 
   stranded(x: number, z: number): boolean {
-    return this.world.sampleHeight(x, z) !== null && !this.canBe(x, z);
+    if (!this.world.sampleWater(x, z, this.water)) return false;
+    return !this.heightRange(x, z, this.range);
   }
 
+  /** The swim band over any water with room for it, whatever its depth, shore
+   *  or type. */
   heightRange(x: number, z: number, out: HeightRange): boolean {
     const { settings, water } = this;
     if (!this.world.sampleWater(x, z, water) || !water.wet) return false;
@@ -193,11 +208,7 @@ export class WaterHabitat implements Habitat {
         out.max = Math.min(out.max, water.level - near);
       }
     }
-    return (
-      out.min < out.max &&
-      waterCoverage(settings.depth, settings.shore, water) > HABITAT_PASS &&
-      this.typeAllowed()
-    );
+    return out.min < out.max;
   }
 
   private typeAllowed(): boolean {

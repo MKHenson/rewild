@@ -28,7 +28,8 @@ export interface SpawnBiome {
 
 /** What spawn planning reads the world through, beside `CreatureWorld`. */
 export interface SpawnSite {
-  /** The named biome's weight at (x, z), 0 to 1. */
+  /** The named biome's weight at (x, z), 0 to 1. A water biome's is its part
+   *  of the water biomes there, without the handover from the land's bed. */
   biomeWeight(name: string, x: number, z: number): number;
   /** Where the named creature may be. Null skips its rules. */
   habitat(creature: string): Habitat | null;

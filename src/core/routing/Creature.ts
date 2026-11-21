@@ -14,6 +14,7 @@ import { HeadLook } from '../creatures/HeadLook';
 import { IMovementMode, MovementSystem } from '../creatures/MovementSystem';
 import { Seek } from '../creatures/modes/Seek';
 import { Wander } from '../creatures/modes/Wander';
+import { SwimDriver } from '../creatures/SwimDriver';
 import { SkinnedAsset } from './SkinnedAsset';
 import { StateMachineData } from './Types';
 
@@ -41,10 +42,13 @@ export function createCreatureWorld(data: StateMachineData): CreatureWorld {
  * only plays idle.
  */
 export class Creature extends SkinnedAsset {
+  /** Every creature mounted in game and not yet disposed. */
+  static readonly live = new Set<Creature>();
   readonly preset: CreaturePreset;
   movement: MovementSystem | null = null;
   headLook: HeadLook | null = null;
   footPlant: FootPlant | null = null;
+  swim: SwimDriver | null = null;
 
   private readonly hasLookChain: boolean;
   private readonly hasLegs: boolean;
@@ -64,6 +68,15 @@ export class Creature extends SkinnedAsset {
     const legs = animation.bones?.legs;
     this.hasLegs = !!legs && !!preset.footIK;
     if (legs && preset.footIK) skinned.setLegs(legs);
+
+    if (preset.driver === 'swim') {
+      const spine = animation.bones?.spine;
+      if (!spine || !preset.swim)
+        throw new Error(
+          `The swim driver needs the template's bones.spine and the preset's swim.`
+        );
+      skinned.setChain(spine, preset.swim);
+    }
   }
 
   mount(): void {
@@ -89,8 +102,22 @@ export class Creature extends SkinnedAsset {
           this.transform,
           world
         );
+      if (this.preset.driver === 'swim')
+        this.swim = new SwimDriver(
+          this.preset.swim!,
+          this.skinned.chainLength * this.transform.scale.x,
+          this.skinned,
+          this.animator
+        );
     }
     this.movement.placeAt(this.initialPosition, this.initialRotation);
+    this.swim?.reset(this.movement.heading);
+    Creature.live.add(this);
+  }
+
+  dispose(): void {
+    Creature.live.delete(this);
+    super.dispose();
   }
 
   private createMovement(world: CreatureWorld): MovementSystem {

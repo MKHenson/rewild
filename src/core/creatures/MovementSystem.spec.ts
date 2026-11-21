@@ -454,3 +454,134 @@ describe('MovementSystem flying', () => {
     expect(Math.abs(system.roll)).toBeLessThan(0.02);
   });
 });
+
+describe('MovementSystem loading and leaving its habitat', () => {
+  it('does nothing until the ground under it is loaded', () => {
+    const mode = new GoalMode('a');
+    mode.goalZ = 10;
+    const { world, system, run } = setup(anywhere, [mode]);
+    system.place(0, 50, 0, 0);
+    world.height = () => null;
+    run(1);
+    expect(system.z).toBe(0);
+    expect(system.y).toBe(50);
+    expect(system.activeMode).toBeNull();
+
+    world.height = () => 0;
+    run(1);
+    expect(system.z).toBeGreaterThan(0);
+  });
+
+  it('keeps to where it can pass while outside its habitat', () => {
+    const mode = new GoalMode('a');
+    mode.goalZ = 10;
+    const { system, run } = setup(
+      { canBe: () => false, canPass: (_x, z) => z < 2 },
+      [mode]
+    );
+    run(5);
+
+    expect(system.z).toBeGreaterThan(1);
+    expect(system.z).toBeLessThan(2);
+  });
+});
+
+describe('MovementSystem climbing with pitch', () => {
+  it('climbs no steeper than its nose can point', () => {
+    const habitat: Habitat = {
+      swims: true,
+      canBe: () => true,
+      heightRange: (_x, _z, out) => {
+        out.min = 10;
+        out.max = 10;
+        return true;
+      },
+    };
+    const mode = new GoalMode('a');
+    mode.goalZ = 100;
+    const world = new TestWorld();
+    const system = new MovementSystem(
+      { ...SETTINGS, climbSpeed: 2, pitch: 0.3 },
+      habitat,
+      world,
+      [mode]
+    );
+    system.place(0, 0, 0, 0);
+    for (let i = 0; i < 40; i++) system.update(0.05);
+
+    expect(system.speed).toBeCloseTo(1);
+    expect(system.verticalSpeed).toBeCloseTo(Math.tan(0.3), 2);
+  });
+});
+
+describe('MovementSystem gliding', () => {
+  it('coasts to a stop over its glide time, not its acceleration', () => {
+    const mode = new GoalMode('a');
+    mode.goalZ = 100;
+    const world = new TestWorld();
+    const system = new MovementSystem(
+      { ...SETTINGS, glide: 1 },
+      anywhere,
+      world,
+      [mode]
+    );
+    system.place(0, 0, 0, 0);
+    for (let i = 0; i < 20; i++) system.update(0.05);
+    expect(system.speed).toBeCloseTo(1);
+
+    mode.wants = 0;
+    for (let i = 0; i < 10; i++) system.update(0.05);
+    expect(system.speed).toBeGreaterThan(0.5);
+    expect(system.speed).toBeLessThan(0.7);
+
+    for (let i = 0; i < 100; i++) system.update(0.05);
+    expect(system.speed).toBe(0);
+  });
+
+  it('slows as it nears its goal, so it drifts in rather than stops', () => {
+    const mode = new GoalMode('a');
+    mode.goalZ = 3;
+    const world = new TestWorld();
+    const system = new MovementSystem(
+      { ...SETTINGS, glide: 1 },
+      anywhere,
+      world,
+      [mode]
+    );
+    system.place(0, 0, 0, 0);
+    let fastest = 0;
+    for (let i = 0; i < 200; i++) {
+      system.update(0.05);
+      fastest = Math.max(fastest, system.speed);
+      if (3 - system.z < 0.5) break;
+    }
+    expect(system.speed).toBeLessThan(fastest);
+    expect(system.speed).toBeLessThanOrEqual(0.55);
+  });
+});
+
+describe('MovementSystem pitch when slow', () => {
+  it('lies level as it rises or sinks without moving forward', () => {
+    const habitat: Habitat = {
+      swims: true,
+      canBe: () => true,
+      heightRange: (_x, _z, out) => {
+        out.min = 10;
+        out.max = 10;
+        return true;
+      },
+    };
+    const world = new TestWorld();
+    const system = new MovementSystem(
+      { ...SETTINGS, climbSpeed: 1, pitch: 0.4 },
+      habitat,
+      world,
+      []
+    );
+    system.place(0, 0, 0, 0);
+    for (let i = 0; i < 20; i++) system.update(0.05);
+
+    expect(system.verticalSpeed).toBeGreaterThan(0);
+    expect(system.pitch).toBeCloseTo(0, 4);
+  });
+});

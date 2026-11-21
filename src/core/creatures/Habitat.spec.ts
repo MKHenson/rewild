@@ -140,7 +140,21 @@ describe('WaterHabitat', () => {
     expect(shallows.canBe(0, 0)).toBe(true);
     world.shore = () => 40;
     expect(shallows.canBe(0, 0)).toBe(false);
-    expect(shallows.stranded(0, 0)).toBe(true);
+    expect(shallows.stranded(0, 0)).toBe(false);
+    expect(shallows.canPass(0, 0)).toBe(true);
+  });
+
+  it('can pass, and is not stranded, in water its depth or type rules out', () => {
+    const world = new TestWorld();
+    world.depth = () => 2;
+    const habitat = new WaterHabitat(
+      { ...WATER, depth: { from: 4, to: 6 }, waterTypes: ['ocean'] },
+      world
+    );
+    expect(habitat.canBe(0, 0)).toBe(false);
+    expect(habitat.canPass(0, 0)).toBe(true);
+    expect(habitat.stranded(0, 0)).toBe(false);
+    expect(habitat.heightRange(0, 0, range)).toBe(true);
   });
 
   it('swims in a band up from the bed', () => {

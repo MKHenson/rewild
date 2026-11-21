@@ -134,3 +134,73 @@ describe('Seek as evade in water', () => {
     expect(system.activeMode).toBe('evade');
   });
 });
+
+describe('Seek as evade for a swimmer', () => {
+  it('heads for the depth furthest from the player', () => {
+    const world = new TestWorld();
+    const seek = new Seek('evade', EVADE, true);
+    const system = new MovementSystem(
+      SETTINGS,
+      { swims: true, canBe: () => true },
+      world,
+      [seek]
+    );
+    system.place(0, 5, 0, 0);
+
+    world.player = new Vector3(0, 8, 1);
+    system.update(0.05);
+    expect(system.goalLevel).toBe(0);
+
+    world.player = new Vector3(0, 2, 1);
+    system.update(0.05);
+    expect(system.goalLevel).toBe(1);
+  });
+});
+
+describe('Seek as evade with startle', () => {
+  function startled() {
+    const world = new TestWorld();
+    const seek = new Seek(
+      'evade',
+      { radius: 5, release: 8, startle: 0.5 },
+      true
+    );
+    const system = new MovementSystem(SETTINGS, { canBe: () => true }, world, [
+      seek,
+    ]);
+    system.place(0, 0, 0, 0);
+    return { world, seek, system };
+  }
+
+  it('does not notice a still player, however near', () => {
+    const { world, system } = startled();
+    world.player = new Vector3(0, 0, 1);
+    for (let i = 0; i < 40; i++) system.update(0.05);
+
+    expect(system.activeMode).toBeNull();
+  });
+
+  it('flees once the player moves near it, and keeps fleeing if they stop', () => {
+    const { world, system } = startled();
+    world.player = new Vector3(0, 0, 3);
+    for (let i = 0; i < 10; i++) {
+      world.player.x += 0.1;
+      system.update(0.05);
+    }
+    expect(system.activeMode).toBe('evade');
+
+    for (let i = 0; i < 10; i++) system.update(0.05);
+    expect(system.activeMode).toBe('evade');
+  });
+
+  it('ignores a player moving outside its radius', () => {
+    const { world, system } = startled();
+    world.player = new Vector3(0, 0, 6);
+    for (let i = 0; i < 10; i++) {
+      world.player.x += 0.1;
+      system.update(0.05);
+    }
+
+    expect(system.activeMode).toBeNull();
+  });
+});

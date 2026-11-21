@@ -7,6 +7,7 @@ export * from './core/OrthographicCamera';
 export * from './core/Mesh';
 export * from './core/SkinnedMesh';
 export * from './core/SkinnedInstance';
+export * from './renderers/skinning/ChainLayer';
 export * from './core/Sprite3D';
 export * from './core/UISurface3D';
 export * from './geometry/Geometry';

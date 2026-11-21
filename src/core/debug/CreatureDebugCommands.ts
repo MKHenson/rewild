@@ -1,3 +1,5 @@
+import { createWaterQuerySample } from 'rewild-renderer';
+import { Creature } from '../routing/Creature';
 import { getCreatureSpawner } from '../routing/CreatureSpawner';
 
 /** Metres from a creature `goToCreature` puts the player. */
@@ -60,6 +62,46 @@ export function registerCreatureDebugCommands() {
         `of the bed; the land biome under them holds the rest.`
     );
     console.table(seaBiomes);
+  };
+
+  (window as any).showCreaturesNear = (radius = 30) => {
+    const player = getCreatureSpawner()?.gameData?.player?.asset;
+    if (!player) {
+      console.log('showCreaturesNear(radius = 30) — no player in game.');
+      return;
+    }
+    const p = player.transform.position;
+    const water = createWaterQuerySample();
+    const rows = [];
+    for (const creature of Creature.live) {
+      const movement = creature.movement;
+      if (!movement) continue;
+      const { x, y, z, habitat, world } = movement;
+      const distance = Math.hypot(x - p.x, y - p.y, z - p.z);
+      if (distance > radius) continue;
+      const wet = world.sampleWater(x, z, water) && water.wet;
+      rows.push({
+        name: creature.name,
+        distance: +distance.toFixed(1),
+        y: +y.toFixed(2),
+        ground: +(world.sampleHeight(x, z) ?? NaN).toFixed(2),
+        waterDepth: wet ? +water.depth.toFixed(2) : 0,
+        mode: movement.activeMode,
+        speed: +movement.speed.toFixed(2),
+        inHabitat: habitat.canBe(x, z),
+        canPass: habitat.canPass?.(x, z) ?? '-',
+        stranded: movement.stranded,
+        blocked: movement.blocked,
+        gait: creature.swim?.gait ?? '-',
+      });
+    }
+    rows.sort((a, b) => a.distance - b.distance);
+    console.log(
+      `showCreaturesNear(${radius}) — ${rows.length} creatures. A swimmer is ` +
+        `stranded where the water is shallower than its bedMargin plus ` +
+        `surfaceMargin; outside its habitat it still swims where it can pass.`
+    );
+    console.table(rows);
   };
 
   (window as any).goToCreature = (index = 0, creature?: string) => {

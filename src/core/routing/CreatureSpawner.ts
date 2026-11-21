@@ -24,8 +24,6 @@ import { TemplateLoader } from '../TemplateLoader';
 import { Creature, createCreatureWorld } from './Creature';
 import { StateMachineData } from './Types';
 
-/** Spawned creatures alive at once, at most. */
-export const MAX_SPAWNED = 100;
 /** Seconds between spawn checks. */
 const CHECK_INTERVAL = 0.5;
 /** Chunk coordinates are packed into one number in this range either side of 0. */
@@ -201,8 +199,11 @@ export class CreatureSpawner extends Container implements SpawnSite {
     const terrain = data.renderer.terrainRenderer;
     if (this.seaBiomes.has(name)) {
       if (!world.sampleWater(x, z, _water)) return 0;
-      this.probe.probeSea(terrain, x, z, _water);
-      return this.probe.seaWeightOf(name);
+      // The share fades the bed from land to water through the handover. A
+      // creature's habitat decides how shallow it lives, so only the split
+      // between water biomes counts here.
+      const share = this.probe.probeSea(terrain, x, z, _water);
+      return share > 0 ? this.probe.seaWeightOf(name) / share : 0;
     }
     this.probe.probe(terrain, x, z);
     return this.probe.weightOf(name);
@@ -404,11 +405,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
       plan.homeZ - this.player.z
     );
     if (group.state === 'idle') {
-      if (
-        distance < range.spawn &&
-        this.count + plan.members.length <= MAX_SPAWNED
-      )
-        this.spawn(group);
+      if (distance < range.spawn) this.spawn(group);
     } else if (group.state !== 'failed' && distance > range.despawn)
       this.despawn(group);
   }

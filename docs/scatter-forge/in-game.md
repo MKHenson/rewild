@@ -144,7 +144,7 @@ Two layer keys are for plants that grow under water. The tool writes both for [k
   a surface canopy in shallow water and stands free in deep water. Only the near mesh folds, so a
   layer with `waterCeiling` must set `castShadow: false` and have no impostor.
 
-A plant that grows on the bed goes in a sea biome's `scatter` list in `biomes/SeaBiomes.ts`. Sea
+A plant that grows on the bed goes in a sea biome's `scatter` list in `biomes/WaterBiomes.ts`. Sea
 biomes own the bed under the water: kelp in the kelp forest, seagrass in the meadow, pondweed on the
 lake bed. Every sea rule grows under water, and can use `waterDepth`, `shore` (metres to dry
 ground) and `waterType` as well as the land selectors.

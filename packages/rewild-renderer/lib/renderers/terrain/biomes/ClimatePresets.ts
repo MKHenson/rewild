@@ -7,7 +7,7 @@ import type {
   ContinentConfig,
   LakeConfig,
 } from './BiomeTypes';
-import { ARID_SEA, DEFAULT_SEA } from './SeaBiomes';
+import { ARID_SEA, DEFAULT_SEA } from './WaterBiomes';
 import { FOREST, MOUNTAIN, PLAIN } from './TemperateBiomes';
 
 // Continents several times wider than a temperature band, so a coast runs past

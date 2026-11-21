@@ -148,9 +148,43 @@
       "name": "tuna",
       "type": "asset",
       "preset": "tuna",
-      "clips": { "idle": "Swim" },
+      "clips": { "walk": "swim-pose" },
+      "bones": {
+        "spine": [
+          "Main",
+          "Spine_1",
+          "Spine_2",
+          "Spine_3",
+          "Spine_4",
+          "Spine_5",
+          "Spine_6",
+          "Spine_7",
+          "Spine_8",
+          "Tail_Fin"
+        ]
+      },
       "resource": {
         "geometryId": "tuna"
+      }
+    },
+    {
+      "name": "trout",
+      "type": "asset",
+      "preset": "trout",
+      "clips": { "walk": "swim" },
+      "clipSpeeds": { "walk": 0.3 },
+      "bones": {
+        "spine": [
+          "SPINE_01",
+          "SPINE_02",
+          "SPINE_03",
+          "SPINE_04",
+          "SPINE_05",
+          "TAIL_02"
+        ]
+      },
+      "resource": {
+        "geometryId": "trout"
       }
     },
     {

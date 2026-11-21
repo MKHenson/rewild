@@ -43,6 +43,10 @@ const LOOK_AHEAD_SAMPLES = 2;
 const HEIGHT_RESPONSE = 1;
 /** Seconds a roll takes to settle. */
 const ROLL_SMOOTHING = 0.4;
+/** m/s² a gliding creature slows at, at the least, so it comes to rest. */
+const MIN_GLIDE_SLOWING = 0.1;
+/** Part of its climb speed a still pitching creature keeps, fading out by its walk speed. */
+const SLOW_CLIMB = 0.2;
 /** Seconds a pitch takes to settle. */
 const PITCH_SMOOTHING = 0.3;
 
@@ -79,6 +83,8 @@ export class MovementSystem {
   goalLevel = 0.5;
   /** It is in the wrong medium. */
   stranded = false;
+  /** Seconds the current update covers. Modes read it while they score. */
+  dt = 0;
 
   readonly settings: MovementSettings;
   readonly habitat: Habitat;
@@ -92,6 +98,8 @@ export class MovementSystem {
   private goalZ = 0;
   private goalSpeed = 0;
   private detourSign = 1;
+  /** Set each step: it is outside its habitat, so steps check `canPass`. */
+  private outside = false;
 
   constructor(
     settings: MovementSettings,
@@ -170,7 +178,10 @@ export class MovementSystem {
     this.arrived = true;
   }
 
+  /** Does nothing until the ground under the creature is loaded. */
   update(dt: number): void {
+    if (this.world.sampleHeight(this.x, this.z) === null) return;
+    this.dt = dt;
     this.stranded = this.habitat.stranded?.(this.x, this.z) ?? false;
     if (this.stranded) this.release();
     else {
@@ -253,6 +264,7 @@ export class MovementSystem {
     const { settings } = this;
     const before = this.heading;
     const cruise = this.stranded ? 0 : settings.cruiseSpeed ?? 0;
+    const glide = this.stranded ? 0 : settings.glide ?? 0;
     const dx = this.goalX - this.x;
     const dz = this.goalZ - this.z;
     const distance = Math.hypot(dx, dz);
@@ -269,18 +281,22 @@ export class MovementSystem {
       );
       this.heading = turnToward(this.heading, desired, settings.turnRate * dt);
       const facing = Math.cos(wrapAngle(desired - this.heading));
-      target = Math.min(
-        this.goalSpeed * Math.max(0, facing),
-        Math.sqrt(2 * settings.acceleration * distance)
-      );
+      // The fastest it can go and still stop at the goal.
+      const stopping = glide
+        ? distance / glide
+        : Math.sqrt(2 * settings.acceleration * distance);
+      target = Math.min(this.goalSpeed * Math.max(0, facing), stopping);
     } else if (this.goalSpeed > 0) this.arrived = true;
     target = Math.max(target, cruise);
 
-    const change = settings.acceleration * dt;
-    this.speed =
-      this.speed < target
-        ? Math.min(target, this.speed + change)
-        : Math.max(target, this.speed - change);
+    if (this.speed < target)
+      this.speed = Math.min(target, this.speed + settings.acceleration * dt);
+    else {
+      const slowing = glide
+        ? Math.max(this.speed / glide, MIN_GLIDE_SLOWING)
+        : settings.acceleration;
+      this.speed = Math.max(target, this.speed - slowing * dt);
+    }
 
     if (this.blocked) this.speed = 0;
     else if (this.speed > 0) this.move(this.speed * dt, desired);
@@ -293,7 +309,9 @@ export class MovementSystem {
   private updatePitch(dt: number): void {
     const limit = this.settings.pitch;
     if (!limit) return;
-    const climb = Math.atan2(this.verticalSpeed, this.speed);
+    // A slow creature rises or sinks level, so it lies flat as it stops.
+    const level = Math.min(1, this.speed / this.settings.walkSpeed);
+    const climb = Math.atan2(this.verticalSpeed, this.speed) * level;
     const target = this.stranded ? 0 : Math.max(-limit, Math.min(limit, climb));
     this.pitch += (target - this.pitch) * (1 - Math.exp(-dt / PITCH_SMOOTHING));
   }
@@ -345,9 +363,19 @@ export class MovementSystem {
       return;
     }
 
+    // A creature that pitches climbs no steeper than its nose can point.
+    const steepest = settings.pitch
+      ? Math.min(
+          climb,
+          this.speed * Math.tan(settings.pitch) +
+            climb *
+              SLOW_CLIMB *
+              Math.max(0, 1 - this.speed / settings.walkSpeed)
+        )
+      : climb;
     const desired = Math.max(
-      -climb,
-      Math.min(climb, (target - this.y) * HEIGHT_RESPONSE)
+      -steepest,
+      Math.min(steepest, (target - this.y) * HEIGHT_RESPONSE)
     );
     const change = settings.acceleration * dt;
     this.verticalSpeed =
@@ -373,8 +401,10 @@ export class MovementSystem {
    * keeps the heading when nothing is left.
    */
   private clearDirection(toGoal: number, probe: number): number {
-    // A creature outside its habitat walks freely, so it can find its way back.
-    if (!this.habitat.canBe(this.x, this.z)) return toGoal;
+    // Outside its habitat it keeps only to where it can pass, so it can find
+    // its way back.
+    this.outside = !this.habitat.canBe(this.x, this.z);
+    if (this.outside && !this.habitat.canPass) return toGoal;
     if (this.canStep(toGoal, probe)) return toGoal;
 
     const moving = this.speed > 0;
@@ -394,7 +424,8 @@ export class MovementSystem {
 
   /** Steps along the heading, or along `desired` while still turning to it. */
   private move(distance: number, desired: number): void {
-    if (!this.habitat.canBe(this.x, this.z)) {
+    this.outside = !this.habitat.canBe(this.x, this.z);
+    if (this.outside && !this.habitat.canPass) {
       this.x += Math.sin(this.heading) * distance;
       this.z += Math.cos(this.heading) * distance;
       return;
@@ -406,10 +437,11 @@ export class MovementSystem {
   }
 
   private canStep(direction: number, distance: number): boolean {
-    return this.habitat.canBe(
-      this.x + Math.sin(direction) * distance,
-      this.z + Math.cos(direction) * distance
-    );
+    const x = this.x + Math.sin(direction) * distance;
+    const z = this.z + Math.cos(direction) * distance;
+    return this.outside
+      ? this.habitat.canPass!(x, z)
+      : this.habitat.canBe(x, z);
   }
 
   private tryStep(direction: number, distance: number): boolean {
