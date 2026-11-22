@@ -486,32 +486,32 @@ Each TODO is one GitHub ticket in the Shoal milestone. The order follows the dep
 
 ### Stage 1: place and swim
 
-- [ ] **1. 3D movement for water creatures**
+- [x] **1. 3D movement for water creatures**
 
   - Scope: pitch toward the climb, limited per preset. 3D player distance in Seek and Evade for water creatures.
   - Expect: a tuna tilts nose up as it climbs. A fish 20 m below a swimmer does not flee.
 
-- [ ] **2. Shore distance**
+- [x] **2. Shore distance**
 
   - Scope: a capped distance to dry ground in the water map, built in Rust in the terrain worker with an apron. Rebuilt on edits. A debug view.
   - Expect: the debug view shows the distance rising from the coast. Worker time stays within budget.
 
-- [ ] **3. Depth and shore rules**
+- [x] **3. Depth and shore rules**
 
   - Scope: `depth` and `shore` selectors on the water habitat, on creature rules and on scatter rules. Swim bands from the bed or the surface. Spawn radius per habitat.
   - Expect: a fish stays over the depths its habitat allows. Trout only in lakes.
 
-- [ ] **4. Sea biomes**
+- [x] **4. Sea biomes**
 
   - Scope: sea biomes in the climate, picked by temperature and zone, with their own cell grid. Bed layers, scatter and creatures. Weights in the terrain worker, read by the biome probe. Lake beds by water type. A debug view.
   - Expect: a cold coast grows a kelp forest on the shelf, a warm coast a coral reef with rare coral heads, and the shallows seagrass. Lakes have weed beds.
 
-- [ ] **5. Swim driver**
+- [x] **5. Swim driver**
 
   - Scope: the swim controller with phase, envelope, gaits and turn curve. The chain layer in the pose pipeline. The Hold mode. Tuna, trout and guppies.
   - Expect: tuna and trout swim with no swim clip, burst and coast, and curve into turns. A trout hovers in place, then moves on.
 
-- [ ] **6. Shader swim**
+- [x] **6. Shader swim**
 
   - Scope: an instanced pass with no skeleton. Per-instance wave values. A painted fin mask. The sardine model, used by sardine and minnow presets at their own scales. A console command that lays out a test batch.
   - Expect: 1,000 fish draw in one call each model, each waving at its own phase.
