@@ -23,6 +23,7 @@ import { SamplerManager } from './managers/SamplerManager';
 import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
 import { SkinnedModelManager } from './managers/SkinnedModelManager';
+import { SwimModelManager } from './renderers/swim/SwimModel';
 import { IMaterialsTemplate } from './managers/types';
 import { UIFont, UIIcons, UIRenderer } from 'rewild-gpu-ui';
 import { isVisualComponent } from './typeGuards';
@@ -131,6 +132,7 @@ export class Renderer {
   samplerManager: SamplerManager;
   materialManager: MaterialManager;
   skinnedModels: SkinnedModelManager;
+  swimModels: SwimModelManager;
   mipmapGenerator: MipMapGenerator;
 
   // Every performance number the engine publishes, and the only thing the perf
@@ -437,6 +439,7 @@ export class Renderer {
     this.geometryManager = new GeometryManager();
     this.materialManager = new MaterialManager();
     this.skinnedModels = new SkinnedModelManager();
+    this.swimModels = new SwimModelManager();
     this.mipmapGenerator = new MipMapGenerator();
 
     const materialsTemplate = (await fetch('/templates/materials.json').then(
@@ -519,6 +522,7 @@ export class Renderer {
     this.textureManager.dispose();
     this.samplerManager.dispose();
     this.skinnedModels.dispose();
+    this.swimModels.dispose();
     this.geometryManager.dispose();
     this.materialManager.dispose();
     this.geometryManager.dispose();

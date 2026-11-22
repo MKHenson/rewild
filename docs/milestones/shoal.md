@@ -4,7 +4,7 @@ Working doc. It is for planning this work, not a milestone write up. When the wo
 
 ## Goal
 
-The seas and lakes come alive. A player wades into the shallows and guppies dart away from their feet. Further out, a school of sardines streams past, and tuna cruise below it. Crabs walk the bed of the sea and the lake. Jellyfish drift, and sting if you touch them. A shark circles, and may come for you. A pod of orcas breaks the surface off the coast, rests, and comes over to look at you.
+The seas and lakes come alive. A player wades into the shallows and guppies dart away from their feet to hide. Further out, a school of sardines streams past, and tuna cruise below it. In the lakes, minnows school in the shallows and trout hold in the deeper water. Crabs walk the bed of the sea and the lake. Jellyfish drift, and sting if you touch them. A shark circles, and may come for you. A pod of orcas breaks the surface off the coast, rests, and comes over to look at you.
 
 The player can fight back and fish. They carry a spear, and what they catch goes in a basic inventory. Creatures get hurt and die. A fish on land flops and dies. A school that is hunted gets smaller.
 
@@ -26,7 +26,7 @@ Shoal is too much for one drop. It ships in four stages. Each stage is playable 
 
 | Stage                | What it gives                                                                                      | Creatures                     |
 | -------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------- |
-| **1. Place and swim** | 3D movement, shore distance, zone rules, the swim driver, school fish, simple schools, bed walking | Tuna, sardine, trout, guppy, crab, jellyfish |
+| **1. Place and swim** | 3D movement, shore distance, zone rules, the swim driver, school fish, simple schools, bed walking | Tuna, sardine, minnow, trout, guppy, crab, jellyfish |
 | **2. Life and death** | Health, damage and death. Fish die on land. Jellyfish and sharks hurt the player. Sharks hunt     | Shark                         |
 | **3. Spear and catch** | A basic inventory and a spear. Fish can be caught, sharks fought                                  | -                             |
 | **4. Orcas and the deep** | Pods, curiosity, surface actions, leaping, sleeping. Richer school shapes. A deep zone      | Orca, anglerfish              |
@@ -43,8 +43,9 @@ These test assets shape the work. Mat makes them in Blender.
 | ------------- | ----------------------------------------- | ----------------------------- | -------------------- | ----- |
 | **Tuna**      | Large fish in small schools               | Open ocean                    | Bones, swim driver   | 1     |
 | **Sardine**   | Small fish in big schools                 | Ocean, reef to open water     | Shader swim, no bones | 1    |
+| **Minnow**    | Small fish in schools. The sardine model, scaled down | Lake shallows     | Shader swim, no bones | 1    |
 | **Trout**     | Lake fish, alone or in twos and threes    | Lakes and tarns               | Bones, swim driver   | 1     |
-| **Guppy**     | Small lone fish, darts away from the player | Shallows of sea and lakes   | Shader swim, no bones | 1    |
+| **Guppy**     | Small lone fish, darts away to hide       | Shallows of sea and lakes     | Bones, swim driver   | 1     |
 | **Crab**      | Walks the bed, sea and lake               | Bed                           | Bones, clips         | 1     |
 | **Jellyfish** | Drifts and pulses. Stings on contact      | Ocean, any depth              | Small rig, a pulse clip | 1  |
 | **Shark**     | Large lone predator. Can attack the player | Reef and open water          | Bones, swim driver   | 2     |
@@ -57,7 +58,9 @@ These test assets shape the work. Mat makes them in Blender.
 
 **Trout and tuna.** Same driver, different presets and habitats. Tuna keep moving, as a group. Trout are loners: each one picks a spot, hovers there with small fin and tail corrections, then moves on. Wander's `hold` does this: through each wait the fish keeps to its spot with small drifts, and the swim driver gives it the hover gait. Any fish can use it.
 
-**Guppies.** Lone fish, not a school. Each is an ordinary creature with Wander and Evade, a fast turn rate and quick bursts, so it darts away from the player and settles a few metres off. They use the shader swim, so they have no CPU pose, but each is still a full creature. **Sardines** are the school.
+**Guppies.** Lone fish, not a school. Each is an ordinary creature on the swim driver, like a small trout with a fast turn rate and quick bursts. It holds in the shallows, and when the player comes near it darts away. Darting to cover, such as seagrass, kelp or rocks, waits for creatures that keep to a scatter asset (see Sea biomes, Later). Until then it settles a few metres off.
+
+**Sardines and minnows** are the school fish: sardines in the ocean, minnows in lakes. They share the shader swim, the school object and the sardine model, and differ by preset, habitat and scale. A school fish preset names its model and the scale it is drawn at.
 
 ---
 
@@ -122,7 +125,7 @@ Depth and shore distance describe the sea well enough. The default continent has
 
 | Zone       | Depth          | Shore distance  | Lives there                              |
 | ---------- | -------------- | --------------- | ---------------------------------------- |
-| Shallows   | 0 – 2 m        | 0 – 20 m        | Guppies, crabs, seagrass                 |
+| Shallows   | 0 – 2 m        | 0 – 20 m        | Guppies, minnows, crabs, seagrass        |
 | Shelf      | 2 – 6 m        | To the shelf edge | Sardines, sharks, kelp, coral          |
 | Open water | 6 m +          | Past the shelf  | Tuna, sardines, sharks, orcas, jellyfish |
 | Deep       | Past the floor | Far out         | Anglerfish                               |
@@ -159,7 +162,7 @@ The default zones:
 | Coral reef      | Warm        | Shelf    | Sand, reef rock     | Seagrass, rare rock outcrops    |             |
 | Sand flats      | Any         | Slope    | Sand                | Little                          | Tuna        |
 | Open ocean      | Any         | Open     | Sand                | Nothing                         | Tuna        |
-| Lake bed        | Any         | Lake     | Leaf litter, stones | Pondweed, weed                  |             |
+| Lake bed        | Any         | Lake     | Leaf litter, stones | Pondweed, weed                  | Minnows     |
 
 The arid climate has a warm sea throughout: coral on every shelf. Coral models do not exist yet; the reef grows rock outcrops until they do. The deep comes with Stage 4.
 
@@ -239,8 +242,8 @@ Orcas use the same controller with the wave turned 90°, so the body moves up an
 
 A locomotion driver, the seam Sinew left for it. It reads the movement values (speed, turn rate, climb) and outputs wave values: frequency, amplitude, envelope and spine curve. Modes do not change.
 
-- **Bones.** Tuna, trout, sharks and orcas. A chain layer in the pose pipeline's procedural slot bends the spine bones. Clips still play over it.
-- **Shader.** Sardines and guppies. Each vertex has a spine weight and a fin mask, painted in Blender as vertex colours. Each instance sends its phase, amplitude and curve. No skeleton, no CPU pose.
+- **Bones.** Tuna, trout, guppies, sharks and orcas. A chain layer in the pose pipeline's procedural slot bends the spine bones. Clips still play over it.
+- **Shader.** Sardines and minnows. The vertex shader bends the body by the chain layer's rule, so a shader fish and a bone fish of one shape swim alike. Where a vertex lies along the body comes from its Z, so no spine weight is painted. `COLOR_0.r` is an optional fin mask: masked vertices also turn about the body's long axis, so a tail fin swishes and a side fin flaps. Each instance sends its phase, amplitude and curve. No skeleton, no CPU pose.
 
 The chain layer serves tails and snakes in the land doc.
 
@@ -249,6 +252,18 @@ The chain layer serves tails and snakes in the land doc.
 ## Schools
 
 A school is one object. It owns a home (as in Sinew) and its members' positions, headings and speeds in flat arrays. Neighbours come from a small spatial grid rebuilt each frame.
+
+A school is not a creature, and its members are not objects. What the two share is behaviour, so each piece is an interface that a creature answers for itself and a school answers per member index:
+
+| Interface    | What it answers                                         | Used by                            |
+| ------------ | ------------------------------------------------------- | ---------------------------------- |
+| Swim source  | Phase, amplitude and curve for the wave                 | Chain layer, shader swim           |
+| Damageable   | Health, damage with a source, death                     | Spear, predators, stranding        |
+| Hit target   | A reach test along a ray, returning what it hit         | Spear                              |
+| Threat       | Its position and how much it frightens                  | The threat query                   |
+| Prey         | Its position and kind, to be picked and chased          | Hunt mode                          |
+
+The habitat sample and the threat query are shared functions, not interfaces. A school calls them per grid cell, a creature for itself.
 
 Each member steers by:
 
@@ -444,8 +459,9 @@ Susurrus plays the sounds. Each stage lists the files to make when it is ready, 
 
 ## Answered questions
 
-- **Test assets.** Tuna, shark, sardine, crab, orca, trout, guppy, jellyfish and anglerfish. See Creatures.
-- **School fish weights.** Painted in Blender as vertex colours.
+- **Test assets.** Tuna, shark, sardine, minnow, crab, orca, trout, guppy, jellyfish and anglerfish. See Creatures.
+- **School fish weights.** The spine comes from the model's Z. Only a fin mask is painted, in `COLOR_0.r`.
+- **Guppies.** Lone bone fish that dart away to hide, not school fish. Sardines and minnows are the school fish.
 - **Shore distance.** Needed. Rust first, in the terrain worker.
 - **Schools go down.** Yes, by predators and the spear. They refill slowly while the player is away.
 - **Player death.** The game ends, through the existing game over flow.
@@ -492,18 +508,18 @@ Each TODO is one GitHub ticket in the Shoal milestone. The order follows the dep
 
 - [ ] **5. Swim driver**
 
-  - Scope: the swim controller with phase, envelope, gaits and turn curve. The chain layer in the pose pipeline. The Hold mode. Tuna and trout.
+  - Scope: the swim controller with phase, envelope, gaits and turn curve. The chain layer in the pose pipeline. The Hold mode. Tuna, trout and guppies.
   - Expect: tuna and trout swim with no swim clip, burst and coast, and curve into turns. A trout hovers in place, then moves on.
 
 - [ ] **6. Shader swim**
 
-  - Scope: an instanced pass with no skeleton. Per-instance wave values. Painted spine and fin weights. Guppies.
-  - Expect: 1,000 fish draw in one call each model, each waving at its own phase. Guppies in the shallows dart away from the player one by one.
+  - Scope: an instanced pass with no skeleton. Per-instance wave values. A painted fin mask. The sardine model, used by sardine and minnow presets at their own scales. A console command that lays out a test batch.
+  - Expect: 1,000 fish draw in one call each model, each waving at its own phase.
 
 - [ ] **7. Schools**
 
   - Scope: the school object, flat member arrays, spatial grid, steering, habitat checks, the school budget, school spawn rules. Placing a school in the editor. Console commands.
-  - Expect: sardines stream past and part round the player. A placed school holds in place in the editor.
+  - Expect: sardines stream past and part round the player. Minnows school in the lake shallows. A placed school holds in place in the editor.
 
 - [ ] **8. Bed creatures and jellyfish**
 

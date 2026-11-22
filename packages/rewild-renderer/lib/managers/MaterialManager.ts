@@ -12,6 +12,7 @@ import { StandardPass } from '../materials/StandardPass';
 import { StandardInstancedPass } from '../materials/StandardInstancedPass';
 import { ScatterInstancedPass } from '../materials/ScatterInstancedPass';
 import { SkinnedInstancedPass } from '../materials/SkinnedInstancedPass';
+import { SwimInstancedPass } from '../materials/SwimInstancedPass';
 import { ALPHA_MODES } from '../materials/uniforms/StandardMaterial';
 import { GltfMaterialTemplate } from '../core/GltfMaterials';
 
@@ -21,7 +22,8 @@ export type StandardPassKind =
   | 'standard'
   | 'standard-instanced'
   | 'standard-scatter'
-  | 'standard-skinned';
+  | 'standard-skinned'
+  | 'standard-swim';
 
 export class MaterialManager {
   materials: Map<string, IMaterialPass>;
@@ -217,9 +219,12 @@ export function createStandardPass(
   | StandardPass
   | StandardInstancedPass
   | ScatterInstancedPass
-  | SkinnedInstancedPass {
+  | SkinnedInstancedPass
+  | SwimInstancedPass {
   const pass =
-    kind === 'standard-scatter'
+    kind === 'standard-swim'
+      ? new SwimInstancedPass()
+      : kind === 'standard-scatter'
       ? new ScatterInstancedPass()
       : kind === 'standard-skinned'
       ? new SkinnedInstancedPass()

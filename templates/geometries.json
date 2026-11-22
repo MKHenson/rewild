@@ -214,6 +214,10 @@
     "type": "gltf",
     "url": "models/trout.glb"
   },
+  "sardine": {
+    "type": "gltf",
+    "url": "models/sardine.glb"
+  },
   "crow": {
     "type": "gltf",
     "url": "models/crow.glb"

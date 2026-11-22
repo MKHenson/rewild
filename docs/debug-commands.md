@@ -412,6 +412,19 @@ crossfade should show no pop, and the instances should stay out of step with eac
 `animateSkinned` takes a template's animation fields as its config. Between the walk and run
 speeds the feet should keep in step with no slide.
 
+```js
+showSwimInstances('sardine'); // a block of 1,000 shader-swim fish along the view, side on, waving in place
+showSwimInstances('minnow', 200, 0.3, 0); // count, m/s, share of turnCurve
+hideSwimInstances();
+```
+
+The preset is a school fish preset in `SchoolFishPresets.ts`, which names a static model facing +Z
+and the scale it is drawn at. Each primitive is
+one draw for the whole block. Each fish beats at its own phase, at the rate the preset gives for
+the speed, and its spine curves into a turn and back over 4 s. The tail should swing about a tenth
+of the body length either side while the head stays nearly still. A model with a `COLOR_0.r` fin
+mask also flutters its fins. Registered in `SwimDebugCommands.ts`.
+
 Spawning is registered in `CreatureDebugCommands.ts` and works in game only.
 
 ```js
