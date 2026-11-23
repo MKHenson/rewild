@@ -88,6 +88,8 @@ const _PAD_LOOK_SPEED = 3.0;
 // Per dt (two seconds' worth of delta): walking is 3 m/s.
 const _MOVE_SPEED: f32 = 1.5;
 const _RUN_MULTIPLIER: f32 = 3.0;
+// How much faster than walking a player in god mode flies.
+const GOD_SPEED_SHARE: f32 = 3.0;
 const _SWIM_RUN_MULTIPLIER: f32 = 1.8;
 const _CROUCH_SPEED_MULTIPLIER: f32 = 0.5;
 // The body is 1.78 m tall; eye heights are over the capsule centre (0.89 m up).
@@ -184,6 +186,9 @@ export class Player extends Node {
   immersion: f32 = 0;
   /** Whether the camera's eye is below the water's surface. */
   cameraUnderWater: boolean = false;
+  /** Flies where the camera looks, faster, with hunger and oxygen held. */
+  godMode: boolean = false;
+  private _flyMove = new RapierVector3(0, 0, 0);
   private _sounds: PlayerSounds | null = null;
   private _water = createWaterQuerySample();
   // World height a submerged swimmer holds their eye at; NaN while floating.
@@ -328,8 +333,7 @@ export class Player extends Node {
   // The HUD bars fade out while the personal assistant or a menu shows.
   private _fadeHud(): void {
     if (!this._hud) return;
-    this._hud.root.style.opacity =
-      this._menuOpen || this.assistantOpen ? 0 : 1;
+    this._hud.root.style.opacity = this._menuOpen || this.assistantOpen ? 0 : 1;
   }
 
   /** Sync internal yaw/pitch from the camera quaternion (e.g. after an external lookAt). */
@@ -748,6 +752,11 @@ export class Player extends Node {
       }
     }
 
+    if (this.godMode && alive && this.capsuleBody) {
+      this._fly(delta, hasTerrain ? terrainRenderer! : null);
+      return;
+    }
+
     // Gravity is held off until there is ground to land on, so an early frame
     // (or a terrain-less level) can't drop the player out of the world.
     let gravityEnabled = this.hasGround;
@@ -1112,20 +1121,7 @@ export class Player extends Node {
       sounds.update(delta);
     }
 
-    if (this._flashlight) {
-      const flashY = camY - _FLASHLIGHT_BODY_DROP;
-      this._flashlight.transform.position.set(camX, flashY, camZ);
-      const sinYaw = Math.sin(this._yaw);
-      const cosYaw = Math.cos(this._yaw);
-      const sinPitch = Math.sin(this._pitch);
-      const cosPitch = Math.cos(this._pitch);
-      // Target is 1 unit along the camera look direction from the flashlight position (not the eye).
-      this._flashlight.target.position.set(
-        camX - sinYaw * cosPitch,
-        flashY + sinPitch,
-        camZ - cosYaw * cosPitch
-      );
-    }
+    this._placeFlashlight(camX, camY, camZ);
 
     this._aimLook(R, camX, camY, camZ, alive);
 
@@ -1192,6 +1188,91 @@ export class Player extends Node {
     return hit ? hit.timeOfImpact : Infinity;
   }
 
+  /**
+   * God mode's step: W and S along the camera's look, A and D sideways, Space
+   * and C straight up and down, at GOD_SPEED_SHARE times walking pace. The
+   * capsule still collides, but nothing pulls it down, and neither hunger nor
+   * oxygen fall.
+   */
+  private _fly(delta: f32, terrain: TerrainRenderer | null): void {
+    if (this.swimming) {
+      const p = this.capsuleBody.translation();
+      this.swimming = false;
+      this._resizeForSwimming(false, p.y - _SWIM_HALF_EXTENT, -Infinity);
+    }
+    this._crouching = false;
+    this.verticalVelocity = 0;
+    this.jumpRequested = false;
+    this.grounded = false;
+    this._swimHold = NaN;
+    this.stopMotion();
+    this._calmFall();
+    this._oxygen.reset();
+
+    const sinYaw = Math.sin(this._yaw);
+    const cosYaw = Math.cos(this._yaw);
+    const sinPitch = Math.sin(this._pitch);
+    const cosPitch = Math.cos(this._pitch);
+    const forward =
+      (this._movingForward ? 1 : 0) - (this._movingBackward ? 1 : 0);
+    const right = (this._movingRight ? 1 : 0) - (this._movingLeft ? 1 : 0);
+    const up = (this._upHeld ? 1 : 0) - (this._downHeld ? 1 : 0);
+    const step =
+      _MOVE_SPEED *
+      GOD_SPEED_SHARE *
+      (this._sprinting ? _RUN_MULTIPLIER : 1.0) *
+      (delta / 0.5);
+
+    const move = this._flyMove;
+    move.x = (-sinYaw * cosPitch * forward + cosYaw * right) * step;
+    move.y = (sinPitch * forward + up) * step;
+    move.z = (-cosYaw * cosPitch * forward - sinYaw * right) * step;
+    this.characterController.disableSnapToGround();
+    this.characterController.computeColliderMovement(this.collider, move);
+    const moved = this.characterController.computedMovement();
+    const current = this.capsuleBody.translation();
+    const nextX = current.x + moved.x;
+    const nextY = current.y + moved.y;
+    const nextZ = current.z + moved.z;
+    this.capsuleBody.setNextKinematicTranslation({
+      x: nextX,
+      y: nextY,
+      z: nextZ,
+    });
+
+    this._eye = easeEye(this._eye, _STANDING_EYE_HEIGHT, delta);
+    const camY = nextY + this._eye;
+    this.cameraController.camera.transform.position.set(nextX, camY, nextZ);
+    this.feetY = nextY - _CAPSULE_HALF_EXTENT;
+
+    const water = this._water;
+    const inWater =
+      !!terrain &&
+      terrain.waterQuery.sample(nextX, nextZ, water, this._waterProbe) &&
+      water.coverage > 0;
+    this.immersion = inWater ? Math.max(0, water.surface - this.feetY) : 0;
+    this.cameraUnderWater = inWater && camY < water.surface;
+
+    this._showBars();
+    this._placeFlashlight(nextX, camY, nextZ);
+  }
+
+  /** Puts the flashlight just under the eye, pointing where the camera looks. */
+  private _placeFlashlight(camX: f32, camY: f32, camZ: f32): void {
+    if (!this._flashlight) return;
+    const flashY = camY - _FLASHLIGHT_BODY_DROP;
+    this._flashlight.transform.position.set(camX, flashY, camZ);
+    const sinYaw = Math.sin(this._yaw);
+    const cosYaw = Math.cos(this._yaw);
+    const sinPitch = Math.sin(this._pitch);
+    const cosPitch = Math.cos(this._pitch);
+    this._flashlight.target.position.set(
+      camX - sinYaw * cosPitch,
+      flashY + sinPitch,
+      camZ - cosYaw * cosPitch
+    );
+  }
+
   private _handleMouseMove(e: MouseEvent) {
     if (!this._isLocked || this._dead) return;
     this._yaw -= e.movementX * _MOUSE_SENSITIVITY;
@@ -1222,13 +1303,19 @@ export class Player extends Node {
       this._upHeld = true;
     } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight')
       this._sprinting = true;
-    else if (e.code === 'KeyC') {
-      this._downHeld = true;
-      if (!e.repeat) this._toggleCrouch();
-    } else if (e.code === 'KeyF') this._toggleFlashlight();
     else if (e.code === 'KeyI' && !e.repeat) {
       if (this.assistantOpen) this.closeAssistant();
       else this.openAssistant();
+    } else if (e.code === 'KeyC') {
+      this._downHeld = true;
+      if (!e.repeat && !this.swimming && !this.godMode)
+        this._crouching = !this._crouching;
+    } else if (e.code === 'KeyF' && this._flashlight) {
+      this._flashlightOn = !this._flashlightOn;
+      this._sounds?.flashlight();
+      this._flashlight.intensity = this._flashlightOn
+        ? Player._FLASHLIGHT_INTENSITY
+        : 0.0;
     }
   }
 

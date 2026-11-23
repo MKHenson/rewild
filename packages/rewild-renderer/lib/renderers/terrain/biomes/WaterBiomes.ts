@@ -24,6 +24,22 @@ export const TROUT: BiomeCreatures = {
   spread: 3,
 };
 
+// Sardines in schools, from the reef out to open water.
+export const SARDINES: BiomeCreatures = {
+  creature: 'sardine-school',
+  density: 1,
+  school: [100, 250],
+  spread: 4,
+};
+
+// Minnows in small schools in the lake shallows.
+export const MINNOWS: BiomeCreatures = {
+  creature: 'minnow-school',
+  density: 3,
+  school: [20, 50],
+  spread: 1.5,
+};
+
 // Depth bands of the ocean, each handing over to the next across a few metres.
 // The shelf reaches past the shelf edge onto the top of the slope, where the
 // kelp still holds.
@@ -176,6 +192,7 @@ export function kelpForest(sand: string, rock: string): SeaBiomeParams {
     name: 'kelp-forest',
     layers: rockySand(sand, rock, 0.55),
     scatter: [...KELP, BED_PEBBLES],
+    creatures: [SARDINES],
   };
 }
 
@@ -194,6 +211,7 @@ export function coralReef(sand: string, rock: string): SeaBiomeParams {
         noise: { scale: 50, seedSalt: 179, band: { from: 0.8, to: 0.9 } },
       },
     ],
+    creatures: [SARDINES],
   };
 }
 
@@ -202,12 +220,16 @@ export function sandFlats(sand: string): SeaBiomeParams {
     name: 'sand-flats',
     layers: [{ material: sand }],
     scatter: [{ ...BED_PEBBLES, density: 0.05 }],
-    creatures: [TUNA],
+    creatures: [TUNA, SARDINES],
   };
 }
 
 export function openOcean(bed: string): SeaBiomeParams {
-  return { name: 'open-ocean', layers: [{ material: bed }], creatures: [TUNA] };
+  return {
+    name: 'open-ocean',
+    layers: [{ material: bed }],
+    creatures: [TUNA, SARDINES],
+  };
 }
 
 export function lakeBed(silt: string, stones: string): SeaBiomeParams {
@@ -215,7 +237,7 @@ export function lakeBed(silt: string, stones: string): SeaBiomeParams {
     name: 'lake-bed',
     layers: rockySand(silt, stones, 0.3),
     scatter: [...LAKE_WEED, BED_PEBBLES],
-    creatures: [TROUT],
+    creatures: [TROUT, MINNOWS],
   };
 }
 

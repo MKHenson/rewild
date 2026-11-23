@@ -18,6 +18,9 @@ import { Creature } from './routing/Creature';
 import { SkinnedAsset } from './routing/SkinnedAsset';
 import { CreatureBehaviour } from './routing/behaviours/CreatureBehaviour';
 import { getCreaturePreset } from './creatures/CreaturePresets';
+import { getSchoolFishPreset } from './creatures/SchoolFishPresets';
+import { SchoolAsset } from './routing/SchoolAsset';
+import { SchoolBehaviour } from './routing/behaviours/SchoolBehaviour';
 import { LightAsset } from './routing/LightAsset';
 import { createColliderDesc } from './physics/ColliderShapes';
 import { LevelReader, PortalAsset } from './routing/PortalAsset';
@@ -58,6 +61,15 @@ export class TemplateLoader {
         // If no game manager then its in the editor
         if (!gameManager) toReturn.addVisualHelper(renderer);
       }
+    } else if (template?.type === 'asset' && template.school) {
+      const school = new SchoolAsset(
+        renderer,
+        template.school,
+        getSchoolFishPreset(template.school),
+        !gameManager
+      );
+      if (gameManager) school.addBehavior(new SchoolBehaviour(school));
+      toReturn = school;
     } else if (template?.type === 'asset') {
       const { geometryId, materialId } = template.resource;
 
@@ -180,6 +192,7 @@ export class TemplateLoader {
     toReturn.data = resource;
     if (toReturn instanceof Asset3D) toReturn.transform.name = resource.name;
     if (toReturn instanceof PortalAsset) toReturn.applyProperties();
+    if (toReturn instanceof SchoolAsset) toReturn.applyProperties();
 
     return toReturn;
   }

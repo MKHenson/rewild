@@ -2,8 +2,10 @@ import { IResource } from 'models';
 import { Vector3 } from 'rewild-common';
 import { createWaterQuerySample, resolveClimatePreset } from 'rewild-renderer';
 import { BiomeProbe } from 'rewild-renderer/lib/renderers/terrain/BiomeProbe';
+import { MetricOptions } from 'rewild-renderer/lib/metrics/MetricsRegistry';
 import { Container, IAsset } from 'rewild-routing';
 import { getCreaturePreset } from '../creatures/CreaturePresets';
+import { getSchoolFishPreset } from '../creatures/SchoolFishPresets';
 import {
   CreatureWorld,
   DESPAWN_RADIUS,
@@ -14,6 +16,7 @@ import {
 } from '../creatures/Habitat';
 import { DEFAULT_ROAM, HerdHome } from '../creatures/HerdHome';
 import {
+  DEFAULT_SPREAD,
   PlannedCreature,
   PlannedGroup,
   SpawnBiome,
@@ -22,14 +25,34 @@ import {
 } from '../creatures/SpawnPlanner';
 import { TemplateLoader } from '../TemplateLoader';
 import { Creature, createCreatureWorld } from './Creature';
+import { SchoolAsset, takeSchoolSteerTime } from './SchoolAsset';
 import { StateMachineData } from './Types';
 
 /** Seconds between spawn checks. */
 const CHECK_INTERVAL = 0.5;
+/** School members live or loading at once, at most, apart from lone creatures. */
+export const SCHOOL_BUDGET = 1000;
 /** Chunk coordinates are packed into one number in this range either side of 0. */
 const CHUNK_KEY_RANGE = 32768;
 
 const UP = new Vector3(0, 1, 0);
+const SCHOOLS_METRIC: MetricOptions = {
+  label: 'schools',
+  group: 'counts',
+  kind: 'count',
+  order: 9,
+};
+const SCHOOL_MEMBERS_METRIC: MetricOptions = {
+  label: 'school members',
+  group: 'counts',
+  kind: 'count',
+  order: 10,
+};
+const SCHOOL_STEER_METRIC: MetricOptions = {
+  label: 'school steering',
+  group: 'cpu',
+  order: 8,
+};
 const _water = createWaterQuerySample();
 
 let active: CreatureSpawner | null = null;
@@ -68,6 +91,20 @@ export interface SpawnedCreatureReport {
   mode: string | null;
 }
 
+/** One live school, as `describe` reports it. */
+export interface SpawnedSchoolReport {
+  id: string;
+  preset: string;
+  members: number;
+  state: string;
+  /** Members that felt the player in the last steering step. */
+  threatened: number;
+  x: number;
+  y: number;
+  z: number;
+  distance: number;
+}
+
 /** What a spawner is doing, for the debug console. */
 export interface SpawnerReport {
   climate: string;
@@ -80,9 +117,13 @@ export interface SpawnerReport {
   /** The water at the player, as the sea biomes read it. Null when dry. */
   water: { depth: number; shore: number; coverage: number } | null;
   live: number;
+  /** Spawned school members live or loading, against SCHOOL_BUDGET. */
+  schoolMembers: number;
   chunks: number;
   groups: SpawnGroupReport[];
   creatures: SpawnedCreatureReport[];
+  /** Every live school in game, spawned or placed, nearest first. */
+  schools: SpawnedSchoolReport[];
 }
 
 type GroupState = 'idle' | 'loading' | 'live' | 'failed';
@@ -90,6 +131,7 @@ type GroupState = 'idle' | 'loading' | 'live' | 'failed';
 class SpawnGroup {
   state: GroupState = 'idle';
   creatures: Creature[] = [];
+  school: SchoolAsset | null = null;
   /** Bumped on each spawn and despawn, so a late load can tell it is stale. */
   generation = 0;
   readonly home: HerdHome;
@@ -138,6 +180,8 @@ export class CreatureSpawner extends Container implements SpawnSite {
   private timer = 0;
   /** Creatures live or loading. */
   private count = 0;
+  /** Spawned school members live or loading. */
+  private schoolMembers = 0;
   private nearX0 = 0;
   private nearX1 = 0;
   private nearZ0 = 0;
@@ -189,6 +233,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
         this.refresh();
       }
       this.driftHomes(delta);
+      this.recordMetrics();
     }
     super.onUpdate(delta, total);
   }
@@ -218,10 +263,12 @@ export class CreatureSpawner extends Container implements SpawnSite {
       (asset) => asset.name === creature
     );
     habitat = null;
-    if (!template?.preset)
+    if (!template?.preset && !template?.school)
       console.warn(`Spawn rule creature '${creature}' is not a creature.`);
     else {
-      const settings = getCreaturePreset(template.preset).habitat;
+      const settings = template.school
+        ? [getSchoolFishPreset(template.school).habitat]
+        : getCreaturePreset(template.preset!).habitat;
       habitat = createHabitat(settings, this.world);
       const range = spawnRange(settings[0]);
       this.ranges.set(creature, range);
@@ -243,9 +290,11 @@ export class CreatureSpawner extends Container implements SpawnSite {
       seaBiomes: {},
       water: null,
       live: this.count,
+      schoolMembers: this.schoolMembers,
       chunks: this.chunks.size,
       groups: [],
       creatures: [],
+      schools: [],
     };
     if (!world || !terrain || !world.playerPosition(player)) return report;
 
@@ -278,7 +327,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
         report.groups.push({
           chunk: `${cx},${cy}`,
           creature: group.plan.rule.creature,
-          members: group.plan.members.length,
+          members: group.plan.school?.size ?? group.plan.members.length,
           state: group.state,
           distance: Math.round(
             Math.hypot(group.plan.homeX - player.x, group.plan.homeZ - player.z)
@@ -310,7 +359,36 @@ export class CreatureSpawner extends Container implements SpawnSite {
         mode: creature.movement?.activeMode ?? null,
       });
     }
+
+    for (const asset of this.liveSchools()) {
+      const school = asset.school!;
+      const { x, z } = school.home;
+      report.schools.push({
+        id: asset.id,
+        preset: asset.presetName,
+        members: school.count,
+        state: school.state,
+        threatened: school.threatened,
+        x: Math.round(x * 10) / 10,
+        y: Math.round(school.homeY * 10) / 10,
+        z: Math.round(z * 10) / 10,
+        distance: Math.round(Math.hypot(x - player.x, z - player.z)),
+      });
+    }
     return report;
+  }
+
+  /** Every live school in game, spawned or placed, nearest the player first. */
+  liveSchools(): SchoolAsset[] {
+    const schools: SchoolAsset[] = [];
+    for (const asset of SchoolAsset.live) if (asset.school) schools.push(asset);
+    if (this.world?.playerPosition(this.player)) {
+      const { x, z } = this.player;
+      const away = (asset: SchoolAsset) =>
+        Math.hypot(asset.school!.home.x - x, asset.school!.home.z - z);
+      schools.sort((a, b) => away(a) - away(b));
+    }
+    return schools;
   }
 
   /** Every live creature, nearest the player first. */
@@ -411,6 +489,10 @@ export class CreatureSpawner extends Container implements SpawnSite {
   }
 
   private spawn(group: SpawnGroup): void {
+    if (group.plan.school) {
+      this.spawnSchool(group);
+      return;
+    }
     const { members, rule } = group.plan;
     const generation = ++group.generation;
     group.state = 'loading';
@@ -445,10 +527,48 @@ export class CreatureSpawner extends Container implements SpawnSite {
       });
   }
 
+  /** Stays idle while the school would go over SCHOOL_BUDGET. */
+  private spawnSchool(group: SpawnGroup): void {
+    const size = group.plan.school!.size;
+    if (this.schoolMembers + size > SCHOOL_BUDGET) return;
+    const generation = ++group.generation;
+    group.state = 'loading';
+    this.schoolMembers += size;
+
+    this.createSchool(group.plan)
+      .then((asset) => {
+        if (group.generation !== generation || !this.world) {
+          asset.dispose();
+          return;
+        }
+        group.school = asset;
+        group.state = 'live';
+        this.live.push(group);
+        this.addAsset(asset);
+        this.parentObject3D.add(asset);
+        asset.load();
+        asset.mount();
+      })
+      .catch((err) => {
+        console.error(err);
+        if (group.generation !== generation) return;
+        group.state = 'failed';
+        this.schoolMembers -= size;
+      });
+  }
+
   private despawn(group: SpawnGroup): void {
     if (group.state !== 'loading' && group.state !== 'live') return;
     group.generation++;
-    this.count -= group.plan.members.length;
+    if (group.plan.school) this.schoolMembers -= group.plan.school.size;
+    else this.count -= group.plan.members.length;
+
+    if (group.school) {
+      this.parentObject3D.remove(group.school);
+      this.removeAsset(group.school);
+      group.school.dispose();
+      group.school = null;
+    }
 
     if (group.state === 'live') {
       const { creatures } = group;
@@ -481,6 +601,55 @@ export class CreatureSpawner extends Container implements SpawnSite {
         movement.homeZ = home.z;
       }
     }
+  }
+
+  private recordMetrics(): void {
+    const metrics = this.data?.renderer.metrics;
+    if (!metrics?.enabled) {
+      takeSchoolSteerTime();
+      return;
+    }
+    let schools = 0;
+    let members = 0;
+    for (const asset of SchoolAsset.live) {
+      if (!asset.school) continue;
+      schools++;
+      members += asset.school.count;
+    }
+    metrics.record('counts.schools', schools, SCHOOLS_METRIC);
+    metrics.record('counts.schoolMembers', members, SCHOOL_MEMBERS_METRIC);
+    metrics.record('cpu.schools', takeSchoolSteerTime(), SCHOOL_STEER_METRIC);
+  }
+
+  private async createSchool(plan: PlannedGroup): Promise<SchoolAsset> {
+    const { data } = this;
+    if (!data) throw new Error('The spawner is not mounted.');
+    const { rule, school, homeX, homeZ, heading } = plan;
+    const resource: IResource = {
+      id: school!.id,
+      name: rule.creature,
+      type: 'actor',
+      templateId: rule.creature,
+      properties: [
+        { type: 'count', value: school!.size },
+        { type: 'spread', value: rule.spread ?? DEFAULT_SPREAD },
+      ],
+    };
+    const asset = await this.templateLoader.createResource(
+      resource,
+      data.renderer,
+      data.gameManager
+    );
+    if (!(asset instanceof SchoolAsset)) {
+      (asset as IAsset).dispose?.();
+      throw new Error(`Spawn rule creature '${rule.creature}' is not a school.`);
+    }
+    asset.drift = rule.drift ?? null;
+    asset.roam = rule.roam ?? null;
+    const ground = data.renderer.terrainRenderer.sampleHeight(homeX, homeZ);
+    asset.initialPosition.set(homeX, ground ?? 0, homeZ);
+    asset.initialRotation.setFromAxisAngle(UP, heading);
+    return asset;
   }
 
   private async createCreature(

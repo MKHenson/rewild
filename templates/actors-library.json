@@ -109,6 +109,22 @@
           "templateId": "trout"
         },
         {
+          "name": "Sardine School",
+          "templateId": "sardine-school",
+          "properties": [
+            { "type": "count", "value": 150 },
+            { "type": "spread", "value": 6 }
+          ]
+        },
+        {
+          "name": "Minnow School",
+          "templateId": "minnow-school",
+          "properties": [
+            { "type": "count", "value": 40 },
+            { "type": "spread", "value": 6 }
+          ]
+        },
+        {
           "name": "Crow",
           "templateId": "crow"
         },

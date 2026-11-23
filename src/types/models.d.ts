@@ -42,6 +42,8 @@ declare module 'models' {
     | 'targetLevel'
     | 'locked'
     | 'action'
+    | 'count'
+    | 'spread'
     | 'camera-transform';
   export type PropValueType =
     | 'string'
@@ -275,6 +277,8 @@ declare module 'models' {
     behaviors?: string[];
     /** Names a creature preset, which makes a skinned asset move on its own. */
     preset?: string;
+    /** Names a school fish preset, which makes the asset a school of them. */
+    school?: string;
   }
 
   export interface IResource3D {

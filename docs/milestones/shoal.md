@@ -516,7 +516,7 @@ Each TODO is one GitHub ticket in the Shoal milestone. The order follows the dep
   - Scope: an instanced pass with no skeleton. Per-instance wave values. A painted fin mask. The sardine model, used by sardine and minnow presets at their own scales. A console command that lays out a test batch.
   - Expect: 1,000 fish draw in one call each model, each waving at its own phase.
 
-- [ ] **7. Schools**
+- [x] **7. Schools**
 
   - Scope: the school object, flat member arrays, spatial grid, steering, habitat checks, the school budget, school spawn rules. Placing a school in the editor. Console commands.
   - Expect: sardines stream past and part round the player. Minnows school in the lake shallows. A placed school holds in place in the editor.

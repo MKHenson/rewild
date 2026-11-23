@@ -154,6 +154,16 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
     label: 'Radius',
     valueType: 'float',
   },
+  count: {
+    label: 'Count',
+    valueType: 'float',
+    valueOptions: { min: 1, max: 500, step: 1, precision: 0 },
+  },
+  spread: {
+    label: 'Spread (m)',
+    valueType: 'float',
+    valueOptions: { min: 0.2, max: 30, step: 0.1, precision: 1 },
+  },
   targetLevel: {
     label: 'Target Level',
     valueType: 'string',

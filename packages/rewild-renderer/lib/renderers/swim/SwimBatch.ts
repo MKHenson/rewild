@@ -1,10 +1,11 @@
-import { Box3 } from 'rewild-common';
+import { Box3, Matrix4, Ray, Vector3 } from 'rewild-common';
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { Geometry } from '../../geometry/Geometry';
 import { SwimInstancedPass } from '../../materials/SwimInstancedPass';
 import { IS_VISUAL_COMPONENT } from '../../typeGuards';
-import { IVisualComponent } from '../../../types/interfaces';
+import { IRaycaster, IVisualComponent } from '../../../types/interfaces';
+import { Intersection, Raycaster } from '../../core/Raycaster';
 import { ChainShape } from '../skinning/ChainLayer';
 import { SwimBody, SwimModel } from './SwimModel';
 
@@ -12,6 +13,10 @@ import { SwimBody, SwimModel } from './SwimModel';
 export const SWIM_STRIDE = 12;
 /** projMatrix + modelViewMatrix + nodeMatrix + body + shape. */
 const UNIFORM_FLOATS = 16 * 3 + 8;
+
+const _inverse = new Matrix4();
+const _ray = new Ray();
+const _hit = new Vector3();
 
 /** How fins flutter about the body's long axis. Needs a COLOR_0.r fin mask. */
 export interface FinFlutter {
@@ -198,7 +203,27 @@ export class SwimBatchMesh implements IVisualComponent {
     return this.batch.localBounds;
   }
 
-  raycast(): void {}
+  /** Hits the batch bounds when the raycaster asks for skinned meshes. */
+  raycast(raycaster: IRaycaster, intersects: Intersection[]): void {
+    if (!(raycaster instanceof Raycaster) || !raycaster.hitsSkinned) return;
+    if (this.batch.count === 0) return;
+
+    const matrixWorld = this.transform.matrixWorld;
+    _inverse.copy(matrixWorld).invert();
+    _ray.copy(raycaster.ray).applyMatrix4(_inverse);
+    if (_ray.intersectBox(this.localBounds, _hit) === null) return;
+
+    _hit.applyMatrix4(matrixWorld);
+    const distance = raycaster.ray.origin.distanceTo(_hit);
+    if (distance < raycaster.near || distance > raycaster.far) return;
+
+    const intersection = new Intersection();
+    intersection.distance = distance;
+    intersection.point = _hit.clone();
+    intersection.object = this.transform;
+    intersection.face = null;
+    intersects.push(intersection);
+  }
 
   prepare(renderer: Renderer, pass: SwimInstancedPass): GPUBindGroup | null {
     const instances = this.batch.instanceBuffer(renderer);

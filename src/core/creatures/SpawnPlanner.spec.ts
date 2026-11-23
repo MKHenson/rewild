@@ -218,4 +218,26 @@ describe('planChunkSpawns', () => {
       before.map((g) => [g.homeX, g.homeZ])
     );
   });
+
+  it('plans a school as one group with a member count', () => {
+    const { world, site, plan } = setup([
+      { creature: 'sardine-school', density: 1, school: [50, 80] },
+    ]);
+    world.depth = () => 6;
+    site.habitats['sardine-school'] = new WaterHabitat(
+      { type: 'water', bedMargin: 0.5, surfaceMargin: 0.5 },
+      world
+    );
+    const groups = plan();
+    expect(groups.length).toBe(4);
+    const ids = new Set<string>();
+    for (const group of groups) {
+      expect(group.members).toEqual([]);
+      expect(group.school!.size).toBeGreaterThanOrEqual(50);
+      expect(group.school!.size).toBeLessThanOrEqual(80);
+      expect(group.school!.id.startsWith(SPAWN_ID_PREFIX)).toBe(true);
+      ids.add(group.school!.id);
+    }
+    expect(ids.size).toBe(groups.length);
+  });
 });

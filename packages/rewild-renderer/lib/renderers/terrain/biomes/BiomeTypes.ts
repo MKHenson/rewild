@@ -204,6 +204,7 @@ export interface BiomeCreatures {
   creature: string; // creature template name
   density: number; // groups per hectare
   group?: [number, number]; // animals per group, inclusive. Omitted ⇒ one
+  school?: [number, number]; // members of one school, inclusive. `creature` names a school template
   spread?: number; // metres from the group's home its animals spawn
   drift?: number; // m/s the group's home drifts. Omitted ⇒ it stays put
   roam?: number; // metres from where it spawned the home may drift

@@ -51,7 +51,10 @@ export interface PlannedGroup {
   homeZ: number;
   /** Radians about Y the home first drifts along. */
   heading: number;
+  /** Empty for a school, which places its own members. */
   members: PlannedCreature[];
+  /** A school's stable id and member count. */
+  school?: { id: string; size: number };
 }
 
 function mix(hash: number, value: number): number {
@@ -143,6 +146,22 @@ export function planChunkSpawns(
         if (chance >= site.biomeWeight(biome.name, homeX, homeZ)) continue;
         if (!ruleAllows(rule, world, homeX, homeZ)) continue;
         if (!habitat.canBe(homeX, homeZ)) continue;
+
+        if (rule.school) {
+          const [least, most] = rule.school;
+          groups.push({
+            rule,
+            homeX,
+            homeZ,
+            heading,
+            members: [],
+            school: {
+              id: `${SPAWN_ID_PREFIX}${cx},${cy}:${index++}`,
+              size: least + Math.floor(random() * (most - least + 1)),
+            },
+          });
+          continue;
+        }
 
         const members: PlannedCreature[] = [];
         for (let m = 0; m < size; m++) {

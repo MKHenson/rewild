@@ -13,6 +13,7 @@ import {
   Renderer,
   SkinnedInstance,
   SkinnedMesh,
+  SwimBatchMesh,
   Sprite3D,
   Transform,
   loadActivity,
@@ -36,6 +37,7 @@ import {
 import { IAssetPlacement, ITreeNodeAction } from 'models';
 import { TemplateLoader } from 'src/core/TemplateLoader';
 import { PortalAsset } from 'src/core/routing/PortalAsset';
+import { SchoolAsset } from 'src/core/routing/SchoolAsset';
 import { localAssetReader } from 'src/database/database';
 import { bindScreenshotHotkey } from 'src/core/ScreenshotHotkey';
 import { Asset3D } from 'src/core/routing/Asset3D';
@@ -311,6 +313,7 @@ export class EditorViewport extends Component<Props> {
       this.renderer.scene.removeChild(transform);
       (transform.userData.portal as PortalAsset | undefined)?.dispose();
       (transform.userData.skinned as SkinnedInstance | undefined)?.dispose();
+      (transform.userData.school as SchoolAsset | undefined)?.dispose();
     };
 
     const setTransformSelected = (transform: Transform, value: boolean) => {
@@ -591,6 +594,7 @@ export class EditorViewport extends Component<Props> {
         intersection &&
         (intersection.object.component instanceof Mesh ||
           intersection.object.component instanceof SkinnedMesh ||
+          intersection.object.component instanceof SwimBatchMesh ||
           intersection.object.component instanceof Sprite3D)
       ) {
         let current: Transform | null = intersection.object;

@@ -56,6 +56,19 @@ export function registerPlayerDebugCommands() {
     console.log(`Hunger → ${v}`);
   };
 
+  (window as any).godMode = (on?: boolean) => {
+    const p = player('godMode');
+    if (!p) return;
+    p.godMode = typeof on === 'boolean' ? on : !p.godMode;
+    console.log(
+      p.godMode
+        ? 'God mode on — hunger and oxygen hold, you fly where you look at 3x ' +
+            'walking pace (Shift for faster), Space rises, C sinks. ' +
+            'godMode() again turns it off.'
+        : 'God mode off.'
+    );
+  };
+
   (window as any).setStamina = (value?: number) => {
     const p = player('setStamina');
     if (!p) return;

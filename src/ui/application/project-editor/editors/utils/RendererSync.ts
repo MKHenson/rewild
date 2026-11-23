@@ -6,6 +6,7 @@ import { setTerrainProviders } from 'src/core/TerrainProviders';
 import { registerDebugCommands } from 'src/core/debug';
 import { applyAtmosphere } from 'src/core/AtmosphereSync';
 import { PortalAsset } from 'src/core/routing/PortalAsset';
+import { SchoolAsset } from 'src/core/routing/SchoolAsset';
 
 export function SyncRendererFromLevel(
   renderer: Renderer,
@@ -46,9 +47,13 @@ export function syncFromEditorResource(id: string, renderer: Renderer) {
     applyAtmosphere(renderer, editorResource);
   } else if (sceneObject && editorResource) {
     const portal = sceneObject.userData.portal;
+    const school = sceneObject.userData.school;
     if (portal instanceof PortalAsset) {
       const resource = sceneGraphStore.findNodeById(id)?.resource;
       if (resource) portal.applyProperties(resource);
+    } else if (school instanceof SchoolAsset) {
+      const resource = sceneGraphStore.findNodeById(id)?.resource;
+      if (resource) school.applyProperties(resource);
     } else if (sceneObject.component instanceof PointLight) {
       const color = editorResource.color as Vector3;
       sceneObject.component.color.setRGB(color[0], color[1], color[2]);

@@ -4,6 +4,7 @@ import { Container } from 'rewild-routing';
 import { Transform } from 'rewild-renderer';
 import { Asset3D } from './Asset3D';
 import { Creature } from './Creature';
+import { SchoolAsset } from './SchoolAsset';
 import { resolvePlacement } from '../placement/ConformedPlacement';
 import { ConformedPlacementSync } from '../placement/ConformedPlacementSync';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
@@ -70,6 +71,7 @@ export class ContainerWithState extends Container {
       if (!(asset instanceof Asset3D)) continue;
       // A moving creature keeps itself on the ground.
       if (asset instanceof Creature && asset.movement) continue;
+      if (asset instanceof SchoolAsset && asset.school) continue;
 
       const body = asset.getBehavioursByName('rigid-body')[0] as
         | RigidBodyBehaviour

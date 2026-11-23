@@ -188,6 +188,22 @@
       }
     },
     {
+      "name": "sardine-school",
+      "type": "asset",
+      "school": "sardine",
+      "resource": {
+        "geometryId": "sardine"
+      }
+    },
+    {
+      "name": "minnow-school",
+      "type": "asset",
+      "school": "minnow",
+      "resource": {
+        "geometryId": "sardine"
+      }
+    },
+    {
       "name": "crow",
       "type": "asset",
       "preset": "crow",

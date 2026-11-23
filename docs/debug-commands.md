@@ -435,6 +435,9 @@ showCreatureSpawns(100); // more groups
 goToCreature(); // moves the player 4m from the nearest live creature, facing it along +Z
 goToCreature(3); // the fourth nearest
 goToCreature(0, 'lioness'); // the nearest of one creature template
+showSchools(); // live schools, spawned and placed, nearest first: members, state, home, and the school budget
+goToSchool(); // moves the player 3m short of the nearest school's members, facing them along +Z, and prints their size, depth and draw count
+goToSchool(2); // the third nearest
 ```
 
 The live creature table gives each creature's position against the ground under it, whether it is
@@ -458,6 +461,8 @@ player(); // health, hunger, stamina, oxygen, body temperature and how wet the b
 setHealth(20); // 0..100
 setHunger(10); // 0..100
 setStamina(0); // 0..100; empty exhausts the player, as running it down does
+godMode(); // toggles god mode: fly where you look at 3x walking pace (Shift faster, Space up, C down), hunger and oxygen hold
+godMode(false); // off
 setOxygen(30); // 0..100
 setBodyTemperature(0.8); // -1 really cold .. 1 really hot, held until released
 setBodyTemperature('weather'); // lets it follow the weather again
