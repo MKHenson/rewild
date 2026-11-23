@@ -37,6 +37,29 @@ describe('Button', () => {
     expect(style.backgroundColor).toBe('primary400');
   });
 
+  it('has no fill as a text button, and a wash of its colour on hover', () => {
+    const button = new Button({ label: 'Cancel', variant: 'text' });
+    const { input } = setup(button);
+    const style = button.node.style;
+    expect(style.backgroundColor).toEqual({ theme: 'primaryText', alpha: 0 });
+    expect(style.color).toBe('onSurface');
+    expect(style.boxShadow).toBeUndefined();
+
+    input.pointer('move', { ...MOUSE, x: 10, y: 10 });
+    expect(style.backgroundColor).toEqual({
+      theme: 'primaryText',
+      alpha: 0.08,
+    });
+    expect(style.color).toBe('primaryText');
+
+    input.pointer('down', { ...MOUSE, x: 10, y: 10, button: 0 });
+    expect(style.backgroundColor).toEqual({
+      theme: 'primaryText',
+      alpha: 0.14,
+    });
+    expect(style.transform).toEqual({ y: 1 });
+  });
+
   it('calls onClick on a click and on Enter', () => {
     const onClick = jest.fn();
     const button = new Button({ label: 'Quit', onClick });

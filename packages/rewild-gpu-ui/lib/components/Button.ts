@@ -1,11 +1,14 @@
 import type { UIIconName } from '../iconNames';
-import { UIBoxShadow, UIStyle } from '../style';
+import { UIBoxShadow, UIColor, UIStyle } from '../style';
 import type { UIThemeColor } from '../theme';
 import { UIComponent, UINode } from '../UINode';
 import { Icon } from './Icon';
 import { Label } from './Label';
 
 export type ButtonColor = 'primary' | 'secondary' | 'error';
+
+/** `contained` fills the button. `text` has no fill until hover, as the DOM's text button. */
+export type ButtonVariant = 'contained' | 'text';
 
 type ButtonState = 'rest' | 'hover' | 'press';
 
@@ -52,6 +55,20 @@ const SHADOWS: Record<ButtonState, UIBoxShadow[]> = {
   ],
 };
 
+/** The colour a text button takes on hover and press, as the DOM's text button. */
+const TEXT_COLORS: Record<ButtonColor, UIThemeColor> = {
+  primary: 'primaryText',
+  secondary: 'secondary400',
+  error: 'error400',
+};
+
+/** A text button's wash, as a share of its colour: `currentColor` at 8 % and 14 % in the DOM. */
+const TEXT_WASH: Record<ButtonState, number> = {
+  rest: 0,
+  hover: 0.08,
+  press: 0.14,
+};
+
 /** A press moves the button down 1 px, with no transition. */
 const PRESSED = { y: 1 };
 
@@ -61,6 +78,8 @@ export interface ButtonOptions {
   icon?: UIIconName;
   /** Defaults to `primary`. */
   color?: ButtonColor;
+  /** Defaults to `contained`. */
+  variant?: ButtonVariant;
   disabled?: boolean;
   onClick?: () => void;
   /** Names the node in debug output. Defaults to `button`. */
@@ -69,8 +88,11 @@ export interface ButtonOptions {
 }
 
 /**
- * The DOM's contained button: a label and an optional icon on a theme
- * colour. It lights on hover, darkens and dips on a press, and takes focus.
+ * The DOM's contained or text button: a label and an optional icon. A
+ * contained button is on a theme colour, and lights on hover and darkens on
+ * a press. A text button is the surface's text colour with no fill, and
+ * takes its colour and a light wash of it on hover. Both dip on a press and
+ * take focus.
  * A click, Enter or the gamepad's A calls `onClick`.
  */
 export class Button implements UIComponent {
@@ -78,12 +100,14 @@ export class Button implements UIComponent {
   onClick: (() => void) | null;
   private readonly label: Label;
   private color: ButtonColor;
+  private variant: ButtonVariant;
   private hovered = false;
   private pressed = false;
   private _disabled = false;
 
   constructor(options: ButtonOptions) {
     this.color = options.color ?? 'primary';
+    this.variant = options.variant ?? 'contained';
     this.onClick = options.onClick ?? null;
     this.label = new Label({ text: options.label });
     this.node = new UINode({
@@ -166,11 +190,20 @@ export class Button implements UIComponent {
 
   private paint(): void {
     const state = this.pressed ? 'press' : this.hovered ? 'hover' : 'rest';
-    const [fill, text] = COLORS[this.color][state];
     const style = this.node.style;
-    style.backgroundColor = fill;
-    style.color = text;
-    style.boxShadow = SHADOWS[state];
+    if (this.variant === 'text') {
+      const color = TEXT_COLORS[this.color];
+      // The wash is the colour at 0 % at rest, so it fades in on hover.
+      const fill: UIColor = { theme: color, alpha: TEXT_WASH[state] };
+      style.backgroundColor = fill;
+      style.color = state === 'rest' ? 'onSurface' : color;
+      style.boxShadow = undefined;
+    } else {
+      const [fill, text] = COLORS[this.color][state];
+      style.backgroundColor = fill;
+      style.color = text;
+      style.boxShadow = SHADOWS[state];
+    }
     style.transform = this.pressed ? PRESSED : undefined;
   }
 }

@@ -138,4 +138,22 @@ describe('Select', () => {
     expect(select.node.focused).toBe(false);
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('replaces its options and keeps its value', () => {
+    const { select, update, click, onChange } = setup();
+    select.options = [
+      { value: 'medium', label: 'Middle' },
+      { value: 'ultra', label: 'Ultra' },
+    ];
+    update();
+    expect(select.node.children[0].text).toBe('Middle');
+    const items = select.popup.panel.children;
+    expect(items.length).toBe(2);
+    click(50, 30);
+    expect(items[0].focused).toBe(true);
+    const { x, y } = items[1].rect;
+    click(x + 2, y + 2);
+    expect(select.value).toBe('ultra');
+    expect(onChange.mock.calls).toEqual([['ultra']]);
+  });
 });

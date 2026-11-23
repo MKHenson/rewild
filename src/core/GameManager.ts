@@ -12,7 +12,8 @@ import { bindScreenshotHotkey } from './ScreenshotHotkey';
 import { audio, closeSceneScope, openSceneScope } from './audio/audio';
 import { AudioScope } from 'rewild-audio';
 import { WorldSound } from './audio/WorldSound';
-import { Gamepad } from './input/Gamepad';
+import { Gamepad, GamepadButton } from './input/Gamepad';
+import { GameMenus, GameMenusTheme } from './menus/GameMenus';
 
 export class GameManager {
   renderer: Renderer;
@@ -33,26 +34,34 @@ export class GameManager {
   worldSound: WorldSound;
   RAPIER: typeof import('@dimforge/rapier3d-compat');
   physicsWorld: World;
-  onUnlock: () => void;
+  /** The menus over the game. They exist once `init` has loaded the game. */
+  menus: GameMenus | null = null;
   /** Asked to replace this game with one in another level of the project. */
   onTravel: ((levelId: string) => void) | null = null;
+  /** Asked to start this level again, from game over. */
+  onRestart: (() => void) | null = null;
+  /** Asked to leave the game, from the menu or game over. */
+  onQuit: (() => void) | null = null;
   private travelling = false;
   private _onPointerlockChange: () => void;
+  private _onKeyDown: (event: KeyboardEvent) => void;
   private unbindScreenshotHotkey: (() => void) | null = null;
   TerrainEventDelegate: (event: TerrainEvent) => void;
   terrainRapierBodyMap: Map<string, RigidBody>;
   scatterColliders: ScatterColliderStreamer;
 
-  constructor(player: Player, onUnlock: () => void) {
+  /** `theme` is the player's theme choice, which the settings menu shows and sets. */
+  constructor(player: Player, private theme: GameMenusTheme) {
     this.hasInitialized = false;
     this.renderer = new Renderer();
     this.stateMachine = new StateMachine();
     this.player = player;
+    this.player.onDeath = () => this.menus?.showGameOver();
     this.clock = new Clock();
-    this.onUnlock = onUnlock;
     this.sound = openSceneScope();
     this.worldSound = new WorldSound(audio, this.sound);
     this._onPointerlockChange = this._handlePointerlockChange.bind(this);
+    this._onKeyDown = this._handleKeyDown.bind(this);
     this.TerrainEventDelegate = this.onTerrainEvent.bind(this);
     this.terrainRapierBodyMap = new Map();
   }
@@ -82,9 +91,18 @@ export class GameManager {
       if (!stateMachine) throw new Error('Could not load statemachine');
 
       this.stateMachine = stateMachine;
+      this.menus = new GameMenus(this.renderer.ui, {
+        quality: this.renderer.quality,
+        getTheme: this.theme.getTheme,
+        setTheme: this.theme.setTheme,
+        onResume: () => this.lock(),
+        onRestart: () => this.onRestart?.(),
+        onQuit: () => this.onQuit?.(),
+      });
       this.clock.start();
 
       document.addEventListener('pointerlockchange', this._onPointerlockChange);
+      document.addEventListener('keydown', this._onKeyDown);
       this.unbindScreenshotHotkey = bindScreenshotHotkey(this.renderer);
       this.player.requestLock();
 
@@ -178,10 +196,24 @@ export class GameManager {
     registerScatterColliderCommands(this.scatterColliders);
   }
 
+  /** Losing the pointer, such as to Escape, opens the menu. */
   private _handlePointerlockChange() {
-    if (!document.pointerLockElement) {
-      this.onUnlock();
-    }
+    if (!document.pointerLockElement) this.menus?.openMenu();
+  }
+
+  /**
+   * Escape opens the menu when the pointer is already free. While a menu is
+   * open, the UI takes the keys, so Escape closes it there.
+   */
+  private _handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Escape') this.menus?.openMenu();
+  }
+
+  /** Start opens the menu, and frees the mouse so it can point at it. */
+  private openMenuFromPad(): void {
+    if (this.menus?.state !== 'playing') return;
+    this.menus.openMenu();
+    if (document.pointerLockElement) document.exitPointerLock();
   }
 
   onUpdate() {
@@ -209,6 +241,7 @@ export class GameManager {
     const ui = this.renderer.ui.input;
     pad.poll();
     const uiHasPad = ui.focusScope() !== null;
+    if (!uiHasPad && pad.pressed(GamepadButton.Start)) this.openMenuFromPad();
     // A press that began in play does not act in the UI.
     if (uiHasPad && this.playerHasPad) ui.syncGamepads(pad.pads);
     if (uiHasPad) ui.readGamepads(pad.pads, performance.now());
@@ -216,12 +249,17 @@ export class GameManager {
   }
 
   dispose() {
+    this.menus?.dispose();
     closeSceneScope(this.sound);
     this.stateMachine?.dispose();
     this.scatterColliders?.dispose();
     this.renderer.dispose();
     this.unbindScreenshotHotkey?.();
-    document.removeEventListener('pointerlockchange', this._onPointerlockChange);
+    document.removeEventListener(
+      'pointerlockchange',
+      this._onPointerlockChange
+    );
+    document.removeEventListener('keydown', this._onKeyDown);
     this.renderer.terrainRenderer.dispatcher.remove(this.TerrainEventDelegate);
   }
 }

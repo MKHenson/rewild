@@ -17,8 +17,6 @@ import {
   QUALITY_ASPECTS,
   QualityAspect,
   QualityOverrides,
-  RENDER_QUALITIES,
-  RENDER_SCALES,
   RenderQuality,
   RenderScale,
 } from 'rewild-renderer/lib/utils/RenderQuality';
@@ -27,105 +25,21 @@ import { VOLUME_SETTINGS, VolumeSetting } from 'rewild-audio';
 import { audioSettings } from '../../core/audio/audio';
 import { OutputDeviceField } from './OutputDeviceField';
 import { getUiTheme, setUiTheme, UiTheme } from '../utils/uiTheme';
+import {
+  APPLY_NOTE,
+  ASPECTS,
+  QUALITY_OPTIONS,
+  RENDER_QUALITY_DESCRIPTION,
+  RENDER_SCALE_DESCRIPTION,
+  SCALE_OPTIONS,
+  THEME_DESCRIPTION,
+  THEME_OPTIONS,
+  VOLUMES,
+} from '../../core/menus/settingsOptions';
 
 type Props = {
   /** Leave the settings, discarding anything not applied. */
   onClose: () => void;
-};
-
-const qualityOptions = RENDER_QUALITIES.map((quality) => ({
-  value: quality,
-  label: quality.charAt(0).toUpperCase() + quality.slice(1),
-}));
-
-const scaleOptions = [...RENDER_SCALES].reverse().map((scale) => ({
-  value: String(scale),
-  label: `${Math.round(scale * 100)}%`,
-}));
-
-const themeOptions: { value: UiTheme; label: string }[] = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'Match system' },
-];
-
-/** What each subsystem costs, in the terms a player picking a tier cares about. */
-const ASPECTS: Record<QualityAspect, { label: string; description: string }> = {
-  clouds: {
-    label: 'Clouds',
-    description:
-      'Volumetric cloud detail, and the resolution they are drawn at. By far ' +
-      'the most expensive part of the sky — the first thing to lower on a ' +
-      'machine that is struggling.',
-  },
-  cloudShadows: {
-    label: 'Cloud Shadows',
-    description:
-      'How finely the shadows clouds cast across the landscape are traced.',
-  },
-  shadows: {
-    label: 'Shadows',
-    description:
-      'Sharpness of the shadows cast by the sun, and how far out they reach. ' +
-      'Ultra doubles the shadow map and costs four times the fill of High.',
-  },
-  godRays: {
-    label: 'God Rays',
-    description:
-      'Shafts of sunlight through gaps in the cloud. Cheap to lower — the ' +
-      'shafts are soft, so a coarser trace is hard to spot.',
-  },
-  bloom: {
-    label: 'Bloom',
-    description: 'The glow that spreads out of the brightest parts of a frame.',
-  },
-  terrain: {
-    label: 'Terrain detail',
-    description:
-      'Surface relief on the ground and how far out it carries. The heaviest ' +
-      'setting here on most views, because terrain fills the screen.',
-  },
-  water: {
-    label: 'Water detail',
-    description:
-      'How many ripples shade the surface of the sea and lakes, and how far ' +
-      'out they carry. The waves themselves are the same on every setting.',
-  },
-  ao: {
-    label: 'Ambient Occlusion',
-    description:
-      'Soft darkening where the sky is hidden: under rocks, at the foot of ' +
-      'trees and inside canopies. Off on Low; higher tiers reach further ' +
-      'and take more samples.',
-  },
-  heatShimmer: {
-    label: 'Heat Shimmer',
-    description:
-      'The haze that wavers over hot ground in the distance, in hot ' +
-      'weather only. Off on Low; Medium uses a simpler ripple.',
-  },
-  drawDistance: {
-    label: 'Draw Distance',
-    description:
-      'How far out trees, rocks and plants draw, and how soon they switch to ' +
-      'simpler models. Lower tiers save in the scene and in the shadows. ' +
-      'Distant forests stay on every tier.',
-  },
-};
-
-const VOLUMES: Record<VolumeSetting, { label: string; description: string }> = {
-  master: { label: 'Master', description: 'Everything the game plays.' },
-  music: { label: 'Music', description: 'The score.' },
-  world: {
-    label: 'World',
-    description:
-      'Wind, rain, thunder, water, wildlife and everything else outdoors.',
-  },
-  player: {
-    label: 'Player',
-    description: 'Your footsteps, breathing and voice.',
-  },
-  ui: { label: 'Interface', description: 'Menus and buttons.' },
 };
 
 /** A volume slider and its percentage, wired straight to the audio settings. */
@@ -158,8 +72,8 @@ function volumeRow(setting: VolumeSetting) {
 }
 
 /**
- * The game's settings screen — the `/settings` route from the main menu, and the
- * panel the in-game menu swaps itself out for.
+ * The game's settings screen: the `/settings` route from the main menu. The
+ * in-game menu opens `SettingsMenu`, which shows the same settings.
  */
 @register('x-settings-panel')
 export class SettingsPanel extends Component<Props> {
@@ -218,13 +132,12 @@ export class SettingsPanel extends Component<Props> {
                 <Field label="Render Quality">
                   <Select
                     value={level()}
-                    options={qualityOptions}
+                    options={QUALITY_OPTIONS}
                     onChange={onLevelChange}
                   />
                 </Field>
                 <Typography variant="light">
-                  Sets every section below at once. Lower it if the game runs
-                  poorly, then raise anything back that you want to keep.
+                  {RENDER_QUALITY_DESCRIPTION}
                 </Typography>
               </div>
 
@@ -232,17 +145,14 @@ export class SettingsPanel extends Component<Props> {
                 <Field label="Render Scale">
                   <Select
                     value={String(renderScale())}
-                    options={scaleOptions}
+                    options={SCALE_OPTIONS}
                     onChange={(value) =>
                       setRenderScale(Number(value) as RenderScale)
                     }
                   />
                 </Field>
                 <Typography variant="light">
-                  The resolution the world draws at, as a share of the window.
-                  Lower it if the game runs poorly. Menus and the HUD always
-                  draw at full resolution, and Render Quality does not change
-                  it.
+                  {RENDER_SCALE_DESCRIPTION}
                 </Typography>
               </div>
 
@@ -254,7 +164,7 @@ export class SettingsPanel extends Component<Props> {
                     <Field label={ASPECTS[aspect].label}>
                       <Select
                         value={overrides()[aspect] || level()}
-                        options={qualityOptions}
+                        options={QUALITY_OPTIONS}
                         onChange={(value) => onAspectChange(aspect, value)}
                       />
                     </Field>
@@ -265,10 +175,7 @@ export class SettingsPanel extends Component<Props> {
                 ))}
               </div>
 
-              <Typography variant="info">
-                Applying rebuilds the affected shaders, so expect a brief pause
-                on the next frame.
-              </Typography>
+              <Typography variant="info">{APPLY_NOTE}</Typography>
             </Tab>
             <Tab label="Audio">
               <div class="volumes">{VOLUME_SETTINGS.map(volumeRow)}</div>
@@ -301,14 +208,11 @@ export class SettingsPanel extends Component<Props> {
                 <Field label="Theme">
                   <Select
                     value={uiTheme()}
-                    options={themeOptions}
+                    options={THEME_OPTIONS}
                     onChange={onThemeChange}
                   />
                 </Field>
-                <Typography variant="light">
-                  Colours for menus and the editor. Match system follows your
-                  operating system's light or dark setting.
-                </Typography>
+                <Typography variant="light">{THEME_DESCRIPTION}</Typography>
               </div>
 
               <InfoBox variant="info" title="">

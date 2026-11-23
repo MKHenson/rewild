@@ -49,7 +49,7 @@ Both UIs read the same theme values, so they look like one product. See Theme.
 | **3. Settings**        | Popups, form controls: tabs, select, slider, switch, field                                                  | Settings in the game            |
 | **4. In the world**    | World surfaces, the look-at pointer and crosshair, locked portals, actions, the WorldPanel asset            | An "Open Portal" WorldPanel     |
 
-Each stage is playable on its own. Stage 1 looks the same as today on purpose: it proves the new parts against a UI we know. Until Stage 3 is done, Settings in the in-game menu opens the DOM panel.
+Each stage is playable on its own. Stage 1 looks the same as today on purpose: it proves the new parts against a UI we know. From Stage 3, Settings in the in-game menu opens the Mica panel. The main menu's `/settings` route keeps the DOM panel.
 
 ---
 
@@ -454,7 +454,7 @@ Components are TypeScript classes that build a subtree, handle their own states,
 | `Meter`    | A bar filled to a value, coloured from full to empty           | 1     |
 | `Label`    | Text                                                           | 2     |
 | `Icon`     | One icon from the atlas                                        | 2     |
-| `Button`   | Label, optional icon, states, focusable, `click`               | 2     |
+| `Button`   | Label, optional icon, states, focusable, `click`. A `contained` or a `text` variant, as the DOM's | 2     |
 | `Modal`    | A glass panel on its own surface, with a dimmed backdrop. Escape and B close it | 2 |
 | `Stack`    | A flex column or row with a theme gap                          | 2     |
 | `Popup`    | A small panel next to a node, on its own surface. See Popups   | 3     |
@@ -512,6 +512,12 @@ menu.append(
 ### Settings
 
 The in-game settings use the same settings data as the DOM panel: render quality and its overrides, volumes, output device and theme. Only the view changes. Both panels read and write the same stores, so a change in one shows in the other.
+
+- **The code.** `SettingsMenu` in `src/core/menus`. `settingsOptions.ts` holds the options and the help text, and both panels read it.
+- **Opening.** Each open reads the stores again, so the panel shows a change made in the DOM panel. It opens on the Display tab.
+- **Applying.** The Display tab is a draft. Apply writes it to the renderer's `quality` and closes. Cancel, Escape and B drop it. Audio and the theme change at once, as in the DOM.
+- **The output device.** The panel lists the devices each time it opens and while a device connects or goes. A `Select` takes a new list through its `options`. With no named devices, a button asks the browser to name them.
+- **The theme.** The app gives `GameManager` `getUiTheme` and `setUiTheme`, so `src/core` does not import `src/ui`.
 
 ---
 
@@ -792,7 +798,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: `Tabs`, `Select`, `Slider`, `Switch`, `Field`, `Divider`, `InfoBox`, each with mouse, keyboard and gamepad input. Scrolling: `overflow: 'scroll'`, the wheel, touch, scrollbars, focus into view and the right stick.
   - Expect: each control works with the gamepad alone. The slider follows a drag off its track. A long tab panel and a long select list scroll with each input.
 
-- [ ] **14. Settings in the game**
+- [x] **14. Settings in the game**
 
   - Scope: the in-game settings panel, bound to the same settings data as the DOM panel. Settings in the in-game menu opens it.
   - Expect: each setting in the DOM panel is in the in-game panel, and a change in one shows in the other.
