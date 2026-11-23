@@ -1,4 +1,4 @@
-import type { UISurface, UISurfaceOptions } from '../lib';
+import type { UISurface, UISurfaceOptions, UIWorldSize } from '../lib';
 
 /** What an example builds into. The inspector mirrors the surface's tree as DOM elements. */
 export interface ExampleView {
@@ -22,6 +22,12 @@ export interface Example {
   log?: boolean;
   /** Draws the test image under both sides, so glass has something to blur. */
   backdrop?: boolean;
+  /**
+   * Makes the example's surface a world surface of this size in metres. A
+   * camera looks at it from the front, so the whole surface shows when it
+   * faces the camera. The DOM side shows its tree flat, as seen from the front.
+   */
+  world?: UIWorldSize;
   /**
    * Builds the tree. An example that animates returns a function, which the
    * inspector calls with the time in seconds before each frame it draws.

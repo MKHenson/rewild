@@ -225,6 +225,31 @@ describe('UIInput pointer', () => {
       'pointermove',
     ]);
   });
+
+  it('gives a world surface no screen points and no focus scope', () => {
+    const { input, hud, menu, log } = setup();
+    const world = new UISurface({
+      kind: 'world',
+      name: 'panel',
+      order: 2,
+      input: 'all',
+      size: { width: 0.2, height: 0.2 },
+    });
+    const node = box(0, 0, 200);
+    world.root.append(node);
+    world.update(world.layoutWidth, world.layoutHeight);
+    record(log, 'world', node);
+    const both = new UIInput({ surfaces: [hud, menu, world] });
+    expect(both.focusScope()).toBeNull();
+    expect(both.pointer('down', at(20, 20))).toBe('taken');
+    expect(log).toEqual([
+      'menu pointerenter',
+      'panel pointerenter',
+      'button pointerenter',
+      'button pointerdown',
+    ]);
+    expect(input.pointer('down', at(120, 20))).toBe('passed');
+  });
 });
 
 describe('UIInput wheel and keys', () => {

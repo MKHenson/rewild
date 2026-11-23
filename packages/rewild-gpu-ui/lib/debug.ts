@@ -21,10 +21,12 @@ export function describeNode(node: UINode): string {
  * rectangles are from the last layout.
  */
 export function printTree(surface: UISurface): string {
-  const { name, kind, order, input, width, height } = surface;
+  const { name, kind, order, input, width, height, size } = surface;
+  const metres =
+    kind === 'world' ? ` · ${num(size.width)} × ${num(size.height)} m` : '';
   const lines = [
     `${name} · ${kind} · order ${order} · input ${input} · ` +
-      `${num(width)} × ${num(height)}`,
+      `${num(width)} × ${num(height)}${metres}`,
   ];
   const write = (node: UINode, label: string, depth: number) => {
     const { x, y, width, height } = node.rect;

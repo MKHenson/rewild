@@ -24,3 +24,4 @@ export * from './UIInput';
 export * from './UINode';
 export * from './UIRenderer';
 export * from './UISurface';
+export * from './world';

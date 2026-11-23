@@ -11,13 +11,23 @@
 // Glyph, icon and shadow primitives skip the effect. The base draws glyphs
 // and icons from the font atlas and the icon atlas, and shadows from the box.
 // A glass box lays its effect over the blurred backdrop.
+//
+// A world surface draws on a quad in the scene. From behind, it shows only its
+// glass boxes, as plain glass with no effect.
 
 struct Uniforms {
   // The surface size in CSS pixels.
   viewport: vec2f,
+  // Device pixels per CSS pixel. A world surface works its own out per pixel.
   pixelRatio: f32,
   // Seconds, for effects that animate.
   time: f32,
+  // The target size in device pixels.
+  targetSize: vec2f,
+  // 1 for a world surface, else 0.
+  world: f32,
+  // Maps the surface's CSS pixels to clip space.
+  clip: mat4x4f,
 };
 
 // Matches PrimitiveStream in stream.ts. Rects are x, y, width, height in CSS
@@ -74,10 +84,31 @@ const GLASS_SATURATION = 1.5;
 struct VertexOut {
   @builtin(position) position: vec4f,
   @location(0) @interpolate(flat) index: u32,
+  // The position on the surface, in CSS pixels.
+  @location(1) local: vec2f,
 };
+
+// Device pixels per CSS pixel at this fragment. Set at the start of `fs`.
+var<private> scale: f32;
 
 fn isAtlas(kind: f32) -> bool {
   return kind == KIND_GLYPH || kind == KIND_ICON;
+}
+
+// The surface point `p` in device pixels on the target.
+fn toTarget(p: vec2f) -> vec2f {
+  let clip = u.clip * vec4f(p, 0.0, 1.0);
+  return clip.xy / max(clip.w, 1e-4) * u.targetSize * 0.5;
+}
+
+// CSS pixels on a world surface per device pixel near `p`. The surface is in
+// perspective, so it differs from corner to corner.
+fn worldPixelSize(p: vec2f) -> f32 {
+  let origin = toTarget(p);
+  let across = length(toTarget(p + vec2f(1.0, 0.0)) - origin);
+  let down = length(toTarget(p + vec2f(0.0, 1.0)) - origin);
+  // At most 16, so a surface seen edge on does not grow without end.
+  return 1.0 / max(min(across, down), 1.0 / 16.0);
 }
 
 @vertex
@@ -87,11 +118,16 @@ fn vs(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) index: u
   let corner = vec2f(f32(vertexIndex & 1u), f32(vertexIndex >> 1u));
   // One device pixel round the box for the anti-aliased edge, and the outset.
   let outset = select(prim.params.w, 0.0, isAtlas(prim.params.z));
-  let pad = 1.0 / u.pixelRatio + outset;
+  var pixel = 1.0 / u.pixelRatio;
+  if (u.world > 0.0) {
+    pixel = worldPixelSize(rect.xy + corner * rect.zw);
+  }
+  let pad = pixel + outset;
   let p = rect.xy - pad + corner * (rect.zw + 2.0 * pad);
   var output: VertexOut;
-  output.position = vec4f(p / u.viewport * vec2f(2.0, -2.0) + vec2f(-1.0, 1.0), 0.0, 1.0);
+  output.position = u.clip * vec4f(p, 0.0, 1.0);
   output.index = index;
+  output.local = p;
   return output;
 }
 
@@ -106,7 +142,7 @@ fn roundRectDistance(p: vec2f, rect: vec4f, radii: vec4f) -> f32 {
 }
 
 fn coverage(d: f32) -> f32 {
-  return clamp(0.5 - d * u.pixelRatio, 0.0, 1.0);
+  return clamp(0.5 - d * scale, 0.0, 1.0);
 }
 
 fn premultiply(color: vec4f) -> vec4f {
@@ -135,16 +171,16 @@ fn atlasCoverage(atlas: texture_2d<f32>, prim: Primitive, p: vec2f) -> f32 {
   let uv = texel / vec2f(textureDimensions(atlas));
   let s = textureSampleLevel(atlas, atlasSampler, uv, 0.0).rgb;
   let distance = max(min(s.r, s.g), min(max(s.r, s.g), s.b)) - 0.5;
-  let pixelsPerTexel = prim.rect.z * u.pixelRatio / (cell.z - cell.x);
+  let pixelsPerTexel = prim.rect.z * scale / (cell.z - cell.x);
   // At least 1, so small text stays smooth.
   let range = max(prim.params.w * pixelsPerTexel, 1.0);
   return clamp(distance * range + 0.5, 0.0, 1.0);
 }
 
-// The blurred backdrop at `p`, premultiplied, with the saturation raised by
-// the CSS `saturate()` matrix.
-fn glassBackdrop(p: vec2f) -> vec4f {
-  let color = textureSampleLevel(backdrop, atlasSampler, p / u.viewport, 0.0);
+// The blurred backdrop at `uv` on the target, premultiplied, with the
+// saturation raised by the CSS `saturate()` matrix.
+fn glassBackdrop(uv: vec2f) -> vec4f {
+  let color = textureSampleLevel(backdrop, atlasSampler, uv, 0.0);
   let s = GLASS_SATURATION;
   let matrix = mat3x3f(
     vec3f(0.213 + 0.787 * s, 0.213 - 0.213 * s, 0.213 - 0.213 * s),
@@ -197,7 +233,7 @@ fn blurredRow(x: f32, y: f32, sigma: f32, corner: f32, halfSize: vec2f) -> f32 {
 // deviation `sigma`. It sums four rows along y. After Evan Wallace, "Fast
 // rounded rectangle shadows". Each quarter of the box uses its own corner.
 fn blurredBox(p: vec2f, rect: vec4f, radii: vec4f, sigma: f32) -> f32 {
-  if (sigma * u.pixelRatio < 0.25) {
+  if (sigma * scale < 0.25) {
     return coverage(roundRectDistance(p, rect, radii));
   }
   let halfSize = rect.zw * 0.5;
@@ -243,10 +279,22 @@ fn insetShadow(prim: Primitive, p: vec2f) -> vec4f {
 }
 
 @fragment
-fn fs(input: VertexOut) -> @location(0) vec4f {
+fn fs(input: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+  let world = u.world > 0.0;
+  // The derivatives run before any branch, as WGSL needs.
+  let dx = dpdx(input.local);
+  let dy = dpdy(input.local);
+  let worldScale = inverseSqrt(max(abs(dx.x * dy.y - dx.y * dy.x), 1e-12));
+  scale = select(u.pixelRatio, worldScale, world);
+  let p = select(input.position.xy / u.pixelRatio, input.local, world);
+  let uv = input.position.xy / u.targetSize;
+
   let prim = primitives[input.index];
-  let p = input.position.xy / u.pixelRatio;
   let kind = prim.params.z;
+  let back = world && !front;
+  if (back && kind != KIND_GLASS) {
+    return vec4f(0.0);
+  }
   let alpha = coverage(roundRectDistance(p, prim.clip, prim.clipRadii)) * prim.params.y;
 
   if (kind == KIND_GLYPH) {
@@ -269,14 +317,19 @@ fn fs(input: VertexOut) -> @location(0) vec4f {
   let innerRadii = max(prim.radii - borderWidth, vec4f(0.0));
   let inner = select(1.0, coverage(roundRectDistance(p, innerRect, innerRadii)), borderWidth > 0.0);
 
-  var color = effect(prim, Pixel(p - prim.rect.xy, edge, outer, inner));
+  var color: vec4f;
+  if (back) {
+    color = withBorder(premultiply(prim.fill), prim, inner);
+  } else {
+    color = effect(prim, Pixel(p - prim.rect.xy, edge, outer, inner));
+  }
   // The backdrop fills the box under the effect, as CSS's backdrop-filter
   // fills the border box under the background.
   var under = vec4f(0.0);
   if (kind == KIND_GLASS) {
-    under = glassBackdrop(p) * outer * (1.0 - color.a);
+    under = glassBackdrop(uv) * outer * (1.0 - color.a);
   }
-  if (prim.params.w == 0.0) {
+  if (prim.params.w == 0.0 || back) {
     color *= outer;
   }
   return (color + under) * alpha;

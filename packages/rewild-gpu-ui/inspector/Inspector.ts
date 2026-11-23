@@ -7,7 +7,9 @@ import {
   UIRenderer,
   UISurface,
 } from '../lib';
+import { Matrix4 } from 'rewild-common';
 import { BackdropImage, testImage } from './backdropImage';
+import { exampleCamera } from './camera';
 import { parseComputedColor } from './cssColor';
 import { DomMirror, mirrorTree } from './domMirror';
 import { Example, ExampleRegistry } from './registry';
@@ -35,6 +37,9 @@ class ExampleCard {
   private animate: ((seconds: number) => void) | null;
   private mirror: DomMirror | null = null;
   private backdrop: BackdropImage | null = null;
+  /** The depth that a world example's surfaces test, cleared on each draw. */
+  private depth: GPUTexture | null = null;
+  private viewProjection = new Matrix4();
 
   constructor(
     device: GPUDevice,
@@ -73,7 +78,11 @@ class ExampleCard {
       domPane.style.background = `center / cover url(${testImage().url})`;
     }
     const domCaption = el('figcaption');
-    domCaption.textContent = example.log ? 'Events, the newest first' : 'DOM';
+    domCaption.textContent = example.log
+      ? 'Events, the newest first'
+      : example.world
+      ? 'DOM, flat and from the front'
+      : 'DOM';
     dom.append(domPane, domCaption);
 
     sides.append(mica, dom);
@@ -91,10 +100,11 @@ class ExampleCard {
     this.renderer.input.attach(canvasElement, { pageKeys: false });
     this.renderer.input.onDispatch = () => requestDraw();
     this.renderer.input.onRedraw = () => requestDraw();
-    this.surface = this.renderer.createSurface({
-      kind: 'screen',
-      name: example.name,
-    });
+    this.surface = this.renderer.createSurface(
+      example.world
+        ? { kind: 'world', name: example.name, size: example.world }
+        : { kind: 'screen', name: example.name }
+    );
     const log = (line: string) => {
       if (!example.log) return;
       const entry = el('div');
@@ -111,7 +121,11 @@ class ExampleCard {
       }) ?? null;
     if (!example.log) {
       this.mirror = mirrorTree(this.surface.root);
-      domPane.append(this.mirror.element);
+      domPane.append(
+        example.world
+          ? fitWorldMirror(this.surface, this.mirror.element, domPane)
+          : this.mirror.element
+      );
     }
 
     this.stopObserving = observeCanvasSize(canvasElement, (size) => {
@@ -162,19 +176,36 @@ class ExampleCard {
     const encoder = device.createCommandEncoder({ label: 'inspector' });
     const view = context.getCurrentTexture().createView();
     const viewport = { width: canvas.width, height: canvas.height, pixelRatio };
+    const background = parseComputedColor(
+      getComputedStyle(this.micaPane).backgroundColor
+    );
     if (this.backdrop) {
       this.backdrop.draw(encoder, view, canvas.width, canvas.height);
       this.renderer.backdrop = { texture: this.backdrop.scene! };
-      this.renderer.render(encoder, view, viewport);
-    } else {
-      const background = getComputedStyle(this.micaPane).backgroundColor;
-      this.renderer.render(
-        encoder,
-        view,
-        viewport,
-        parseComputedColor(background)
-      );
     }
+    const world = this.surface.kind === 'world';
+    if (world) {
+      // The world surface draws before the screen pass, so that pass must
+      // not clear.
+      const depthView = this.clearDepth(encoder, view, background);
+      this.renderer.renderWorld(encoder, {
+        view,
+        depthView,
+        width: canvas.width,
+        height: canvas.height,
+        viewProjection: exampleCamera(
+          this.viewProjection,
+          this.surface.size,
+          canvas.width / canvas.height
+        ),
+      });
+    }
+    this.renderer.render(
+      encoder,
+      view,
+      viewport,
+      this.backdrop || world ? undefined : background
+    );
     device.queue.submit([encoder.finish()]);
     const { drawCalls, nodes, primitives } = this.renderer.stats;
     this.micaCaption.textContent = `Mica · ${canvas.width} × ${
@@ -184,8 +215,58 @@ class ExampleCard {
     }`;
   }
 
+  /**
+   * Clears the depth for a world example, and the colour too when there is
+   * no backdrop. Returns the depth's view.
+   */
+  private clearDepth(
+    encoder: GPUCommandEncoder,
+    view: GPUTextureView,
+    background: GPUColor
+  ): GPUTextureView {
+    const { canvas, device } = this.canvas;
+    const depth = this.depth;
+    if (
+      !depth ||
+      depth.width !== canvas.width ||
+      depth.height !== canvas.height
+    ) {
+      depth?.destroy();
+      this.depth = device.createTexture({
+        label: 'inspector-depth',
+        size: [canvas.width, canvas.height],
+        format: 'depth24plus',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+    }
+    const depthView = this.depth!.createView();
+    encoder
+      .beginRenderPass({
+        label: 'inspector clear',
+        colorAttachments: this.backdrop
+          ? []
+          : [
+              {
+                view,
+                clearValue: background,
+                loadOp: 'clear',
+                storeOp: 'store',
+              },
+            ],
+        depthStencilAttachment: {
+          view: depthView,
+          depthClearValue: 1,
+          depthLoadOp: 'clear',
+          depthStoreOp: 'store',
+        },
+      })
+      .end();
+    return depthView;
+  }
+
   dispose(): void {
     this.stopObserving();
+    this.depth?.destroy();
     this.backdrop?.dispose();
     this.renderer.dispose();
     this.canvas.dispose();
@@ -346,6 +427,35 @@ export class Inspector {
       if (this.cards.some((card) => card.animated)) this.requestDraw();
     });
   }
+}
+
+/**
+ * Holds the DOM mirror of a world surface at the surface's layout size, scaled
+ * to fit the pane and centred in it.
+ */
+function fitWorldMirror(
+  surface: UISurface,
+  mirror: HTMLElement,
+  pane: HTMLElement
+): HTMLElement {
+  const width = surface.layoutWidth;
+  const height = surface.layoutHeight;
+  const frame = el('div');
+  frame.style.position = 'absolute';
+  frame.style.left = '50%';
+  frame.style.top = '50%';
+  frame.style.width = `${width}px`;
+  frame.style.height = `${height}px`;
+  frame.append(mirror);
+  const fit = () => {
+    const scale = Math.min(
+      (pane.clientWidth * 0.9) / width,
+      (pane.clientHeight * 0.9) / height
+    );
+    frame.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  };
+  new ResizeObserver(fit).observe(pane);
+  return frame;
 }
 
 function el(tag: string, className?: string): HTMLElement {
