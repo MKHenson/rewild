@@ -1,3 +1,4 @@
+import { Matrix4 } from 'rewild-common';
 import type { UIFont } from './font';
 import type { UIIcons } from './icons';
 import meterEffect from './shaders/meter.wgsl';
@@ -7,12 +8,25 @@ import { UIBackdrop, UIBackdropSource } from './UIBackdrop';
 import { UIEffects } from './UIEffects';
 import { UIInput } from './UIInput';
 import { UISurface, UISurfaceOptions } from './UISurface';
+import { outsideView, screenClip, worldClip } from './world';
 
 export interface UIViewport {
   /** The target size in device pixels. */
   width: number;
   height: number;
   pixelRatio: number;
+}
+
+/** Where world surfaces draw: into the scene, tested against its depth. */
+export interface UIWorldTarget {
+  view: GPUTextureView;
+  /** The scene's depth. The surfaces test it and do not write it. */
+  depthView: GPUTextureView;
+  /** The target size in device pixels. */
+  width: number;
+  height: number;
+  /** The camera's projection times its view matrix. */
+  viewProjection: Matrix4;
 }
 
 /** What the last render cost. */
@@ -39,12 +53,18 @@ export interface UITimestampWrites {
   /** Brackets all the blur passes, from the start of the first to the end of the last. */
   blur?: () => GPURenderPassTimestampWrites | undefined;
   draw?: () => GPURenderPassTimestampWrites | undefined;
+  world?: () => GPURenderPassTimestampWrites | undefined;
 }
 
 interface SurfaceBuffers {
   buffer: GPUBuffer;
+  /** The screen surfaces share one. Each world surface has its own. */
+  uniforms: GPUBuffer;
   bindGroup: GPUBindGroup;
 }
+
+/** Floats in the uniforms. Matches `Uniforms` in ui.wgsl. */
+const UNIFORM_FLOATS = 24;
 
 /** A run of primitives in one surface that share a pipeline. */
 interface DrawRun {
@@ -56,7 +76,9 @@ interface DrawRun {
 
 /**
  * Draws surfaces in order, each in one draw call per run of an effect. Boxes,
- * text and icons share the plain rect pipeline.
+ * text and icons share the plain rect pipeline. Screen surfaces draw over the
+ * frame in `render`. World surfaces draw in the scene in `renderWorld`, which
+ * runs before `render` in a frame.
  */
 export class UIRenderer {
   /** Draw calls in the last render. */
@@ -94,7 +116,13 @@ export class UIRenderer {
   private buffers = new Map<UISurface, SurfaceBuffers>();
   private bindGroupLayout: GPUBindGroupLayout;
   private uniforms: GPUBuffer;
+  private uniformData = new Float32Array(UNIFORM_FLOATS);
+  private clip = new Matrix4();
   private runs: DrawRun[] = [];
+  /** True when the last `renderWorld` drew glass, so `render` blurs for the next frame. */
+  private worldGlass = false;
+  /** Draw calls in the last `renderWorld`, which `render` adds to its stats. */
+  private worldDrawCalls = 0;
   private _font: UIFont | null = null;
   private _icons: UIIcons | null = null;
   private _showLayout = false;
@@ -102,7 +130,15 @@ export class UIRenderer {
   /** Bound in place of an atlas until there is a font or icons. */
   private emptyAtlas: GPUTexture;
 
-  constructor(private device: GPUDevice, format: GPUTextureFormat) {
+  /**
+   * Both kinds of surface draw into targets of `format`. World surfaces test
+   * a scene depth of `depthFormat`.
+   */
+  constructor(
+    private device: GPUDevice,
+    format: GPUTextureFormat,
+    depthFormat: GPUTextureFormat = 'depth24plus'
+  ) {
     const visibility = GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT;
     this.bindGroupLayout = device.createBindGroupLayout({
       label: 'ui',
@@ -130,13 +166,9 @@ export class UIRenderer {
       label: 'ui',
       bindGroupLayouts: [this.bindGroupLayout],
     });
-    this.effects = new UIEffects(device, format, layout);
+    this.effects = new UIEffects(device, format, layout, depthFormat);
     this.effects.register('meter', meterEffect);
-    this.uniforms = device.createBuffer({
-      label: 'ui-uniforms',
-      size: 16,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    this.uniforms = this.createUniforms('ui-uniforms');
     this.blur = new UIBackdrop(device);
     if (typeof document !== 'undefined') {
       this.theme.read();
@@ -203,7 +235,8 @@ export class UIRenderer {
   removeSurface(surface: UISurface): void {
     const index = this._surfaces.indexOf(surface);
     if (index !== -1) this._surfaces.splice(index, 1);
-    this.buffers.get(surface)?.buffer.destroy();
+    const buffers = this.buffers.get(surface);
+    if (buffers) this.destroyBuffers(buffers);
     this.buffers.delete(surface);
   }
 
@@ -213,9 +246,78 @@ export class UIRenderer {
   }
 
   /**
-   * Draws every surface into `view`. Clears it first when `clearValue` is
-   * given, or else draws over what is there. With no `clearValue` and nothing
-   * to draw, it starts no pass. When glass shows, it blurs the backdrop first.
+   * Draws the world surfaces into the scene, far ones first. Call it once per
+   * frame, before `render`. Glass reads the blur that `render` made in the
+   * last frame, since this frame's blur does not exist yet. A surface wholly
+   * out of view lays out but does not draw.
+   */
+  renderWorld(encoder: GPUCommandEncoder, target: UIWorldTarget): void {
+    const now = performance.now();
+    const shown: { surface: UISurface; bindGroup: GPUBindGroup; w: number }[] =
+      [];
+    this.worldGlass = false;
+    for (const surface of this._surfaces) {
+      if (surface.kind !== 'world') continue;
+      const width = surface.layoutWidth;
+      const height = surface.layoutHeight;
+      surface.update(width, height, 1, now);
+      this.upload(surface);
+      const buffers = this.buffers.get(surface);
+      if (!buffers || !surface.stream.count) continue;
+      const clip = worldClip(
+        this.clip,
+        target.viewProjection,
+        surface.worldMatrix,
+        surface.size,
+        surface.pixelsPerMetre
+      );
+      if (outsideView(clip, width, height)) continue;
+      this.writeUniforms(
+        buffers.uniforms,
+        width,
+        height,
+        1,
+        target,
+        clip,
+        true
+      );
+      if (surface.stream.glass > 0) this.worldGlass = true;
+      // The distance to the centre, along the view.
+      const e = clip.elements;
+      const w = e[3] * (width / 2) + e[7] * (height / 2) + e[15];
+      shown.push({ surface, bindGroup: buffers.bindGroup, w });
+    }
+    // The surfaces do not write depth, so the far ones draw first.
+    shown.sort((a, b) => b.w - a.w);
+    const runs = this.runs;
+    runs.length = 0;
+    for (const { surface, bindGroup } of shown)
+      this.addRuns(surface, bindGroup, true);
+
+    this.worldDrawCalls = 0;
+    if (!runs.length) return;
+    const pass = encoder.beginRenderPass({
+      label: 'ui world',
+      timestampWrites: this.timestampWrites?.world?.(),
+      colorAttachments: [
+        { view: target.view, loadOp: 'load', storeOp: 'store' },
+      ],
+      depthStencilAttachment: {
+        view: target.depthView,
+        depthLoadOp: 'load',
+        depthStoreOp: 'store',
+      },
+    });
+    this.worldDrawCalls = this.drawRuns(pass);
+    pass.end();
+  }
+
+  /**
+   * Draws the screen surfaces into `view`. Clears it first when `clearValue`
+   * is given, or else draws over what is there. With no `clearValue` and
+   * nothing to draw, it starts no pass. When glass shows on a screen surface,
+   * or on a world surface in this frame's `renderWorld`, it blurs the
+   * backdrop first.
    */
   render(
     encoder: GPUCommandEncoder,
@@ -226,29 +328,25 @@ export class UIRenderer {
     const { pixelRatio } = viewport;
     const width = viewport.width / pixelRatio;
     const height = viewport.height / pixelRatio;
-    this.device.queue.writeBuffer(
+    this.writeUniforms(
       this.uniforms,
-      0,
-      new Float32Array([width, height, pixelRatio, performance.now() / 1000])
+      width,
+      height,
+      pixelRatio,
+      viewport,
+      screenClip(this.clip, width, height),
+      false
     );
 
     const now = performance.now();
-    const stats = this.stats;
-    stats.surfaces = this._surfaces.length;
-    stats.nodes = stats.primitives = 0;
-    stats.layouts = stats.layoutTime = stats.writes = stats.writeTime = 0;
-    let glass = false;
+    let glass = this.worldGlass;
     for (const surface of this._surfaces) {
+      if (surface.kind !== 'screen') continue;
       surface.update(width, height, pixelRatio, now);
       this.upload(surface);
       if (surface.stream.glass > 0) glass = true;
-      stats.nodes += surface.nodeCount;
-      stats.primitives += surface.stream.count;
-      if (surface.laidOut) stats.layouts++;
-      if (surface.wrote) stats.writes++;
-      stats.layoutTime += surface.layoutTime;
-      stats.writeTime += surface.writeTime;
     }
+    this.countStats();
     // The blur runs only when glass shows.
     if (glass && this.backdrop) {
       // Backdrop pixels per CSS pixel. The backdrop can be smaller than the target.
@@ -268,23 +366,15 @@ export class UIRenderer {
     runs.length = 0;
     for (const surface of this._surfaces) {
       const buffers = this.buffers.get(surface);
-      const { count, effects } = surface.stream;
-      if (!buffers) continue;
-      for (let first = 0; first < count; ) {
-        const effect = effects[first];
-        let end = first + 1;
-        while (end < count && effects[end] === effect) end++;
-        runs.push({
-          bindGroup: buffers.bindGroup,
-          pipeline: this.effects.pipeline(effect),
-          first,
-          count: end - first,
-        });
-        first = end;
-      }
+      if (surface.kind === 'screen' && buffers)
+        this.addRuns(surface, buffers.bindGroup, false);
     }
 
-    this.drawCalls = stats.drawCalls = 0;
+    // The world surfaces drew earlier in the frame.
+    this.drawCalls = this.worldDrawCalls;
+    this.worldDrawCalls = 0;
+    this.worldGlass = false;
+    this.stats.drawCalls = this.drawCalls;
     if (!runs.length && !clearValue) return;
     const pass = encoder.beginRenderPass({
       label: 'ui',
@@ -298,17 +388,8 @@ export class UIRenderer {
         },
       ],
     });
-    let bindGroup: GPUBindGroup | null = null;
-    let pipeline: GPURenderPipeline | null = null;
-    for (const run of runs) {
-      if (run.pipeline !== pipeline) pass.setPipeline(run.pipeline);
-      if (run.bindGroup !== bindGroup) pass.setBindGroup(0, run.bindGroup);
-      pipeline = run.pipeline;
-      bindGroup = run.bindGroup;
-      pass.draw(4, run.count, 0, run.first);
-      this.drawCalls++;
-    }
-    stats.drawCalls = this.drawCalls;
+    this.drawCalls += this.drawRuns(pass);
+    this.stats.drawCalls = this.drawCalls;
     pass.end();
   }
 
@@ -316,19 +397,115 @@ export class UIRenderer {
     this.input.detach();
     this.stopWatchingTheme();
     this.blur.dispose();
-    for (const { buffer } of this.buffers.values()) buffer.destroy();
+    for (const buffers of this.buffers.values()) this.destroyBuffers(buffers);
     this.buffers.clear();
     this.uniforms.destroy();
     this.emptyAtlas.destroy();
   }
 
+  /**
+   * Counts what the surfaces cost in their last update. A world surface
+   * updates in `renderWorld`, earlier in the frame.
+   */
+  private countStats(): void {
+    const stats = this.stats;
+    stats.surfaces = this._surfaces.length;
+    stats.nodes = stats.primitives = 0;
+    stats.layouts = stats.layoutTime = stats.writes = stats.writeTime = 0;
+    for (const surface of this._surfaces) {
+      stats.nodes += surface.nodeCount;
+      stats.primitives += surface.stream.count;
+      if (surface.laidOut) stats.layouts++;
+      if (surface.wrote) stats.writes++;
+      stats.layoutTime += surface.layoutTime;
+      stats.writeTime += surface.writeTime;
+    }
+  }
+
+  /** Adds the surface's runs of primitives that share an effect to `runs`. */
+  private addRuns(
+    surface: UISurface,
+    bindGroup: GPUBindGroup,
+    world: boolean
+  ): void {
+    const { count, effects } = surface.stream;
+    for (let first = 0; first < count; ) {
+      const effect = effects[first];
+      let end = first + 1;
+      while (end < count && effects[end] === effect) end++;
+      this.runs.push({
+        bindGroup,
+        pipeline: this.effects.pipeline(effect, world),
+        first,
+        count: end - first,
+      });
+      first = end;
+    }
+  }
+
+  /** Draws `runs` into the pass. Returns the number of draw calls. */
+  private drawRuns(pass: GPURenderPassEncoder): number {
+    let bindGroup: GPUBindGroup | null = null;
+    let pipeline: GPURenderPipeline | null = null;
+    for (const run of this.runs) {
+      if (run.pipeline !== pipeline) pass.setPipeline(run.pipeline);
+      if (run.bindGroup !== bindGroup) pass.setBindGroup(0, run.bindGroup);
+      pipeline = run.pipeline;
+      bindGroup = run.bindGroup;
+      pass.draw(4, run.count, 0, run.first);
+    }
+    return this.runs.length;
+  }
+
+  private createUniforms(label: string): GPUBuffer {
+    return this.device.createBuffer({
+      label,
+      size: UNIFORM_FLOATS * 4,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+  }
+
+  /** Writes `Uniforms` in ui.wgsl. `target` is in device pixels. */
+  private writeUniforms(
+    buffer: GPUBuffer,
+    width: number,
+    height: number,
+    pixelRatio: number,
+    target: { width: number; height: number },
+    clip: Matrix4,
+    world: boolean
+  ): void {
+    const d = this.uniformData;
+    d[0] = width;
+    d[1] = height;
+    d[2] = pixelRatio;
+    d[3] = performance.now() / 1000;
+    d[4] = target.width;
+    d[5] = target.height;
+    d[6] = world ? 1 : 0;
+    d[7] = 0;
+    d.set(clip.elements, 8);
+    this.device.queue.writeBuffer(buffer, 0, d);
+  }
+
+  private destroyBuffers(buffers: SurfaceBuffers): void {
+    buffers.buffer.destroy();
+    if (buffers.uniforms !== this.uniforms) buffers.uniforms.destroy();
+  }
+
   /** Binds the atlases and the backdrop again, after one of them changed. */
   private rebind(): void {
     for (const buffers of this.buffers.values())
-      buffers.bindGroup = this.createBindGroup(buffers.buffer);
+      buffers.bindGroup = this.createBindGroup(
+        buffers.buffer,
+        buffers.uniforms
+      );
   }
 
-  private createBindGroup(buffer: GPUBuffer): GPUBindGroup {
+  private createBindGroup(
+    buffer: GPUBuffer,
+    uniforms: GPUBuffer
+  ): GPUBindGroup {
     const fontAtlas = this._font?.texture ?? this.emptyAtlas;
     const iconAtlas = this._icons?.texture ?? this.emptyAtlas;
     this.boundBackdrop = this.blur.texture;
@@ -336,7 +513,7 @@ export class UIRenderer {
     return this.device.createBindGroup({
       layout: this.bindGroupLayout,
       entries: [
-        { binding: 0, resource: { buffer: this.uniforms } },
+        { binding: 0, resource: { buffer: uniforms } },
         { binding: 1, resource: { buffer } },
         { binding: 2, resource: fontAtlas.createView() },
         { binding: 3, resource: this.sampler },
@@ -361,7 +538,17 @@ export class UIRenderer {
         size: data.byteLength,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
-      buffers = { buffer, bindGroup: this.createBindGroup(buffer) };
+      // Each world surface has its own place in the world, so its own uniforms.
+      const uniforms =
+        buffers?.uniforms ??
+        (surface.kind === 'world'
+          ? this.createUniforms(`ui-${surface.name}-uniforms`)
+          : this.uniforms);
+      buffers = {
+        buffer,
+        uniforms,
+        bindGroup: this.createBindGroup(buffer, uniforms),
+      };
       this.buffers.set(surface, buffers);
       // A new buffer holds nothing yet.
       from = 0;

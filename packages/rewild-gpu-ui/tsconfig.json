@@ -2,12 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "types": ["jest", "@webgpu/types"]
+    "types": ["jest", "@webgpu/types", "rewild-common/types/types"]
   },
-  "include": [
-    "index.ts",
-    "lib/**/*.ts",
-    "inspector/**/*.ts",
-    "types/**/*.d.ts"
-  ]
+  "include": ["index.ts", "lib/**/*.ts", "inspector/**/*.ts", "types/**/*.d.ts"]
 }

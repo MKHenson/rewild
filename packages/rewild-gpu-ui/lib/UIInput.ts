@@ -301,11 +301,15 @@ export class UIInput {
     return this.keyAction(scope, init) ? 'prevented' : result;
   }
 
-  /** The topmost open surface that takes all input, where focus lives. */
+  /**
+   * The topmost open screen surface that takes all input, where focus lives.
+   * World surfaces are not focus scopes.
+   */
   focusScope(): UISurface | null {
     const surfaces = this.source.surfaces;
     for (let i = surfaces.length - 1; i >= 0; i--) {
       const surface = surfaces[i];
+      if (surface.kind !== 'screen') continue;
       if (surface.input === 'all' && surface.open) return surface;
     }
     return null;
@@ -427,13 +431,15 @@ export class UIInput {
   }
 
   /**
-   * The node that takes a point: on the topmost surface that has a node
-   * there, or that takes all input.
+   * The node that takes a point: on the topmost screen surface that has a
+   * node there, or that takes all input. A screen point does not reach a
+   * world surface.
    */
   private pick(x: number, y: number): UINode | null {
     const surfaces = this.source.surfaces;
     for (let i = surfaces.length - 1; i >= 0; i--) {
       const surface = surfaces[i];
+      if (surface.kind !== 'screen') continue;
       if (surface.input === 'none' || !surface.open) continue;
       const hit = hitTest(surface.root, x, y);
       if (surface.input === 'all') return hit ?? surface.root;
@@ -693,7 +699,7 @@ export class UIInput {
     clientY: number
   ): { x: number; y: number } {
     const rect = this.element!.getBoundingClientRect();
-    const surface = this.source.surfaces[0];
+    const surface = this.source.surfaces.find((s) => s.kind === 'screen');
     const scaleX = surface && rect.width ? surface.width / rect.width : 1;
     const scaleY = surface && rect.height ? surface.height / rect.height : 1;
     return {

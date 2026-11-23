@@ -537,6 +537,23 @@ The panel is a WorldPanel asset. A designer drags it into the level in the edito
 - **The back.** From behind, the panel shows plain glass, not its UI mirrored. The back takes no input.
 - **Crisp in the world.** Glyph size follows the screen pixel range from derivatives, so text stays sharp at any distance.
 
+```ts
+const panel = renderer.ui.createSurface({
+  kind: 'world',
+  name: 'portal-panel',
+  size: { width: 0.8, height: 0.5 },
+});
+panel.worldMatrix.set(transform.matrixWorld.elements);
+```
+
+- **Placing it.** `worldMatrix` places the surface, column-major. The local origin is the centre of the surface, x points right, y points up and the front faces +z. `size` and `pixelsPerMetre` can change, and the surface lays out again.
+- **Drawing.** `UIRenderer.renderWorld` draws the world surfaces, far ones first, once per frame before `render`. The renderer calls it after the tone map, into the frame at the scene size, so world UI has the same colours as screen UI. Rain and the overlays draw after it. It tests the scene depth and does not write it, because the boxes of a surface all lie in one plane. A surface wholly out of view lays out and does not draw.
+- **One shader.** Screen and world surfaces share `ui.wgsl`. A uniform matrix maps the surface's pixels to clip space. A world surface works out its device pixels per CSS pixel from derivatives, for its edges, text and shadows, and grows each quad by one device pixel for the anti-aliased edge. Each effect has a second pipeline for world surfaces, with depth.
+- **The back.** On a back face, the shader draws only the glass boxes, with their fill and border and no effect, and drops the rest. A panel with no glass shows nothing from behind.
+- **Glass.** World glass samples the blur at its place on the screen, from last frame. A world surface with glass in view keeps the blur running.
+- **Input.** Screen pointers and the focus scope skip world surfaces. Ticket 16 gives them the look-at ray.
+- **Fog.** World UI draws after the atmosphere composite, so fog does not cover a far panel.
+
 ### Looking at it
 
 - **The look-at ray.** Each frame, a ray from the eye through the screen centre is tested against world surfaces. A hit becomes a surface pixel, then normal pointer events, so the button gets hover and press with no new code.
@@ -641,7 +658,7 @@ The renderer uses WebGPU. An XR session needs the browser to share WebXR with We
 - **The stream** uploads only for dirty surfaces. A changed value updates one instance.
 - **Draw calls.** One per surface, plus one per custom effect pipeline in use.
 - **Blur** only when a glass node is visible.
-- **Stats.** `UIRenderer.stats` holds what the last render cost: surfaces, nodes, primitives, draw calls, and the layouts and stream writes with their times. The renderer publishes them to the perf panel. `ui layout` and `ui stream` are under `cpu`, recorded only on frames where they run, so the panel shows how often they run. `ui nodes`, `ui primitives` and `ui draw calls` are under `counts`. `gpu · ui` times the blur, from the start of its first pass to the end of its last, and the draw pass. The inspector shows the counts under each example.
+- **Stats.** `UIRenderer.stats` holds what the last render cost: surfaces, nodes, primitives, draw calls, and the layouts and stream writes with their times. The renderer publishes them to the perf panel. `ui layout` and `ui stream` are under `cpu`, recorded only on frames where they run, so the panel shows how often they run. `ui nodes`, `ui primitives` and `ui draw calls` are under `counts`. `gpu · ui` times the world pass, the blur, from the start of its first pass to the end of its last, and the draw pass. The inspector shows the counts under each example.
 
 ## The UI inspector
 
@@ -670,6 +687,7 @@ Mica runs on a bare `GPUDevice` and a canvas. It does not need the game's `Rende
 | `setUILayoutOverlay(true)` | Draws the layout overlay on each surface: border boxes, margins, padding and clip rectangles, like the browser's |
 | `printUITree(name?)`       | Prints the tree of a surface, or of all surfaces: each node's path, rectangle, text, icon, effect and style       |
 | `printUIFocus()`           | Prints the focus scope, the focused node of each surface, and the node under each pointer                         |
+| `addUIWorldPanel()`        | Stands a test glass panel 2 m in front of the camera, facing it. `clearUIWorldPanels()` removes them              |
 
 - **One overlay.** `UIRenderer.showLayout` sets the overlay on all its surfaces, and on surfaces made later. The inspector's switch uses it too.
 - **What shows.** The overlay leaves out a surface whose root is hidden, and a node at opacity 0 with its children. A closed modal stays in its tree at opacity 0, and its boxes would hide the boxes that show.
@@ -805,7 +823,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
 
 ### Stage 4: in the world
 
-- [ ] **15. World surfaces**
+- [x] **15. World surfaces**
 
   - Scope: surfaces on a quad, drawn in the scene with depth, a plain glass back, the glass backdrop.
   - Expect: a test panel stands in the world. The player walks round it and sees its back, and the terrain can hide it.

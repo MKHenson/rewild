@@ -45,6 +45,7 @@ import { QualitySettings } from './utils/QualitySettings';
 import { sortFrontToBack } from './utils/frontToBack';
 
 const _projScreenMatrix = new Matrix4();
+const _uiViewProjection = new Matrix4();
 
 // Opaque, then water, then transparent: blended passes write no depth, so
 // water has to land before them.
@@ -174,7 +175,7 @@ export class Renderer {
 
   camera: PerspectiveCamera;
   scene: Transform;
-  /** Draws the screen UI over the frame. */
+  /** Draws the world UI in the scene and the screen UI over the frame. */
   ui: UIRenderer;
   currentRenderList: RenderList;
   sky: Sky;
@@ -449,8 +450,9 @@ export class Renderer {
 
     this.ui = new UIRenderer(device, this.presentationFormat);
     this.ui.input.attach(canvas);
-    this.uiGpuTimer.init(device, ['ui-blur', 'ui-draw']);
+    this.uiGpuTimer.init(device, ['ui-world', 'ui-blur', 'ui-draw']);
     this.ui.timestampWrites = {
+      world: () => this.uiGpuTimer.writes('ui-world'),
       blur: () => this.uiGpuTimer.writes('ui-blur'),
       draw: () => this.uiGpuTimer.writes('ui-draw'),
     };
@@ -1337,6 +1339,24 @@ export class Renderer {
       // HDR radiance becomes displayable colour.
       const frameView = this.frameView;
       this.frameCompositor.render(this, frameView);
+
+      // World UI draws in the tone-mapped frame, so its colours match the
+      // screen UI. It tests the scene depth, so terrain can hide it. Its glass
+      // reads the last frame's blur, which the screen UI makes below.
+      const worldUIEncoder = device.createCommandEncoder({
+        label: 'ui world encoder',
+      });
+      this.ui.renderWorld(worldUIEncoder, {
+        view: frameView,
+        depthView: this.depthTexture.createView(),
+        width: this.sceneWidth,
+        height: this.sceneHeight,
+        viewProjection: _uiViewProjection.multiplyMatrices(
+          camera.camera.projectionMatrix,
+          camera.camera.matrixWorldInverse
+        ),
+      });
+      device.queue.submit([worldUIEncoder.finish()]);
 
       // Render precipitation onto the tone-mapped frame so particles are
       // visible against both terrain and sky (not gated through fog alpha).

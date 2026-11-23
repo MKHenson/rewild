@@ -1,3 +1,4 @@
+import { Matrix4 } from 'rewild-common';
 import { UIFocusEvent } from './events';
 import { canFocus } from './focus';
 import type { UIFont } from './font';
@@ -7,6 +8,7 @@ import { scrollIntoView } from './scroll';
 import { PrimitiveStream, writeTree } from './stream';
 import type { UITheme } from './theme';
 import { Dirty, UINode } from './UINode';
+import { DEFAULT_PIXELS_PER_METRE, UIWorldSize } from './world';
 
 /**
  * Which pointer and key input a surface takes from what is under it.
@@ -22,23 +24,48 @@ export type UISurfaceInput = 'none' | 'nodes' | 'all';
 /** The most layouts in one update, when `onLayout` moves nodes. */
 const MAX_LAYOUTS = 3;
 
+/**
+ * Where a surface draws. A `screen` surface draws over the game, in screen
+ * pixels. A `world` surface draws on a quad in the scene, with depth.
+ */
+export type UISurfaceKind = 'screen' | 'world';
+
 export interface UISurfaceOptions {
-  kind: 'screen';
+  kind: UISurfaceKind;
   name: string;
   /** Surfaces draw from low to high order, then in the order they were made. */
   order?: number;
   /** Defaults to `nodes`. */
   input?: UISurfaceInput;
+  /** A world surface's size in metres. Defaults to 1 by 1. */
+  size?: UIWorldSize;
+  /** A world surface's layout pixels per metre. Defaults to 1,000. */
+  pixelsPerMetre?: number;
 }
 
 /** Owns one UI tree and says where it draws. */
 export class UISurface {
-  readonly kind: 'screen';
+  readonly kind: UISurfaceKind;
   readonly name: string;
   readonly order: number;
   readonly root = new UINode();
   readonly stream = new PrimitiveStream();
   input: UISurfaceInput;
+  /**
+   * A world surface's size in metres. It lays out at this size times
+   * `pixelsPerMetre`.
+   */
+  size: UIWorldSize;
+  /**
+   * A world surface's layout pixels per metre. It sets how big the UI is in
+   * the world, not how sharp it is.
+   */
+  pixelsPerMetre: number;
+  /**
+   * Places a world surface in the world. The local origin is
+   * the surface's centre, x points right, y points up and the front faces +z.
+   */
+  readonly worldMatrix = new Matrix4();
   /** The node that captured each pointer, by pointer id. See `UINode.setPointerCapture`. */
   readonly pointerCaptures = new Map<number, UINode>();
   width = 0;
@@ -79,7 +106,19 @@ export class UISurface {
     this.name = options.name;
     this.order = options.order ?? 0;
     this.input = options.input ?? 'nodes';
+    this.size = { ...(options.size ?? { width: 1, height: 1 }) };
+    this.pixelsPerMetre = options.pixelsPerMetre ?? DEFAULT_PIXELS_PER_METRE;
     this.root.owner = this;
+  }
+
+  /** A world surface's layout width in CSS pixels. */
+  get layoutWidth(): number {
+    return this.size.width * this.pixelsPerMetre;
+  }
+
+  /** A world surface's layout height in CSS pixels. */
+  get layoutHeight(): number {
+    return this.size.height * this.pixelsPerMetre;
   }
 
   /** The font that text measures and draws with. Text has no size until it is set. */
