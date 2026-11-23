@@ -70,3 +70,19 @@ export function applyAtmosphere(renderer: Renderer, atmosphere: AtmosphereProps)
     state: startingState(atmosphere.weatherState, climate),
   });
 }
+
+/** The sky's knobs as atmosphere props, with the day/night cycle off. */
+export function readAtmosphere(renderer: Renderer): AtmosphereProps {
+  const sky = renderer.sky.skyRenderer;
+  return {
+    cloudiness: sky.cloudiness,
+    foginess: sky.foginess,
+    windiness: sky.windiness,
+    windDirection: sky.windBearing,
+    precipitation: sky.precipitation,
+    temperature: sky.temperature,
+    elevation: sky.elevation,
+    moonPhase: sky.moon.phase,
+    dayNightCycle: false,
+  };
+}

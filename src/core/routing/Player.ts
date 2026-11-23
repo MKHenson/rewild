@@ -391,6 +391,7 @@ export class Player extends Node {
     this._sinceDeath = 0;
     this._eye = _STANDING_EYE_HEIGHT;
     this._crouching = false;
+    this._releaseInput();
     this.cameraController.camera.transform.position.set(0, 0, -10);
     this.cameraController.camera.lookAt(0, 0, 0);
     this.syncLookFromCamera();
@@ -411,7 +412,7 @@ export class Player extends Node {
     this._waterQuery = stateData.renderer.terrainRenderer.waterQuery;
     this._waterLens = stateData.renderer.terrainRenderer.waterLens;
     this._sounds?.dispose();
-    const scope = stateData.gameManager?.sound;
+    const scope = stateData.gameManager?.levelSound;
     this._sounds = scope
       ? new PlayerSounds(audio, scope, footstepsDef(), voiceDef())
       : null;
@@ -441,7 +442,8 @@ export class Player extends Node {
       flash.castShadow = true;
       this._flashlight = flash;
     }
-    this._flashlight.intensity = 0.0; // off by default
+    this._flashlightOn = false;
+    this._flashlight.intensity = 0.0;
     stateData.renderer.scene.addChild(this._flashlight.transform);
 
     if (!this.characterController) {
@@ -473,6 +475,16 @@ export class Player extends Node {
       this.characterController.setApplyImpulsesToDynamicBodies(true);
       this.characterController.setCharacterMass(80.0);
       this.characterController.setMaxSlopeClimbAngle(MAX_SLOPE_CLIMB);
+    } else {
+      const camPos = this.cameraController.camera.transform.position;
+      this.capsuleBody.setTranslation(
+        {
+          x: camPos.x,
+          y: Math.max(camPos.y - _STANDING_EYE_HEIGHT, _MIN_CAPSULE_Y),
+          z: camPos.z,
+        },
+        true
+      );
     }
   }
 
@@ -564,8 +576,6 @@ export class Player extends Node {
     document.removeEventListener('keydown', this._onKeyDown);
     document.removeEventListener('keyup', this._onKeyUp);
     this._canvas?.removeEventListener('click', this._onCanvasClick);
-
-    if (document.pointerLockElement) document.exitPointerLock();
     this._canvas = null;
 
     if (this._flashlight) {
@@ -580,10 +590,15 @@ export class Player extends Node {
 
     this._sounds?.dispose();
     this._sounds = null;
+  }
 
-    if (this.rapierWorld && this.characterController) {
+  /** Takes the capsule and the character controller out of the physics world. */
+  dispose(): void {
+    super.dispose();
+    if (!this.rapierWorld) return;
+    if (this.characterController)
       this.rapierWorld.removeCharacterController(this.characterController);
-    }
+    if (this.capsuleBody) this.rapierWorld.removeRigidBody(this.capsuleBody);
   }
 
   /**
@@ -671,6 +686,12 @@ export class Player extends Node {
     this._collapseSpeed = speed;
     this._collapseTime = collapseTime(this._eye - _LYING_EYE, speed);
     this._deathRoll = (Math.random() < 0.5 ? -1 : 1) * COLLAPSE_ROLL;
+    this._releaseInput();
+    this.onDeath?.();
+  }
+
+  /** Lets go of every held key, as if each were released. */
+  private _releaseInput(): void {
     this._movingForward = false;
     this._movingBackward = false;
     this._movingLeft = false;
@@ -679,7 +700,6 @@ export class Player extends Node {
     this._downHeld = false;
     this._upHeld = false;
     this.jumpRequested = false;
-    this.onDeath?.();
   }
 
   // The level's rigid bodies start disabled so props don't sink through

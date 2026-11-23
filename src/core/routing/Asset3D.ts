@@ -65,6 +65,12 @@ export class Asset3D implements IAsset<IResource> {
     }
   }
 
+  /** Removes every behaviour, so each releases what it holds. */
+  dispose(): void {
+    for (const behavior of this.behaviours.splice(0))
+      behavior.onRemoved?.(this);
+  }
+
   getBehavioursByName(name: string): IBehaviour[] {
     return this.behaviours.filter((behaviour) => behaviour.name === name);
   }

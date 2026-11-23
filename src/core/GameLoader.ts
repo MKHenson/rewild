@@ -9,28 +9,44 @@ import { CreatureSpawner } from './routing/CreatureSpawner';
 import { StateMachineData } from './routing/Types';
 import { GameManager } from './GameManager';
 import { setTerrainProviders } from './TerrainProviders';
-import { loadGameSource } from './GameSource';
-import { registerDebugCommands } from './debug';
-import { applyAtmosphere } from './AtmosphereSync';
+import { GameSource } from './GameSource';
+import { applyAtmosphere, AtmosphereProps } from './AtmosphereSync';
 
-/** Loads game files and assets and sends the created objects to wasm */
+/**
+ * Points the terrain at a level. Settings that changed drop the chunks; call
+ * `terrainRenderer.reload()` after it to drop them whatever changed.
+ */
+export function applyLevelTerrain(renderer: Renderer, source: GameSource) {
+  const { level, read } = source;
+  const terrain = level?.sceneGraph?.terrain;
+  if (terrain) {
+    renderer.terrainRenderer.seed = terrain.seed;
+    renderer.terrainRenderer.climatePreset =
+      terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
+    renderer.terrainRenderer.seaLevel = terrain.seaLevel ?? 0;
+  }
+  renderer.terrainRenderer.enabled = level ? level.hasTerrain : true;
+  setTerrainProviders(renderer, read);
+}
 
-export async function loadInitialLevels(
-  projectId: string,
-  player: Player,
-  gameManager: GameManager,
-  levelId?: string
+/** Sets the sky to a level's atmosphere, or to `fallback` for a level with none. */
+export function applyLevelAtmosphere(
+  renderer: Renderer,
+  source: GameSource,
+  fallback: AtmosphereProps
 ) {
-  const templateLoader = new TemplateLoader();
-  const renderer: Renderer = gameManager.renderer;
-  await templateLoader.load();
+  applyAtmosphere(renderer, source.level?.sceneGraph?.atmosphere ?? fallback);
+}
 
-  // A project without a start level falls back to a bare world: default sky,
-  // default terrain, no actors. The Player places itself on the surface.
-  const { project, level, read, readLevel } = await loadGameSource(
-    projectId,
-    levelId
-  );
+/** Creates a level's actors in a new state machine. A source without a level gives a bare world. */
+export async function loadLevel(
+  source: GameSource,
+  templateLoader: TemplateLoader,
+  player: Player,
+  gameManager: GameManager
+) {
+  const renderer: Renderer = gameManager.renderer;
+  const { level, readLevel } = source;
   templateLoader.levelReader = readLevel;
 
   const stateMachine = new StateMachine<StateMachineData>({
@@ -39,46 +55,35 @@ export async function loadInitialLevels(
     gameManager,
   });
 
-  const sceneGraph = level?.sceneGraph;
-  if (sceneGraph?.terrain) {
-    renderer.terrainRenderer.seed = sceneGraph.terrain.seed;
-    renderer.terrainRenderer.climatePreset =
-      sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
-    renderer.terrainRenderer.seaLevel = sceneGraph.terrain.seaLevel ?? 0;
-  }
-
-  if (sceneGraph?.atmosphere) applyAtmosphere(renderer, sceneGraph.atmosphere);
-
-  registerDebugCommands(renderer, project);
-
-  renderer.terrainRenderer.enabled = level ? level.hasTerrain : true;
-  setTerrainProviders(renderer, read);
-
   const levelRouter = new InGameLevel(
     level?.name ?? 'Untitled Level',
-    new Asset3D(renderer.scene),
-    false,
-    player
+    new Asset3D(renderer.scene)
   );
   stateMachine.addNode(player, true);
   stateMachine.addNode(levelRouter, true);
 
-  for (const container of sceneGraph?.containers ?? []) {
-    const containerRouter = new ContainerWithState(
-      container,
-      levelRouter.parentObject3D
-    );
-    levelRouter.addChild(containerRouter);
+  try {
+    for (const container of level?.sceneGraph?.containers ?? []) {
+      const containerRouter = new ContainerWithState(
+        container,
+        levelRouter.parentObject3D
+      );
+      levelRouter.addChild(containerRouter);
 
-    for (const actor of container.actors) {
-      let object = (await templateLoader.createResource(
-        actor,
-        gameManager.renderer,
-        gameManager
-      )) as Asset3D;
+      for (const actor of container.actors) {
+        const object = (await templateLoader.createResource(
+          actor,
+          renderer,
+          gameManager
+        )) as Asset3D;
 
-      containerRouter.addAsset(object);
+        containerRouter.addAsset(object);
+      }
     }
+  } catch (err) {
+    stateMachine.detachNode(player);
+    stateMachine.dispose();
+    throw err;
   }
 
   if (renderer.terrainRenderer.enabled)

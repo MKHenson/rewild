@@ -38,7 +38,7 @@
   "license": "ISC",
   "homepage": "https://bitbucket.org/MathewKHenson/rewild-web#readme",
   "dependencies": {
-    "@dimforge/rapier3d-compat": "^0.19.3",
+    "@dimforge/rapier3d-compat": "^0.21.0",
     "date-fns": "2.29.3"
   },
   "devDependencies": {

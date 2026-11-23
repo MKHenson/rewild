@@ -18,6 +18,7 @@ export class SkinnedAsset extends Asset3D {
   }
 
   dispose(): void {
+    super.dispose();
     this.skinned.dispose();
   }
 }

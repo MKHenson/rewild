@@ -67,6 +67,9 @@ function findButton(node: UINode, label: string): UINode | null {
 const shown = (surfaces: UISurface[]) =>
   surfaces.filter((s) => s.input === 'all').map((s) => s.name);
 
+const opacity = (surfaces: UISurface[], name: string) =>
+  surfaces.find((s) => s.name === name)!.root.style.opacity;
+
 describe('GameMenus', () => {
   let duck: jest.SpyInstance;
   beforeEach(() => {
@@ -157,6 +160,62 @@ describe('GameMenus', () => {
     jest.runAllTimers();
     click('Restart');
     expect(options.onRestart).toHaveBeenCalledTimes(1);
+  });
+
+  it('restarts from the menu', () => {
+    const { menus, options, click } = setup();
+    menus.openMenu();
+    click('Restart');
+    expect(options.onRestart).toHaveBeenCalledTimes(1);
+  });
+
+  it('covers game over with the loading screen, then plays with nothing shown', () => {
+    const { menus, surfaces } = setup();
+    menus.showGameOver();
+    jest.runAllTimers();
+    expect(shown(surfaces)).toEqual(['game-over']);
+
+    menus.showLoading();
+    expect(menus.state).toBe('loading');
+    expect(shown(surfaces)).toEqual([]);
+    expect(opacity(surfaces, 'loading')).toBe(1);
+
+    menus.openMenu();
+    expect(menus.state).toBe('loading');
+
+    menus.play();
+    expect(menus.state).toBe('playing');
+    expect(shown(surfaces)).toEqual([]);
+    expect(opacity(surfaces, 'loading')).toBe(0);
+    menus.showGameOver();
+    jest.runAllTimers();
+    expect(shown(surfaces)).toEqual(['game-over']);
+  });
+
+  it('does not show the game over options after a restart', () => {
+    const { menus, surfaces } = setup();
+    menus.showGameOver();
+    menus.showLoading();
+    menus.play();
+    jest.runAllTimers();
+    expect(shown(surfaces)).toEqual([]);
+  });
+
+  it('lifts the dim when a load covers the menu', () => {
+    const { menus } = setup();
+    menus.openMenu();
+    menus.showLoading();
+    expect(duck.mock.calls).toEqual([[true], [false]]);
+  });
+
+  it('quits from a load error', () => {
+    const { menus, options, surfaces, click } = setup();
+    menus.showLoading();
+    menus.showLoadError('Not found');
+    expect(menus.state).toBe('loadError');
+    expect(shown(surfaces)).toEqual(['load-error']);
+    click('Main Menu');
+    expect(options.onQuit).toHaveBeenCalledTimes(1);
   });
 
   it('removes its surfaces and lifts the dim on dispose', () => {

@@ -52,6 +52,25 @@ describe('StateMachine', () => {
     expect(node.mounted).toBe(false);
   });
 
+  it('detaches a node without disposing it, so another machine can mount it', () => {
+    const first = new StateMachine();
+    const node = new Node('test1');
+    first.addNode(node, true);
+    first.OnLoop(0, 0);
+
+    first.detachNode(node);
+    first.dispose();
+    expect(node.mounted).toBe(false);
+    expect(node.isDisposed).toBe(false);
+    expect(node.stateMachine).toBeNull();
+
+    const second = new StateMachine();
+    second.addNode(node, true);
+    second.OnLoop(0, 0);
+    expect(node.mounted).toBe(true);
+    expect(node.stateMachine).toBe(second);
+  });
+
   it('will dispose of a node whose signal has exited, if autoDispose is true', () => {
     const stateMachine = new StateMachine();
     const node = new Node('test1');
