@@ -3,7 +3,15 @@ import { Renderer } from 'rewild-renderer';
 import { Pane3D } from 'rewild-ui';
 import { Player } from './routing/Player';
 import { Clock } from './Clock';
-import { loadInitialLevels } from './GameLoader';
+import {
+  applyLevelAtmosphere,
+  applyLevelTerrain,
+  loadLevel,
+} from './GameLoader';
+import { GameSource, loadGameSource } from './GameSource';
+import { TemplateLoader } from './TemplateLoader';
+import { AtmosphereProps, readAtmosphere } from './AtmosphereSync';
+import { registerDebugCommands } from './debug';
 import { RigidBody, World } from '@dimforge/rapier3d-compat';
 import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
 import { ScatterColliderStreamer } from './physics/ScatterColliderStreamer';
@@ -14,6 +22,14 @@ import { AudioScope } from 'rewild-audio';
 import { WorldSound } from './audio/WorldSound';
 import { Gamepad, GamepadButton } from './input/Gamepad';
 import { GameMenus, GameMenusTheme } from './menus/GameMenus';
+import { LOADING_FADE } from './menus/LoadingScreen';
+
+/**
+ * Longest frame, in seconds, the game advances by. A longer frame, such as a
+ * pipeline compile on a slow machine, counts as this. Without the cap, one
+ * long frame gives a fall speed that kills the player on landing.
+ */
+export const MAX_FRAME_DELTA = 0.1;
 
 export class GameManager {
   renderer: Renderer;
@@ -31,18 +47,26 @@ export class GameManager {
   clock: Clock;
   /** Every sound this game plays; it fades out when the game is disposed. */
   sound: AudioScope;
+  /** The running level's sounds, inside `sound`. They fade out when the level unloads. */
+  levelSound: AudioScope;
   worldSound: WorldSound;
   RAPIER: typeof import('@dimforge/rapier3d-compat');
   physicsWorld: World;
   /** The menus over the game. They exist once `init` has loaded the game. */
   menus: GameMenus | null = null;
-  /** Asked to replace this game with one in another level of the project. */
-  onTravel: ((levelId: string) => void) | null = null;
-  /** Asked to start this level again, from game over. */
-  onRestart: (() => void) | null = null;
-  /** Asked to leave the game, from the menu or game over. */
+  /** Asked to leave the game, from the menu, game over or a level that could not load. */
   onQuit: (() => void) | null = null;
-  private travelling = false;
+  /** True while a level loads or failed to load. The world does not run. */
+  loading = false;
+  private disposed = false;
+  private projectId = '';
+  /** The running level, which a restart loads again. */
+  private source: GameSource | null = null;
+  private readonly templateLoader = new TemplateLoader();
+  /** The sky for a level saved with no atmosphere. */
+  private defaultAtmosphere: AtmosphereProps = {};
+  /** Rises with each level load, so a load that ends after the game is disposed is dropped. */
+  private loadId = 0;
   private _onPointerlockChange: () => void;
   private _onKeyDown: (event: KeyboardEvent) => void;
   private unbindScreenshotHotkey: (() => void) | null = null;
@@ -59,6 +83,7 @@ export class GameManager {
     this.player.onDeath = () => this.menus?.showGameOver();
     this.clock = new Clock();
     this.sound = openSceneScope();
+    this.levelSound = this.sound.createScope();
     this.worldSound = new WorldSound(audio, this.sound);
     this._onPointerlockChange = this._handlePointerlockChange.bind(this);
     this._onKeyDown = this._handleKeyDown.bind(this);
@@ -74,32 +99,28 @@ export class GameManager {
     try {
       if (this.hasInitialized) return false;
       this.hasInitialized = true;
+      this.projectId = projectId;
 
       await this.initPhysics();
       await this.renderer.init(pane3D.canvas()!, false);
 
       this.player.setCamera(this.renderer.camera);
-      const stateMachine = await loadInitialLevels(
-        projectId,
-        this.player,
-        this,
-        levelId
-      );
-
+      this.defaultAtmosphere = readAtmosphere(this.renderer);
       this.renderer.terrainRenderer.dispatcher.add(this.TerrainEventDelegate);
+      await this.templateLoader.load();
 
-      if (!stateMachine) throw new Error('Could not load statemachine');
+      const source = await loadGameSource(projectId, levelId);
+      registerDebugCommands(this.renderer, source.project);
+      if (!(await this.enterLevel(source, false))) return false;
 
-      this.stateMachine = stateMachine;
       this.menus = new GameMenus(this.renderer.ui, {
         quality: this.renderer.quality,
         getTheme: this.theme.getTheme,
         setTheme: this.theme.setTheme,
         onResume: () => this.lock(),
-        onRestart: () => this.onRestart?.(),
+        onRestart: () => this.restart(),
         onQuit: () => this.onQuit?.(),
       });
-      this.clock.start();
 
       document.addEventListener('pointerlockchange', this._onPointerlockChange);
       document.addEventListener('keydown', this._onKeyDown);
@@ -114,11 +135,99 @@ export class GameManager {
     }
   }
 
-  /** Leaves this level for another. Deferred, as the caller is mid-frame. */
+  /** Leaves this level for another of the project. The pointer stays locked. */
   travelTo(levelId: string) {
-    if (this.travelling) return;
-    this.travelling = true;
-    setTimeout(() => this.onTravel?.(levelId));
+    if (this.loading) return;
+    this.changeLevel(() => loadGameSource(this.projectId, levelId), false);
+  }
+
+  /**
+   * Starts this level again, such as from game over. The terrain stays, as it
+   * is the same. The pointer locks again when the restart comes from a click.
+   */
+  restart() {
+    const source = this.source;
+    if (this.loading || !source) return;
+    if (navigator.userActivation?.isActive) document.body.requestPointerLock();
+    this.changeLevel(async () => source, true);
+  }
+
+  /**
+   * Covers the game, unloads the level and loads the next. A failed load
+   * shows why, and leaves the world paused until the player quits.
+   */
+  private async changeLevel(
+    getSource: () => Promise<GameSource>,
+    restart: boolean
+  ) {
+    this.loading = true;
+    this.menus?.showLoading();
+    try {
+      const [source] = await Promise.all([
+        getSource(),
+        new Promise((resolve) => setTimeout(resolve, LOADING_FADE)),
+      ]);
+      if (this.disposed) return;
+      if (!(await this.enterLevel(source, restart))) return;
+    } catch (err: unknown) {
+      console.error(err);
+      if (this.disposed) return;
+      this.menus?.showLoadError(
+        err instanceof Error ? err.message : String(err)
+      );
+      return;
+    }
+    this.loading = false;
+    this.menus?.play();
+    if (!document.pointerLockElement) this.menus?.openMenu();
+  }
+
+  /**
+   * Unloads the running level and loads `source` in its place. A restart keeps
+   * the terrain; another level drops its chunks. False when the game was
+   * disposed during the load.
+   */
+  private async enterLevel(source: GameSource, restart: boolean) {
+    const id = ++this.loadId;
+    this.unloadLevel();
+
+    const renderer = this.renderer;
+    if (!restart) {
+      applyLevelTerrain(renderer, source);
+      if (this.source) renderer.terrainRenderer.reload();
+    }
+    applyLevelAtmosphere(renderer, source, this.defaultAtmosphere);
+    this.levelSound = this.sound.createScope();
+
+    const stateMachine = await loadLevel(
+      source,
+      this.templateLoader,
+      this.player,
+      this
+    );
+    if (id !== this.loadId) {
+      if (!this.disposed) this.releaseLevel(stateMachine);
+      return false;
+    }
+
+    this.stateMachine = stateMachine;
+    this.source = source;
+    this.clock.start();
+    return true;
+  }
+
+  private unloadLevel() {
+    const stateMachine = this.stateMachine;
+    this.stateMachine = new StateMachine();
+    this.releaseLevel(stateMachine);
+    this.levelSound.dispose();
+  }
+
+  /** Disposes a level's state machine, and keeps the player for the next. */
+  private releaseLevel(stateMachine: StateMachine) {
+    if (stateMachine.nodes.includes(this.player))
+      stateMachine.detachNode(this.player);
+    stateMachine.dispose();
   }
 
   private onTerrainEvent(event: TerrainEvent) {
@@ -217,16 +326,19 @@ export class GameManager {
   }
 
   onUpdate() {
+    if (this.disposed) return;
     const clock = this.clock;
-    const delta = clock.getDelta();
+    const delta = Math.min(clock.getDelta(), MAX_FRAME_DELTA);
     const total = clock.getElapsedTime();
 
-    const viewer = this.renderer.camera.camera.transform.position;
-    this.scatterColliders.update(viewer.x, viewer.y, viewer.z);
-    this.physicsWorld.step();
+    if (!this.loading) {
+      const viewer = this.renderer.camera.camera.transform.position;
+      this.scatterColliders.update(viewer.x, viewer.y, viewer.z);
+      this.physicsWorld.step();
+    }
 
     this.routeGamepad();
-    this.stateMachine?.OnLoop(delta, total);
+    if (!this.loading) this.stateMachine.OnLoop(delta, total);
     this.renderer.onFrame();
     audio.setListenerFromMatrix(
       this.renderer.camera.camera.transform.matrixWorld
@@ -249,10 +361,14 @@ export class GameManager {
   }
 
   dispose() {
+    this.disposed = true;
+    this.loadId++;
     this.menus?.dispose();
+    this.releaseLevel(this.stateMachine);
+    this.player.dispose();
     closeSceneScope(this.sound);
-    this.stateMachine?.dispose();
     this.scatterColliders?.dispose();
+    this.renderer.terrainRenderer.dispatcher.remove(this.TerrainEventDelegate);
     this.renderer.dispose();
     this.unbindScreenshotHotkey?.();
     document.removeEventListener(
@@ -260,6 +376,8 @@ export class GameManager {
       this._onPointerlockChange
     );
     document.removeEventListener('keydown', this._onKeyDown);
-    this.renderer.terrainRenderer.dispatcher.remove(this.TerrainEventDelegate);
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.terrainRapierBodyMap.clear();
+    this.physicsWorld?.free();
   }
 }

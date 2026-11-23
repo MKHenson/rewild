@@ -76,6 +76,18 @@ export class StateMachine<T = any> {
       this.removeNode(child);
     }
 
+    this.takeOut(node);
+    node.dispose();
+    node.stateMachine = null;
+  }
+
+  /** Takes a top-level node out of the machine and unmounts it, without disposing it. */
+  detachNode(node: Node): void {
+    this.takeOut(node);
+    node.stateMachine = null;
+  }
+
+  private takeOut(node: Node): void {
     const nodeIndex = this.nodes.indexOf(node);
     const activeNodeIndex = this.activeNodes.indexOf(node);
     const inactiveNodeIndex = this.inactiveNodes.indexOf(node);
@@ -91,8 +103,6 @@ export class StateMachine<T = any> {
     }
 
     if (node.mounted) node.unMount();
-    node.dispose();
-    node.stateMachine = null;
   }
 
   OnLoop(delta: f32, total: u32): void {

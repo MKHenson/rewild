@@ -83,7 +83,7 @@ export class PortalAsset extends Asset3D {
     this.transform.userData.portal = this;
     if (gameManager) {
       this.addBehavior(new PortalTrigger());
-      this.sound = new PortalSound(gameManager.sound, audio);
+      this.sound = new PortalSound(gameManager.levelSound, audio);
       this.marker = this.createMarker(renderer);
     }
   }
@@ -195,6 +195,7 @@ export class PortalAsset extends Asset3D {
 
   /** Releases the view cube and the pass's buffers, and drops any load in flight. */
   dispose(): void {
+    super.dispose();
     this.disposed = true;
     this.viewCube?.destroy();
     this.viewCube = null;

@@ -1,6 +1,7 @@
 import { BehaviourState, IBehaviour, IAsset } from 'rewild-routing';
 import { Asset3D } from '../Asset3D';
-import { RigidBody } from '@dimforge/rapier3d-compat/dynamics';
+import { RigidBody } from '@dimforge/rapier3d-compat';
+import type { World } from '@dimforge/rapier3d-compat';
 import { Quaternion } from 'rewild-common';
 import {
   Vector3 as RapierVec3,
@@ -14,13 +15,25 @@ export class RigidBodyBehaviour implements IBehaviour {
   quat: Quaternion;
   isFixed: boolean;
   sceneBVH: SceneBVH | null;
+  private world: World | null;
 
-  constructor(rb: RigidBody, sceneBVH: SceneBVH | null = null) {
+  constructor(
+    rb: RigidBody,
+    world: World | null,
+    sceneBVH: SceneBVH | null = null
+  ) {
     this.name = 'rigid-body';
     this.rb = rb;
+    this.world = world;
     this.quat = new Quaternion();
     this.isFixed = rb.isFixed();
     this.sceneBVH = sceneBVH;
+  }
+
+  /** Takes the body and its colliders out of the world. */
+  onRemoved(): void {
+    this.world?.removeRigidBody(this.rb);
+    this.world = null;
   }
 
   onUpdate(delta: f32, total: u32, asset: IAsset): void {

@@ -72,6 +72,15 @@ export class GameOverScreen {
     }, OPTIONS_AFTER);
   }
 
+  /** Hides the screen at once, and gives back the mouse, the keys and the gamepad. */
+  hide(): void {
+    window.clearTimeout(this.timer);
+    this.title.node.style.opacity = 0;
+    this.options.node.style.opacity = 0;
+    this.surface.input = 'none';
+    this.surface.setFocus(null);
+  }
+
   dispose(): void {
     window.clearTimeout(this.timer);
     this.ui.removeSurface(this.surface);

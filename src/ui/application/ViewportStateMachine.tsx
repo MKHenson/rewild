@@ -8,11 +8,8 @@ import { getUiTheme, setUiTheme } from '../utils/uiTheme';
 
 interface Props {
   projectId: string;
-  /** The level to play; the project's start level when unset. */
+  /** The level to start in; the project's start level when unset. */
   levelId?: string;
-  onTravel: (levelId: string) => void;
-  /** Restart on game over. */
-  onRestart: () => void;
   onQuit: () => void;
 }
 
@@ -27,8 +24,6 @@ export class ViewportStateMachine extends Component<Props> {
       getTheme: getUiTheme,
       setTheme: setUiTheme,
     });
-    this.gameManager.onTravel = (levelId) => this.props.onTravel(levelId);
-    this.gameManager.onRestart = () => this.props.onRestart();
     this.gameManager.onQuit = () => this.props.onQuit();
 
     // Covers physics init, renderer setup and the initial level load.

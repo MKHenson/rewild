@@ -2,6 +2,7 @@ import { Button, Modal, Stack, UIRenderer } from 'rewild-gpu-ui';
 
 export interface InGameMenuActions {
   onResume: () => void;
+  onRestart: () => void;
   onSettings: () => void;
   onQuit: () => void;
   /** Escape or the gamepad's B closed the menu. */
@@ -9,7 +10,7 @@ export interface InGameMenuActions {
 }
 
 /**
- * The menu that Escape opens in the game: Resume, Settings and Quit on a
+ * The menu that Escape opens in the game: Resume, Restart, Settings and Quit on a
  * glass modal. It works with a mouse, a keyboard and a gamepad.
  */
 export class InGameMenu {
@@ -29,6 +30,7 @@ export class InGameMenu {
         style: { padding: [16, 0, 8, 0] },
         children: [
           new Button({ label: 'Resume', onClick: actions.onResume }),
+          new Button({ label: 'Restart', onClick: actions.onRestart }),
           new Button({
             label: 'Settings',
             icon: 'settings',

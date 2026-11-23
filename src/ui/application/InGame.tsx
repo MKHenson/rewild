@@ -7,47 +7,22 @@ interface Props {
 }
 
 /**
- * A game session. The game owns its menus, so this only makes the viewport,
- * and makes it again to restart or to travel to another level.
+ * A game session. The game owns its menus and changes level in place, so
+ * this only makes the viewport.
  */
 @register('x-in-game')
 export class InGame extends Component<Props> {
   init() {
-    const [levelId, setLevelId] = this.useState<string | undefined>(undefined);
-
-    const createViewport = () =>
-      (
-        <ViewportStateMachine
-          projectId={this.props.projectId}
-          levelId={levelId()}
-          onTravel={onTravel}
-          onRestart={onRestart}
-          onQuit={onQuit}
-        />
-      ) as ViewportStateMachine;
-
-    const onRestart = () => {
-      viewport.dispose();
-      viewport = createViewport();
-      this.render();
-    };
-
-    const onTravel = (target: string) => {
-      viewport.dispose();
-      setLevelId(target, false);
-      viewport = createViewport();
-      this.render();
-    };
-
-    const onQuit = () => {
-      this.props.onQuit();
-    };
+    const viewport = (
+      <ViewportStateMachine
+        projectId={this.props.projectId}
+        onQuit={() => this.props.onQuit()}
+      />
+    ) as ViewportStateMachine;
 
     this.onCleanup = () => {
       viewport.dispose();
     };
-
-    let viewport = createViewport();
 
     return () => <div>{viewport}</div>;
   }

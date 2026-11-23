@@ -15,12 +15,18 @@ export class AudioScope {
   private readonly _beds: Bed[] = [];
   private readonly _emitters: Emitter[] = [];
   private readonly _children: AudioScope[] = [];
+  private _parent: AudioScope | null = null;
   private _disposed = false;
 
   constructor(private readonly _engine: AudioEngine, readonly id: number) {}
 
   get disposed(): boolean {
     return this._disposed;
+  }
+
+  /** The open scopes inside this one. */
+  get children(): readonly AudioScope[] {
+    return this._children;
   }
 
   play(name: string, options?: PlayOptions): boolean {
@@ -56,7 +62,10 @@ export class AudioScope {
   createScope(): AudioScope {
     const child = this._engine.createScope();
     if (this._disposed) child.dispose(0);
-    else this._children.push(child);
+    else {
+      child._parent = this;
+      this._children.push(child);
+    }
     return child;
   }
 
@@ -69,8 +78,11 @@ export class AudioScope {
   dispose(fade: number = SCOPE_FADE): void {
     if (this._disposed) return;
     this._disposed = true;
-    for (const child of this._children) child.dispose(fade);
-    this._children.length = 0;
+    for (const child of this._children.splice(0)) child.dispose(fade);
+    const siblings = this._parent?._children;
+    const index = siblings ? siblings.indexOf(this) : -1;
+    if (index > -1) siblings!.splice(index, 1);
+    this._parent = null;
     for (const bed of this._beds) bed.dispose(fade);
     for (const emitter of this._emitters) emitter.dispose(fade);
     this._beds.length = 0;

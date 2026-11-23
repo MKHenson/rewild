@@ -162,6 +162,18 @@ describe('AudioScope', () => {
     expect(ctx().sources).toHaveLength(0);
   });
 
+  it('drops a child scope from its parent when the child is disposed', () => {
+    const parent = engine.createScope();
+    const first = parent.createScope();
+    const second = parent.createScope();
+    first.dispose();
+    expect(parent.children).toEqual([second]);
+
+    parent.dispose();
+    expect(second.disposed).toBe(true);
+    expect(parent.children).toEqual([]);
+  });
+
   it('gives each scope its own id', () => {
     expect(engine.createScope().id).not.toBe(engine.createScope().id);
   });
