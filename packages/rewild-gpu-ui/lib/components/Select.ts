@@ -52,15 +52,14 @@ export class Select implements UIComponent {
   /** The list. It opens on its own surface, over the field's. */
   readonly popup: Popup;
   onChange: ((value: string) => void) | null;
-  private readonly options: SelectOption[];
+  private _options: SelectOption[] = [];
   private readonly valueLabel: UINode;
-  private readonly items: SelectItem[];
+  private items: SelectItem[] = [];
   private _value: string | undefined;
   private _disabled = false;
   private hovered = false;
 
   constructor(ui: UISurfaceFactory, options: SelectOptions) {
-    this.options = options.options;
     this.onChange = options.onChange ?? null;
     this.valueLabel = new UINode({
       name: 'value',
@@ -101,10 +100,7 @@ export class Select implements UIComponent {
       onClose: () => this.paint(),
       style: { padding: 0, overflow: 'scroll', maxHeight: LIST_HEIGHT },
     });
-    this.items = this.options.map(
-      (option) => new SelectItem(option.label, () => this.pick(option.value))
-    );
-    this.popup.append(...this.items);
+    this.options = options.options;
 
     this.node.on('pointerenter', () => {
       this.hovered = true;
@@ -121,6 +117,20 @@ export class Select implements UIComponent {
     this.paint();
   }
 
+  get options(): SelectOption[] {
+    return this._options;
+  }
+
+  /** Replaces the options, such as a list of devices that changes. The value stays. */
+  set options(options: SelectOption[]) {
+    this._options = options;
+    this.items = options.map(
+      (option) => new SelectItem(option.label, () => this.pick(option.value))
+    );
+    this.popup.panel.replaceChildren(...this.items);
+    this.value = this._value;
+  }
+
   get value(): string | undefined {
     return this._value;
   }
@@ -128,8 +138,8 @@ export class Select implements UIComponent {
   /** Chooses an option with no `onChange`, for a value set from outside. */
   set value(value: string | undefined) {
     this._value = value;
-    const index = this.options.findIndex((o) => o.value === value);
-    this.valueLabel.text = this.options[index]?.label ?? '';
+    const index = this._options.findIndex((o) => o.value === value);
+    this.valueLabel.text = this._options[index]?.label ?? '';
     this.items.forEach((item, i) => (item.selected = i === index));
   }
 
@@ -161,7 +171,7 @@ export class Select implements UIComponent {
     if (this._disabled) return;
     this.popup.panel.style.minWidth = this.node.rect.width;
     this.popup.open(this.node);
-    const index = this.options.findIndex((o) => o.value === this._value);
+    const index = this._options.findIndex((o) => o.value === this._value);
     const chosen = this.items[index]?.node;
     if (chosen) {
       chosen.focus({ focusVisible: this.popup.surface.focusVisible });

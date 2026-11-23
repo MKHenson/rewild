@@ -42,6 +42,54 @@ example({
 
 example({
   part,
+  name: 'Text buttons',
+  description:
+    "The DOM's text button in each colour, with an icon, and disabled. It has no fill until hover, then takes its colour over a light wash of it. The last row is a modal's Cancel and Apply.",
+  log: true,
+  height: 200,
+  build: ({ surface, log }) => {
+    surface.input = 'all';
+    const button = (options: ConstructorParameters<typeof Button>[0]) =>
+      new Button({
+        variant: 'text',
+        ...options,
+        onClick: () => log(`click ${options.label}`),
+      });
+    surface.root.append(
+      new Stack({
+        gap: 'l',
+        style: { padding: 24, backgroundColor: 'surface', color: 'onSurface' },
+        children: [
+          new Stack({
+            direction: 'row',
+            children: [
+              button({ label: 'Primary' }),
+              button({ label: 'Secondary', color: 'secondary' }),
+              button({ label: 'Error', color: 'error' }),
+            ],
+          }),
+          new Stack({
+            direction: 'row',
+            children: [
+              button({ label: 'Settings', icon: 'settings' }),
+              button({ label: 'Disabled', disabled: true }),
+            ],
+          }),
+          new Stack({
+            direction: 'row',
+            children: [
+              button({ label: 'Cancel' }),
+              button({ label: 'Apply', variant: 'contained' }),
+            ],
+          }),
+        ],
+      })
+    );
+  },
+});
+
+example({
+  part,
   name: 'A menu in a modal',
   description:
     'The in-game menu. Open it, then use the mouse, the keys or a gamepad. Escape, B or a click outside the panel closes it. It fades and shrinks in over 250 ms.',

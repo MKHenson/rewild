@@ -4,17 +4,16 @@ import { Player } from 'src/core/routing/Player';
 import { GameManager } from 'src/core/GameManager';
 import { GameLoadError } from './GameLoadError';
 import { loadingLabel } from '../utils/loadingLabel';
+import { getUiTheme, setUiTheme } from '../utils/uiTheme';
 
 interface Props {
   projectId: string;
   /** The level to play; the project's start level when unset. */
   levelId?: string;
   onTravel: (levelId: string) => void;
-  onUnlock: () => void;
-  onDeath: () => void;
+  /** Restart on game over. */
+  onRestart: () => void;
   onQuit: () => void;
-  /** The game loaded, so its renderer's UI can take surfaces. */
-  onReady?: (gameManager: GameManager) => void;
 }
 
 @register('x-viewport-statemachine')
@@ -24,9 +23,13 @@ export class ViewportStateMachine extends Component<Props> {
 
   init() {
     this.player = new Player('Player');
-    this.gameManager = new GameManager(this.player, this.props.onUnlock);
-    this.player.onDeath = () => this.props.onDeath();
+    this.gameManager = new GameManager(this.player, {
+      getTheme: getUiTheme,
+      setTheme: setUiTheme,
+    });
     this.gameManager.onTravel = (levelId) => this.props.onTravel(levelId);
+    this.gameManager.onRestart = () => this.props.onRestart();
+    this.gameManager.onQuit = () => this.props.onQuit();
 
     // Covers physics init, renderer setup and the initial level load.
     const [loading, setLoading] = this.useState(true);
@@ -50,14 +53,11 @@ export class ViewportStateMachine extends Component<Props> {
         this.props.levelId
       );
       loadActivity.remove(onLoadActivity);
-      this.gameManager.onUnlock = this.props.onUnlock;
       // init() swallows its own errors, so drop the overlay either way rather
       // than leaving the player staring at a shell that will never clear.
       setLoading(false);
-      if (initialized) {
-        this.props.onReady?.(this.gameManager);
-        window.requestAnimationFrame(onFrame);
-      } else if (this.gameManager.loadError)
+      if (initialized) window.requestAnimationFrame(onFrame);
+      else if (this.gameManager.loadError)
         toReturn.appendChild(
           <GameLoadError
             error={this.gameManager.loadError}
@@ -87,11 +87,7 @@ export class ViewportStateMachine extends Component<Props> {
 
     const canvas = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
     const loadingOverlay = (<Loading overlay label="Loading" />) as Loading;
-    const toReturn = (
-      <div class="container">
-        {canvas}
-      </div>
-    ) as HTMLDivElement;
+    const toReturn = (<div class="container">{canvas}</div>) as HTMLDivElement;
 
     return () => {
       if (loading()) {
