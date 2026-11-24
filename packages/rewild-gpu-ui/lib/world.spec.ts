@@ -1,7 +1,13 @@
 import { Matrix4, Vector3 } from 'rewild-common';
 import { UINode } from './UINode';
 import { UISurface } from './UISurface';
-import { outsideView, screenClip, surfaceToLocal, worldClip } from './world';
+import {
+  outsideView,
+  rayToSurface,
+  screenClip,
+  surfaceToLocal,
+  worldClip,
+} from './world';
 
 /** The surface point `x`, `y` through `m`, after the divide by w. */
 function project(m: Matrix4, x: number, y: number): number[] {
@@ -9,8 +15,8 @@ function project(m: Matrix4, x: number, y: number): number[] {
   return [p.x, p.y, p.z];
 }
 
-function close(actual: number[], expected: number[]): void {
-  expected.forEach((value, i) => expect(actual[i]).toBeCloseTo(value, 5));
+function close(actual: number[], expected: number[], digits = 5): void {
+  expected.forEach((value, i) => expect(actual[i]).toBeCloseTo(value, digits));
 }
 
 function translation(x: number, y: number, z: number): Matrix4 {
@@ -102,5 +108,64 @@ describe('UISurface in the world', () => {
     const surface = new UISurface({ kind: 'world', name: 'panel', size });
     size.width = 2;
     expect(surface.size.width).toBe(1);
+  });
+});
+
+describe('rayToSurface', () => {
+  const size = { width: 0.8, height: 0.5 };
+  const forward = { x: 0, y: 0, z: -1 };
+
+  it('finds the surface pixel a ray meets from the front', () => {
+    const world = translation(0, 1, -2);
+    const hit = rayToSurface({ x: 0, y: 1, z: 0 }, forward, world, size, 1000);
+    expect(hit).not.toBeNull();
+    close([hit!.x, hit!.y, hit!.distance], [400, 250, 2], 3);
+    expect(hit!.front).toBe(true);
+    // 0.1 m right and 0.1 m up is 100 px right and 100 px nearer the top.
+    const off = rayToSurface(
+      { x: 0.1, y: 1.1, z: 0 },
+      forward,
+      world,
+      size,
+      1000
+    );
+    close([off!.x, off!.y], [500, 150], 3);
+  });
+
+  it('gives a point off the surface, for a pointer that a node captured', () => {
+    const hit = rayToSurface(
+      { x: 1, y: 0, z: 0 },
+      forward,
+      translation(0, 0, -2),
+      size,
+      1000
+    );
+    close([hit!.x, hit!.y], [1400, 250], 3);
+  });
+
+  it('marks a ray that meets the back of a turned surface', () => {
+    const turned = new Matrix4().makeRotationY(Math.PI).setPosition(0, 0, -2);
+    const hit = rayToSurface(
+      { x: 0.1, y: 0, z: 0 },
+      forward,
+      turned,
+      size,
+      1000
+    );
+    expect(hit!.front).toBe(false);
+    // From behind, the surface's left edge is on the right.
+    close([hit!.x], [300], 3);
+  });
+
+  it('misses a surface behind the ray or parallel to it', () => {
+    const world = translation(0, 0, -2);
+    const back = { x: 0, y: 0, z: 1 };
+    expect(
+      rayToSurface({ x: 0, y: 0, z: 0 }, back, world, size, 1000)
+    ).toBeNull();
+    const side = { x: 1, y: 0, z: 0 };
+    expect(
+      rayToSurface({ x: 0, y: 0, z: 0 }, side, world, size, 1000)
+    ).toBeNull();
   });
 });

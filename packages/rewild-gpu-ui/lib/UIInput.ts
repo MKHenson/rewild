@@ -29,6 +29,7 @@ import {
 } from './scroll';
 import { Dirty, Rect, UINode } from './UINode';
 import type { UISurface } from './UISurface';
+import { rayToSurface, UIVector3 } from './world';
 
 /**
  * What became of an input. `taken` means a surface took it, so the game must
@@ -44,6 +45,25 @@ export interface UISurfaceList {
   readonly surfaces: readonly UISurface[];
 }
 
+/** One input of a pointer that points with a ray in the world. */
+export interface UIRayInit {
+  pointerId: number;
+  /** Where the ray starts, in world space. */
+  origin: UIVector3;
+  /** The ray's direction, in world space, with a length of 1. */
+  direction: UIVector3;
+  /**
+   * Metres along the ray. A world surface farther than this misses. When the
+   * scene has something nearer along the ray, pass its distance, so the scene
+   * blocks the ray.
+   */
+  reach: number;
+  /** The button that changed, as in the DOM: 0 is the main button. */
+  button?: number;
+  /** The buttons that are down, as a DOM bit mask. */
+  buttons?: number;
+}
+
 /** A pointer the input knows, and the node under it. */
 export interface UIPointerHit {
   pointerId: number;
@@ -57,8 +77,13 @@ export interface UIPointerHit {
   game: boolean;
 }
 
+/** The node that takes a point, for one pointer. */
+type Pick = (x: number, y: number) => UINode | null;
+
 interface PointerState {
   type: UIPointerType;
+  /** Finds the node under the pointer: on the screen, or on the surface its ray meets. */
+  pick: Pick;
   /** The last input of the pointer, for the leave events when it goes. */
   last: UIPointerInit;
   /** The hovered node and its ancestors, the node first. */
@@ -186,11 +211,56 @@ export class UIInput {
    * belongs to the game, and the UI ignores the pointer until it is up.
    */
   pointer(action: UIPointerAction, init: UIPointerInit): UIInputResult {
+    return this.sendPointer(action, init, this.pickScreen);
+  }
+
+  /**
+   * Sends one input of a ray pointer. The ray meets the front of the nearest
+   * open world surface that takes input, within reach. Its point on that
+   * surface then acts as a screen point does in `pointer`. A pointer that a
+   * node captured stays on the plane of that node's surface, even off its
+   * edge. A ray from behind a surface does not reach its nodes.
+   */
+  ray(action: UIPointerAction, init: UIRayInit): UIInputResult {
+    const id = init.pointerId;
+    const state = this.pointers.get(id);
+    if (action === 'cancel')
+      return state ? this.cancel(state, state.last) : 'passed';
+    const captured = this.captured(id)?.surface;
+    const hit = captured
+      ? surfaceHit(captured, init)
+      : this.castRay(init.origin, init.direction, init.reach);
+    const surface = hit?.surface ?? null;
+    return this.sendPointer(
+      action,
+      {
+        pointerId: id,
+        pointerType: 'ray',
+        x: hit?.x ?? state?.last.x ?? 0,
+        y: hit?.y ?? state?.last.y ?? 0,
+        button: init.button ?? 0,
+        buttons: init.buttons ?? 0,
+      },
+      surface ? (x, y) => pickOn(surface, x, y) : () => null
+    );
+  }
+
+  /** The node the pointer hovers, or null. */
+  pointerTarget(pointerId: number): UINode | null {
+    return this.pointers.get(pointerId)?.hover[0] ?? null;
+  }
+
+  private sendPointer(
+    action: UIPointerAction,
+    init: UIPointerInit,
+    pick: Pick
+  ): UIInputResult {
     const id = init.pointerId;
     let state = this.pointers.get(id);
     if (!state) {
       state = {
         type: init.pointerType,
+        pick,
         last: init,
         hover: [],
         down: null,
@@ -204,6 +274,7 @@ export class UIInput {
       this.pointers.set(id, state);
     }
     state.last = init;
+    state.pick = pick;
     if (state.game) {
       if (action === 'up' || action === 'cancel') this.pointers.delete(id);
       return 'passed';
@@ -211,7 +282,7 @@ export class UIInput {
     if (action === 'cancel') return this.cancel(state, init);
     if (state.bar || state.panning) return this.drag(state, action, init);
 
-    const target = this.captured(id) ?? this.pick(init.x, init.y);
+    const target = this.captured(id) ?? pick(init.x, init.y);
     this.hover(state, target, init);
 
     if (action === 'down') {
@@ -255,8 +326,8 @@ export class UIInput {
     state.down = null;
     state.taken = false;
     state.pan = null;
-    if (state.type === 'mouse') {
-      this.hover(state, this.pick(init.x, init.y), init);
+    if (pointsBetweenPresses(state.type)) {
+      this.hover(state, pick(init.x, init.y), init);
     } else {
       // A touch is gone when it lifts.
       this.hover(state, null, init);
@@ -441,11 +512,44 @@ export class UIInput {
       const surface = surfaces[i];
       if (surface.kind !== 'screen') continue;
       if (surface.input === 'none' || !surface.open) continue;
-      const hit = hitTest(surface.root, x, y);
-      if (surface.input === 'all') return hit ?? surface.root;
-      if (hit && hit !== surface.root) return hit;
+      const hit = pickOn(surface, x, y);
+      if (hit) return hit;
     }
     return null;
+  }
+
+  private pickScreen: Pick = (x, y) => this.pick(x, y);
+
+  /**
+   * The nearest open world surface that takes input and whose front the ray
+   * meets within `reach`, with the point it meets. A surface's root blocks
+   * the ray, even where it has no node that takes input.
+   */
+  private castRay(
+    origin: UIVector3,
+    direction: UIVector3,
+    reach: number
+  ): SurfaceHit | null {
+    let nearest: SurfaceHit | null = null;
+    let distance = reach;
+    for (const surface of this.source.surfaces) {
+      if (surface.kind !== 'world') continue;
+      if (surface.input === 'none' || !surface.open) continue;
+      const hit = rayToSurface(
+        origin,
+        direction,
+        surface.worldMatrix,
+        surface.size,
+        surface.pixelsPerMetre
+      );
+      if (!hit?.front || hit.distance > distance) continue;
+      const { x, y } = hit;
+      if (x < 0 || y < 0) continue;
+      if (x > surface.layoutWidth || y > surface.layoutHeight) continue;
+      distance = hit.distance;
+      nearest = { surface, x, y };
+    }
+    return nearest;
   }
 
   private focusFromPointer(target: UINode): void {
@@ -601,8 +705,8 @@ export class UIInput {
     state.pan = null;
     state.panning = false;
     state.taken = false;
-    if (state.type === 'mouse') {
-      if (action === 'up') this.hover(state, this.pick(init.x, init.y), init);
+    if (pointsBetweenPresses(state.type)) {
+      if (action === 'up') this.hover(state, state.pick(init.x, init.y), init);
     } else {
       this.pointers.delete(init.pointerId);
     }
@@ -796,6 +900,40 @@ export class UIInput {
     for (const [id, state] of this.pointers)
       if (state.type === 'mouse') this.pointerOut(id);
   };
+}
+
+/** A ray pointer's point on a surface. */
+interface SurfaceHit {
+  surface: UISurface;
+  x: number;
+  y: number;
+}
+
+/**
+ * The node on the surface that takes a point. A surface that takes all input
+ * takes a miss on its root. Other surfaces let a miss through.
+ */
+function pickOn(surface: UISurface, x: number, y: number): UINode | null {
+  const hit = hitTest(surface.root, x, y);
+  if (surface.input === 'all') return hit ?? surface.root;
+  return hit && hit !== surface.root ? hit : null;
+}
+
+/** Where the ray meets the plane of the surface, from either side, or null. */
+function surfaceHit(surface: UISurface, ray: UIRayInit): SurfaceHit | null {
+  const hit = rayToSurface(
+    ray.origin,
+    ray.direction,
+    surface.worldMatrix,
+    surface.size,
+    surface.pixelsPerMetre
+  );
+  return hit && { surface, x: hit.x, y: hit.y };
+}
+
+/** A mouse and a ray point between presses. A touch or a pen is gone when it lifts. */
+function pointsBetweenPresses(type: UIPointerType): boolean {
+  return type === 'mouse' || type === 'ray';
 }
 
 /**

@@ -118,6 +118,7 @@ class ExampleCard {
         canvas: canvasElement,
         log,
         createSurface: (options) => this.renderer.createSurface(options),
+        input: this.renderer.input,
       }) ?? null;
     if (!example.log) {
       this.mirror = mirrorTree(this.surface.root);

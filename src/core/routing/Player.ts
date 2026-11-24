@@ -23,7 +23,13 @@ import {
   Ray,
 } from '@dimforge/rapier3d-compat';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
-import { hexColor, Meter, UINode, UIRenderer } from 'rewild-gpu-ui';
+import {
+  hexColor,
+  Meter,
+  UILookPointer,
+  UINode,
+  UIRenderer,
+} from 'rewild-gpu-ui';
 import {
   clamp,
   Color,
@@ -148,6 +154,8 @@ const _HEALTH_REGEN_AFTER: f32 = 20;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
 const _resizeTranslation = { x: 0, y: 0, z: 0 };
+const _lookOrigin = { x: 0, y: 0, z: 0 };
+const _lookDirection = { x: 0, y: 0, z: -1 };
 
 interface Hud {
   health: Meter;
@@ -277,6 +285,9 @@ export class Player extends Node {
   // Metres a second the wind's gusts shove the player downwind.
   private _gustPush: f32 = 0;
   private _hud: Hud | null = null;
+  // The look-at pointer, for the buttons of world panels.
+  private _look: UILookPointer | null = null;
+  private _lookRay: Ray | null = null;
   private _stamina = new Stamina();
   private _oxygen = new Oxygen();
   private _body = new BodyTemperature();
@@ -337,6 +348,8 @@ export class Player extends Node {
   private static readonly _FLASHLIGHT_RANGE: f32 = 400;
 
   private _onMouseMove: (e: MouseEvent) => void;
+  private _onMouseDown: (e: MouseEvent) => void;
+  private _onMouseUp: (e: MouseEvent) => void;
   private _onKeyDown: (e: KeyboardEvent) => void;
   private _onKeyUp: (e: KeyboardEvent) => void;
   private _onPointerlockChange: () => void;
@@ -349,6 +362,8 @@ export class Player extends Node {
     this.raycaster = new Raycaster();
 
     this._onMouseMove = this._handleMouseMove.bind(this);
+    this._onMouseDown = this._handleMouseDown.bind(this);
+    this._onMouseUp = this._handleMouseUp.bind(this);
     this._onKeyDown = this._handleKeyDown.bind(this);
     this._onKeyUp = this._handleKeyUp.bind(this);
     this._onPointerlockChange = this._handlePointerlockChange.bind(this);
@@ -379,6 +394,7 @@ export class Player extends Node {
     const stateData = this.stateMachine?.data as StateMachineData;
 
     if (!this._hud) this._hud = createHud(stateData.renderer.ui);
+    this._look ??= new UILookPointer(stateData.renderer.ui);
 
     this.hunger = 100.0;
     this.health = 100.0;
@@ -424,6 +440,8 @@ export class Player extends Node {
     // OnLoop mounts this node, so the change event has fired without us.
     this._isLocked = !!document.pointerLockElement;
     document.addEventListener('mousemove', this._onMouseMove);
+    document.addEventListener('mousedown', this._onMouseDown);
+    document.addEventListener('mouseup', this._onMouseUp);
     document.addEventListener('pointerlockchange', this._onPointerlockChange);
     document.addEventListener('keydown', this._onKeyDown);
     document.addEventListener('keyup', this._onKeyUp);
@@ -569,6 +587,9 @@ export class Player extends Node {
     if (Player.current === this) Player.current = null;
 
     document.removeEventListener('mousemove', this._onMouseMove);
+    document.removeEventListener('mousedown', this._onMouseDown);
+    document.removeEventListener('mouseup', this._onMouseUp);
+    this._look?.stop();
     document.removeEventListener(
       'pointerlockchange',
       this._onPointerlockChange
@@ -1161,8 +1182,69 @@ export class Player extends Node {
       );
     }
 
+    this._aimLook(R, camX, camY, camZ, alive);
+
     if (alive && this._health <= 0)
       this._die(hurt ? fallSpeed * _VELOCITY_TO_SPEED : 0);
+  }
+
+  /**
+   * Points the look-at ray from the eye along the view while the player
+   * looks round, so the button of a world panel lights and shows the
+   * crosshair. Anything with a collider in front of a panel blocks it.
+   */
+  private _aimLook(
+    R: StateMachineData['gameManager']['RAPIER'] | undefined,
+    x: f32,
+    y: f32,
+    z: f32,
+    alive: boolean
+  ): void {
+    const look = this._look;
+    if (!look) return;
+    if (!this._isLocked || !alive) {
+      look.stop();
+      return;
+    }
+    const cosPitch = Math.cos(this._pitch);
+    _lookOrigin.x = x;
+    _lookOrigin.y = y;
+    _lookOrigin.z = z;
+    _lookDirection.x = -Math.sin(this._yaw) * cosPitch;
+    _lookDirection.y = Math.sin(this._pitch);
+    _lookDirection.z = -Math.cos(this._yaw) * cosPitch;
+    look.aim(_lookOrigin, _lookDirection, this._sceneDistance(R, look.reach));
+  }
+
+  /**
+   * Metres along the look-at ray to the nearest collider other than the
+   * player's own, or Infinity when there is none within `reach`.
+   */
+  private _sceneDistance(
+    R: StateMachineData['gameManager']['RAPIER'] | undefined,
+    reach: number
+  ): number {
+    if (!R || !this.rapierWorld) return Infinity;
+    const ray = (this._lookRay ??= new R.Ray(
+      { x: 0, y: 0, z: 0 },
+      { x: 0, y: 0, z: -1 }
+    ));
+    ray.origin.x = _lookOrigin.x;
+    ray.origin.y = _lookOrigin.y;
+    ray.origin.z = _lookOrigin.z;
+    ray.dir.x = _lookDirection.x;
+    ray.dir.y = _lookDirection.y;
+    ray.dir.z = _lookDirection.z;
+    const hit = this.rapierWorld.castRay(
+      ray,
+      reach,
+      true,
+      R.QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined,
+      undefined,
+      this.capsuleBody
+    );
+    return hit ? hit.timeOfImpact : Infinity;
   }
 
   private _handleMouseMove(e: MouseEvent) {
@@ -1172,9 +1254,21 @@ export class Player extends Node {
     this._pitch = Math.max(-_PI_HALF, Math.min(_PI_HALF, this._pitch));
   }
 
+  /** The main button clicks the node under the crosshair, while the mouse looks round. */
+  private _handleMouseDown(e: MouseEvent) {
+    if (this._isLocked && e.button === 0) this._look?.press('mouse');
+  }
+
+  private _handleMouseUp(e: MouseEvent) {
+    if (e.button === 0) this._look?.release('mouse');
+  }
+
   private _handleKeyDown(e: KeyboardEvent) {
     if (this._dead) return;
-    if (e.code === 'KeyW') this._movingForward = true;
+    if (e.code === 'KeyE') {
+      // E clicks the node under the crosshair.
+      if (!e.repeat) this._look?.press('key');
+    } else if (e.code === 'KeyW') this._movingForward = true;
     else if (e.code === 'KeyS') this._movingBackward = true;
     else if (e.code === 'KeyA') this._movingLeft = true;
     else if (e.code === 'KeyD') this._movingRight = true;
@@ -1204,9 +1298,10 @@ export class Player extends Node {
 
   /**
    * Reads the gamepad, while the player has it and is in play. The right
-   * stick looks and the left stick moves. A jumps and rises in water, B
-   * crouches and dives, the left stick's click or the left trigger sprints,
-   * and Y toggles the flashlight.
+   * stick looks and the left stick moves. A clicks the node under the
+   * crosshair, or else jumps and rises in water. B crouches and dives, the
+   * left stick's click or the left trigger sprints, and Y toggles the
+   * flashlight.
    */
   private _readGamepad(delta: f32): void {
     const gameManager = (this.stateMachine?.data as StateMachineData)
@@ -1223,6 +1318,7 @@ export class Player extends Node {
       this._padSprint = false;
       this._padDown = false;
       this._padUp = false;
+      this._look?.release('pad');
       return;
     }
     // A square curve aims finely near the centre and turns fast at the edge.
@@ -1234,15 +1330,19 @@ export class Player extends Node {
     this._padMoveY = move.y;
     this._padSprint =
       pad.held(GamepadButton.LeftStick) || pad.held(GamepadButton.LeftTrigger);
-    this._padUp = pad.held(GamepadButton.A);
+    const pointer = this._look;
+    if (pad.pressed(GamepadButton.A) && !pointer?.press('pad'))
+      this.jumpRequested = true;
+    if (!pad.held(GamepadButton.A)) pointer?.release('pad');
+    this._padUp = pad.held(GamepadButton.A) && !pointer?.pressed;
     this._padDown = pad.held(GamepadButton.B);
-    if (pad.pressed(GamepadButton.A)) this.jumpRequested = true;
     if (pad.pressed(GamepadButton.B)) this._toggleCrouch();
     if (pad.pressed(GamepadButton.Y)) this._toggleFlashlight();
   }
 
   private _handleKeyUp(e: KeyboardEvent) {
-    if (e.code === 'KeyW') this._movingForward = false;
+    if (e.code === 'KeyE') this._look?.release('key');
+    else if (e.code === 'KeyW') this._movingForward = false;
     else if (e.code === 'KeyS') this._movingBackward = false;
     else if (e.code === 'KeyA') this._movingLeft = false;
     else if (e.code === 'KeyD') this._movingRight = false;
