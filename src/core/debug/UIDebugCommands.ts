@@ -23,7 +23,8 @@ export function registerUIDebugCommands(renderer: Renderer) {
     panels.push(surface);
     console.log(
       `Added "${surface.name}" ${PANEL_DISTANCE} m in front of the camera. ` +
-        'Walk round it to see its back. clearUIWorldPanels() removes them all.'
+        'Walk round it to see its back. Look at its button and click, or press E or A, to use it. ' +
+        'clearUIWorldPanels() removes them all.'
     );
   };
 
@@ -65,7 +66,7 @@ export function registerUIDebugCommands(renderer: Renderer) {
 
 /**
  * A glass panel of 0.8 by 0.5 m that stands upright in front of the camera
- * and faces it. Its button takes no input until the look-at pointer comes.
+ * and faces it. The look-at pointer clicks its button, which logs the click.
  */
 function createWorldPanel(renderer: Renderer, index: number): UISurface {
   const surface = renderer.ui.createSurface({
@@ -99,7 +100,11 @@ function createWorldPanel(renderer: Renderer, index: number): UISurface {
         alignSelf: 'stretch',
       },
     }).node,
-    new Button({ label: 'Open Portal', style: { width: 240 } }).node
+    new Button({
+      label: 'Open Portal',
+      style: { width: 240 },
+      onClick: () => console.log(`Clicked the button of "${surface.name}".`),
+    }).node
   );
 
   // Upright, facing the camera across the ground, so it turns only about y.

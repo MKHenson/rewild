@@ -21,8 +21,19 @@ export function exampleCamera(
   aspect: number
 ): Matrix4 {
   const top = NEAR * Math.tan(FOV_Y / 2);
-  const fit = Math.max(size.height, size.width / aspect);
-  const distance = fit / 2 / Math.tan(FOV_Y / 2) / FILL;
+  const distance = exampleCameraDistance(size, aspect);
   out.makePerspective(-top * aspect, top * aspect, top, -top, NEAR, FAR);
   return out.multiply(view.makeTranslation(0, 0, -distance));
+}
+
+/**
+ * How far in front of the origin, along +z, a world example's camera stands,
+ * so a surface of `size` fills most of the view.
+ */
+export function exampleCameraDistance(
+  size: UIWorldSize,
+  aspect: number
+): number {
+  const fit = Math.max(size.height, size.width / aspect);
+  return fit / 2 / Math.tan(FOV_Y / 2) / FILL;
 }

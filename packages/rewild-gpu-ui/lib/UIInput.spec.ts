@@ -2,6 +2,7 @@ import { UIEventType, UIPointerInit } from './events';
 import { UIInput } from './UIInput';
 import { UINode } from './UINode';
 import { UISurface, UISurfaceOptions } from './UISurface';
+import { UIVector3 } from './world';
 
 type Pointer = Pick<UIPointerInit, 'pointerId' | 'pointerType' | 'button'>;
 
@@ -414,5 +415,125 @@ describe('UIInput focus', () => {
     expect(surface.focused).toBe(buttons[1]);
     input.readGamepads([pad([0])], 30);
     expect(click).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('UIInput rays', () => {
+  const FORWARD: UIVector3 = { x: 0, y: 0, z: -1 };
+
+  /**
+   * A world panel of 0.4 by 0.2 m, 2 m in front of the eye, with a button
+   * at 100..300 by 50..150 px, its middle on the ray.
+   */
+  function setupWorld(z = -2) {
+    const log: string[] = [];
+    const panel = new UISurface({
+      kind: 'world',
+      name: 'panel',
+      size: { width: 0.4, height: 0.2 },
+    });
+    panel.worldMatrix.makeTranslation(0, 0, z);
+    const button = new UINode({
+      style: {
+        position: 'absolute',
+        left: 100,
+        top: 50,
+        width: 200,
+        height: 100,
+      },
+    });
+    panel.root.append(button);
+    panel.update(panel.layoutWidth, panel.layoutHeight);
+    record(log, 'button', button);
+    const input = new UIInput({ surfaces: [panel] });
+    const ray = (x = 0, y = 0, reach = 3) => ({
+      pointerId: -2,
+      origin: { x, y, z: 0 },
+      direction: FORWARD,
+      reach,
+    });
+    return { input, panel, button, log, ray };
+  }
+
+  it('turns a ray into pointer events on the node it meets', () => {
+    const { input, button, log, ray } = setupWorld();
+    expect(input.ray('move', ray())).toBe('taken');
+    expect(input.pointerTarget(-2)).toBe(button);
+    expect(input.ray('down', ray())).toBe('taken');
+    expect(input.ray('up', ray())).toBe('taken');
+    expect(log).toEqual([
+      'button pointerenter',
+      'button pointermove',
+      'button pointerdown',
+      'button pointerup',
+      'button click',
+    ]);
+    // The ray points between presses, as a mouse does.
+    expect(input.pointerTarget(-2)).toBe(button);
+  });
+
+  it('leaves a node when the ray moves off it, and passes a miss', () => {
+    const { input, log, ray } = setupWorld();
+    input.ray('move', ray());
+    // 0.15 m right is past the button's right edge, still on the panel.
+    expect(input.ray('move', ray(0.15))).toBe('passed');
+    expect(input.ray('move', ray(1))).toBe('passed');
+    expect(log).toEqual([
+      'button pointerenter',
+      'button pointermove',
+      'button pointerleave',
+    ]);
+  });
+
+  it('misses a surface past reach, behind the eye or seen from behind', () => {
+    const { input, panel, log, ray } = setupWorld();
+    expect(input.ray('move', ray(0, 0, 1.5))).toBe('passed');
+    panel.worldMatrix.makeTranslation(0, 0, 2);
+    expect(input.ray('move', ray())).toBe('passed');
+    panel.worldMatrix.makeRotationY(Math.PI).setPosition(0, 0, -2);
+    expect(input.ray('move', ray())).toBe('passed');
+    expect(log).toEqual([]);
+  });
+
+  it('takes the nearest surface, whose root blocks the ones behind it', () => {
+    const far = setupWorld(-2);
+    const near = new UISurface({
+      kind: 'world',
+      name: 'near',
+      size: { width: 0.4, height: 0.2 },
+    });
+    near.worldMatrix.makeTranslation(0, 0, -1);
+    near.update(near.layoutWidth, near.layoutHeight);
+    const input = new UIInput({ surfaces: [far.panel, near] });
+    expect(input.ray('move', far.ray())).toBe('passed');
+    expect(far.log).toEqual([]);
+    near.input = 'none';
+    expect(input.ray('move', far.ray())).toBe('taken');
+    expect(far.log).toEqual(['button pointerenter', 'button pointermove']);
+  });
+
+  it('keeps a captured pointer on its surface, off its edge', () => {
+    const { input, button, ray } = setupWorld();
+    const moves: number[] = [];
+    button.on('pointerdown', (e) => button.setPointerCapture(e.pointerId));
+    button.on('pointermove', (e) => moves.push(e.x));
+    input.ray('down', ray());
+    input.ray('move', ray(1));
+    expect(moves).toHaveLength(1);
+    // 1 m right of the panel's centre, which is 200 px from its left edge.
+    expect(moves[0]).toBeCloseTo(1200, 3);
+  });
+
+  it('cancels the press and the hover with no click', () => {
+    const { input, log, ray } = setupWorld();
+    input.ray('down', ray());
+    expect(input.ray('cancel', ray())).toBe('taken');
+    expect(input.pointerTarget(-2)).toBeNull();
+    expect(log).toEqual([
+      'button pointerenter',
+      'button pointerdown',
+      'button pointercancel',
+      'button pointerleave',
+    ]);
   });
 });

@@ -100,3 +100,59 @@ export function outsideView(
   }
   return all !== 0;
 }
+
+/** A point or a direction in the world. */
+export interface UIVector3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** Where a ray meets the plane of a world surface. */
+export interface UISurfaceRayHit {
+  /** The point in surface CSS pixels. It can be off the surface. */
+  x: number;
+  y: number;
+  /** How far along the ray, in lengths of its direction. */
+  distance: number;
+  /** True when the ray meets the front of the surface, which faces +z. */
+  front: boolean;
+}
+
+const _toSurface = new Matrix4();
+
+/**
+ * Where a ray from `origin` along `direction`, in world space, meets the plane
+ * of a world surface. Returns null when the ray is parallel to the plane or
+ * points away from it.
+ */
+export function rayToSurface(
+  origin: UIVector3,
+  direction: UIVector3,
+  worldMatrix: Matrix4,
+  size: UIWorldSize,
+  pixelsPerMetre: number
+): UISurfaceRayHit | null {
+  const e = surfaceToLocal(_toSurface, size, pixelsPerMetre)
+    .premultiply(worldMatrix)
+    .invert().elements;
+  // The ray in surface space, where the plane is z = 0. The map is affine, so
+  // a distance along the ray is the same in both spaces.
+  const { x, y, z } = origin;
+  const ox = e[0] * x + e[4] * y + e[8] * z + e[12];
+  const oy = e[1] * x + e[5] * y + e[9] * z + e[13];
+  const oz = e[2] * x + e[6] * y + e[10] * z + e[14];
+  const d = direction;
+  const dx = e[0] * d.x + e[4] * d.y + e[8] * d.z;
+  const dy = e[1] * d.x + e[5] * d.y + e[9] * d.z;
+  const dz = e[2] * d.x + e[6] * d.y + e[10] * d.z;
+  if (Math.abs(dz) < 1e-12) return null;
+  const distance = -oz / dz;
+  if (!(distance > 0)) return null;
+  return {
+    x: ox + distance * dx,
+    y: oy + distance * dy,
+    distance,
+    front: oz > 0,
+  };
+}

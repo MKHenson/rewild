@@ -21,6 +21,7 @@ export * from './UIBackdrop';
 export * from './UICanvas';
 export * from './UIEffects';
 export * from './UIInput';
+export * from './UILookPointer';
 export * from './UINode';
 export * from './UIRenderer';
 export * from './UISurface';

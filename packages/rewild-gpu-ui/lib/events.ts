@@ -1,7 +1,10 @@
 import type { UINode } from './UINode';
 
-/** `''` for a click from a key or a gamepad, as in the DOM. */
-export type UIPointerType = 'mouse' | 'touch' | 'pen' | '';
+/**
+ * `''` for a click from a key or a gamepad, as in the DOM. `ray` for a pointer
+ * that points with a ray in the world, such as the look-at ray.
+ */
+export type UIPointerType = 'mouse' | 'touch' | 'pen' | 'ray' | '';
 
 /** The phases of a dispatch, with the same values as the DOM's `Event` constants. */
 export enum UIEventPhase {

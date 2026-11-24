@@ -551,16 +551,28 @@ panel.worldMatrix.set(transform.matrixWorld.elements);
 - **One shader.** Screen and world surfaces share `ui.wgsl`. A uniform matrix maps the surface's pixels to clip space. A world surface works out its device pixels per CSS pixel from derivatives, for its edges, text and shadows, and grows each quad by one device pixel for the anti-aliased edge. Each effect has a second pipeline for world surfaces, with depth.
 - **The back.** On a back face, the shader draws only the glass boxes, with their fill and border and no effect, and drops the rest. A panel with no glass shows nothing from behind.
 - **Glass.** World glass samples the blur at its place on the screen, from last frame. A world surface with glass in view keeps the blur running.
-- **Input.** Screen pointers and the focus scope skip world surfaces. Ticket 16 gives them the look-at ray.
+- **Input.** Screen pointers and the focus scope skip world surfaces. Only a ray reaches them. See Looking at it.
 - **Fog.** World UI draws after the atmosphere composite, so fog does not cover a far panel.
 
 ### Looking at it
 
 - **The look-at ray.** Each frame, a ray from the eye through the screen centre is tested against world surfaces. A hit becomes a surface pixel, then normal pointer events, so the button gets hover and press with no new code.
-- **Reach.** Only a hit within reach counts, for example 3 m. Past it, the panel is only something to look at.
-- **Blocked.** A hit counts only if nothing in the scene is nearer along the ray.
-- **The crosshair.** It shows only while the ray hits a node that takes input, within reach. It is a node on a screen surface, so Mica draws it too.
-- **Using it.** A mouse click, E, or A on a gamepad clicks the node under the crosshair.
+- **Which surface.** The ray takes the nearest open world surface that takes input and whose front it meets. A surface's root blocks the surfaces behind it, also where it has no node. The back of a surface takes no input and blocks nothing.
+- **Reach.** Only a hit within reach counts, 3 m by default. Past it, the panel is only something to look at.
+- **Blocked.** A hit counts only if nothing in the scene is nearer along the ray. The player casts the ray into the physics world. A collider other than the player's own, nearer than the panel, blocks it.
+- **The crosshair.** It shows only while the ray hits a focusable node, such as a button, within reach. Text on the panel does not show it. It is an 8 px white dot with a soft shadow, on its own screen surface, and it fades in and out over 120 ms.
+- **Using it.** A mouse click, E, or A on a gamepad clicks the node under the crosshair. A press with no crosshair goes to the game, so A still jumps. A press that the crosshair takes holds the pointer down until it comes up, and the click goes to the node that holds both the down and the up, as with a mouse.
+- **Capture.** A node that captures the ray, such as a slider, keeps it on the plane of its surface, even off the surface's edge.
+- **Stopping.** When the pointer is free, such as when the menu opens, or the player dies, the pointer stops. The node under it gets `pointercancel` and `pointerleave`, and no click.
+
+```ts
+const look = new UILookPointer(renderer.ui);
+look.aim(eye, forward, distanceToScene); // each frame, while the player looks round
+look.press('mouse'); // true when the UI took the press
+look.release('mouse'); // clicks when no other source holds the pointer
+```
+
+- **The code.** `UIInput.ray` turns a ray into pointer events, with `pointerType: 'ray'`. `rayToSurface` in `lib/world.ts` finds the surface pixel. `UILookPointer` owns the crosshair and the presses. `Player` in `src/core/routing` aims it, casts the blocking ray, and gives it the mouse, E and A. An XR controller can use `UIInput.ray` the same way.
 
 ### The WorldPanel asset
 
@@ -669,7 +681,7 @@ npm run ui-inspector
 ```
 
 - **Served** by esbuild, the same as the game, from its own entry and HTML page. It does not load the game, a level or the editor.
-- **The list.** On the left, the parts of Mica to check: layout, boxes, text, icons, meters, buttons, focus, glass, scrolling, form controls, and later world surfaces.
+- **The list.** On the left, the parts of Mica to check: layout, boxes, text, icons, meters, buttons, focus, glass, scrolling, form controls, world surfaces and the look-at pointer.
 - **The examples.** A click on a part loads its examples on the right, drawn by Mica on a WebGPU canvas. An example is a small function that builds a tree.
 - **Side by side.** A layout example also draws as DOM elements with the same styles, next to the Mica version. The two must match.
 - **Tools.** The layout overlay, a light and dark theme switch, and a device pixel ratio switch.
@@ -687,12 +699,12 @@ Mica runs on a bare `GPUDevice` and a canvas. It does not need the game's `Rende
 | `setUILayoutOverlay(true)` | Draws the layout overlay on each surface: border boxes, margins, padding and clip rectangles, like the browser's |
 | `printUITree(name?)`       | Prints the tree of a surface, or of all surfaces: each node's path, rectangle, text, icon, effect and style       |
 | `printUIFocus()`           | Prints the focus scope, the focused node of each surface, and the node under each pointer                         |
-| `addUIWorldPanel()`        | Stands a test glass panel 2 m in front of the camera, facing it. `clearUIWorldPanels()` removes them              |
+| `addUIWorldPanel()`        | Stands a test glass panel 2 m in front of the camera, facing it. Its button logs a click. `clearUIWorldPanels()` removes them |
 
 - **One overlay.** `UIRenderer.showLayout` sets the overlay on all its surfaces, and on surfaces made later. The inspector's switch uses it too.
 - **What shows.** The overlay leaves out a surface whose root is hidden, and a node at opacity 0 with its children. A closed modal stays in its tree at opacity 0, and its boxes would hide the boxes that show.
 - **Names.** `printUITree` and `printUIFocus` show each node's path, the child index at each level, such as `root/0/2`, and its `name` after a `#`. `name` is for debug output only. A component names its node by its kind, such as `#button`, unless its options give a `name`. The HUD names its bars, such as `#health`.
-- **Pointers.** A locked mouse has no screen point, so in play `printUIFocus` shows no pointer. Open the menu first.
+- **Pointers.** A locked mouse has no screen point, so in play `printUIFocus` shows no mouse pointer. Open the menu first. The look-at ray shows as pointer -2, with its point in the pixels of the surface it hits.
 - **The code.** `printTree` and `printFocus` in `lib/debug.ts` return text, so tests can check them. `src/core/debug/UIDebugCommands.ts` puts them on the window.
 
 ---
@@ -828,7 +840,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: surfaces on a quad, drawn in the scene with depth, a plain glass back, the glass backdrop.
   - Expect: a test panel stands in the world. The player walks round it and sees its back, and the terrain can hide it.
 
-- [ ] **16. Look-at pointer and crosshair**
+- [x] **16. Look-at pointer and crosshair**
 
   - Scope: ray to surface pixel, the look-at ray source, reach, blocking by the scene, the crosshair, click by mouse, E and gamepad A.
   - Expect: looking at a button within reach shows the crosshair and lights the button. Past reach, or from behind, nothing shows.
