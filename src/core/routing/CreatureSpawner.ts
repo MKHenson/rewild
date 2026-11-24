@@ -14,7 +14,8 @@ import {
   createHabitat,
   spawnRange,
 } from '../creatures/Habitat';
-import { DEFAULT_ROAM, HerdHome } from '../creatures/HerdHome';
+import { CreatureGroup } from '../creatures/CreatureGroup';
+import { DEFAULT_ROAM, HerdHome, HomeCycle } from '../creatures/HerdHome';
 import {
   DEFAULT_SPREAD,
   PlannedCreature,
@@ -74,6 +75,8 @@ export interface SpawnGroupReport {
   despawnRadius: number;
   /** m/s the home drifts. */
   drift: number;
+  /** The home is resting in its settle and travel cycle. */
+  resting: boolean;
   /** Metres the home has drifted from where the group spawned. */
   drifted: number;
 }
@@ -99,6 +102,8 @@ export interface SpawnedSchoolReport {
   state: string;
   /** Members that felt the player in the last steering step. */
   threatened: number;
+  /** near steers every frame, far ten times a second, point moves as one. */
+  lod: 'near' | 'far' | 'point';
   x: number;
   y: number;
   z: number;
@@ -128,28 +133,44 @@ export interface SpawnerReport {
 
 type GroupState = 'idle' | 'loading' | 'live' | 'failed';
 
+interface HomeDrift {
+  drift: number;
+  roam: number;
+  cycle?: HomeCycle;
+}
+
 class SpawnGroup {
   state: GroupState = 'idle';
   creatures: Creature[] = [];
+  /** Its creatures, as they steer by each other. */
+  readonly flock = new CreatureGroup();
   school: SchoolAsset | null = null;
   /** Bumped on each spawn and despawn, so a late load can tell it is stale. */
   generation = 0;
   readonly home: HerdHome;
 
+  /** A school preset's drift, roam and cycle stand in for those the rule
+   *  leaves out. */
   constructor(
     readonly plan: PlannedGroup,
     habitat: Habitat,
-    readonly range: SpawnRange
+    readonly range: SpawnRange,
+    defaults: HomeDrift | undefined
   ) {
     const { rule } = plan;
     this.home = new HerdHome(
       plan.homeX,
       plan.homeZ,
       plan.heading,
-      rule.drift ?? 0,
-      rule.roam ?? DEFAULT_ROAM,
+      rule.drift ?? defaults?.drift ?? 0,
+      rule.roam ?? defaults?.roam ?? DEFAULT_ROAM,
       habitat
     );
+    this.home.cycle =
+      rule.settle && rule.travel
+        ? { settle: rule.settle, travel: rule.travel }
+        : defaults?.cycle ?? null;
+    this.flock.level = 0.3 + Math.random() * 0.4;
   }
 }
 
@@ -172,6 +193,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
   private readonly live: SpawnGroup[] = [];
   private readonly habitats = new Map<string, Habitat | null>();
   private readonly ranges = new Map<string, SpawnRange>();
+  private readonly drifts = new Map<string, HomeDrift>();
   /** Metres from the player chunks are planned to: the furthest despawn
    *  radius of any habitat seen. */
   private reach = DESPAWN_RADIUS;
@@ -266,9 +288,18 @@ export class CreatureSpawner extends Container implements SpawnSite {
     if (!template?.preset && !template?.school)
       console.warn(`Spawn rule creature '${creature}' is not a creature.`);
     else {
-      const settings = template.school
-        ? [getSchoolFishPreset(template.school).habitat]
+      const school = template.school
+        ? getSchoolFishPreset(template.school)
+        : null;
+      const settings = school
+        ? [school.habitat]
         : getCreaturePreset(template.preset!).habitat;
+      if (school)
+        this.drifts.set(creature, {
+          drift: school.drift,
+          roam: school.roam,
+          cycle: school.cycle,
+        });
       habitat = createHabitat(settings, this.world);
       const range = spawnRange(settings[0]);
       this.ranges.set(creature, range);
@@ -330,11 +361,12 @@ export class CreatureSpawner extends Container implements SpawnSite {
           members: group.plan.school?.size ?? group.plan.members.length,
           state: group.state,
           distance: Math.round(
-            Math.hypot(group.plan.homeX - player.x, group.plan.homeZ - player.z)
+            Math.hypot(group.home.x - player.x, group.home.z - player.z)
           ),
           spawnRadius: group.range.spawn,
           despawnRadius: group.range.despawn,
           drift: group.home.speed,
+          resting: group.home.resting,
           drifted:
             Math.round(
               Math.hypot(
@@ -369,6 +401,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
         members: school.count,
         state: school.state,
         threatened: school.threatened,
+        lod: school.asPoint ? 'point' : school.far ? 'far' : 'near',
         x: Math.round(x * 10) / 10,
         y: Math.round(school.homeY * 10) / 10,
         z: Math.round(z * 10) / 10,
@@ -441,8 +474,15 @@ export class CreatureSpawner extends Container implements SpawnSite {
       cy <= this.nearZ1
     )
       return;
-    for (let i = 0; i < groups.length; i++) this.despawn(groups[i]);
-    this.chunks.delete(key);
+    // A group whose home drifted near the player outlives its chunk's range.
+    let kept = false;
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i];
+      if (group.state === 'live' || group.state === 'loading')
+        this.updateGroup(group);
+      if (group.state === 'live' || group.state === 'loading') kept = true;
+    }
+    if (!kept) this.chunks.delete(key);
   };
 
   /** The chunk's groups, planned on first use. Null until its heights load. */
@@ -469,18 +509,20 @@ export class CreatureSpawner extends Container implements SpawnSite {
         new SpawnGroup(
           plan,
           this.habitat(plan.rule.creature)!,
-          this.ranges.get(plan.rule.creature)!
+          this.ranges.get(plan.rule.creature)!,
+          this.drifts.get(plan.rule.creature)
         )
     );
     this.chunks.set(key, groups);
     return groups;
   }
 
+  /** Spawns or despawns by the distance to where the home is now. */
   private updateGroup(group: SpawnGroup): void {
-    const { plan, range } = group;
+    const { home, range } = group;
     const distance = Math.hypot(
-      plan.homeX - this.player.x,
-      plan.homeZ - this.player.z
+      home.x - this.player.x,
+      home.z - this.player.z
     );
     if (group.state === 'idle') {
       if (distance < range.spawn) this.spawn(group);
@@ -496,9 +538,15 @@ export class CreatureSpawner extends Container implements SpawnSite {
     const { members, rule } = group.plan;
     const generation = ++group.generation;
     group.state = 'loading';
+    group.home.joinCycle();
     this.count += members.length;
 
-    Promise.all(members.map((m) => this.createCreature(rule.creature, m)))
+    const { home, plan } = group;
+    const dx = home.x - plan.homeX;
+    const dz = home.z - plan.homeZ;
+    Promise.all(
+      members.map((m) => this.createCreature(rule.creature, m, dx, dz))
+    )
       .then((creatures) => {
         if (group.generation !== generation || !this.world) {
           for (const creature of creatures) creature.dispose();
@@ -507,7 +555,10 @@ export class CreatureSpawner extends Container implements SpawnSite {
         group.creatures = creatures;
         group.state = 'live';
         this.live.push(group);
-        const { home } = group;
+        const { home, flock } = group;
+        flock.homeX = home.x;
+        flock.homeZ = home.z;
+        flock.speed = home.moving ? home.speed : 0;
         for (const creature of creatures) {
           this.addAsset(creature);
           this.parentObject3D.add(creature);
@@ -516,6 +567,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
           if (creature.movement) {
             creature.movement.homeX = home.x;
             creature.movement.homeZ = home.z;
+            flock.join(creature.movement);
           }
         }
       })
@@ -533,9 +585,10 @@ export class CreatureSpawner extends Container implements SpawnSite {
     if (this.schoolMembers + size > SCHOOL_BUDGET) return;
     const generation = ++group.generation;
     group.state = 'loading';
+    group.home.joinCycle();
     this.schoolMembers += size;
 
-    this.createSchool(group.plan)
+    this.createSchool(group)
       .then((asset) => {
         if (group.generation !== generation || !this.world) {
           asset.dispose();
@@ -579,6 +632,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
         creature.dispose();
       }
       creatures.length = 0;
+      group.flock.clear();
       const index = this.live.indexOf(group);
       if (index > -1) {
         this.live[index] = this.live[this.live.length - 1];
@@ -591,9 +645,13 @@ export class CreatureSpawner extends Container implements SpawnSite {
   private driftHomes(dt: number): void {
     const { live } = this;
     for (let i = 0; i < live.length; i++) {
-      const { home, creatures } = live[i];
-      if (home.speed <= 0) continue;
+      const { home, creatures, school, flock } = live[i];
+      // A school moves its own home.
+      if (home.speed <= 0 || school) continue;
       home.update(dt);
+      flock.homeX = home.x;
+      flock.homeZ = home.z;
+      flock.speed = home.moving ? home.speed : 0;
       for (let c = 0; c < creatures.length; c++) {
         const movement = creatures[c].movement;
         if (!movement) continue;
@@ -621,10 +679,10 @@ export class CreatureSpawner extends Container implements SpawnSite {
     metrics.record('cpu.schools', takeSchoolSteerTime(), SCHOOL_STEER_METRIC);
   }
 
-  private async createSchool(plan: PlannedGroup): Promise<SchoolAsset> {
+  private async createSchool(group: SpawnGroup): Promise<SchoolAsset> {
     const { data } = this;
     if (!data) throw new Error('The spawner is not mounted.');
-    const { rule, school, homeX, homeZ, heading } = plan;
+    const { rule, school, homeX, homeZ, heading } = group.plan;
     const resource: IResource = {
       id: school!.id,
       name: rule.creature,
@@ -644,17 +702,19 @@ export class CreatureSpawner extends Container implements SpawnSite {
       (asset as IAsset).dispose?.();
       throw new Error(`Spawn rule creature '${rule.creature}' is not a school.`);
     }
-    asset.drift = rule.drift ?? null;
-    asset.roam = rule.roam ?? null;
+    asset.home = group.home;
     const ground = data.renderer.terrainRenderer.sampleHeight(homeX, homeZ);
     asset.initialPosition.set(homeX, ground ?? 0, homeZ);
     asset.initialRotation.setFromAxisAngle(UP, heading);
     return asset;
   }
 
+  /** Spawns a planned creature moved by (dx, dz), as far as its home has drifted. */
   private async createCreature(
     template: string,
-    planned: PlannedCreature
+    planned: PlannedCreature,
+    dx: number,
+    dz: number
   ): Promise<Creature> {
     const { data } = this;
     if (!data) throw new Error('The spawner is not mounted.');
@@ -673,7 +733,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
       (asset as IAsset).dispose?.();
       throw new Error(`Spawn rule creature '${template}' is not a creature.`);
     }
-    asset.initialPosition.set(planned.x, planned.y, planned.z);
+    asset.initialPosition.set(planned.x + dx, planned.y, planned.z + dz);
     asset.initialRotation.setFromAxisAngle(UP, planned.heading);
     return asset;
   }
@@ -683,6 +743,7 @@ export class CreatureSpawner extends Container implements SpawnSite {
     this.chunks.clear();
     this.habitats.clear();
     this.ranges.clear();
+    this.drifts.clear();
     this.reach = DESPAWN_RADIUS;
   }
 

@@ -136,6 +136,11 @@ export class SwimBatch {
       localBounds.min.set(x0, y0, z0);
       localBounds.max.set(x1, y1, z1);
     }
+    this.moved();
+  }
+
+  /** Tells the scene the batch moved, as after changing `transform`. */
+  moved(): void {
     const bvh = this.renderer.sceneBVH;
     if (bvh)
       for (let i = 0; i < this.meshes.length; i++)

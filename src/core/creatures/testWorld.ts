@@ -2,6 +2,7 @@ import { LocomotionSetName } from 'models';
 import { Vector3 } from 'rewild-common';
 import { WaterQuerySample } from 'rewild-renderer';
 import { CreatureWorld } from './Habitat';
+import { ThreatField, ThreatSample } from './Threats';
 import { ICreatureAnimator } from './MovementSystem';
 
 /** A stub world for specs: heights, water depth and shore distance as
@@ -13,6 +14,7 @@ export class TestWorld implements CreatureWorld {
   /** Water type names by palette index. All the water is the first type. */
   palette: string[] = ['lake'];
   player: Vector3 | null = null;
+  threats: ThreatField | null = null;
 
   sampleHeight(x: number, z: number): number | null {
     return this.height(x, z);
@@ -39,6 +41,30 @@ export class TestWorld implements CreatureWorld {
   playerPosition(out: Vector3): boolean {
     if (!this.player) return false;
     out.copy(this.player);
+    return true;
+  }
+
+  /** The player, as the one threat, unless `threats` is set. */
+  nearestThreat(
+    x: number,
+    y: number,
+    z: number,
+    reach: number,
+    out: ThreatSample
+  ): boolean {
+    if (this.threats) return this.threats.nearest(x, y, z, reach, out);
+    if (!this.player) return false;
+    const distance = Math.hypot(
+      this.player.x - x,
+      this.player.y - y,
+      this.player.z - z
+    );
+    if (distance >= reach) return false;
+    out.x = this.player.x;
+    out.y = this.player.y;
+    out.z = this.player.z;
+    out.distance = distance;
+    out.fright = 1;
     return true;
   }
 }

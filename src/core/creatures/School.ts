@@ -3,20 +3,21 @@ import { SwimSettings } from './CreaturePresets';
 import { CreatureWorld, Habitat, HeightRange } from './Habitat';
 import { HerdHome } from './HerdHome';
 import { wrapAngle } from './MovementSystem';
+import { FlockPull } from './Flocking';
 import { SchoolSteering } from './SchoolFishPresets';
-import { HOVER_SHARE, HOVER_SPEED } from './SwimDriver';
+import { GAIT_BURST, GAIT_COAST, SwimGaits } from './SwimGaits';
+import { ThreatSample, createThreatSample } from './Threats';
 
 /** Grid cells a school's neighbour grid may use; past this its cells grow. */
 export const MAX_GRID_CELLS = 4096;
-/** Neighbours a member aligns and gathers with, at most. */
-export const MAX_NEIGHBOURS = 10;
 /** Members a member checks for spacing, at most, nearest cells first. */
 export const MAX_SCANNED = 64;
 /** Places tried inside the habitat for each member as the school spawns. */
 const PLACE_ATTEMPTS = 6;
 /** Part of the spread the school spawns over vertically. */
 const VERTICAL_SPREAD = 0.3;
-/** Metres from the player past which a school steers at the far rate. */
+/** Metres from the player past which a school steers at the far rate, and
+ *  moves as one point while out of view. */
 export const STEER_LOD_DISTANCE = 40;
 /** Seconds between steering updates of a far school. */
 export const FAR_STEER_INTERVAL = 0.1;
@@ -24,12 +25,13 @@ export const FAR_STEER_INTERVAL = 0.1;
 const BAND_PAD = 0.5;
 /** The longest steering pull, in units of `acceleration`. */
 const MAX_PULL = 3;
-/** Seconds the amplitude takes to settle. */
-const AMPLITUDE_SMOOTHING = 0.15;
-/** Seconds the turn curve takes to settle. */
-const CURVE_SMOOTHING = 0.2;
 /** Seconds the speed takes to settle on its target. */
 const SPEED_SMOOTHING = 0.4;
+/** Part of its speed a member keeps while it coasts, and gains in a burst. */
+const COAST_SPEED = 0.85;
+const BURST_SPEED = 1.15;
+/** Half the diagonal of a unit cube: a cell's centre to its corner. */
+const HALF_DIAGONAL = Math.sqrt(3) / 2;
 
 /** No water with room to swim. */
 const COLUMN_DRY = 0;
@@ -46,7 +48,8 @@ const NEIGHBOUR_CELLS = (() => {
   for (let z = -1; z <= 1; z++)
     for (let y = -1; y <= 1; y++)
       for (let x = -1; x <= 1; x++) offsets.push([x, y, z]);
-  const steps = (o: number[]) => Math.abs(o[0]) + Math.abs(o[1]) + Math.abs(o[2]);
+  const steps = (o: number[]) =>
+    Math.abs(o[0]) + Math.abs(o[1]) + Math.abs(o[2]);
   offsets.sort((a, b) => steps(a) - steps(b));
   return new Int8Array(offsets.flat());
 })();
@@ -55,17 +58,29 @@ export type SchoolState = 'waiting' | 'cruise' | 'evade';
 
 /**
  * Many fish moving as one. Members are indices into flat arrays of world
- * position, velocity and swim wave, not objects. Each frame a grid over the
+ * position, velocity and swim wave, not objects. Each step a grid over the
  * members finds neighbours, and each member steers by separation, alignment,
- * cohesion, the pull of the school's home, the habitat and the player.
- * Members spawn around the home once the water under it is loaded.
+ * cohesion, the pull of the school's home, the habitat and the threats near
+ * it. Members spawn around the home once the water under it is loaded.
+ *
+ * A school far from the player and out of view moves as one point: members
+ * stay where they are and the home's travel builds up in `offsetX/Y/Z`, which
+ * `settle` adds to every member once it is near or seen again.
  */
 export class School {
   readonly capacity: number;
   count = 0;
   state: SchoolState = 'waiting';
-  /** Members that felt the player this steering step. */
+  /** Members that felt a threat this steering step. */
   threatened = 0;
+  /** It was past STEER_LOD_DISTANCE from the player in the last update. */
+  far = false;
+  /** It moved as one point in the last update. */
+  asPoint = false;
+  /** Metres the home has travelled since the members last moved. */
+  offsetX = 0;
+  offsetY = 0;
+  offsetZ = 0;
 
   readonly px: Float64Array;
   readonly py: Float64Array;
@@ -77,9 +92,8 @@ export class School {
   readonly heading: Float32Array;
   /** Radians nose up. */
   readonly pitch: Float32Array;
-  readonly phase: Float32Array;
-  readonly amplitude: Float32Array;
-  readonly curve: Float32Array;
+  /** Each member's body wave. */
+  readonly gaits: SwimGaits;
 
   readonly home: HerdHome;
   /** The middle of the swim band at the home. */
@@ -97,8 +111,15 @@ export class School {
   private readonly columnCode = new Uint8Array(MAX_GRID_CELLS);
   private readonly columnMin = new Float32Array(MAX_GRID_CELLS);
   private readonly columnMax = new Float32Array(MAX_GRID_CELLS);
+  private readonly threatStamp = new Int32Array(MAX_GRID_CELLS);
+  private readonly threatFound = new Uint8Array(MAX_GRID_CELLS);
+  private readonly threatX = new Float64Array(MAX_GRID_CELLS);
+  private readonly threatY = new Float64Array(MAX_GRID_CELLS);
+  private readonly threatZ = new Float64Array(MAX_GRID_CELLS);
+  private readonly threatFright = new Float32Array(MAX_GRID_CELLS);
   private stamp = 0;
   private gridX = 0;
+  private gridY = 0;
   private gridZ = 0;
   private cell = 1;
   private nx = 0;
@@ -107,7 +128,9 @@ export class School {
   private steerTimer = 0;
   private readonly range: HeightRange = { min: 0, max: 0 };
   private readonly player = new Vector3();
-  /** The last column read: its code, and its band when it has one. */
+  private readonly threat: ThreatSample = createThreatSample();
+  private readonly pull: FlockPull;
+  /** The band of the last column read, when it has one. */
   private bandMin = 0;
   private bandMax = 0;
 
@@ -125,6 +148,7 @@ export class School {
   ) {
     this.capacity = size;
     this.home = home;
+    this.pull = new FlockPull(steering);
     const n = Math.max(1, size);
     this.px = new Float64Array(n);
     this.py = new Float64Array(n);
@@ -134,9 +158,7 @@ export class School {
     this.vz = new Float32Array(n);
     this.heading = new Float32Array(n);
     this.pitch = new Float32Array(n);
-    this.phase = new Float32Array(n);
-    this.amplitude = new Float32Array(n);
-    this.curve = new Float32Array(n);
+    this.gaits = new SwimGaits(swim, n, random);
     this.ax = new Float32Array(n);
     this.ay = new Float32Array(n);
     this.az = new Float32Array(n);
@@ -146,28 +168,58 @@ export class School {
     this.next = new Int32Array(n);
   }
 
-  /** Waits until the water at the home is loaded, then spawns every member. */
-  update(dt: number): void {
+  /**
+   * Waits until the water at the home is loaded, then spawns every member.
+   * `seen` is whether the school is in view, which keeps a far school
+   * moving member by member.
+   */
+  update(dt: number, seen = true): void {
     if (dt <= 0) return;
     if (this.state === 'waiting' && !this.place()) return;
     if (this.count === 0) return;
 
-    this.home.update(dt);
-    if (this.habitat.heightRange?.(this.home.x, this.home.z, this.range))
+    const { home } = this;
+    const fromX = home.x;
+    const fromY = this.homeY;
+    const fromZ = home.z;
+    home.update(dt);
+    if (this.habitat.heightRange?.(home.x, home.z, this.range))
       this.homeY = (this.range.min + this.range.max) / 2;
 
     const hasPlayer = this.world.playerPosition(this.player);
-    this.steerTimer -= dt;
     const far =
       !hasPlayer ||
-      Math.hypot(this.home.x - this.player.x, this.home.z - this.player.z) >
+      Math.hypot(home.x - this.player.x, home.z - this.player.z) >
         STEER_LOD_DISTANCE;
+    this.far = far;
+    this.asPoint = far && !seen;
+    if (this.asPoint) {
+      this.offsetX += home.x - fromX;
+      this.offsetY += this.homeY - fromY;
+      this.offsetZ += home.z - fromZ;
+      return;
+    }
+    this.settle();
+
+    this.steerTimer -= dt;
     if (!far || this.steerTimer <= 0) {
       this.steerTimer = FAR_STEER_INTERVAL;
       this.buildGrid();
-      this.steer(hasPlayer);
+      this.steer();
     }
     this.integrate(dt);
+  }
+
+  /** Moves every member by the travel built up while it moved as a point. */
+  settle(): void {
+    const { offsetX, offsetY, offsetZ } = this;
+    if (offsetX === 0 && offsetY === 0 && offsetZ === 0) return;
+    for (let i = 0; i < this.count; i++) {
+      this.px[i] += offsetX;
+      this.py[i] += offsetY;
+      this.pz[i] += offsetZ;
+    }
+    this.offsetX = this.offsetY = this.offsetZ = 0;
   }
 
   /** Spawns the members around the home. False while the water is not loaded. */
@@ -209,9 +261,8 @@ export class School {
       this.vz[i] = cos * speed;
       this.heading[i] = this.lastHeading[i] = home.heading;
       this.pitch[i] = 0;
-      this.phase[i] = this.random() * TWO_PI;
-      this.amplitude[i] = this.swim.amplitude;
-      this.curve[i] = 0;
+      this.gaits.reset(i);
+      this.gaits.amplitude[i] = this.swim.amplitude;
       this.ax[i] = this.ay[i] = this.az[i] = 0;
       this.fear[i] = 0;
     }
@@ -250,6 +301,7 @@ export class School {
     }
     this.cell = cell;
     this.gridX = x0;
+    this.gridY = y0;
     this.gridZ = z0;
     this.nx = nx;
     this.ny = ny;
@@ -268,14 +320,10 @@ export class School {
     }
   }
 
-  private steer(hasPlayer: boolean): void {
-    const { steering, count, px, py, pz, vx, vy, vz, head, next } = this;
+  private steer(): void {
+    const { steering, count, px, py, pz, vx, vy, vz, head, next, pull } = this;
     const { nx, ny, nz } = this;
-    const radius = steering.neighbourRadius;
-    const radiusSq = radius * radius;
-    const spacing = steering.spacing;
     const limit = steering.acceleration * MAX_PULL;
-    const player = this.player;
     this.threatened = 0;
 
     for (let i = 0; i < count; i++) {
@@ -287,19 +335,14 @@ export class School {
       const cy = Math.floor(c / nx) % ny;
       const cz = Math.floor(c / (nx * ny));
 
-      let sepX = 0;
-      let sepY = 0;
-      let sepZ = 0;
-      let aliX = 0;
-      let aliY = 0;
-      let aliZ = 0;
-      let cohX = 0;
-      let cohY = 0;
-      let cohZ = 0;
-      let seen = 0;
+      pull.begin();
       let scanned = 0;
 
-      for (let o = 0; o < NEIGHBOUR_CELLS.length && scanned < MAX_SCANNED; o += 3) {
+      for (
+        let o = 0;
+        o < NEIGHBOUR_CELLS.length && scanned < MAX_SCANNED;
+        o += 3
+      ) {
         const gx = cx + NEIGHBOUR_CELLS[o];
         const gy = cy + NEIGHBOUR_CELLS[o + 1];
         const gz = cz + NEIGHBOUR_CELLS[o + 2];
@@ -309,55 +352,28 @@ export class School {
         while (j >= 0 && scanned < MAX_SCANNED) {
           if (j !== i) {
             scanned++;
-            const ox = px[j] - x;
-            const oy = py[j] - y;
-            const oz = pz[j] - z;
-            const dSq = ox * ox + oy * oy + oz * oz;
-            if (dSq < radiusSq) {
-              const d = Math.sqrt(dSq);
-              if (d < spacing && d > 1e-6) {
-                const push = (spacing - d) / (spacing * d);
-                sepX -= ox * push;
-                sepY -= oy * push;
-                sepZ -= oz * push;
-              }
-              if (seen < MAX_NEIGHBOURS) {
-                seen++;
-                aliX += vx[j];
-                aliY += vy[j];
-                aliZ += vz[j];
-                cohX += ox;
-                cohY += oy;
-                cohZ += oz;
-              }
-            }
+            pull.neighbour(
+              px[j] - x,
+              py[j] - y,
+              pz[j] - z,
+              vx[j],
+              vy[j],
+              vz[j]
+            );
           }
           j = next[j];
         }
       }
 
-      let fx = sepX * steering.separation;
-      let fy = sepY * steering.separation;
-      let fz = sepZ * steering.separation;
-      if (seen > 0) {
-        const a = steering.alignment / steering.cruiseSpeed;
-        fx += (aliX / seen - vx[i]) * a;
-        fy += (aliY / seen - vy[i]) * a;
-        fz += (aliZ / seen - vz[i]) * a;
-        const k = steering.cohesion / (seen * radius);
-        fx += cohX * k;
-        fy += cohY * k;
-        fz += cohZ * k;
-      }
-
+      pull.gather(vx[i], vy[i], vz[i]);
       const hx = this.home.x - x;
       const hy = this.homeY - y;
       const hz = this.home.z - z;
+      pull.home(hx, hy, hz);
       const homeDistance = Math.hypot(hx, hz);
-      const pull = steering.home / steering.homeRadius;
-      fx += hx * pull;
-      fy += hy * pull;
-      fz += hz * pull;
+      let fx = pull.x;
+      let fy = pull.y;
+      let fz = pull.z;
 
       const toHomeX = homeDistance > 1e-6 ? hx / homeDistance : 0;
       const toHomeZ = homeDistance > 1e-6 ? hz / homeDistance : 0;
@@ -383,18 +399,28 @@ export class School {
       }
 
       let fear = 0;
-      if (hasPlayer) {
-        const ox = x - player.x;
-        const oy = y - player.y;
-        const oz = z - player.z;
-        const d = Math.sqrt(ox * ox + oy * oy + oz * oz);
-        if (d < steering.threatRadius && d > 1e-6) {
-          fear = 1 - d / steering.threatRadius;
-          const push = (steering.threat * fear) / d;
-          fx += ox * push;
-          fy += oy * push * 0.5;
-          fz += oz * push;
+      if (this.cellThreat(c)) {
+        const ox = this.threatX[c] - x;
+        const oy = this.threatY[c] - y;
+        const oz = this.threatZ[c] - z;
+        pull.x = pull.y = pull.z = 0;
+        fear = pull.flee(
+          ox,
+          oy,
+          oz,
+          steering.threatRadius * this.threatFright[c],
+          steering.threat
+        );
+        if (fear > 0) {
+          fx += pull.x;
+          fy += pull.y;
+          fz += pull.z;
           this.threatened++;
+          if (this.fear[i] === 0)
+            this.gaits.escape(
+              i,
+              wrapAngle(Math.atan2(-ox, -oz) - this.heading[i])
+            );
         }
       }
       this.fear[i] = fear;
@@ -418,11 +444,9 @@ export class School {
   }
 
   private integrate(dt: number): void {
-    const { steering, swim, count, px, py, pz, vx, vy, vz } = this;
+    const { steering, count, px, py, pz, vx, vy, vz, gaits } = this;
     const maxPitch = Math.tan(steering.pitch);
-    const speedEase = ease(dt, SPEED_SMOOTHING);
-    const amplitudeEase = ease(dt, AMPLITUDE_SMOOTHING);
-    const curveEase = ease(dt, CURVE_SMOOTHING);
+    const speedEase = 1 - Math.exp(-dt / SPEED_SMOOTHING);
 
     for (let i = 0; i < count; i++) {
       let ux = vx[i] + this.ax[i] * dt;
@@ -430,9 +454,15 @@ export class School {
       let uz = vz[i] + this.az[i] * dt;
 
       let flat = Math.hypot(ux, uz);
-      const fear = this.fear[i];
+      const gait = gaits.gait[i];
       const target =
-        steering.cruiseSpeed + (steering.fleeSpeed - steering.cruiseSpeed) * fear;
+        (steering.cruiseSpeed +
+          (steering.fleeSpeed - steering.cruiseSpeed) * this.fear[i]) *
+        (gait === GAIT_COAST
+          ? COAST_SPEED
+          : gait === GAIT_BURST
+          ? BURST_SPEED
+          : 1);
       if (flat < 1e-4) {
         ux = Math.sin(this.heading[i]) * 1e-4;
         uz = Math.cos(this.heading[i]) * 1e-4;
@@ -454,9 +484,15 @@ export class School {
         ux = -ux;
         uz = -uz;
         if (this.column(x, z) === COLUMN_DRY) {
-          vx[i] = ux;
+          // Stranded where there is no water: head straight for home.
+          const hx = this.home.x - x;
+          const hz = this.home.z - z;
+          const away = Math.hypot(hx, hz) || 1;
+          px[i] = x + (hx / away) * speed * dt;
+          pz[i] = z + (hz / away) * speed * dt;
+          vx[i] = (hx / away) * speed;
           vy[i] = 0;
-          vz[i] = uz;
+          vz[i] = (hz / away) * speed;
           continue;
         }
       }
@@ -480,27 +516,37 @@ export class School {
       this.lastHeading[i] = heading;
       this.heading[i] = heading;
       this.pitch[i] = Math.atan2(uy, speed);
-
-      const swimSpeed = Math.hypot(speed, uy);
-      const beat = Math.min(
-        swim.maxBeat,
-        Math.max(swim.hoverBeat, swimSpeed / swim.stride)
-      );
-      let p = this.phase[i] + TWO_PI * beat * dt;
-      if (p >= TWO_PI) p %= TWO_PI;
-      this.phase[i] = p;
-      const amplitude =
-        swimSpeed < HOVER_SPEED ? swim.amplitude * HOVER_SHARE : swim.amplitude;
-      this.amplitude[i] += (amplitude - this.amplitude[i]) * amplitudeEase;
-      const curve = Math.max(
-        -swim.turnCurve,
-        Math.min(
-          swim.turnCurve,
-          (this.length * turn) / Math.max(swimSpeed, HOVER_SPEED)
-        )
-      );
-      this.curve[i] += (curve - this.curve[i]) * curveEase;
+      gaits.step(i, dt, Math.hypot(speed, uy), turn, this.length, false);
     }
+  }
+
+  /**
+   * Whether a threat is near grid cell `c`, read once a steering step from
+   * the cell's centre, wide enough to cover its corners.
+   */
+  private cellThreat(c: number): boolean {
+    if (this.threatStamp[c] === this.stamp) return this.threatFound[c] === 1;
+    this.threatStamp[c] = this.stamp;
+    const { nx, ny, cell } = this;
+    const x = this.gridX + ((c % nx) + 0.5) * cell;
+    const y = this.gridY + ((Math.floor(c / nx) % ny) + 0.5) * cell;
+    const z = this.gridZ + (Math.floor(c / (nx * ny)) + 0.5) * cell;
+    const sample = this.threat;
+    const found = this.world.nearestThreat(
+      x,
+      y,
+      z,
+      this.steering.threatRadius + cell * HALF_DIAGONAL,
+      sample
+    );
+    this.threatFound[c] = found ? 1 : 0;
+    if (found) {
+      this.threatX[c] = sample.x;
+      this.threatY[c] = sample.y;
+      this.threatZ[c] = sample.z;
+      this.threatFright[c] = sample.fright;
+    }
+    return found;
   }
 
   /**
@@ -537,8 +583,4 @@ export class School {
     }
     return code;
   }
-}
-
-function ease(dt: number, smoothing: number): number {
-  return 1 - Math.exp(-dt / smoothing);
 }

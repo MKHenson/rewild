@@ -46,6 +46,48 @@ describe('HerdHome', () => {
     expect(furthest).toBeLessThan(15 + 2 * 0.1 + 0.001);
   });
 
+  it('rests, then travels, by turns', () => {
+    const { home } = setup(1);
+    home.cycle = { settle: [5, 5], travel: [3, 3] };
+    home.update(0.1);
+    expect(home.resting).toBe(true);
+    expect(home.moving).toBe(false);
+    run(home, 4.5);
+    expect(Math.hypot(home.x, home.z)).toBe(0);
+    run(home, 1.5);
+    expect(home.moving).toBe(true);
+    run(home, 1.5);
+    expect(Math.hypot(home.x, home.z)).toBeGreaterThan(1.5);
+    run(home, 1);
+    expect(home.resting).toBe(true);
+  });
+
+  it('joins its cycle at a random point, resting or travelling', () => {
+    const { home } = setup(1);
+    home.cycle = { settle: [10, 20], travel: [10, 20] };
+    let resting = 0;
+    let travelling = 0;
+    for (let i = 0; i < 200; i++) {
+      home.joinCycle();
+      if (home.resting) resting++;
+      else travelling++;
+      expect(home.timer).toBeGreaterThanOrEqual(0);
+      expect(home.timer).toBeLessThanOrEqual(20);
+    }
+    expect(resting).toBeGreaterThan(50);
+    expect(travelling).toBeGreaterThan(50);
+  });
+
+  it('moves straight away when it joins its cycle travelling', () => {
+    const { home } = setup(1);
+    home.cycle = { settle: [10, 10], travel: [10, 10] };
+    do home.joinCycle();
+    while (home.resting || home.timer < 1);
+    home.update(0.5);
+    expect(home.moving).toBe(true);
+    expect(Math.hypot(home.x, home.z)).toBeGreaterThan(0.4);
+  });
+
   it('does not drift into the water', () => {
     const { world, home } = setup(2, 100);
     world.depth = (x) => (x > 5 ? 2 : 0);

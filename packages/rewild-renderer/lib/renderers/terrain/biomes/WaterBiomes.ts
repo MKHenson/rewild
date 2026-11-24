@@ -8,12 +8,17 @@ import type {
   SeaZone,
 } from './BiomeTypes';
 
-// Fish in open water; the habitat keeps them off the bed.
+// Fish in open water; the habitat keeps them off the bed. The home rests a
+// while, then moves on, and the group travels with it.
 export const TUNA: BiomeCreatures = {
   creature: 'tuna',
-  density: 25,
-  group: [1, 6],
-  spread: 6,
+  density: 1,
+  group: [8, 16],
+  spread: 10,
+  drift: 1,
+  roam: 80,
+  settle: [20, 60],
+  travel: [30, 90],
 };
 
 // Lake fish, alone or in twos and threes.

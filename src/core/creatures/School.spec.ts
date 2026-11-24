@@ -3,6 +3,8 @@ import { WaterHabitat } from './Habitat';
 import { HerdHome } from './HerdHome';
 import { School } from './School';
 import { SCHOOL_FISH_PRESETS } from './SchoolFishPresets';
+import { GAIT_ESCAPE } from './SwimGaits';
+import { ThreatField } from './Threats';
 import { TestWorld } from './testWorld';
 
 const SARDINE = SCHOOL_FISH_PRESETS.sardine;
@@ -162,10 +164,83 @@ describe('School', () => {
     run(school, 2);
     const phases = new Set<number>();
     for (let i = 0; i < school.count; i++)
-      phases.add(Math.round(school.phase[i] * 100));
+      phases.add(Math.round(school.gaits.phase[i] * 100));
     expect(phases.size).toBeGreaterThan(10);
     for (let i = 0; i < school.count; i++)
-      expect(school.amplitude[i]).toBeGreaterThan(0);
+      expect(school.gaits.amplitude[i]).toBeGreaterThan(0);
+  });
+
+  it('snaps members into an escape as they first feel a threat', () => {
+    const { world, school } = setup(40);
+    run(school, 3);
+    world.player = new Vector3(school.px[0], school.py[0], school.pz[0]);
+    school.update(1 / 30);
+    let escaping = 0;
+    for (let i = 0; i < school.count; i++)
+      if (school.gaits.gait[i] === GAIT_ESCAPE) escaping++;
+    expect(escaping).toBe(school.threatened);
+    expect(escaping).toBeGreaterThan(0);
+  });
+
+  it('flees a threat by its fright, and ignores one too far for it', () => {
+    const { world, school } = setup(40);
+    run(school, 3);
+    const threats = new ThreatField();
+    world.threats = threats;
+    const at = new Vector3(school.px[0], school.py[0], school.pz[0] - 6);
+    let fright = 1;
+    threats.add({
+      get fright() {
+        return fright;
+      },
+      position: (out) => {
+        out.copy(at);
+        return true;
+      },
+    });
+    run(school, 0.2);
+    expect(school.state).toBe('cruise');
+    fright = 3;
+    run(school, 0.2);
+    expect(school.state).toBe('evade');
+  });
+
+  it('moves as one point while far and unseen, then settles', () => {
+    const { school } = setup(40, 1);
+    run(school, 1);
+    const x = school.px[5];
+    const z = school.pz[5];
+    const homeX = school.home.x;
+    const homeZ = school.home.z;
+    for (let t = 0; t < 2; t += 1 / 30) school.update(1 / 30, false);
+    expect(school.asPoint).toBe(true);
+    expect(school.px[5]).toBe(x);
+    expect(school.pz[5]).toBe(z);
+    expect(school.offsetX).toBeCloseTo(school.home.x - homeX, 5);
+    expect(school.offsetZ).toBeCloseTo(school.home.z - homeZ, 5);
+    const offsetX = school.offsetX;
+    school.settle();
+    expect(school.px[5]).toBeCloseTo(x + offsetX, 5);
+    expect(school.offsetX).toBe(0);
+  });
+
+  it('swims member by member while unseen but near the player', () => {
+    const { world, school } = setup(40);
+    run(school, 1);
+    world.player = new Vector3(20, -4, 20);
+    const x = school.px[5];
+    school.update(1 / 30, false);
+    expect(school.asPoint).toBe(false);
+    expect(school.px[5]).not.toBe(x);
+  });
+
+  it('brings a member stranded on dry ground back toward home', () => {
+    const { school } = setup(10);
+    run(school, 1);
+    school.px[0] = 40;
+    school.pz[0] = 0;
+    run(school, 10);
+    expect(school.px[0]).toBeLessThan(30);
   });
 
   it('spawns no members where its home has no water', () => {

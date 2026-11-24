@@ -12,6 +12,7 @@ import {
   LandHabitatSettings,
   WaterHabitatSettings,
 } from './CreaturePresets';
+import { ThreatSample } from './Threats';
 
 /** What creatures read the world through. */
 export interface CreatureWorld {
@@ -23,6 +24,15 @@ export interface CreatureWorld {
   waterTypeIndex(name: WaterType['name']): number;
   /** The player's position into `out`; false when there is no player. */
   playerPosition(out: Vector3): boolean;
+  /** The threat that frightens most at (x, y, z) within `reach` metres for
+   *  its fright, into `out`. False when none is that near. */
+  nearestThreat(
+    x: number,
+    y: number,
+    z: number,
+    reach: number,
+    out: ThreatSample
+  ): boolean;
 }
 
 /** The heights a creature may be at over a point. */

@@ -1,5 +1,6 @@
 import { LocomotionSetName } from 'models';
 import { ChainShape, Selector, WaterType } from 'rewild-renderer';
+import { FlockSettings } from './Flocking';
 
 /** How near the player a habitat's creatures spawn. */
 export interface SpawnRangeSettings {
@@ -102,6 +103,9 @@ export interface SeekSettings {
   startle?: number;
 }
 
+/** How a creature travels with its group while their home is on the move. */
+export type ShoalSettings = FlockSettings;
+
 export interface MovementSettings {
   /** m/s. */
   walkSpeed: number;
@@ -126,6 +130,7 @@ export interface MovementSettings {
     wander?: WanderSettings;
     evade?: SeekSettings;
     seek?: SeekSettings;
+    shoal?: ShoalSettings;
   };
 }
 
@@ -264,6 +269,16 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
       modes: {
         wander: { radius: 15, wait: [0, 0], actions: [] },
         evade: { radius: 3, release: 7, startle: 0.5 },
+        shoal: {
+          cruiseSpeed: 1.2,
+          neighbourRadius: 6,
+          spacing: 1.8,
+          separation: 2.5,
+          alignment: 1.2,
+          cohesion: 0.8,
+          home: 0.6,
+          homeRadius: 8,
+        },
       },
     },
     habitat: [

@@ -1,32 +1,21 @@
 import { FinFlutter } from 'rewild-renderer';
 import { SwimSettings, WaterHabitatSettings } from './CreaturePresets';
+import { FlockSettings } from './Flocking';
+import { HomeCycle } from './HerdHome';
 
 /** How each member of a school steers. Weights scale each pull against the others. */
-export interface SchoolSteering {
-  /** m/s a calm member swims at. */
-  cruiseSpeed: number;
+export interface SchoolSteering extends FlockSettings {
   /** m/s a frightened member swims at. */
   fleeSpeed: number;
   /** m/s² a member changes velocity at, at most. */
   acceleration: number;
   /** Radians a member tilts its nose up or down, at most. */
   pitch: number;
-  /** Metres within which members see each other. */
-  neighbourRadius: number;
-  /** Metres members keep between them. */
-  spacing: number;
-  separation: number;
-  alignment: number;
-  cohesion: number;
-  /** Pull toward the home, growing with distance. */
-  home: number;
   /** Push back inside the habitat. */
   habitat: number;
-  /** Push away from the player. */
+  /** Push away from a threat. */
   threat: number;
-  /** Metres from home inside which the home pulls gently. */
-  homeRadius: number;
-  /** Metres from the player at which members turn away. */
+  /** Metres from a threat of fright 1 at which members turn away. */
   threatRadius: number;
   /** Seconds of travel ahead checked for leaving the habitat. */
   lookAhead: number;
@@ -46,6 +35,8 @@ export interface SchoolFishPreset {
   /** m/s the home drifts, and metres from where it started it may go. */
   drift: number;
   roam: number;
+  /** Rests and travels by turns. Left out, it drifts without rest. */
+  cycle?: HomeCycle;
 }
 
 export const SCHOOL_FISH_PRESETS: Record<string, SchoolFishPreset> = {
@@ -85,11 +76,12 @@ export const SCHOOL_FISH_PRESETS: Record<string, SchoolFishPreset> = {
       type: 'water',
       bedMargin: 0.5,
       surfaceMargin: 0.5,
-      depth: { from: 2, to: 3 },
+      depth: { from: 1, to: 1.5 },
       waterTypes: ['ocean'],
     },
-    drift: 0.6,
-    roam: 60,
+    drift: 0.7,
+    roam: 120,
+    cycle: { settle: [10, 30], travel: [30, 60] },
   },
   minnow: {
     model: 'sardine',
@@ -132,8 +124,9 @@ export const SCHOOL_FISH_PRESETS: Record<string, SchoolFishPreset> = {
       spawnRadius: 35,
       despawnRadius: 40,
     },
-    drift: 0.2,
-    roam: 15,
+    drift: 0.25,
+    roam: 30,
+    cycle: { settle: [10, 30], travel: [15, 40] },
   },
 };
 

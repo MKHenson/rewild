@@ -411,7 +411,6 @@ Every new creature can be placed in the editor, the same as Sinew's creatures. W
 
 - **Schools** are placed as one asset with a member count and a spread. In the editor they hold in place and wave, so you can see them.
 - **Bed creatures** snap to the bed under the water, not to the water surface.
-- **A warning** shows when a home is outside the habitat, for example a tuna placed in a lake.
 
 Each creature's ticket includes its placement.
 
@@ -526,58 +525,63 @@ Each TODO is one GitHub ticket in the Shoal milestone. The order follows the dep
   - Scope: the `bed` habitat. Crabs with clips. Jellyfish with a pulse clip and slow drift. Placing both in the editor.
   - Expect: crabs walk the bed of the sea and of a lake. Jellyfish drift and pulse.
 
+- [ ] **9. Spawning round the player, and homes that travel**
+
+  - Scope: rethink how creatures spawn. Today each chunk plans its groups from the seed and they despawn once the player leaves, so the world feels sparse and animals are hard to find. In a large lake only one minnow school spawned: a 35 m spawn radius keeps about 0.4 ha in range, so 3 schools a hectare gives about one. Look at keeping a target population round the player and topping it up as they move, as Ark and Minecraft do, and decide whether creatures persist until they are killed or removed. Groups belong to themselves, not to the chunk that planned them. Homes already rest and travel by turns (a rule's `settle` and `travel`), and the shoal mode carries a group while its home travels, but a home stays within its rule's `roam` of where it spawned. Lift that limit, so a travelling home can go anywhere.
+  - Expect: fish can be found in any large lake or along any coast within a minute or so of looking. A group of tuna lingers, then sets off and travels as one, and is still there when the player follows it.
+
 ### Stage 2: life and death
 
-- [ ] **9. Health and death**
+- [ ] **10. Health and death**
 
   - Scope: health and damage with a source, shared with the player. Procedural death: belly up, limp, sink or float, despawn. The `stranded` preset rule: flail, pose or clip.
   - Expect: a fish dropped on the shore flails on its side and dies. A stranded crab stays still. A body rolls belly up, sinks or floats, and goes after a time.
 
-- [ ] **10. Threats and sharks**
+- [ ] **11. Threats and sharks**
 
   - Scope: the shared threat query. The hunt mode. Attacks as action clips with `hitAt`. The shark. Jellyfish stings. Schools lose members and refill.
   - Expect: a shark circles a school and kills members. A shark can bite the player. A jellyfish stings on contact.
 
-- [ ] **11. Stage 1 and 2 sounds**
+- [ ] **12. Stage 1 and 2 sounds**
 
   - Scope: the sounds for Stages 1 and 2. See Sound.
   - Expect: fish splash, flail, bite and sting with sound.
 
 ### Stage 3: spear and catch
 
-- [ ] **12. Basic inventory**
+- [ ] **13. Basic inventory**
 
   - Scope: inventory data apart from its view. Slots, an item library, pick up and select. A hotbar drawn with the UI framework.
   - Expect: the player picks up an item and sees it on the hotbar.
 
-- [ ] **13. View model**
+- [ ] **14. View model**
 
   - Scope: a held model in the scene, attached to the camera, with its own clips.
   - Expect: the player holds a spear in view, and it plays a thrust.
 
-- [ ] **14. Spear**
+- [ ] **15. Spear**
 
   - Scope: the thrust, the hit test against creatures and school members, damage, catching into the inventory. Spear sounds.
   - Expect: the player spears a trout or a sardine and it goes in the inventory. A speared shark turns away or fights back.
 
 ### Stage 4: orcas and the deep
 
-- [ ] **15. Orcas**
+- [ ] **16. Orcas**
 
   - Scope: the `surface` habitat, the up and down wave, pods, Inspect, look-at with small limits, breathing, leaping, spy hop, tail slap, sleep, hunting. Orca sounds.
   - Expect: a pod swims along the coast, rises to breathe, leaps, comes to look at a still player, and sleeps at night.
 
-- [ ] **16. The deep and anglerfish**
+- [ ] **17. The deep and anglerfish**
 
   - Scope: a deeper ocean floor, the deep sea biome, the anglerfish, its emissive lure and point light.
   - Expect: past the shelf the bed falls away into the dark, and anglerfish hang there with their lures glowing.
 
-- [ ] **17. School shapes**
+- [ ] **18. School shapes**
 
   - Scope: milling, splitting, bait ball and flash, by state.
   - Expect: sardines ball up when a shark circles.
 
-- [ ] **18. Steering LOD and stats**
+- [ ] **19. Steering LOD and stats**
 
   - Scope: steering rate by distance, far schools as one point, perf panel counts and time.
   - Expect: 1,000 members fit the frame budget, and the perf panel shows their cost.

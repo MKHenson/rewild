@@ -122,7 +122,9 @@ export function registerCreatureDebugCommands() {
       `showSchools() — ${report.schools.length} schools live, ${members} ` +
         `members. Spawned schools hold ${report.schoolMembers} of the ` +
         `${SCHOOL_BUDGET} member budget; placed schools sit outside it. ` +
-        `x, y, z is the school's home; evade means members felt the player.`
+        `x, y, z is the school's home; evade means members felt the player. ` +
+        `lod: near steers every frame, far steers ten times a second, point ` +
+        `is far and out of view and moves as one, its members frozen.`
     );
     console.table(report.schools.slice(0, limit));
   };
@@ -143,6 +145,7 @@ export function registerCreatureDebugCommands() {
       return;
     }
     const school = target.school!;
+    school.settle();
     const { home, count } = school;
     if (count === 0) {
       console.log(

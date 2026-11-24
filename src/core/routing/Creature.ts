@@ -11,8 +11,10 @@ import { CreaturePreset } from '../creatures/CreaturePresets';
 import { FootPlant } from '../creatures/FootPlant';
 import { CreatureWorld, createHabitat } from '../creatures/Habitat';
 import { HeadLook } from '../creatures/HeadLook';
+import { gameThreats } from '../creatures/Threats';
 import { IMovementMode, MovementSystem } from '../creatures/MovementSystem';
 import { Seek } from '../creatures/modes/Seek';
+import { Shoal } from '../creatures/modes/Shoal';
 import { Wander } from '../creatures/modes/Wander';
 import { SwimDriver } from '../creatures/SwimDriver';
 import { SkinnedAsset } from './SkinnedAsset';
@@ -33,6 +35,8 @@ export function createCreatureWorld(data: StateMachineData): CreatureWorld {
       out.copy(player.asset.transform.position);
       return true;
     },
+    nearestThreat: (x, y, z, reach, out) =>
+      gameThreats.nearest(x, y, z, reach, out),
   };
 }
 
@@ -128,6 +132,7 @@ export class Creature extends SkinnedAsset {
       modes.push(new Seek('evade', movement.modes.evade, true));
     if (movement.modes.seek)
       modes.push(new Seek('seek', movement.modes.seek, false));
+    if (movement.modes.shoal) modes.push(new Shoal(movement.modes.shoal));
     if (movement.modes.wander)
       modes.push(
         new Wander(

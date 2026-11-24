@@ -9,6 +9,7 @@ import {
 import type { WaterLens } from 'rewild-renderer/lib/renderers/water/WaterLens';
 import type { TerrainRenderer } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
 import { Level, Node } from 'rewild-routing';
+import { Threat, gameThreats } from '../creatures/Threats';
 import { Asset3D } from './Asset3D';
 import { PersonalAssistant } from '../assistant/PersonalAssistant';
 import { MouseRay } from '../assistant/MouseRay';
@@ -184,6 +185,15 @@ export class Player extends Node {
   feetY: f32 = 0;
   /** Metres of water over the player's feet, waves included. */
   immersion: f32 = 0;
+  /** How creatures see the player as a threat. */
+  readonly threat: Threat = {
+    fright: 1,
+    position: (out) => {
+      if (!this.asset) return false;
+      out.copy(this.asset.transform.position);
+      return true;
+    },
+  };
   /** Whether the camera's eye is below the water's surface. */
   cameraUnderWater: boolean = false;
   /** Flies where the camera looks, faster, with hunger and oxygen held. */
@@ -346,6 +356,7 @@ export class Player extends Node {
   mount(): void {
     super.mount();
     Player.current = this;
+    gameThreats.add(this.threat);
 
     const stateData = this.stateMachine?.data as StateMachineData;
 
@@ -527,6 +538,7 @@ export class Player extends Node {
   unMount(): void {
     super.unMount();
     if (Player.current === this) Player.current = null;
+    gameThreats.remove(this.threat);
 
     document.removeEventListener('mousemove', this._onMouseMove);
     document.removeEventListener('mousedown', this._onMouseDown);

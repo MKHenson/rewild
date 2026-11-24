@@ -3,6 +3,7 @@ import { EulerRotationOrder, Quaternion, Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
 import { BehaviourState } from 'rewild-routing';
 import { MovementSettings } from './CreaturePresets';
+import type { CreatureGroup } from './CreatureGroup';
 import { CreatureWorld, Habitat, HeightRange } from './Habitat';
 
 /** The parts of the animation controller movement modes use. */
@@ -85,6 +86,8 @@ export class MovementSystem {
   stranded = false;
   /** Seconds the current update covers. Modes read it while they score. */
   dt = 0;
+  /** The group it spawned with, if any. */
+  group: CreatureGroup | null = null;
 
   readonly settings: MovementSettings;
   readonly habitat: Habitat;

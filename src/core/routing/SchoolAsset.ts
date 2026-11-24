@@ -1,5 +1,5 @@
 import { IResource } from 'models';
-import { EulerRotationOrder, Vector3 } from 'rewild-common';
+import { Box3, EulerRotationOrder, Vector3 } from 'rewild-common';
 import { Renderer, SWIM_STRIDE, SwimBatch, Transform } from 'rewild-renderer';
 import { StateMachine } from 'rewild-routing';
 import { createHabitat } from '../creatures/Habitat';
@@ -23,6 +23,8 @@ const HELD_JITTER = 0.3;
 
 const TWO_PI = Math.PI * 2;
 const _forward = new Vector3();
+const _bounds = new Box3();
+const _offset = new Vector3();
 
 let steerMs = 0;
 
@@ -42,10 +44,9 @@ export class SchoolAsset extends Asset3D {
   /** Every school mounted in game and not yet disposed. */
   static readonly live = new Set<SchoolAsset>();
   school: School | null = null;
-  /** m/s the home drifts. Null uses the preset's. */
-  drift: number | null = null;
-  /** Metres from where it started the home may drift. Null uses the preset's. */
-  roam: number | null = null;
+  /** The home it swims round. Null makes one where it stands, drifting as
+   *  its preset says. */
+  home: HerdHome | null = null;
   size = DEFAULT_SCHOOL_SIZE;
   spread = DEFAULT_SCHOOL_SPREAD;
 
@@ -110,14 +111,19 @@ export class SchoolAsset extends Asset3D {
       const world = createCreatureWorld(data);
       const habitat = createHabitat([preset.habitat], world);
       const { x, z } = this.initialPosition;
-      const home = new HerdHome(
-        x,
-        z,
-        Math.atan2(_forward.x, _forward.z),
-        this.drift ?? preset.drift,
-        this.roam ?? preset.roam,
-        habitat
-      );
+      let home = this.home;
+      if (!home) {
+        home = new HerdHome(
+          x,
+          z,
+          Math.atan2(_forward.x, _forward.z),
+          preset.drift,
+          preset.roam,
+          habitat
+        );
+        home.cycle = preset.cycle ?? null;
+        home.joinCycle();
+      }
       this.school = new School(
         preset.steering,
         preset.swim,
@@ -142,10 +148,22 @@ export class SchoolAsset extends Asset3D {
     const { school, batch } = this;
     if (!school || !batch) return;
     const started = performance.now();
-    school.update(dt);
+    school.update(dt, this.inView());
     steerMs += performance.now() - started;
 
+    if (school.asPoint) {
+      batch.transform.position.set(
+        school.offsetX,
+        school.offsetY,
+        school.offsetZ
+      );
+      batch.moved();
+      return;
+    }
+    batch.transform.position.set(0, 0, 0);
+
     const { x: ox, y: oy, z: oz } = this.transform.position;
+    const { phase, amplitude, curve } = school.gaits;
     const { scale } = this.preset;
     const count = Math.min(school.count, batch.capacity);
     for (let i = 0; i < count; i++) {
@@ -159,10 +177,19 @@ export class SchoolAsset extends Asset3D {
         school.heading[i],
         0
       );
-      batch.setWave(i, school.phase[i], school.amplitude[i], school.curve[i]);
+      batch.setWave(i, phase[i], amplitude[i], curve[i]);
     }
     batch.count = count;
     batch.commit();
+  }
+
+  /** Whether the members, where they were last drawn, are in the camera's view. */
+  private inView(): boolean {
+    const batch = this.batch!;
+    if (batch.count === 0) return true;
+    _offset.copy(this.transform.position).add(batch.transform.position);
+    _bounds.copy(batch.localBounds).translate(_offset);
+    return this.renderer.frustum.intersectsBox(_bounds);
   }
 
   dispose(): void {

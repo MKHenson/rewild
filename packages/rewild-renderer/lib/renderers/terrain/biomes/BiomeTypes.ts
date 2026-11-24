@@ -208,6 +208,8 @@ export interface BiomeCreatures {
   spread?: number; // metres from the group's home its animals spawn
   drift?: number; // m/s the group's home drifts. Omitted ⇒ it stays put
   roam?: number; // metres from where it spawned the home may drift
+  settle?: [number, number]; // seconds the home rests between drifts. Needs `travel`
+  travel?: [number, number]; // seconds each drift lasts. Omitted ⇒ it drifts without rest
   depth?: Selector; // metres of water from the bed to the surface; 0 when dry
   shore?: Selector; // metres to dry ground, up to SHORE_CAP; 0 when dry
 }
