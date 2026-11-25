@@ -49,6 +49,20 @@ export class Level extends Container {
     return super.addChild(node);
   }
 
+  /** The asset with this id in the level or any of its containers, active or not. */
+  findAssetById(id: string): IAsset | null {
+    const own = this.findObjectById(id);
+    if (own) return own;
+    const children = this.children;
+    for (let i: i32 = 0, l = children.length; i < l; i++) {
+      const child = children[i];
+      if (!(child instanceof Container)) continue;
+      const asset = child.findObjectById(id);
+      if (asset) return asset;
+    }
+    return null;
+  }
+
   /** When an exit portal is trigged for a level, it will signal to the runtime to exit */
   onPortalTriggered(portalEntered: Portal): void {
     super.onPortalTriggered(portalEntered);

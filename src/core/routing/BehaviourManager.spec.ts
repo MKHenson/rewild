@@ -3,6 +3,7 @@ import { BehaviourState, IBehaviour } from 'rewild-routing';
 import { Asset3D } from './Asset3D';
 import { BehaviourManager } from './BehaviourManager';
 import { PortalTrigger } from './behaviours/PortalTrigger';
+import { PortalAsset } from './PortalAsset';
 import { Spin } from './behaviours/Spin';
 
 /** Counts its own updates and remembers a target by id. */
@@ -106,6 +107,24 @@ describe('PortalTrigger', () => {
     expect(copy.serialize()).toEqual({ armed: true });
     copy.onMount();
     expect(copy.serialize()).toEqual({ armed: false });
+  });
+
+  it('round-trips whether its portal is locked', () => {
+    const portal = (locked: boolean): PortalAsset =>
+      Object.assign(Object.create(PortalAsset.prototype), { locked });
+    const unlocked = portal(true);
+    const trigger = new PortalTrigger();
+    trigger.onAdded(unlocked);
+    unlocked.doAction('unlock');
+
+    const saved = JSON.parse(JSON.stringify(trigger.serialize()));
+    const loaded = portal(true);
+    const copy = new PortalTrigger();
+    copy.onAdded(loaded);
+    copy.restore(saved);
+
+    expect(saved).toEqual({ armed: false, locked: false });
+    expect(loaded.locked).toBe(false);
   });
 });
 

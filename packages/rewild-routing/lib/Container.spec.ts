@@ -39,6 +39,15 @@ describe('Container', () => {
     expect(container.findObjectByName('Asset2')).toBe(asset2);
   });
 
+  it('finds assets by id', () => {
+    const container = new Container('Test', true, new Asset3D('Test', '1'));
+    const asset = new Asset3D('Asset', '2');
+    container.addAsset(asset);
+
+    expect(container.findObjectById('2')).toBe(asset);
+    expect(container.findObjectById('Asset')).toBeNull();
+  });
+
   it('removes objects from the parent object when unmounted', () => {
     const parent = new Asset3D('Parent', '1');
     const childObject = new Asset3D('Child', '2');

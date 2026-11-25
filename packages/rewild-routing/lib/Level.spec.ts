@@ -91,4 +91,17 @@ describe('Level', () => {
     expect(container.mounted).toBe(false);
     expect(level.mounted).toBe(false);
   });
+
+  it('finds an asset by id in any container, active or not', () => {
+    const level = new Level('Test', new Asset3D('Test', '1'));
+    const active = new Container('Active', true, new Asset3D('Test', '1'));
+    const inactive = new Container('Inactive', false, new Asset3D('Test', '1'));
+    const asset = new Asset3D('Portal', 'portal-id');
+    inactive.addAsset(asset);
+    level.addChild(active);
+    level.addChild(inactive);
+
+    expect(level.findAssetById('portal-id')).toBe(asset);
+    expect(level.findAssetById('missing')).toBeNull();
+  });
 });

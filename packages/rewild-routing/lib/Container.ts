@@ -46,6 +46,13 @@ export class Container extends Node {
     return null;
   }
 
+  findObjectById(id: string): IAsset | null {
+    const objects = this.objects;
+    for (let i: i32 = 0, l = objects.length; i < l; i++)
+      if (objects[i].id == id) return objects[i];
+    return null;
+  }
+
   get assets(): IAsset[] {
     return this.objects;
   }
