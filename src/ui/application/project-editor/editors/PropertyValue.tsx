@@ -17,6 +17,7 @@ import {
 } from 'rewild-ui';
 import { CameraCapture } from './custom-value-editors/CameraCapture';
 import { LevelSelect } from './custom-value-editors/LevelSelect';
+import { ActionSelect } from './custom-value-editors/ActionSelect';
 
 interface Props<T> {
   type: PropValueType;
@@ -56,6 +57,16 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
             readOnly={this.props.readonly}
             value={value as string}
             onChange={(levelId) => onChange?.(levelId as T)}
+          />
+        );
+      }
+
+      if (this.props.customEditor === 'action-select') {
+        return (
+          <ActionSelect
+            readOnly={this.props.readonly}
+            value={value as PropValueObject}
+            onChange={(action) => onChange?.(action as T)}
           />
         );
       }
