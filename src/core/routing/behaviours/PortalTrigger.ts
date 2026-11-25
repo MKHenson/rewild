@@ -11,21 +11,35 @@ const ARM_MARGIN = 1.5;
  * Opens the portal as the player nears it and takes them to its target level
  * when they touch it once it is open. Arms only once the player has been clear
  * of it, so arriving next to a return portal does not send them straight back.
+ * Its state also holds whether the portal is locked.
  */
 export class PortalTrigger implements IBehaviour {
   name = 'portal-trigger';
   private armed = false;
+  private portal: PortalAsset | null = null;
+
+  onAdded(asset: IAsset): void {
+    if (asset instanceof PortalAsset) this.portal = asset;
+  }
+
+  onRemoved(): void {
+    this.portal = null;
+  }
 
   onMount(): void {
     this.armed = false;
   }
 
   serialize(): BehaviourState {
-    return { armed: this.armed };
+    const state: BehaviourState = { armed: this.armed };
+    if (this.portal) state.locked = this.portal.locked;
+    return state;
   }
 
   restore(state: BehaviourState): void {
     if (typeof state.armed === 'boolean') this.armed = state.armed;
+    if (typeof state.locked === 'boolean' && this.portal)
+      this.portal.locked = state.locked;
   }
 
   onUpdate(delta: f32, _total: u32, asset: IAsset): void {

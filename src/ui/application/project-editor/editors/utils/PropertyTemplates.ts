@@ -159,6 +159,11 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
     valueType: 'string',
     customEditor: 'level-select',
   },
+  // A locked portal stays closed until an action unlocks it.
+  locked: {
+    label: 'Locked',
+    valueType: 'boolean',
+  },
   'camera-transform': {
     label: 'Camera Transform',
     valueType: 'object',

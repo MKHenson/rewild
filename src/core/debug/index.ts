@@ -17,6 +17,7 @@ import { registerPlayerDebugCommands } from './PlayerDebugCommands';
 import { registerTerrainDebugCommands } from './TerrainDebugCommands';
 import { registerCreatureDebugCommands } from './CreatureDebugCommands';
 import { registerUIDebugCommands } from './UIDebugCommands';
+import { registerActionDebugCommands } from './ActionDebugCommands';
 import {
   registerScatterDebugCommands,
   registerWindDebugCommands,
@@ -46,4 +47,5 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerPlayerDebugCommands();
   registerCreatureDebugCommands();
   registerUIDebugCommands(renderer);
+  registerActionDebugCommands();
 }

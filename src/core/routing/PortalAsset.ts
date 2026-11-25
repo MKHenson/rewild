@@ -18,6 +18,7 @@ import { GameManager } from '../GameManager';
 import { PortalTrigger } from './behaviours/PortalTrigger';
 import { audio } from '../audio/audio';
 import { InteractionLayer } from '../InteractionLayer';
+import { IActionTarget, PortalAction } from './actions';
 
 /** The level file a portal shows: its destination seen from that level's PlayerStart. */
 export const PORTAL_VIEW_ASSET_TYPE = 'portal-view';
@@ -43,9 +44,10 @@ const MARKER_HEIGHT = 1.5;
 /**
  * A sphere that shows its target level and takes the player there. In a game
  * it starts closed, small and bobbing, and opens as the player nears it (see
- * PortalOpening); in the editor it is always open.
+ * PortalOpening); in the editor it is always open. A locked portal stays
+ * closed until an action unlocks it.
  */
-export class PortalAsset extends Asset3D {
+export class PortalAsset extends Asset3D implements IActionTarget {
   readonly pass = new PortalPass();
   readonly sphere: Mesh;
   /** Glows in the tint and flashes with the lightning. */
@@ -59,6 +61,10 @@ export class PortalAsset extends Asset3D {
   private markerPass: SpritePass | null = null;
   /** Open in the editor; `mount` closes it for a game. */
   opening = new PortalOpening(true);
+  /** Keeps it closed however near the player comes. Actions change it in a game. */
+  locked = false;
+  /** The `locked` property last read, so a remount keeps a lock that an action changed. */
+  private lockedProperty: boolean | null = null;
 
   private renderer: Renderer;
   private readLevel: LevelReader | null;
@@ -114,10 +120,27 @@ export class PortalAsset extends Asset3D {
     this.sound?.hum(this.transform.position, this.radius);
   }
 
+  /** Does what another asset tells it to. See `PORTAL_ACTIONS`. */
+  doAction(action: PortalAction): void {
+    switch (action) {
+      case 'unlock':
+        this.locked = false;
+        break;
+      case 'lock':
+        this.locked = true;
+        break;
+      case 'toggle':
+        this.locked = !this.locked;
+        break;
+    }
+  }
+
   /** Opens or closes the portal by how near `eye` is, `seconds` after the last tick. */
   tick(seconds: number, eye: Point): void {
     const distance = eye.distanceTo(this.transform.position);
-    switch (this.opening.update(seconds, distance, this.radius)) {
+    // A locked portal acts as if the player is out of range, so it closes and stays closed.
+    const reach = this.locked ? Infinity : distance;
+    switch (this.opening.update(seconds, reach, this.radius)) {
       case 'opening':
         this.sound?.open(this.transform.position);
         break;
@@ -174,6 +197,11 @@ export class PortalAsset extends Asset3D {
     }
     if (typeof properties.intensity === 'number')
       this.pass.portal.glow = properties.intensity;
+    const locked = properties.locked === true;
+    if (locked !== this.lockedProperty) {
+      this.lockedProperty = locked;
+      this.locked = locked;
+    }
     this.applyOpening();
 
     this.targetLevel = (properties.targetLevel as string) || '';

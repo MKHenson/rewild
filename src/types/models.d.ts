@@ -40,6 +40,7 @@ declare module 'models' {
     | 'intensity'
     | 'radius'
     | 'targetLevel'
+    | 'locked'
     | 'camera-transform';
   export type PropValueType =
     | 'string'

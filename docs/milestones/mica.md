@@ -700,6 +700,8 @@ Mica runs on a bare `GPUDevice` and a canvas. It does not need the game's `Rende
 | `printUITree(name?)`       | Prints the tree of a surface, or of all surfaces: each node's path, rectangle, text, icon, effect and style       |
 | `printUIFocus()`           | Prints the focus scope, the focused node of each surface, and the node under each pointer                         |
 | `addUIWorldPanel()`        | Stands a test glass panel 2 m in front of the camera, facing it. Its button logs a click. `clearUIWorldPanels()` removes them |
+| `listActionTargets()`      | Lists the assets of the level that have actions: id, name, type, actions, and whether a portal is locked          |
+| `doAction(target, action)` | Tells an asset to do an action, such as `doAction('Portal', 'unlock')`. The target is an id or a name             |
 
 - **One overlay.** `UIRenderer.showLayout` sets the overlay on all its surfaces, and on surfaces made later. The inspector's switch uses it too.
 - **What shows.** The overlay leaves out a surface whose root is hidden, and a node at opacity 0 with its children. A closed modal stays in its tree at opacity 0, and its boxes would hide the boxes that show.
