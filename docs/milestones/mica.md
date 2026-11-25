@@ -850,17 +850,17 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: ray to surface pixel, the look-at ray source, reach, blocking by the scene, the crosshair, click by mouse, E and gamepad A.
   - Expect: looking at a button within reach shows the crosshair and lights the button. Past reach, or from behind, nothing shows.
 
-- [ ] **17. Locked portals and actions**
+- [x] **17. Locked portals and actions**
 
   - Scope: `actions.ts` with the portal's actions. `doAction` on the portal. The `locked` property and its editor entry. The locked state saved as behaviour state. Find an asset by id across the level's containers.
   - Expect: a locked portal stays closed when the player walks up to it. A console call to `unlock` opens it as the player nears it, and it stays unlocked after a save and a load. A portal that is not locked works as today.
 
-- [ ] **18. The `action-select` editor**
+- [x] **18. The `action-select` editor**
 
   - Scope: the custom editor with target and action dropdowns, filled from `assetActions`. The action clears when the target changes. An incomplete action shows as an error.
   - Expect: picking a portal as the target lists Unlock, Lock and Toggle, and the value saves as one `action` property.
 
-- [ ] **19. The personal assistant**
+- [x] **19. The personal assistant**
 
   - Scope: `UISurface3D` and the renderer collecting it from the scene. `depthTest: false` on world surfaces. A mouse ray into `UIInput.ray`. `PersonalAssistant` with the hand, the open and close move, the hologram glass, the tab column, the Portal tab and the Close button. I, the mouse freed and locked again, and no pause while it is open.
   - Expect: in the game, I brings the panel up from the right side to cover most of the view, and the level shows through it. The mouse is free, and Unlock on the Portal tab unlocks the level's portal. I takes the panel down and locks the mouse. The Close button takes it down and locks the mouse. A wall in front of the player does not hide the panel.
