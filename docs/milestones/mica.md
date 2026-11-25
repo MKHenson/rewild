@@ -33,7 +33,7 @@ The DOM stays the home of most of the UI. Mica is for the UI a player uses while
 | HUD: health, hunger, stamina, oxygen, temperature | Mica | 1 |
 | In-game menu, game over             | Mica     | 2     |
 | Settings, from the in-game menu     | Mica     | 3     |
-| WorldPanel: a panel in the level that opens a portal | Mica | 4 |
+| Personal assistant: a menu on the player's hand that opens a portal | Mica | 4 |
 | Hotbar, inventory, prompts          | Mica     | Later |
 
 Both UIs read the same theme values, so they look like one product. See Theme.
@@ -47,7 +47,7 @@ Both UIs read the same theme values, so they look like one product. See Theme.
 | **1. Boxes and bars**  | The package and the UI inspector, nodes, surfaces, style, the batched pass, flex layout, meters, device pixel ratio. The old GPU UI goes | The HUD bars                    |
 | **2. The menu**        | Text v2, icons, events, focus, gamepad, glass, theme, transitions. Button and Modal                         | In-game menu, game over         |
 | **3. Settings**        | Popups, form controls: tabs, select, slider, switch, field                                                  | Settings in the game            |
-| **4. In the world**    | World surfaces, the look-at pointer and crosshair, locked portals, actions, the WorldPanel asset            | An "Open Portal" WorldPanel     |
+| **4. In the world**    | World surfaces, the look-at pointer and crosshair, locked portals, actions, the personal assistant         | The assistant's Portal tab      |
 
 Each stage is playable on its own. Stage 1 looks the same as today on purpose: it proves the new parts against a UI we know. From Stage 3, Settings in the in-game menu opens the Mica panel. The main menu's `/settings` route keeps the DOM panel.
 
@@ -87,7 +87,7 @@ The MSDF shader is right in principle. It takes the median, finds the screen pix
 | Style         | A typed style object per node. Names follow CSS where the meaning is the same. No CSS text, no classes, no cascade. Theme values are shared with the DOM. See Style       |
 | Old GPU UI    | Replaced, not extended. `UIElement`, `GuiManager`, the UI passes and `TextRenderer` go when the HUD bars move in Stage 1                                                   |
 | Drawing       | One primitive stream per surface, in tree order, drawn by one pipeline                                                                                                   |
-| World UI      | Stage 4 adds the WorldPanel asset: a panel in the level that the player walks around and looks at to use. Its first job is to open a portal                             |
+| World UI      | Stage 4 adds the personal assistant: a menu on the player's hand, in 3D, that the player opens with I. It proves the VR use. Its first job is to open a portal            |
 | Actions       | An asset type declares the actions it can do, in one TypeScript file that the game and the editor share. One `action` property holds a target and an action. See Actions |
 | VR            | A future goal. No headset yet. World surfaces and ray pointers are the parts VR needs                                                                                   |
 
@@ -338,7 +338,7 @@ The shape follows the DOM.
   | Mode    | Takes                                                                          | Used by        |
   | ------- | ------------------------------------------------------------------------------ | -------------- |
   | `none`  | Nothing. Its nodes get no events                                               | The HUD        |
-  | `nodes` | Pointer input over a node other than the root. The default                     | WorldPanel, later |
+  | `nodes` | Pointer input over a node other than the root. The default                     | The assistant  |
   | `all`   | All pointer, key and gamepad input while its root shows. See Focus and gamepad | The menu       |
 
   A press that a surface takes stays taken until it is up, and a press that starts in the game stays in the game. `UIInput` listens on the window in the capture phase. When a surface takes a DOM event, the event stops there, so no listener of the game gets it. A click on Resume does not also act in the game. Keys typed in a DOM control are not taken.
@@ -523,9 +523,9 @@ The in-game settings use the same settings data as the DOM panel: render quality
 
 ## In the world (Stage 4)
 
-A player walks up to a glass panel that stands in the level. It reads "Open Portal". They walk round it and see its back. They look at the button, a crosshair shows and the button lights up. They click, and the portal beside it starts to open.
+A player walks up to a portal that stays closed. They press I. A glass panel comes up from their side, as a watch on their arm would, and stops in front of them. It covers most of the view, and the level shows through it. The mouse is free. They click the Portal tab's Unlock button, press I again, and the panel goes back down. The portal opens as they near it.
 
-The panel is a WorldPanel asset. A designer drags it into the level in the editor, the same as a portal, and points its action at the portal.
+The panel is the personal assistant. In VR it will be on a controller, and the controller's ray will point at it. On the desktop the mouse points at it. It is the first proof of the VR use: a menu that moves in 3D with the player, and takes a ray as its input.
 
 ### World surfaces
 
@@ -546,6 +546,10 @@ const panel = renderer.ui.createSurface({
 panel.worldMatrix.set(transform.matrixWorld.elements);
 ```
 
+- **In the scene.** `UISurface3D` in `rewild-renderer` owns a world surface and a transform, the same as `Sprite3D` owns a sprite. Add its transform to the scene to show the surface, and remove it to hide it. The renderer collects each `UISurface3D` in the scene each frame, gives its surface the transform's world matrix, and adds the surface to the UI or takes it out. A raycast hits its quad, from the front or the back.
+- **Over the scene.** A world surface can skip the depth test, with `depthTest: false`, so walls and terrain do not hide it. The assistant does this, because it is close to the eye and must always show. It still draws in 3D, but in the screen UI's pass, under the screen surfaces. So it draws at the canvas's resolution, not at the scene's lower render scale, and its text is as sharp as screen text.
+- **Surface effects.** A surface effect moves and colours a whole world surface, as a node effect colours one box. It is two WGSL functions, `surfacePlace` and `surfaceColor`, registered with `UIEffects.registerSurface` and named in the surface's `effect`. They read the surface's `effectValue`, a uniform, so a change needs no repaint. `surface.wgsl` is the plain one, which changes nothing.
+- **The hologram.** The built-in surface effect `hologram`, in `hologram.wgsl`. As `effectValue` goes from 0 to 1, a dot of light stretches into a line, and the line opens into the surface with glowing top and bottom edges and drifting scanlines. The surface then flickers twice and settles. From 1 to 0 it turns off the same way. `surfacePlace` squeezes the surface toward its centre, so its transform and its layout do not change.
 - **Placing it.** `worldMatrix` places the surface, column-major. The local origin is the centre of the surface, x points right, y points up and the front faces +z. `size` and `pixelsPerMetre` can change, and the surface lays out again.
 - **Drawing.** `UIRenderer.renderWorld` draws the world surfaces, far ones first, once per frame before `render`. The renderer calls it after the tone map, into the frame at the scene size, so world UI has the same colours as screen UI. Rain and the overlays draw after it. It tests the scene depth and does not write it, because the boxes of a surface all lie in one plane. A surface wholly out of view lays out and does not draw.
 - **One shader.** Screen and world surfaces share `ui.wgsl`. A uniform matrix maps the surface's pixels to clip space. A world surface works out its device pixels per CSS pixel from derivatives, for its edges, text and shadows, and grows each quad by one device pixel for the anti-aliased edge. Each effect has a second pipeline for world surfaces, with depth.
@@ -574,23 +578,21 @@ look.release('mouse'); // clicks when no other source holds the pointer
 
 - **The code.** `UIInput.ray` turns a ray into pointer events, with `pointerType: 'ray'`. `rayToSurface` in `lib/world.ts` finds the surface pixel. `UILookPointer` owns the crosshair and the presses. `Player` in `src/core/routing` aims it, casts the blocking ray, and gives it the mouse, E and A. An XR controller can use `UIInput.ray` the same way.
 
-### The WorldPanel asset
+### The personal assistant
 
-A WorldPanel is a new asset type, `world-panel`. It is in the editor's Game group in `templates/actors-library.json`, next to Portal.
+A menu that the player wears, as a watch on the arm. Later it goes on a VR controller. It is not an asset, and the editor does not place it. The player always has it.
 
-- **Placing it.** Drag it from the asset list into the level. It shows at once where it lands, as a 3D glass panel at its set size, with its text and its button. Where it stands and which way it faces are its transform.
-- **In the editor.** The panel draws the same as in the game, but its button takes no input. A click selects the panel, the same as any asset, so the editor's picking must hit the panel's quad.
-- **In the game.** The button works through the look-at pointer. A click calls the panel's action.
-- **Code.** `WorldPanelAsset`, built the same way as `PortalAsset`. It owns a world surface with a `Label` and a `Button`.
-
-| Property     | Value                          | Editor                               |
-| ------------ | ------------------------------ | ------------------------------------ |
-| `panelSize`  | Width and height in metres     | Number fields                        |
-| `text`       | The panel's message            | Text field                           |
-| `buttonText` | The button's label             | Text field                           |
-| `action`     | A target asset and an action   | `action-select`. See Actions         |
-
-The property names do not use `target` or `size`, because `target` is already a light's `vec3` property.
+- **The hand.** A transform that is a child of the camera, so it moves with the view. It has no model yet. At rest it is low at the player's right side, out of view.
+- **Opening.** I opens it. The panel's `UISurface3D` goes onto the hand, and the hand moves up from the side to in front of the eye over 1 s, with an ease out. It turns to face the eye as it comes. Once the hand is a third of the way up, the panel's hologram turns on over 1.5 s, on its own clock. The panel takes input only once the hand is up and the hologram is on. I again, or its Close button, closes it: the hologram turns off, then the hand goes back down, and then the panel leaves the scene.
+- **Breathing.** While the hand is raised, it sways as the player breathes: it rises and falls 8 mm over a 4 s breath, tilts a little with it, and drifts 3 mm to each side more slowly. So the panel feels held, not fixed to the screen.
+- **Size and place.** The panel stands 0.5 m in front of the eye and covers 85% of the view's height and width. Its size comes from the camera's field of view and aspect each time it opens. It lays out at 900 px tall at any size, so its text is the size of screen text.
+- **Look.** The modal's glass, from the theme, with its white light on the glass and its edge that follows the pointer. The level shows through it. The glass is a node that fills the surface, not the root, because the root lets the pointer through.
+- **The mouse.** Opening frees the mouse, so the player can point at the panel. A ray from the eye through the mouse goes to `UIInput.ray`, the same as a VR controller's ray will. While the panel is open, the mouse does not look round and the look-at pointer stops. The player can still move.
+- **Closing.** I closes it and locks the mouse again. The Close button at the top right closes it, and the click that pressed it locks the mouse. Escape and the gamepad's Start close it and open the in-game menu, as they do in play. Death closes it too.
+- **Not a pause.** Freeing the mouse for the assistant does not open the in-game menu. A click on the canvas does not lock the mouse while the assistant is open.
+- **Tabs.** A column of tabs at the left. One tab for now, Portal. Later tabs add more of the game's UI.
+- **The Portal tab.** The portal's name and whether it is locked, and one button for each portal action from `PORTAL_ACTIONS`: Unlock, Lock and Toggle. A level has at most one portal. The tab finds it in the level, in any container, and a click calls its `doAction`. With no portal in the level, the tab says so and shows no buttons.
+- **The code.** `src/core/assistant`: `PersonalAssistant` owns the hand, the panel and the tabs. `PortalTab` is the Portal tab. `MouseRay` turns the free mouse into a ray. `Player` owns them, gives them I and the mouse, and moves the hand each frame. `GameManager` closes it when Escape or Start opens the in-game menu.
 
 ### Actions
 
@@ -636,9 +638,9 @@ doAction(action: keyof typeof PORTAL_ACTIONS) {
 1. **Target**: the assets that have actions, in every container of the level.
 2. **Action**: the actions of the chosen target's type, from `assetActions`. It is empty until a target is chosen, and it clears when the target changes.
 
-A panel with a target and no action is incomplete, and the editor shows it as an error.
+A value with a target and no action is incomplete, and the editor shows it as an error. No asset uses the `action` property yet. It is ready for a later asset, such as a switch or a trigger.
 
-**In the game.** On a click, the WorldPanel finds its target by id, in any container of the level, and calls `doAction`. Today `Container` finds assets only by name, so the level gets a lookup by id across its containers. An id stays the same when an asset is renamed.
+**In the game.** A caller, such as the assistant's Portal tab, finds its target by id, in any container of the level, and calls `doAction`. Today `Container` finds assets only by name, so the level gets a lookup by id across its containers. An id stays the same when an asset is renamed.
 
 A target can be in a container that is not active. The action still changes the target's state, and the change shows when its container becomes active.
 
@@ -646,18 +648,19 @@ A target can be in a container that is not active. The action still changes the 
 
 ### Portals
 
-Today a portal opens when the player comes within `OPEN_RANGE` of it and closes past `CLOSE_RANGE` (`PortalOpening.ts`). Stage 4 adds a portal that waits for a panel:
+Today a portal opens when the player comes within `OPEN_RANGE` of it and closes past `CLOSE_RANGE` (`PortalOpening.ts`). Stage 4 adds a portal that waits for the player to unlock it:
 
 - **Locked.** A portal can start locked. A locked portal stays closed, small and bobbing, however near the player comes.
 - **The `locked` property.** A boolean on the portal, set in the editor. Off by default.
 - **Unlocked.** The `unlock` action unlocks the portal. From then on the portal opens and closes by distance, the same as today. The `lock` action locks it again and it closes.
-- **Default.** A portal with no panel works as today, so no level changes.
+- **Default.** A portal that is not locked works as today, so no level changes.
 - **Saved.** The unlocked state is behaviour state, the same as `PortalTrigger`'s `armed`, so it survives a save and a load.
 
 ### Later
 
 - An XR session, with the camera driven by the headset, and XR controllers as ray sources.
-- A VR menu on a world surface in front of the player.
+- The assistant on a VR controller, with the controller's ray pointing at it.
+- A model for the player's arm. See ticket 20.
 - Sizes and distances tuned on real hardware, in a headset and on handheld devices.
 
 The renderer uses WebGPU. An XR session needs the browser to share WebXR with WebGPU, so that work starts with checking browser support.
@@ -721,7 +724,7 @@ Mica runs on a bare `GPUDevice` and a canvas. It does not need the game's `Rende
 - Moving the main menu, project views or editor off the DOM.
 - An XR session and XR controllers. World surfaces and the look-at ray are the parts they need.
 - Actions on asset types other than the portal.
-- Events that an asset fires, and more than one action per panel. Scripting adds these.
+- Events that an asset fires, and more than one action per `action` property. Scripting adds these.
 
 ---
 
@@ -739,13 +742,13 @@ None at the moment.
 - **Style.** Typed properties with CSS names where they fit. Reuse the theme values, not the CSS.
 - **JSX.** Not needed. A builder API is enough.
 - **A headset.** None yet. Stage 4 builds world UI the player uses on the desktop.
-- **Stage 4's first use.** A WorldPanel in the level that opens a portal.
-- **Panel and portal.** The WorldPanel is a separate asset. Its `action` property names the portal and the action.
+- **Stage 4's first use.** The personal assistant, whose Portal tab opens the level's portal. It replaced a WorldPanel asset placed in the level, because a menu on the hand proves the VR use better.
+- **Which portal.** A level has at most one portal, so the Portal tab needs no target picker.
 - **Target and action.** One `action` property holds both. The editor knows both halves must be set.
 - **Where actions live.** In `src/core/routing/actions.ts`, shared by the game and the editor.
-- **Glass in the world.** A world panel's blur uses last frame's image. The one-frame lag cannot be seen.
-- **Closing a portal.** A second WorldPanel with the `lock` action, or one with `toggle`.
-- **Which targets.** Any asset with actions in any container of the level, not only the panel's own container.
+- **Glass in the world.** A world surface's blur uses last frame's image. The one-frame lag cannot be seen.
+- **Closing a portal.** The Portal tab's Lock or Toggle button.
+- **Which targets.** Any asset with actions in any container of the level.
 - **A package.** `rewild-gpu-ui`, from the start. See The package.
 - **The blur source.** `renderer.sceneColorTarget`, blurred at a quarter resolution with the tone map applied. See Glass.
 - **Fonts.** One Roboto atlas with regular and bold.
@@ -857,7 +860,12 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: the custom editor with target and action dropdowns, filled from `assetActions`. The action clears when the target changes. An incomplete action shows as an error.
   - Expect: picking a portal as the target lists Unlock, Lock and Toggle, and the value saves as one `action` property.
 
-- [ ] **19. The WorldPanel asset**
+- [ ] **19. The personal assistant**
 
-  - Scope: the `world-panel` resource type, its entry in `actors-library.json`, `WorldPanelAsset` with a label and a button on a world surface, its properties, editor picking on its quad. A click calls its action.
-  - Expect: a WorldPanel dragged into the level shows as a glass panel with its text and button, in the editor and in the game. In the game, looking at "Open Portal" and clicking unlocks the portal beside it.
+  - Scope: `UISurface3D` and the renderer collecting it from the scene. `depthTest: false` on world surfaces. A mouse ray into `UIInput.ray`. `PersonalAssistant` with the hand, the open and close move, the hologram glass, the tab column, the Portal tab and the Close button. I, the mouse freed and locked again, and no pause while it is open.
+  - Expect: in the game, I brings the panel up from the right side to cover most of the view, and the level shows through it. The mouse is free, and Unlock on the Portal tab unlocks the level's portal. I takes the panel down and locks the mouse. The Close button takes it down and locks the mouse. A wall in front of the player does not hide the panel.
+
+- [ ] **20. A model for the player's arm**
+
+  - Scope: a model on the assistant's hand, so the player sees their arm come up with the panel.
+  - Expect: opening the assistant shows the arm move up from the side with the panel on its wrist.

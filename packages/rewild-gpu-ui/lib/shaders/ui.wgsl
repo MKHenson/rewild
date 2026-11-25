@@ -12,6 +12,16 @@
 // and icons from the font atlas and the icon atlas, and shadows from the box.
 // A glass box lays its effect over the blurred backdrop.
 //
+// Each pipeline also adds one surface effect, which moves and colours a
+// whole surface, from the surface's `effectValue`:
+//
+//   fn surfacePlace(p: vec2f) -> vec2f
+//   fn surfaceColor(color: vec4f, p: vec2f) -> vec4f
+//
+// `p` is a point on the surface in CSS pixels. `surfacePlace` moves a corner
+// of a quad, and `surfaceColor` colours a finished, premultiplied pixel.
+// surface.wgsl is the plain one, which changes nothing.
+//
 // A world surface draws on a quad in the scene. From behind, it shows only its
 // glass boxes, as plain glass with no effect.
 
@@ -26,6 +36,8 @@ struct Uniforms {
   targetSize: vec2f,
   // 1 for a world surface, else 0.
   world: f32,
+  // The surface effect's value, such as its progress.
+  effectValue: f32,
   // Maps the surface's CSS pixels to clip space.
   clip: mat4x4f,
 };
@@ -125,7 +137,7 @@ fn vs(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) index: u
   let pad = pixel + outset;
   let p = rect.xy - pad + corner * (rect.zw + 2.0 * pad);
   var output: VertexOut;
-  output.position = u.clip * vec4f(p, 0.0, 1.0);
+  output.position = u.clip * vec4f(surfacePlace(p), 0.0, 1.0);
   output.index = index;
   output.local = p;
   return output;
@@ -280,6 +292,12 @@ fn insetShadow(prim: Primitive, p: vec2f) -> vec4f {
 
 @fragment
 fn fs(input: VertexOut, @builtin(front_facing) front: bool) -> @location(0) vec4f {
+  let p = select(input.position.xy / u.pixelRatio, input.local, u.world > 0.0);
+  return surfaceColor(shade(input, front), p);
+}
+
+// The colour of a primitive's pixel, premultiplied.
+fn shade(input: VertexOut, front: bool) -> vec4f {
   let world = u.world > 0.0;
   // The derivatives run before any branch, as WGSL needs.
   let dx = dpdx(input.local);
