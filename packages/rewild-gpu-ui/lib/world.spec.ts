@@ -109,6 +109,24 @@ describe('UISurface in the world', () => {
     size.width = 2;
     expect(surface.size.width).toBe(1);
   });
+
+  it('has no surface effect unless given one', () => {
+    const plain = new UISurface({ kind: 'world', name: 'a' });
+    expect(plain.effect).toBeNull();
+    expect(plain.effectValue).toBe(1);
+    const holo = new UISurface({
+      kind: 'world',
+      name: 'b',
+      effect: 'hologram',
+    });
+    expect(holo.effect).toBe('hologram');
+  });
+
+  it('tests the scene depth unless told not to', () => {
+    expect(new UISurface({ kind: 'world', name: 'a' }).depthTest).toBe(true);
+    const over = new UISurface({ kind: 'world', name: 'b', depthTest: false });
+    expect(over.depthTest).toBe(false);
+  });
 });
 
 describe('rayToSurface', () => {

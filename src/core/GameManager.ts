@@ -305,22 +305,30 @@ export class GameManager {
     registerScatterColliderCommands(this.scatterColliders);
   }
 
-  /** Losing the pointer, such as to Escape, opens the menu. */
+  /**
+   * Losing the pointer, such as to Escape, opens the menu. The personal
+   * assistant frees the pointer too, and that does not open the menu.
+   */
   private _handlePointerlockChange() {
-    if (!document.pointerLockElement) this.menus?.openMenu();
+    if (!document.pointerLockElement && !this.player.assistantOpen)
+      this.menus?.openMenu();
   }
 
   /**
-   * Escape opens the menu when the pointer is already free. While a menu is
-   * open, the UI takes the keys, so Escape closes it there.
+   * Escape opens the menu when the pointer is already free, such as while
+   * the personal assistant is open, which it closes. While a menu is open,
+   * the UI takes the keys, so Escape closes it there.
    */
   private _handleKeyDown(event: KeyboardEvent) {
-    if (event.key === 'Escape') this.menus?.openMenu();
+    if (event.key !== 'Escape') return;
+    this.player.closeAssistant(false);
+    this.menus?.openMenu();
   }
 
   /** Start opens the menu, and frees the mouse so it can point at it. */
   private openMenuFromPad(): void {
     if (this.menus?.state !== 'playing') return;
+    this.player.closeAssistant(false);
     this.menus.openMenu();
     if (document.pointerLockElement) document.exitPointerLock();
   }

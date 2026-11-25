@@ -8,6 +8,7 @@ export * from './core/Mesh';
 export * from './core/SkinnedMesh';
 export * from './core/SkinnedInstance';
 export * from './core/Sprite3D';
+export * from './core/UISurface3D';
 export * from './geometry/Geometry';
 export * from './core/lights';
 export * from './materials/IMaterialPass';

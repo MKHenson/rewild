@@ -2,13 +2,17 @@ import {
   gustField,
   gustShare,
   ICameraController,
+  PerspectiveCamera,
   WaterQuery,
   createWaterQuerySample,
 } from 'rewild-renderer';
 import type { WaterLens } from 'rewild-renderer/lib/renderers/water/WaterLens';
 import type { TerrainRenderer } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
-import { Node } from 'rewild-routing';
+import { Level, Node } from 'rewild-routing';
 import { Asset3D } from './Asset3D';
+import { PersonalAssistant } from '../assistant/PersonalAssistant';
+import { MouseRay } from '../assistant/MouseRay';
+import { levelPortal } from '../assistant/PortalTab';
 import { StateMachineData } from './Types';
 import { Raycaster } from 'node_modules/rewild-renderer/lib/core/Raycaster';
 import { SpotLight } from 'node_modules/rewild-renderer/lib/core/lights/SpotLight';
@@ -288,6 +292,8 @@ export class Player extends Node {
   // The look-at pointer, for the buttons of world panels.
   private _look: UILookPointer | null = null;
   private _lookRay: Ray | null = null;
+  private _assistant: PersonalAssistant | null = null;
+  private _mouseRay: MouseRay | null = null;
   private _stamina = new Stamina();
   private _oxygen = new Oxygen();
   private _body = new BodyTemperature();
@@ -380,6 +386,33 @@ export class Player extends Node {
     document.body.requestPointerLock();
   }
 
+  /** True while the personal assistant is open, so the mouse is free for it. */
+  get assistantOpen(): boolean {
+    return !!this._assistant?.isOpen;
+  }
+
+  /** Opens the personal assistant and frees the mouse to point at it. */
+  openAssistant(): void {
+    const assistant = this._assistant;
+    if (!assistant || assistant.isOpen || this._dead || !this._canvas) return;
+    const camera = this.cameraController as PerspectiveCamera;
+    assistant.open(camera.fov, camera.aspect);
+    if (document.pointerLockElement) document.exitPointerLock();
+    this._mouseRay?.attach(this._canvas);
+  }
+
+  /**
+   * Closes the personal assistant. With `relock`, it locks the mouse again.
+   * Without it, the next click on the canvas locks it.
+   */
+  closeAssistant(relock = true): void {
+    const assistant = this._assistant;
+    if (!assistant?.isOpen) return;
+    assistant.close();
+    this._mouseRay?.detach();
+    if (relock) this.requestLock();
+  }
+
   /** Sync internal yaw/pitch from the camera quaternion (e.g. after an external lookAt). */
   syncLookFromCamera() {
     _euler.setFromQuaternion(this.cameraController.camera.transform.quaternion);
@@ -395,6 +428,22 @@ export class Player extends Node {
 
     if (!this._hud) this._hud = createHud(stateData.renderer.ui);
     this._look ??= new UILookPointer(stateData.renderer.ui);
+    this._assistant ??= new PersonalAssistant(
+      () =>
+        levelPortal(
+          this.stateMachine?.nodes.find(
+            (node): node is Level => node instanceof Level
+          ) ?? null
+        ),
+      // The click that pressed Close goes on to the canvas, and the canvas's
+      // click handler locks the mouse. Locking here too would ask twice.
+      () => this.closeAssistant(false)
+    );
+    this._mouseRay ??= new MouseRay(
+      stateData.renderer.ui.input,
+      this.cameraController
+    );
+    this.cameraController.camera.transform.addChild(this._assistant.hand);
 
     this.hunger = 100.0;
     this.health = 100.0;
@@ -590,6 +639,9 @@ export class Player extends Node {
     document.removeEventListener('mousedown', this._onMouseDown);
     document.removeEventListener('mouseup', this._onMouseUp);
     this._look?.stop();
+    this._mouseRay?.detach();
+    this._assistant?.hide();
+    this._assistant?.hand.removeFromParent();
     document.removeEventListener(
       'pointerlockchange',
       this._onPointerlockChange
@@ -708,6 +760,7 @@ export class Player extends Node {
     this._collapseTime = collapseTime(this._eye - _LYING_EYE, speed);
     this._deathRoll = (Math.random() < 0.5 ? -1 : 1) * COLLAPSE_ROLL;
     this._releaseInput();
+    this.closeAssistant(false);
     this.onDeath?.();
   }
 
@@ -740,6 +793,7 @@ export class Player extends Node {
   onUpdate(delta: f32, total: u32): void {
     const alive = !this._dead;
     this._readGamepad(delta);
+    this._assistant?.update(delta);
 
     // Mouse look; a dying body levels its gaze and rolls onto its side.
     let pitch = this._pitch;
@@ -1281,6 +1335,10 @@ export class Player extends Node {
       this._downHeld = true;
       if (!e.repeat) this._toggleCrouch();
     } else if (e.code === 'KeyF') this._toggleFlashlight();
+    else if (e.code === 'KeyI' && !e.repeat) {
+      if (this.assistantOpen) this.closeAssistant();
+      else this.openAssistant();
+    }
   }
 
   private _toggleCrouch(): void {
@@ -1357,6 +1415,7 @@ export class Player extends Node {
   }
 
   private _handleCanvasClick() {
-    if (!this._isLocked && !this._dead) document.body.requestPointerLock();
+    if (!this._isLocked && !this._dead && !this.assistantOpen)
+      document.body.requestPointerLock();
   }
 }

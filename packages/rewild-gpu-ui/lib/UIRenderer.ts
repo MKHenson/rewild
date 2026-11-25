@@ -2,6 +2,7 @@ import { Matrix4 } from 'rewild-common';
 import type { UIFont } from './font';
 import type { UIIcons } from './icons';
 import meterEffect from './shaders/meter.wgsl';
+import hologramEffect from './shaders/hologram.wgsl';
 import { PRIMITIVE_FLOATS } from './stream';
 import { UITheme } from './theme';
 import { UIBackdrop, UIBackdropSource } from './UIBackdrop';
@@ -123,6 +124,9 @@ export class UIRenderer {
   private worldGlass = false;
   /** Draw calls in the last `renderWorld`, which `render` adds to its stats. */
   private worldDrawCalls = 0;
+  /** World surfaces with no depth test, in view, for `render` to draw. */
+  private over: UISurface[] = [];
+  private readonly overViewProjection = new Matrix4();
   private _font: UIFont | null = null;
   private _icons: UIIcons | null = null;
   private _showLayout = false;
@@ -168,6 +172,7 @@ export class UIRenderer {
     });
     this.effects = new UIEffects(device, format, layout, depthFormat);
     this.effects.register('meter', meterEffect);
+    this.effects.registerSurface('hologram', hologramEffect);
     this.uniforms = this.createUniforms('ui-uniforms');
     this.blur = new UIBackdrop(device);
     if (typeof document !== 'undefined') {
@@ -222,11 +227,20 @@ export class UIRenderer {
   }
 
   createSurface(options: UISurfaceOptions): UISurface {
-    const surface = new UISurface(options);
+    return this.addSurface(new UISurface(options));
+  }
+
+  /**
+   * Draws a surface made elsewhere, and sends input to it. It can come back
+   * after `removeSurface`: it paints again, because its buffers are gone.
+   */
+  addSurface(surface: UISurface): UISurface {
+    if (this._surfaces.includes(surface)) return surface;
     surface.font = this._font;
     surface.icons = this._icons;
     surface.theme = this.theme;
     surface.showLayout = this._showLayout;
+    surface.needsPaint = true;
     this._surfaces.push(surface);
     this._surfaces.sort((a, b) => a.order - b.order);
     return surface;
@@ -256,6 +270,8 @@ export class UIRenderer {
     const shown: { surface: UISurface; bindGroup: GPUBindGroup; w: number }[] =
       [];
     this.worldGlass = false;
+    this.over.length = 0;
+    this.overViewProjection.copy(target.viewProjection);
     for (const surface of this._surfaces) {
       if (surface.kind !== 'world') continue;
       const width = surface.layoutWidth;
@@ -272,6 +288,13 @@ export class UIRenderer {
         surface.pixelsPerMetre
       );
       if (outsideView(clip, width, height)) continue;
+      if (surface.stream.glass > 0) this.worldGlass = true;
+      // A surface over the scene draws in `render`, at the screen's
+      // resolution, which can be higher than the scene's.
+      if (!surface.depthTest) {
+        this.over.push(surface);
+        continue;
+      }
       this.writeUniforms(
         buffers.uniforms,
         width,
@@ -279,9 +302,9 @@ export class UIRenderer {
         1,
         target,
         clip,
-        true
+        true,
+        surface.effectValue
       );
-      if (surface.stream.glass > 0) this.worldGlass = true;
       // The distance to the centre, along the view.
       const e = clip.elements;
       const w = e[3] * (width / 2) + e[7] * (height / 2) + e[15];
@@ -364,6 +387,7 @@ export class UIRenderer {
     // with no pass left open.
     const runs = this.runs;
     runs.length = 0;
+    this.addOverRuns(viewport);
     for (const surface of this._surfaces) {
       const buffers = this.buffers.get(surface);
       if (surface.kind === 'screen' && buffers)
@@ -422,6 +446,46 @@ export class UIRenderer {
     }
   }
 
+  /**
+   * Adds the runs of the world surfaces that skip the depth test, far ones
+   * first, to draw under the screen surfaces at the screen's resolution.
+   */
+  private addOverRuns(viewport: UIViewport): void {
+    const over = this.over;
+    const shown: { surface: UISurface; bindGroup: GPUBindGroup; w: number }[] =
+      [];
+    for (const surface of over) {
+      const buffers = this.buffers.get(surface);
+      if (!buffers) continue;
+      const width = surface.layoutWidth;
+      const height = surface.layoutHeight;
+      const clip = worldClip(
+        this.clip,
+        this.overViewProjection,
+        surface.worldMatrix,
+        surface.size,
+        surface.pixelsPerMetre
+      );
+      this.writeUniforms(
+        buffers.uniforms,
+        width,
+        height,
+        1,
+        viewport,
+        clip,
+        true,
+        surface.effectValue
+      );
+      const e = clip.elements;
+      const w = e[3] * (width / 2) + e[7] * (height / 2) + e[15];
+      shown.push({ surface, bindGroup: buffers.bindGroup, w });
+    }
+    over.length = 0;
+    shown.sort((a, b) => b.w - a.w);
+    for (const { surface, bindGroup } of shown)
+      this.addRuns(surface, bindGroup, true);
+  }
+
   /** Adds the surface's runs of primitives that share an effect to `runs`. */
   private addRuns(
     surface: UISurface,
@@ -435,7 +499,12 @@ export class UIRenderer {
       while (end < count && effects[end] === effect) end++;
       this.runs.push({
         bindGroup,
-        pipeline: this.effects.pipeline(effect, world),
+        pipeline: this.effects.pipeline(
+          effect,
+          surface.effect,
+          world,
+          surface.depthTest
+        ),
         first,
         count: end - first,
       });
@@ -473,7 +542,8 @@ export class UIRenderer {
     pixelRatio: number,
     target: { width: number; height: number },
     clip: Matrix4,
-    world: boolean
+    world: boolean,
+    effectValue = 1
   ): void {
     const d = this.uniformData;
     d[0] = width;
@@ -483,7 +553,7 @@ export class UIRenderer {
     d[4] = target.width;
     d[5] = target.height;
     d[6] = world ? 1 : 0;
-    d[7] = 0;
+    d[7] = effectValue;
     d.set(clip.elements, 8);
     this.device.queue.writeBuffer(buffer, 0, d);
   }

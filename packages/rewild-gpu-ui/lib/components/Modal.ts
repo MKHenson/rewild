@@ -1,4 +1,4 @@
-import { glassSurface } from '../glassStyle';
+import { followPointerLight, glassSurface } from '../glassStyle';
 import { UIStyle } from '../style';
 import { UIChild, UINode } from '../UINode';
 import type { UISurface, UISurfaceOptions } from '../UISurface';
@@ -84,13 +84,7 @@ export class Modal {
     };
     Object.assign(root.style, backdrop);
     root.append(this.panel);
-    // The light starts at the top in the middle, as in the DOM.
-    this.panel.setEffectParams(0.5, 0, 1, 0);
-    this.panel.on('pointermove', (e) => {
-      const { x, y, width, height } = this.panel.rect;
-      if (width > 0 && height > 0)
-        this.panel.setEffectParams((e.x - x) / width, (e.y - y) / height, 1, 0);
-    });
+    followPointerLight(this.panel);
 
     root.on('keydown', (e) => {
       if (e.key === 'Escape') this.dismiss();

@@ -4,7 +4,7 @@ import { Player } from '../routing/Player';
 import { PortalAsset } from '../routing/PortalAsset';
 import { actionsOf, doAssetAction } from '../routing/actions';
 
-// Asset actions, before a WorldPanel can call them. A target is an asset's id
+// Asset actions, from the console. A target is an asset's id
 // or its name, in any container of the running level.
 export function registerActionDebugCommands() {
   const level = (name: string): Level | null => {

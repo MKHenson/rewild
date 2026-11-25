@@ -41,6 +41,13 @@ export interface UISurfaceOptions {
   size?: UIWorldSize;
   /** A world surface's layout pixels per metre. Defaults to 1,000. */
   pixelsPerMetre?: number;
+  /**
+   * False draws a world surface over the scene, so walls and terrain do not
+   * hide it. Defaults to true.
+   */
+  depthTest?: boolean;
+  /** A world surface's registered surface effect. See `UISurface.effect`. */
+  effect?: string | null;
 }
 
 /** Owns one UI tree and says where it draws. */
@@ -48,6 +55,8 @@ export class UISurface {
   readonly kind: UISurfaceKind;
   readonly name: string;
   readonly order: number;
+  /** False draws a world surface over the scene. See `UISurfaceOptions`. */
+  readonly depthTest: boolean;
   readonly root = new UINode();
   readonly stream = new PrimitiveStream();
   input: UISurfaceInput;
@@ -61,6 +70,17 @@ export class UISurface {
    * the world, not how sharp it is.
    */
   pixelsPerMetre: number;
+  /**
+   * A world surface's surface effect, which moves and colours the whole
+   * surface, or null for none. `hologram` is built in. Register more with
+   * `UIEffects.registerSurface`.
+   */
+  effect: string | null;
+  /**
+   * The value the surface effect reads, such as its progress. It needs no
+   * repaint. Screen surfaces share their uniforms, so it is 1 for them.
+   */
+  effectValue = 1;
   /**
    * Places a world surface in the world. The local origin is
    * the surface's centre, x points right, y points up and the front faces +z.
@@ -105,6 +125,8 @@ export class UISurface {
     this.kind = options.kind;
     this.name = options.name;
     this.order = options.order ?? 0;
+    this.depthTest = options.depthTest ?? true;
+    this.effect = options.effect ?? null;
     this.input = options.input ?? 'nodes';
     this.size = { ...(options.size ?? { width: 1, height: 1 }) };
     this.pixelsPerMetre = options.pixelsPerMetre ?? DEFAULT_PIXELS_PER_METRE;

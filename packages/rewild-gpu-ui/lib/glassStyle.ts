@@ -1,4 +1,20 @@
 import type { UIStyle } from './style';
+import type { UINode } from './UINode';
+
+/**
+ * Makes the white light on a glass box and its edge follow the pointer, as
+ * on the DOM modal. The light starts at the top in the middle. The box must
+ * take pointer input: on a surface whose root lets input through, it must
+ * not be the root.
+ */
+export function followPointerLight(glass: UINode): void {
+  glass.setEffectParams(0.5, 0, 1, 0);
+  glass.on('pointermove', (e) => {
+    const { x, y, width, height } = glass.rect;
+    if (width > 0 && height > 0)
+      glass.setEffectParams((e.x - x) / width, (e.y - y) / height, 1, 0);
+  });
+}
 
 /**
  * Frosted glass for a box that floats over the game: a modal or a menu. What

@@ -13,6 +13,7 @@ import { SceneSizeWatcher } from './utils/SceneSizeWatcher';
 import { RenderList } from './core/RenderList';
 import { RenderLayer } from './core/RenderLayer';
 import { Light } from './core/lights/Light';
+import { UISurface3D, UISurface3DList } from './core/UISurface3D';
 import { MipMapGenerator } from './textures/MipMapGenerator';
 import { SceneCategory } from './materials/IMaterialPass';
 import { MetricsRegistry } from './metrics/MetricsRegistry';
@@ -150,6 +151,9 @@ export class Renderer {
 
   /** Portals updated every frame, in view or not. */
   private readonly portals: PortalPass[] = [];
+
+  /** Shows the UI surfaces of the UISurface3Ds in the scene. */
+  private readonly uiSurfaces = new UISurface3DList();
 
   /** Heat haze in hot weather; one of the frame effects. */
   readonly heatShimmer = new HeatShimmer();
@@ -649,6 +653,8 @@ export class Renderer {
 
     if (transform.component instanceof Light) {
       this.currentRenderList.lights.push(transform.component);
+    } else if (transform.component instanceof UISurface3D) {
+      this.currentRenderList.surfaces.push(transform.component);
     }
 
     // Children inherit the overlay layer from their ancestor
@@ -677,6 +683,8 @@ export class Renderer {
 
     if (transform.component instanceof Light) {
       this.currentRenderList.lights.push(transform.component);
+    } else if (transform.component instanceof UISurface3D) {
+      this.currentRenderList.surfaces.push(transform.component);
     }
 
     for (let i = 0, l = transform.children.length; i < l; i++) {
@@ -1072,6 +1080,8 @@ export class Renderer {
     } else {
       this.projectObject(this.scene, pCamera.camera);
     }
+
+    this.uiSurfaces.update(this.currentRenderList.surfaces, this.ui);
 
     metrics.end('cpu.cull');
     metrics.begin('cpu.organize');
