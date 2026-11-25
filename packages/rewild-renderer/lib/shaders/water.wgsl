@@ -315,7 +315,12 @@ fn lakeEdgeFoam(input: VertexOutput, water: WaterSample, foamShade: f32) -> f32 
 // level it says nothing of the depth below, and on the level ray itself it
 // reads zero; there the water map's `mapDepth` takes over.
 fn sheetThickness(input: VertexOutput, mapDepth: f32) -> f32 {
-  let behind = textureLoad(refraction, vec2i(input.Position.xy), 0).a;
+  return thicknessAt(input, mapDepth, vec2i(input.Position.xy));
+}
+
+// As sheetThickness, to the capture's texel at `pixel`.
+fn thicknessAt(input: VertexOutput, mapDepth: f32, pixel: vec2i) -> f32 {
+  let behind = textureLoad(refraction, pixel, 0).a;
   let near = max(-input.viewPosition.z, 1e-4);
   let direction = normalize(input.viewPosition);
   let up = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
@@ -447,8 +452,20 @@ fn oceanPixel(input: VertexOutput, water: WaterSample, footprint: Footprint) -> 
 
 // Light reaching the eye from the bed: down to it and back up the view ray.
 fn waterTransmittance(water: WaterSample, NoV: f32) -> vec3f {
-  let path = water.depth * (1.0 + 1.0 / max(NoV, MIN_PATH_NOV));
+  return waterTransmittanceTo(water, water.depth, NoV);
+}
+
+// As waterTransmittance, from something `depth` metres down.
+fn waterTransmittanceTo(water: WaterSample, depth: f32, NoV: f32) -> vec3f {
+  let path = depth * (1.0 + 1.0 / max(NoV, MIN_PATH_NOV));
   return exp(-water.extinction * path);
+}
+
+// Metres down to what is seen from above at the capture's texel `pixel`, such
+// as a creature in the water, and never past the bed. Pass refractedPixel's,
+// so the depth is that of the colour seen.
+fn seenDepth(input: VertexOutput, water: WaterSample, pixel: vec2i) -> f32 {
+  return min(water.depth, thicknessAt(input, water.depth, pixel));
 }
 
 fn waterFresnel(NoV: f32) -> f32 {
@@ -561,12 +578,12 @@ fn screenUV(viewPosition: vec3f) -> vec2f {
   return vec2f(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
 }
 
-// The scene seen through the water at `pixel`. The ray bends into the water by
-// the wave normal N; the sample moves by how far that lands from where a flat
-// surface would bend it, since the scene behind is already drawn where a flat
-// surface puts it. A sample that lands on something in front of the water is
-// not under it, so the pixel keeps its own.
-fn refractedScene(input: VertexOutput, N: vec3f, depth: f32) -> vec3f {
+// The capture's texel seen through the water at the pixel. The ray bends into
+// the water by the wave normal N; the sample moves by how far that lands from
+// where a flat surface would bend it, since the scene behind is already drawn
+// where a flat surface puts it. A sample that lands on something in front of
+// the water is not under it, so the pixel keeps its own.
+fn refractedPixel(input: VertexOutput, N: vec3f, depth: f32) -> vec2i {
   let size = vec2i(textureDimensions(refraction));
   let pixel = vec2i(input.Position.xy);
   let direction = normalize(input.viewPosition);
@@ -576,9 +593,8 @@ fn refractedScene(input: VertexOutput, N: vec3f, depth: f32) -> vec3f {
   let level = screenUV(input.viewPosition + refract(direction, up, AIR_TO_WATER) * reach);
   let shifted = clamp(pixel + vec2i(round((bent - level) * vec2f(size))), vec2i(0), size - 1);
 
-  let behind = textureLoad(refraction, shifted, 0);
-  let own = textureLoad(refraction, pixel, 0);
-  return select(own.rgb, behind.rgb, behind.a > -input.viewPosition.z);
+  let behind = textureLoad(refraction, shifted, 0).a;
+  return select(pixel, shifted, behind > -input.viewPosition.z);
 }
 
 // The far plane's distance, from the projection.
@@ -729,7 +745,7 @@ fn fromBelow(viewPosition: vec3f, N: vec3f) -> FromBelow {
 }
 
 // The opaque scene above the water seen from below through Snell's window,
-// as refractedScene: the sample moves by how far the waves bend the ray from
+// as refractedPixel: the sample moves by how far the waves bend the ray from
 // where a flat surface would. w is 1 where the window shows the scene, 0
 // where it shows the sky.
 fn sceneAbove(input: VertexOutput, below: FromBelow) -> vec4f {
@@ -802,7 +818,8 @@ fn fs_absorb(input: VertexOutput, @builtin(front_facing) front: bool) -> @locati
   let NoV = clamp(dot(N, V), 1e-4, 1.0);
   // Foam hides the water beneath it.
   let foam = waterFoam(ocean, footprint.size, water);
-  let passed = (1.0 - waterFresnel(NoV)) * waterTransmittance(water, NoV) * (1.0 - foam);
+  let seen = refractedPixel(input, N, water.depth);
+  let passed = (1.0 - waterFresnel(NoV)) * waterTransmittanceTo(water, seenDepth(input, water, seen), NoV) * (1.0 - foam);
   if (waves.origin.w < -0.5) {
     return vec4f(shoreDistanceDebug(input.uv), 1.0);
   }
@@ -819,7 +836,7 @@ fn fs_absorb(input: VertexOutput, @builtin(front_facing) front: bool) -> @locati
     let above = sceneAbove(input, below);
     return vec4f(above.rgb * (1.0 - below.fresnel) * (1.0 - foam), water.coverage);
   }
-  return vec4f(refractedScene(input, N, water.depth) * passed, water.coverage);
+  return vec4f(textureLoad(refraction, seen, 0).rgb * passed, water.coverage);
 }
 
 @fragment
@@ -841,7 +858,8 @@ fn fs_light(input: VertexOutput, @builtin(front_facing) front: bool) -> @locatio
   let roughness = sqrt(alpha);
   let V = normalize(-viewPosition);
   let NoV = clamp(dot(normal, V), 1e-4, 1.0);
-  let transmittance = waterTransmittance(water, NoV);
+  let seen = refractedPixel(input, ocean.normal, water.depth);
+  let transmittance = waterTransmittanceTo(water, select(water.depth, seenDepth(input, water, seen), front), NoV);
 
   #include "./shader-lib/cloud-shadow.frag.wgsl"
   #include "./shader-lib/directional-shadow.frag.wgsl"

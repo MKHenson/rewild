@@ -188,6 +188,24 @@
       }
     },
     {
+      "name": "crab",
+      "type": "asset",
+      "preset": "crab",
+      "clips": { "idle": "pose" },
+      "clipSpeeds": { "walk": 0.4, "run": 1.1 },
+      "resource": {
+        "geometryId": "crab"
+      }
+    },
+    {
+      "name": "jellyfish",
+      "type": "asset",
+      "preset": "jellyfish",
+      "resource": {
+        "geometryId": "jellyfish"
+      }
+    },
+    {
       "name": "sardine-school",
       "type": "asset",
       "school": "sardine",

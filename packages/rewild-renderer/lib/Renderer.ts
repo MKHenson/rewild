@@ -50,9 +50,16 @@ const _projScreenMatrix = new Matrix4();
 const _uiViewProjection = new Matrix4();
 
 // Opaque, then water, then transparent: blended passes write no depth, so
-// water has to land before them.
+// water has to land before them. Passes drawn apart from the composite come
+// last; see renderSeeThrough.
 const drawRank = (group: IRenderGroup) =>
-  group.pass.transparent ? 2 : group.pass.profileCategory === 'water' ? 1 : 0;
+  group.pass.drawsInOwnPass
+    ? 3
+    : group.pass.transparent
+    ? 2
+    : group.pass.profileCategory === 'water'
+    ? 1
+    : 0;
 
 // Squared view distance of a group's first mesh, from the modelViewMatrix
 // render() fills in before organising the solids.
@@ -786,6 +793,41 @@ export class Renderer {
     groups.length = kept;
   }
 
+  /** Draws the groups from `from` on, those whose pass `drawsInOwnPass`,
+   *  in a pass of their own over the scene colour and depth. */
+  private renderSeeThrough(
+    encoder: GPUCommandEncoder,
+    renderList: IRenderGroup[],
+    from: number,
+    sceneColorView: GPUTextureView
+  ): void {
+    if (from >= renderList.length) return;
+    const pass = encoder.beginRenderPass({
+      label: 'see-through pass',
+      colorAttachments: [
+        { view: sceneColorView, loadOp: 'load', storeOp: 'store' },
+        {
+          view: this.sceneIndirectView!,
+          loadOp: 'clear',
+          storeOp: 'discard',
+        },
+      ],
+      depthStencilAttachment: {
+        view: this.depthTexture.createView(),
+        depthLoadOp: 'load',
+        depthStoreOp: 'store',
+      },
+    });
+    this.renderGroupings(
+      renderList,
+      pass,
+      this.camera.camera,
+      from,
+      renderList.length
+    );
+    pass.end();
+  }
+
   renderGroupings(
     renderGroup: IRenderGroup[],
     pass: GPURenderPassEncoder,
@@ -1230,6 +1272,12 @@ export class Renderer {
         opaqueEnd++;
       const hasWater =
         opaqueEnd < renderList.length && drawRank(renderList[opaqueEnd]) === 1;
+      let compositeEnd = opaqueEnd;
+      while (
+        compositeEnd < renderList.length &&
+        drawRank(renderList[compositeEnd]) < 3
+      )
+        compositeEnd++;
 
       this.renderGroupings(renderList, pass, camera.camera, 0, opaqueEnd);
       pass.end();
@@ -1243,6 +1291,13 @@ export class Renderer {
         sceneColorView
       );
 
+      // Above the water, see-through skins land in the refraction capture,
+      // so the water refracts and absorbs them like the bed. Under it they
+      // draw after the composite and fog themselves.
+      const seeThroughFirst = !this.terrainRenderer.underWater.submerged;
+      if (seeThroughFirst)
+        this.renderSeeThrough(encoder, renderList, compositeEnd, sceneColorView);
+
       if (hasWater) {
         this.refraction.capture(
           device,
@@ -1254,7 +1309,7 @@ export class Renderer {
         );
       }
 
-      if (opaqueEnd < renderList.length) {
+      if (opaqueEnd < compositeEnd) {
         const waterPass = encoder.beginRenderPass({
           label: 'water pass',
           colorAttachments: [
@@ -1277,7 +1332,7 @@ export class Renderer {
           waterPass,
           camera.camera,
           opaqueEnd,
-          renderList.length
+          compositeEnd
         );
         waterPass.end();
       }
@@ -1320,6 +1375,14 @@ export class Renderer {
       this.sky.render(this, postProcessingPass, camera.camera);
       this.terrainRenderer.renderUnderWaterFog(this, postProcessingPass);
       postProcessingPass.end();
+
+      if (!seeThroughFirst)
+        this.renderSeeThrough(
+          postProcessingEncoder,
+          renderList,
+          compositeEnd,
+          sceneColorView
+        );
 
       // Spray and marine snow fog themselves, so they draw over the composite,
       // not under it.

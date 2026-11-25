@@ -52,7 +52,7 @@ These test assets shape the work. Mat makes them in Blender.
 | **Orca**      | Top predator in a pod. Curious. Leaps, spy hops, tail slaps, sleeps | Open ocean, surface | Bones, swim driver, clips, look-at | 4 |
 | **Anglerfish** | Slow deep fish with a glowing lure       | The deep                      | Bones, swim driver   | 4     |
 
-**Jellyfish.** A template with a preset needs a skinned model, so a jellyfish has a small rig: a few bones down the bell and tentacles, with a `pulse` clip. The clip driver plays it with no new code. If jellyfish blooms need hundreds, the bell pulse moves to the shader like the school fish.
+**Jellyfish.** A template with a preset needs a skinned model, so a jellyfish has a small rig of a few bones down the bell. Its `idle` clip is the pulse, which the clip driver plays with no new code. The tentacles are drawn in the texture's alpha. Its material is `BLEND`. A see-through skinned mesh writes depth and draws in a pass of its own: above the water, before the refraction capture, so the water refracts and absorbs it like the bed, drawn solid where its alpha passes a cutoff, since the capture holds one depth a pixel; under it, after the atmosphere composite, fogging itself. Either way the water's light reaches the jellyfish, not what lies behind it. If jellyfish blooms need hundreds, the bell pulse moves to the shader like the school fish.
 
 **Anglerfish.** It hangs still in the dark with its lure glowing, and moves in short slow bursts. See The deep.
 
@@ -157,12 +157,12 @@ The default zones:
 
 | Sea biome       | Temperature | Zone     | Bed                 | Grows                           | Lives there |
 | --------------- | ----------- | -------- | ------------------- | ------------------------------- | ----------- |
-| Seagrass meadow | Any         | Shallows | Sand                | Seagrass, pebbles               |             |
+| Seagrass meadow | Any         | Shallows | Sand                | Seagrass, pebbles               | Crabs       |
 | Kelp forest     | Cold, mild  | Shelf    | Sand, rock patches  | Sugar, giant, boa and bull kelp |             |
 | Coral reef      | Warm        | Shelf    | Sand, reef rock     | Seagrass, rare rock outcrops    |             |
-| Sand flats      | Any         | Slope    | Sand                | Little                          | Tuna        |
-| Open ocean      | Any         | Open     | Sand                | Nothing                         | Tuna        |
-| Lake bed        | Any         | Lake     | Leaf litter, stones | Pondweed, weed                  | Minnows     |
+| Sand flats      | Any         | Slope    | Sand                | Little                          | Tuna, jellyfish |
+| Open ocean      | Any         | Open     | Sand                | Nothing                         | Tuna, jellyfish |
+| Lake bed        | Any         | Lake     | Leaf litter, stones | Pondweed, weed                  | Trout, minnows, crabs |
 
 The arid climate has a warm sea throughout: coral on every shelf. Coral models do not exist yet; the reef grows rock outcrops until they do. The deep comes with Stage 4.
 
@@ -193,7 +193,7 @@ The water habitat gets `depth` and `shore` selectors. The swim band can be measu
 
 ### Bed
 
-For crabs. The creature walks the bed, tilts with its slope, and keeps under a depth of water. Crabs use clips only. Foot planting is kept for big or complex animals. Lakes and sea both work.
+For crabs. The creature walks the bed, tilts with its slope, and keeps under a depth of water, from a centimetre or two down to about 8 m. Dry ground strands it. Crabs use clips only. Foot planting is kept for big or complex animals. Lakes and sea both work.
 
 ### Surface (Stage 4)
 
@@ -520,7 +520,7 @@ Each TODO is one GitHub ticket in the Shoal milestone. The order follows the dep
   - Scope: the school object, flat member arrays, spatial grid, steering, habitat checks, the school budget, school spawn rules. Placing a school in the editor. Console commands.
   - Expect: sardines stream past and part round the player. Minnows school in the lake shallows. A placed school holds in place in the editor.
 
-- [ ] **8. Bed creatures and jellyfish**
+- [x] **8. Bed creatures and jellyfish**
 
   - Scope: the `bed` habitat. Crabs with clips. Jellyfish with a pulse clip and slow drift. Placing both in the editor.
   - Expect: crabs walk the bed of the sea and of a lake. Jellyfish drift and pulse.

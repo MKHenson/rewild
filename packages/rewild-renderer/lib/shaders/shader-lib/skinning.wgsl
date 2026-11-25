@@ -8,6 +8,8 @@
 struct SkinnedInstance {
   world : mat4x4f,
   slot : u32,
+  // Which faces this instance draws: 0 both, 1 back, 2 front.
+  faces : u32,
 }
 
 fn skinMatrix(

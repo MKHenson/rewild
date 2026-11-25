@@ -7,7 +7,7 @@ import { StandardMaterial } from './uniforms/StandardMaterial';
 import { Lighting } from './uniforms/Lighting';
 import { EnvironmentUniforms } from './uniforms/EnvironmentUniforms';
 import { StandardPassBase } from './StandardPassBase';
-import { composeShader } from '../utils/shaderDefines';
+import { ShaderDefines, composeShader } from '../utils/shaderDefines';
 import { IVisualComponent } from '../../types/interfaces';
 import { IS_SKINNED_INSTANCED_PASS } from '../typeGuards';
 import type { SkinnedMesh } from '../core/SkinnedMesh';
@@ -18,8 +18,18 @@ const instanceGroupIndex = 1;
 const lightingGroup = 2;
 const environmentGroup = 3;
 
-/** world + slot, padded to SkinnedInstance's std430 size in the shaders. */
+/** world + slot + faces, padded to SkinnedInstance's std430 size in the shaders. */
 export const SKINNED_INSTANCE_FLOATS = 20;
+/** Offset of `faces` in an instance. */
+const FACES_OFFSET = 17;
+const FACES_BOTH = 0;
+const FACES_BACK = 1;
+const FACES_FRONT = 2;
+
+// Back-to-front by view-space depth, which is negative in front of the camera.
+const sortFarthestFirst = (a: IVisualComponent, b: IVisualComponent) =>
+  a.transform.modelViewMatrix.elements[14] -
+  b.transform.modelViewMatrix.elements[14];
 /** projMatrix + viewMatrix + params, matching Uniforms in standard-skinned.wgsl. */
 const UNIFORM_FLOATS = 16 * 2 + 4;
 
@@ -40,6 +50,7 @@ export function writeSkinnedInstance(
   const slot = (mesh as SkinnedMesh).instance.slot;
   data.set(m, o);
   slots[o + 16] = slot;
+  slots[o + FACES_OFFSET] = FACES_BOTH;
   model.schedule.seen(slot, m[12], m[13], m[14]);
 }
 
@@ -71,6 +82,7 @@ export class SkinnedInstancedPass extends StandardPassBase {
   private bindGroup: GPUBindGroup | null = null;
   private bindGroupPipeline: GPURenderPipeline | null = null;
   private bindGroupJoints: GPUBuffer | null = null;
+  private bindGroupUnderWater: GPUBuffer | null = null;
   private readonly frameUniforms = new Float32Array(UNIFORM_FLOATS);
 
   constructor() {
@@ -89,6 +101,21 @@ export class SkinnedInstancedPass extends StandardPassBase {
       this.lightingUniforms,
       this.environmentUniforms,
     ]);
+  }
+
+  get drawsInOwnPass(): boolean {
+    return this.transparent;
+  }
+
+  /** A see-through skin writes depth too, so the water's fog and
+   *  absorption reach it rather than what lies behind it. Instances are
+   *  sorted far to near, so nothing drawn later is hidden by it wrongly. */
+  protected depthStencilState(): GPUDepthStencilState {
+    return { ...super.depthStencilState(), depthWriteEnabled: true };
+  }
+
+  protected shaderDefines(): ShaderDefines {
+    return { ...super.shaderDefines(), SEE_THROUGH: this.transparent };
   }
 
   protected invalidatePipeline(): void {
@@ -189,31 +216,46 @@ export class SkinnedInstancedPass extends StandardPassBase {
       return;
 
     const { device } = renderer;
-    this.ensureInstanceCapacity(renderer, count);
-    for (let i = 0; i < count; i++)
-      writeSkinnedInstance(
-        model,
-        meshes[i],
-        this.instanceData,
-        this.instanceSlots,
-        i
-      );
+    // See-through instances blend only far to near, and a two-sided one only
+    // back faces first: it is written twice.
+    if (this.transparent) meshes.sort(sortFarthestFirst);
+    const split = this.transparent && this.doubleSided;
+    const instances = split ? count * 2 : count;
+    this.ensureInstanceCapacity(renderer, instances);
+    const data = this.instanceData;
+    const slots = this.instanceSlots;
+    for (let i = 0; i < count; i++) {
+      if (!split) {
+        writeSkinnedInstance(model, meshes[i], data, slots, i);
+        continue;
+      }
+      const back = 2 * i * SKINNED_INSTANCE_FLOATS;
+      const front = back + SKINNED_INSTANCE_FLOATS;
+      writeSkinnedInstance(model, meshes[i], data, slots, 2 * i);
+      data.copyWithin(front, back, front);
+      slots[back + FACES_OFFSET] = FACES_BACK;
+      slots[front + FACES_OFFSET] = FACES_FRONT;
+    }
     device.queue.writeBuffer(
       this.instanceBuffer!,
       0,
-      this.instanceData,
+      data,
       0,
-      count * SKINNED_INSTANCE_FLOATS
+      instances * SKINNED_INSTANCE_FLOATS
     );
 
     const uniforms = this.frameUniforms;
     uniforms.set(camera.projectionMatrix.elements, 0);
     uniforms.set(camera.matrixWorldInverse.elements, 16);
     uniforms[32] = model.poses.jointCount;
+    uniforms[33] =
+      this.transparent && !renderer.terrainRenderer.underWater.submerged
+        ? 1
+        : 0;
     device.queue.writeBuffer(this.uniformBuffer!, 0, uniforms);
 
     pass.setBindGroup(instanceGroupIndex, this.instanceBindGroup(renderer));
-    pass.drawIndexed(geometry.indices!.length, count);
+    pass.drawIndexed(geometry.indices!.length, instances);
     this.lastDrawn = performance.now();
     this.lastDrawnCount = count;
   }
@@ -246,10 +288,14 @@ export class SkinnedInstancedPass extends StandardPassBase {
    *  buffers are replaced as they grow. */
   private instanceBindGroup(renderer: Renderer): GPUBindGroup {
     const joints = this.model!.jointBuffer!;
+    const underWater = renderer.terrainRenderer.underWater.buffer(
+      renderer.device
+    );
     if (
       this.bindGroup &&
       this.bindGroupPipeline === this.pipeline &&
-      this.bindGroupJoints === joints
+      this.bindGroupJoints === joints &&
+      this.bindGroupUnderWater === underWater
     )
       return this.bindGroup;
 
@@ -260,10 +306,12 @@ export class SkinnedInstancedPass extends StandardPassBase {
         { binding: 0, resource: { buffer: this.uniformBuffer! } },
         { binding: 1, resource: { buffer: this.instanceBuffer! } },
         { binding: 2, resource: { buffer: joints } },
+        { binding: 3, resource: { buffer: underWater } },
       ],
     });
     this.bindGroupPipeline = this.pipeline;
     this.bindGroupJoints = joints;
+    this.bindGroupUnderWater = underWater;
     return this.bindGroup;
   }
 }

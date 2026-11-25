@@ -1,5 +1,6 @@
 import { BehaviourState } from 'rewild-routing';
 import { WanderSettings } from '../CreaturePresets';
+import { HeightRange } from '../Habitat';
 import { IMovementMode, MovementSystem } from '../MovementSystem';
 
 /** Points tried before Wander gives up and waits. */
@@ -10,12 +11,16 @@ export const MIN_WANDER_STEP = 1;
 export const STALL_TIME = 3;
 /** Metres closer to its point a creature must get to count as making progress. */
 const STALL_PROGRESS = 0.5;
+/** The most of its walk over `STALL_TIME` progress may ask for, so slow walkers count too. */
+const STALL_SHARE = 0.5;
 /** Radians round home between circling points, at the least. */
 const CIRCLE_STEP = Math.PI / 4;
 /** Nearest a circling point is to home, as a share of the radius. */
 const CIRCLE_INNER = 0.7;
 
 type Phase = 'pick' | 'walk' | 'wait';
+
+const _range: HeightRange = { min: 0, max: 0 };
 
 /**
  * Walks to points near home, waits at each, and plays an action while it
@@ -140,7 +145,11 @@ export class Wander implements IMovementMode {
       this.targetX - system.x,
       this.targetZ - system.z
     );
-    if (distance < this.closest - STALL_PROGRESS) {
+    const progress = Math.min(
+      STALL_PROGRESS,
+      system.settings.walkSpeed * STALL_TIME * STALL_SHARE
+    );
+    if (distance < this.closest - progress) {
       this.closest = distance;
       this.stalled = 0;
     } else if (system.speed > 0) this.stalled += dt;
@@ -183,13 +192,24 @@ export class Wander implements IMovementMode {
         }
         continue;
       }
-      this.setTarget(x, z, random());
+      this.setTarget(x, z, this.pickLevel(system, x, z));
       return true;
     }
 
     if (!passable || habitat.canBe(system.x, system.z)) return false;
-    this.setTarget(passX, passZ, random());
+    this.setTarget(passX, passZ, this.pickLevel(system, passX, passZ));
     return true;
+  }
+
+  /** Where in the height range over (x, z) to aim: within the radius of its
+   *  height now, so it wanders no further up or down than across. */
+  private pickLevel(system: MovementSystem, x: number, z: number): number {
+    const roll = system.random();
+    if (!system.habitat.heightRange?.(x, z, _range)) return roll;
+    const { min, max } = _range;
+    if (max <= min) return 0.5;
+    const y = system.y + (roll * 2 - 1) * this.radius;
+    return Math.max(0, Math.min(1, (y - min) / (max - min)));
   }
 
   private setTarget(x: number, z: number, level: number): void {

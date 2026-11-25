@@ -150,6 +150,28 @@ describe('planChunkSpawns', () => {
       }
   });
 
+  it('keeps a group within its spread of one height in deep water', () => {
+    const { world, site, biomes, plan } = setup([]);
+    site.habitats.tuna = new WaterHabitat(
+      { type: 'water', bedMargin: 0.5, surfaceMargin: 1 },
+      world
+    );
+    biomes[0].creatures = [
+      { creature: 'tuna', density: 5, group: [10, 10], spread: 4 },
+    ];
+    world.height = () => -50;
+    world.depth = () => 50;
+
+    const groups = plan();
+    expect(groups.length).toBeGreaterThan(0);
+    for (const group of groups) {
+      const heights = group.members.map((m) => m.y);
+      expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(
+        4
+      );
+    }
+  });
+
   it('spawns birds inside their band', () => {
     const { world, site, biomes, plan } = setup([]);
     site.habitats.crow = new AirHabitat(

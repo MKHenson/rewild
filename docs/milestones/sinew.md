@@ -301,6 +301,7 @@ Choose one entry for `habitat`:
 ```ts
 { type: 'land', slope: { from: 35, to: 30 }, waterDepth: { from: 0.3, to: 0.2 } }
 { type: 'water', bedMargin: 0.4, surfaceMargin: 1, depth: { from: 4, to: 6 }, waterTypes: ['ocean'] }
+{ type: 'bed', depth: [{ from: 0, to: 0.02 }, { from: 8, to: 6 }] }
 { type: 'air', band: [15, 30], lookAhead: 3 }
 ```
 
@@ -311,7 +312,10 @@ Water can limit `depth` (metres from the bed to the surface) and `shore` (metres
 `swim: { from: 'bed', band: [0.2, 2] }` keeps the creature near the bed, and `from: 'surface'` near
 the top. `waterTypes` is optional; left out, any water will do.
 
-Any habitat can set `spawnRadius` and `despawnRadius`. Water defaults to 60 m and 80 m, land and air
+Bed creatures walk the ground under the water and lean to its slope. They take the water's `depth`,
+`shore` and `waterTypes`, and are stranded on dry ground.
+
+Any habitat can set `spawnRadius` and `despawnRadius`. Water and bed default to 60 m and 80 m, land and air
 to 120 m and 150 m.
 
 ---

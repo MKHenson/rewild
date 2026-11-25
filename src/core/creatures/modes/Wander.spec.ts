@@ -1,5 +1,5 @@
 import { MovementSettings, WanderSettings } from '../CreaturePresets';
-import { Habitat } from '../Habitat';
+import { Habitat, WaterHabitat } from '../Habitat';
 import { MovementSystem } from '../MovementSystem';
 import { TestAnimator, TestWorld } from '../testWorld';
 import { STALL_TIME, Wander } from './Wander';
@@ -279,5 +279,55 @@ describe('Wander with hold', () => {
     for (let i = 0; i < 125; i++) system.update(0.05);
 
     expect(wander.phase).toBe('walk');
+  });
+});
+
+describe('Wander at a slow walk', () => {
+  it('reaches its point and acts, rather than giving it up', () => {
+    const animator = new TestAnimator();
+    const wander = new Wander({
+      radius: 3,
+      wait: [1, 1],
+      actions: [{ meaning: 'feed', weight: 1 }],
+    });
+    const system = new MovementSystem(
+      { ...SETTINGS, walkSpeed: 0.12, acceleration: 2 },
+      { canBe: () => true },
+      new TestWorld(),
+      [wander],
+      animator,
+      rolls(0.99)
+    );
+    system.place(0, 0, 0, 0);
+    for (let t = 0; t < 60; t += 0.05) system.update(0.05);
+    expect(animator.calls).toContain('play feed');
+  });
+});
+
+describe('Wander in deep water', () => {
+  it('picks heights within its radius of where it swims', () => {
+    const world = new TestWorld();
+    world.height = () => -50;
+    world.depth = () => 50;
+    const habitat = new WaterHabitat(
+      { type: 'water', bedMargin: 0.5, surfaceMargin: 0.5 },
+      world
+    );
+    const wander = new Wander({ radius: 5, wait: [0, 0], actions: [] });
+    const system = new MovementSystem(
+      { ...SETTINGS, climbSpeed: 1 },
+      habitat,
+      world,
+      [wander],
+      null,
+      rolls(0.99)
+    );
+    system.place(0, -25, 0, 0);
+    for (let i = 0; i < 20; i++) {
+      wander.phase = 'pick';
+      system.update(0.05);
+      const aim = -49.5 + wander.targetLevel * 49;
+      expect(Math.abs(aim - system.y)).toBeLessThanOrEqual(5.01);
+    }
   });
 });

@@ -27,6 +27,14 @@ export interface IMaterialPass {
    */
   transparent?: boolean;
   /**
+   * Draws in a pass of its own and writes depth. With the camera above the
+   * water it draws before the refraction capture, so the water refracts and
+   * absorbs it; under the water, after the atmosphere composite, fogging
+   * itself. Either way the water's light is not taken from the depth behind
+   * it. Needs `transparent`.
+   */
+  drawsInOwnPass?: boolean;
+  /**
    * Rasterizes back faces as well as front. Raycasting reads it for the same
    * reason the pipeline does
    */

@@ -214,6 +214,14 @@
     "type": "gltf",
     "url": "models/trout.glb"
   },
+  "crab": {
+    "type": "gltf",
+    "url": "models/crab.glb"
+  },
+  "jellyfish": {
+    "type": "gltf",
+    "url": "models/jellyfish.glb"
+  },
   "sardine": {
     "type": "gltf",
     "url": "models/sardine.glb"
@@ -257,5 +265,9 @@
   "seagrass-02": {
     "type": "gltf",
     "url": "nature/water-plants/seagrass/seagrass-02.glb"
+  },
+  "kelp-02": {
+    "type": "gltf",
+    "url": "nature/kelp/kelp-giant/kelp-02.glb"
   }
 }

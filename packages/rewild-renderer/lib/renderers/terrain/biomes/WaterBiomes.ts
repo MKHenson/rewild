@@ -45,6 +45,23 @@ export const MINNOWS: BiomeCreatures = {
   spread: 1.5,
 };
 
+// Crabs on the bed of the shallows and of lakes, alone or in twos and threes.
+export const CRABS: BiomeCreatures = {
+  creature: 'crab',
+  density: 6,
+  group: [1, 3],
+  spread: 2,
+};
+
+// Jellyfish drifting at any depth past the shelf, alone or in blooms.
+export const JELLYFISH: BiomeCreatures = {
+  creature: 'jellyfish',
+  density: 3,
+  group: [1, 100],
+  spread: 10,
+  drift: 0.2,
+};
+
 // Depth bands of the ocean, each handing over to the next across a few metres.
 // The shelf reaches past the shelf edge onto the top of the slope, where the
 // kelp still holds.
@@ -76,13 +93,13 @@ const HANDOVER = { from: 0.3, to: 1.5 };
 
 const SEAGRASS: SeaScatter = {
   layer: 'seagrass_01',
-  density: 0.7,
+  density: 1,
   waterDepth: [
     { from: 0.4, to: 0.8 },
     { from: 7, to: 5 },
   ],
   shore: [{ from: 120, to: 80 }],
-  noise: { scale: 16, seedSalt: 149, band: { from: 0.35, to: 0.55 } },
+  noise: { scale: 16, seedSalt: 149, band: { from: 0.25, to: 0.45 } },
 };
 
 // Cobbles on the bed, thinning on steep ground.
@@ -93,23 +110,23 @@ const BED_PEBBLES: SeaScatter = {
   noise: { scale: 40, seedSalt: 167, band: { from: 0.4, to: 0.65 } },
 };
 
-// Sugar kelp in the shallows of the shelf, giant and feather boa kelp in
+// Sugar kelp in the shallows of the shelf, two giant kelps and feather boa in
 // forests over it, and bull kelp scattered among them. Each stand is a patch
 // of the noise, so the shelf holds stands with open ground between.
 const KELP: SeaScatter[] = [
   {
     layer: 'kelp_sugar_01',
-    density: 0.12,
+    density: 0.2,
     waterDepth: [
       { from: 0.6, to: 1 },
       { from: 4, to: 3 },
     ],
     shore: [{ from: 40, to: 25 }],
-    noise: { scale: 12, seedSalt: 151, band: { from: 0.4, to: 0.6 } },
+    noise: { scale: 12, seedSalt: 151, band: { from: 0.3, to: 0.5 } },
   },
   {
     layer: 'kelp_01',
-    density: 0.45,
+    density: 0.5,
     waterDepth: [
       { from: 2.5, to: 3.5 },
       { from: 25, to: 18 },
@@ -118,11 +135,24 @@ const KELP: SeaScatter[] = [
       { from: 15, to: 30 },
       { from: 220, to: 180 },
     ],
-    noise: { scale: 30, seedSalt: 157, band: { from: 0.45, to: 0.6 } },
+    noise: { scale: 30, seedSalt: 157, band: { from: 0.35, to: 0.5 } },
+  },
+  {
+    layer: 'kelp_02',
+    density: 0.5,
+    waterDepth: [
+      { from: 6, to: 9 },
+      { from: 25, to: 18 },
+    ],
+    shore: [
+      { from: 15, to: 30 },
+      { from: 220, to: 180 },
+    ],
+    noise: { scale: 30, seedSalt: 157, band: { from: 0.35, to: 0.5 } },
   },
   {
     layer: 'kelp_boa_01',
-    density: 0.25,
+    density: 0.4,
     waterDepth: [
       { from: 2, to: 3 },
       { from: 14, to: 10 },
@@ -131,11 +161,11 @@ const KELP: SeaScatter[] = [
       { from: 10, to: 20 },
       { from: 160, to: 120 },
     ],
-    noise: { scale: 24, seedSalt: 163, band: { from: 0.55, to: 0.7 } },
+    noise: { scale: 24, seedSalt: 163, band: { from: 0.45, to: 0.6 } },
   },
   {
     layer: 'kelp_bull_01',
-    density: 0.06,
+    density: 0.1,
     waterDepth: [
       { from: 3, to: 4 },
       { from: 25, to: 18 },
@@ -189,6 +219,7 @@ export function seagrassMeadow(sand: string): SeaBiomeParams {
     name: 'seagrass-meadow',
     layers: [{ material: sand }],
     scatter: [SEAGRASS, BED_PEBBLES],
+    creatures: [CRABS],
   };
 }
 
@@ -225,7 +256,7 @@ export function sandFlats(sand: string): SeaBiomeParams {
     name: 'sand-flats',
     layers: [{ material: sand }],
     scatter: [{ ...BED_PEBBLES, density: 0.05 }],
-    creatures: [TUNA, SARDINES],
+    creatures: [TUNA, SARDINES, JELLYFISH],
   };
 }
 
@@ -233,7 +264,7 @@ export function openOcean(bed: string): SeaBiomeParams {
   return {
     name: 'open-ocean',
     layers: [{ material: bed }],
-    creatures: [TUNA, SARDINES],
+    creatures: [TUNA, SARDINES, JELLYFISH],
   };
 }
 
@@ -242,7 +273,7 @@ export function lakeBed(silt: string, stones: string): SeaBiomeParams {
     name: 'lake-bed',
     layers: rockySand(silt, stones, 0.3),
     scatter: [...LAKE_WEED, BED_PEBBLES],
-    creatures: [TROUT, MINNOWS],
+    creatures: [TROUT, MINNOWS, CRABS],
   };
 }
 

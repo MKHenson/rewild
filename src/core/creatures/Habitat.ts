@@ -8,6 +8,7 @@ import {
 } from 'rewild-renderer';
 import {
   AirHabitatSettings,
+  BedHabitatSettings,
   HabitatSettings,
   LandHabitatSettings,
   WaterHabitatSettings,
@@ -47,6 +48,8 @@ export interface Habitat {
   readonly flies?: boolean;
   /** Moves in 3D, so modes measure the player in 3D. */
   readonly swims?: boolean;
+  /** Leans its pitch and roll to the slope of the ground under it. */
+  readonly tilts?: boolean;
   /** Seconds of travel ahead to check `heightRange` for rising ground. */
   readonly lookAhead?: number;
   canBe(x: number, z: number): boolean;
@@ -117,7 +120,7 @@ export interface SpawnRange {
 
 /** The spawn range a habitat sets, or its type's default. */
 export function spawnRange(settings: HabitatSettings): SpawnRange {
-  const water = settings.type === 'water';
+  const water = settings.type === 'water' || settings.type === 'bed';
   const spawn =
     settings.spawnRadius ?? (water ? WATER_SPAWN_RADIUS : SPAWN_RADIUS);
   const despawn =
@@ -187,7 +190,7 @@ export class WaterHabitat implements Habitat {
       this.heightRange(x, z, this.range) &&
       waterCoverage(this.settings.depth, this.settings.shore, this.water) >
         HABITAT_PASS &&
-      this.typeAllowed()
+      typeAllowed(this.settings.waterTypes, this.world, this.water)
     );
   }
 
@@ -220,17 +223,50 @@ export class WaterHabitat implements Habitat {
     }
     return out.min < out.max;
   }
+}
 
-  private typeAllowed(): boolean {
-    const { waterTypes } = this.settings;
-    if (!waterTypes) return true;
-    let weight = 0;
-    for (let i = 0; i < waterTypes.length; i++) {
-      const index = this.world.waterTypeIndex(waterTypes[i]);
-      if (index >= 0) weight += this.water.typeWeights[index];
-    }
-    return weight > HABITAT_PASS;
+/** Walks the bed under the water, leaning to its slope. Dry ground strands it. */
+export class BedHabitat implements Habitat {
+  readonly swims = true;
+  readonly tilts = true;
+  private readonly water = createWaterQuerySample();
+
+  constructor(
+    private readonly settings: BedHabitatSettings,
+    private readonly world: CreatureWorld
+  ) {}
+
+  canBe(x: number, z: number): boolean {
+    const { settings, water } = this;
+    return (
+      this.canPass(x, z) &&
+      waterCoverage(settings.depth, settings.shore, water) > HABITAT_PASS &&
+      typeAllowed(settings.waterTypes, this.world, water)
+    );
   }
+
+  canPass(x: number, z: number): boolean {
+    return this.world.sampleWater(x, z, this.water) && this.water.wet;
+  }
+
+  stranded(x: number, z: number): boolean {
+    return !this.canPass(x, z);
+  }
+}
+
+/** Whether `water` is mostly of the named types. Any water passes with none. */
+function typeAllowed(
+  waterTypes: WaterType['name'][] | undefined,
+  world: CreatureWorld,
+  water: WaterQuerySample
+): boolean {
+  if (!waterTypes) return true;
+  let weight = 0;
+  for (let i = 0; i < waterTypes.length; i++) {
+    const index = world.waterTypeIndex(waterTypes[i]);
+    if (index >= 0) weight += water.typeWeights[index];
+  }
+  return weight > HABITAT_PASS;
 }
 
 export class AirHabitat implements Habitat {
@@ -274,6 +310,8 @@ export function createHabitat(
       return new LandHabitat(habitat, world);
     case 'water':
       return new WaterHabitat(habitat, world);
+    case 'bed':
+      return new BedHabitat(habitat, world);
     case 'air':
       return new AirHabitat(habitat, world);
     default:

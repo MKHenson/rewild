@@ -50,6 +50,8 @@ const MIN_GLIDE_SLOWING = 0.1;
 const SLOW_CLIMB = 0.2;
 /** Seconds a pitch takes to settle. */
 const PITCH_SMOOTHING = 0.3;
+/** Metres either side of a tilting creature its slope is measured over. */
+const TILT_STEP = 0.25;
 
 const TWO_PI = Math.PI * 2;
 const _forward = new Vector3();
@@ -306,7 +308,30 @@ export class MovementSystem {
 
     this.updateRoll(before, dt);
     this.updateHeight(dt);
-    this.updatePitch(dt);
+    if (this.habitat.tilts) this.updateTilt(dt);
+    else this.updatePitch(dt);
+  }
+
+  /** Leans nose up the slope ahead and rolls its +X side up the slope across. */
+  private updateTilt(dt: number): void {
+    const { world, x, z } = this;
+    const ground = world.sampleHeight(x, z);
+    if (ground === null) return;
+    const sin = Math.sin(this.heading);
+    const cos = Math.cos(this.heading);
+    const ahead = world.sampleHeight(x + sin * TILT_STEP, z + cos * TILT_STEP);
+    const behind = world.sampleHeight(x - sin * TILT_STEP, z - cos * TILT_STEP);
+    const left = world.sampleHeight(x + cos * TILT_STEP, z - sin * TILT_STEP);
+    const right = world.sampleHeight(x - cos * TILT_STEP, z + sin * TILT_STEP);
+    const pitch = Math.atan(
+      ((ahead ?? ground) - (behind ?? ground)) / (2 * TILT_STEP)
+    );
+    const roll = Math.atan(
+      ((left ?? ground) - (right ?? ground)) / (2 * TILT_STEP)
+    );
+    const blend = 1 - Math.exp(-dt / PITCH_SMOOTHING);
+    this.pitch += (pitch - this.pitch) * blend;
+    this.roll += (roll - this.roll) * blend;
   }
 
   private updatePitch(dt: number): void {

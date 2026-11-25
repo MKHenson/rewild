@@ -5,6 +5,8 @@ import {
 } from './CreaturePresets';
 import {
   AirHabitat,
+  BedHabitat,
+  Habitat,
   HeightRange,
   LandHabitat,
   WATER_DESPAWN_RADIUS,
@@ -270,5 +272,52 @@ describe('createHabitat', () => {
     expect(
       createHabitat([{ type: 'air', band: [1, 2], lookAhead: 1 }], world)
     ).toBeInstanceOf(AirHabitat);
+  });
+});
+
+describe('BedHabitat', () => {
+  function bed() {
+    const world = new TestWorld();
+    const habitat = new BedHabitat(
+      {
+        type: 'bed',
+        depth: [
+          { from: 0, to: 0.02 },
+          { from: 8, to: 6 },
+        ],
+      },
+      world
+    );
+    return { world, habitat };
+  }
+
+  it('accepts very shallow water and rejects deep water', () => {
+    const { world, habitat } = bed();
+    world.depth = () => 0.05;
+    expect(habitat.canBe(0, 0)).toBe(true);
+    world.depth = () => 10;
+    expect(habitat.canBe(0, 0)).toBe(false);
+    expect(habitat.canPass(0, 0)).toBe(true);
+  });
+
+  it('is stranded on dry ground only', () => {
+    const { world, habitat } = bed();
+    expect(habitat.stranded(0, 0)).toBe(true);
+    world.depth = () => 10;
+    expect(habitat.stranded(0, 0)).toBe(false);
+  });
+
+  it('stands on the ground and measures the player in 3D', () => {
+    const { habitat } = bed();
+    expect((habitat as Habitat).heightRange).toBeUndefined();
+    expect(habitat.swims).toBe(true);
+    expect(habitat.tilts).toBe(true);
+  });
+
+  it('uses the water spawn range', () => {
+    expect(spawnRange({ type: 'bed' })).toEqual({
+      spawn: WATER_SPAWN_RADIUS,
+      despawn: WATER_DESPAWN_RADIUS,
+    });
   });
 });

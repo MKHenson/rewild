@@ -30,11 +30,14 @@ const HAS_FOLIAGE_NORMAL_MAP: bool = ${ HAS_FOLIAGE_NORMAL_MAP };
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
 #include "./shader-lib/skinning.wgsl"
+#include "./shader-lib/under-water.wgsl"
+#include "./shader-lib/water-fog.wgsl"
 
 struct Uniforms {
   projMatrix : mat4x4f,
   viewMatrix : mat4x4f,
-  // x = joints per pose.
+  // x = joints per pose. y = 1 while a see-through skin draws for the
+  // refraction capture, from above the water.
   params : vec4f,
 }
 
@@ -85,9 +88,32 @@ struct VertexOutput {
   @location(2) viewPosition : vec3f,
   @location(3) color : vec4f,
   @location(4) tangent : vec4f,
+  @location(5) @interpolate(flat) faces : u32,
 }
 
 const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
+// A see-through skin fogs itself where the lens is in the water, since it then
+// draws after the atmosphere composite, and draws each instance's back faces
+// before its front ones.
+const SEE_THROUGH: bool = ${ SEE_THROUGH };
+// Alpha below which a see-through skin drawn for the refraction capture leaves
+// the texel to the water. The capture holds one depth a pixel, so what shows
+// through a skin would get the skin's absorption; the rest draws solid.
+const CAPTURE_CUTOFF: f32 = 0.4;
+const FACES_BACK: u32 = 1u;
+const FACES_FRONT: u32 = 2u;
+
+// The water's fog between the camera and a fragment at `viewPosition`.
+fn fogInWater(color: vec4f, viewPosition: vec3f) -> vec4f {
+  let distance = length(viewPosition);
+  let dir = normalize((underWater.viewToWorld * vec4f(viewPosition / max(distance, 1e-4), 0.0)).xyz);
+  if (!lensInWater(dir)) {
+    return color;
+  }
+  let sky = textureSampleLevel(iblIrradianceMap, iblSampler, vec3f(0.0, 1.0, 0.0), 0.0).rgb * WATER_PI;
+  let scatter = waterInScatter(dir, cameraWaterDepth(), cameraBedBelow(), distance, sky);
+  return vec4f(color.rgb * waterTransmittanceAlong(distance) + scatter, color.a);
+}
 
 @group(0) @binding(0) var mySampler: sampler;
 @group(0) @binding(1) var baseColorMap: texture_2d<f32>;
@@ -101,6 +127,7 @@ const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 @group(1) @binding(0) var<uniform> uniforms : Uniforms;
 @group(1) @binding(1) var<storage, read> instances : array<SkinnedInstance>;
 @group(1) @binding(2) var<storage, read> jointMatrices : array<mat4x4f>;
+@group(1) @binding(3) var<uniform> underWater : UnderWater;
 
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 
@@ -146,6 +173,7 @@ fn transformVertex(
   output.normal = modelView3 * normal;
   output.color = color;
   output.tangent = vec4f(modelView3 * tangent.xyz, tangent.w);
+  output.faces = instance.faces;
   return output;
 }
 
@@ -188,8 +216,13 @@ fn fs(
   @location(2) viewPosition: vec3f,
   @location(3) vertexColor: vec4f,
   @location(4) tangent: vec4f,
+  @location(5) @interpolate(flat) faces: u32,
   @builtin(front_facing) isFrontFacing: bool
 ) -> SceneFragment {
+
+  if (SEE_THROUGH && ((faces == FACES_BACK && isFrontFacing) || (faces == FACES_FRONT && !isFrontFacing))) {
+    discard;
+  }
 
   #include "./shader-lib/cloud-shadow.frag.wgsl"
   #include "./shader-lib/directional-shadow.frag.wgsl"
@@ -208,6 +241,17 @@ fn fs(
 
   if (directionalShadowParams.debugMode != 0u) {
     outColor = vec4f(mix(outColor.rgb, cascadeDebugTint, 0.5), outColor.a);
+  }
+
+  if (SEE_THROUGH) {
+    if (uniforms.params.y > 0.5) {
+      if (outColor.a < CAPTURE_CUTOFF) {
+        discard;
+      }
+      outColor.a = 1.0;
+    } else {
+      outColor = fogInWater(outColor, viewPosition);
+    }
   }
 
   return sceneFragment(outColor);

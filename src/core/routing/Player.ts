@@ -86,6 +86,19 @@ const _PI_HALF = Math.PI / 2 - 0.01;
 const _MOUSE_SENSITIVITY = 0.002;
 // Radians a second with the right stick pushed all the way.
 const _PAD_LOOK_SPEED = 3.0;
+const _LOOK_SPIKE_MIN = 250;
+const _LOOK_SPIKE_RATIO = 8;
+
+/** Locks with raw mouse input where supported, falling back to a plain lock. */
+function lockPointer(): void {
+  const body = document.body;
+  try {
+    const pending = body.requestPointerLock({ unadjustedMovement: true });
+    if (pending) pending.catch(() => body.requestPointerLock());
+  } catch {
+    body.requestPointerLock();
+  }
+}
 // Per dt (two seconds' worth of delta): walking is 3 m/s.
 const _MOVE_SPEED: f32 = 1.5;
 const _RUN_MULTIPLIER: f32 = 3.0;
@@ -238,6 +251,7 @@ export class Player extends Node {
   // Pointer-lock / mouse-look state
   private _yaw: f32 = 0;
   private _pitch: f32 = 0;
+  private _lastLookDelta: f32 = 0;
   private _movingForward = false;
   private _movingBackward = false;
   private _movingLeft = false;
@@ -302,7 +316,7 @@ export class Player extends Node {
 
   requestLock() {
     if (this._dead) return;
-    document.body.requestPointerLock();
+    lockPointer();
   }
 
   /** True while the personal assistant is open, so the mouse is free for it. */
@@ -1287,8 +1301,20 @@ export class Player extends Node {
 
   private _handleMouseMove(e: MouseEvent) {
     if (!this._isLocked || this._dead) return;
-    this._yaw -= e.movementX * _MOUSE_SENSITIVITY;
-    this._pitch -= e.movementY * _MOUSE_SENSITIVITY;
+    const dx = e.movementX;
+    const dy = e.movementY;
+    const size = Math.abs(dx) + Math.abs(dy);
+    // Chrome occasionally reports a single bogus delta of hundreds of pixels under pointer lock.
+    if (
+      size > _LOOK_SPIKE_MIN &&
+      size > this._lastLookDelta * _LOOK_SPIKE_RATIO
+    ) {
+      this._lastLookDelta = 0;
+      return;
+    }
+    this._lastLookDelta = size;
+    this._yaw -= dx * _MOUSE_SENSITIVITY;
+    this._pitch -= dy * _MOUSE_SENSITIVITY;
     this._pitch = Math.max(-_PI_HALF, Math.min(_PI_HALF, this._pitch));
   }
 
@@ -1402,6 +1428,7 @@ export class Player extends Node {
 
   private _handlePointerlockChange() {
     this._isLocked = !!document.pointerLockElement;
+    this._lastLookDelta = 0;
   }
 
   private _handleCanvasClick() {

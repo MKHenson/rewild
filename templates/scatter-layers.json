@@ -1896,5 +1896,34 @@
     "foliage": true,
     "castShadow": false,
     "waterCeiling": 0.08
+  },
+  "kelp_02": {
+    "name": "kelp_02",
+    "geometryId": "kelp-02",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.7,
+        "to": 1.3
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "alignToNormal": 0,
+    "yOffset": -0.018,
+    "footprint": 1.2,
+    "wind": {
+      "amplitude": 1.2,
+      "frequency": 0.18,
+      "flutter": 0.2,
+      "medium": "water"
+    },
+    "authoredNormals": false,
+    "foliage": true,
+    "castShadow": false,
+    "waterCeiling": 0.35
   }
 }

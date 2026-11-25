@@ -142,6 +142,8 @@ export function planChunkSpawns(
         const chance = random();
         const heading = random() * TWO_PI;
         const size = min + Math.floor(random() * (max - min + 1));
+        // Members gather round one height, as they gather round the home.
+        const groupLevel = random();
 
         if (chance >= site.biomeWeight(biome.name, homeX, homeZ)) continue;
         if (!ruleAllows(rule, world, homeX, homeZ)) continue;
@@ -175,8 +177,11 @@ export function planChunkSpawns(
             if (!habitat.canBe(x, z)) continue;
 
             let y = world.sampleHeight(x, z) ?? 0;
-            if (habitat.heightRange?.(x, z, _range))
-              y = _range.min + level * (_range.max - _range.min);
+            if (habitat.heightRange?.(x, z, _range)) {
+              const { min, max } = _range;
+              const middle = min + groupLevel * (max - min);
+              y = Math.max(min, Math.min(max, middle + (level - 0.5) * spread));
+            }
 
             members.push({
               id: `${SPAWN_ID_PREFIX}${cx},${cy}:${index++}`,

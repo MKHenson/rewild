@@ -2,7 +2,7 @@ import { Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
 import { BehaviourState } from 'rewild-routing';
 import { MovementSettings } from './CreaturePresets';
-import { AirHabitat, Habitat, WaterHabitat } from './Habitat';
+import { AirHabitat, BedHabitat, Habitat, WaterHabitat } from './Habitat';
 import { IMovementMode, MovementSystem } from './MovementSystem';
 import { TestAnimator, TestWorld } from './testWorld';
 
@@ -583,5 +583,42 @@ describe('MovementSystem pitch when slow', () => {
 
     expect(system.verticalSpeed).toBeGreaterThan(0);
     expect(system.pitch).toBeCloseTo(0, 4);
+  });
+});
+
+describe('MovementSystem on the bed', () => {
+  function walker(height: (x: number, z: number) => number) {
+    const world = new TestWorld();
+    world.height = height;
+    world.depth = () => 2;
+    const habitat = new BedHabitat({ type: 'bed' }, world);
+    const mode = new GoalMode('a');
+    const system = new MovementSystem(SETTINGS, habitat, world, [mode]);
+    return { mode, system };
+  }
+
+  it('stands on the bed', () => {
+    const { mode, system } = walker((x) => x * 0.1);
+    system.place(0, 3, 0, 0);
+    mode.goalX = 0;
+    mode.goalZ = 5;
+    for (let t = 0; t < 3; t += 0.05) system.update(0.05);
+    expect(system.y).toBeCloseTo(system.x * 0.1, 2);
+  });
+
+  it('leans nose up a slope ahead', () => {
+    const { system } = walker((_x, z) => z * 0.5);
+    system.place(0, 0, 0, 0);
+    for (let t = 0; t < 3; t += 0.05) system.update(0.05);
+    expect(system.pitch).toBeCloseTo(Math.atan(0.5), 2);
+    expect(system.roll).toBeCloseTo(0, 5);
+  });
+
+  it('rolls its +X side up a slope across', () => {
+    const { system } = walker((x) => x * 0.5);
+    system.place(0, 0, 0, 0);
+    for (let t = 0; t < 3; t += 0.05) system.update(0.05);
+    expect(system.roll).toBeCloseTo(Math.atan(0.5), 2);
+    expect(system.pitch).toBeCloseTo(0, 5);
   });
 });

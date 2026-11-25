@@ -46,6 +46,17 @@ export interface WaterHabitatSettings extends SpawnRangeSettings {
   waterTypes?: WaterType['name'][];
 }
 
+/** Where a creature that walks the bed under the water may be. */
+export interface BedHabitatSettings extends SpawnRangeSettings {
+  type: 'bed';
+  /** Metres of water from the bed to the surface at rest. */
+  depth?: Selector;
+  /** Metres to dry ground, up to SHORE_CAP. */
+  shore?: Selector;
+  /** Water type names it lives in. Any water when left out. */
+  waterTypes?: WaterType['name'][];
+}
+
 /** Where a flying creature may be. */
 export interface AirHabitatSettings extends SpawnRangeSettings {
   type: 'air';
@@ -58,6 +69,7 @@ export interface AirHabitatSettings extends SpawnRangeSettings {
 export type HabitatSettings =
   | LandHabitatSettings
   | WaterHabitatSettings
+  | BedHabitatSettings
   | AirHabitatSettings;
 
 /** Something a creature may do while it waits. */
@@ -309,7 +321,7 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
     movement: {
       walkSpeed: 0.4,
       runSpeed: 2.5,
-      turnRate: 3,
+      turnRate: 6,
       acceleration: 3,
       glide: 0.8,
       climbSpeed: 0.3,
@@ -333,6 +345,65 @@ export const CREATURE_PRESETS: Record<string, CreaturePreset> = {
         waterTypes: ['lake'],
         spawnRadius: 35,
         despawnRadius: 40,
+      },
+    ],
+  },
+  crab: {
+    driver: 'clips',
+    movement: {
+      walkSpeed: 0.2,
+      runSpeed: 1.0,
+      turnRate: 1,
+      acceleration: 2,
+      modes: {
+        wander: {
+          radius: 3,
+          wait: [3, 8],
+          actions: [
+            { meaning: 'feed', weight: 3 },
+            { meaning: null, weight: 2 },
+          ],
+        },
+        evade: { radius: 2.0, release: 6, startle: 0.5 },
+      },
+    },
+    habitat: [
+      {
+        type: 'bed',
+        depth: [
+          { from: 0, to: 0.02 },
+          { from: 8, to: 6 },
+        ],
+        spawnRadius: 30,
+        despawnRadius: 35,
+      },
+    ],
+  },
+  jellyfish: {
+    driver: 'clips',
+    movement: {
+      walkSpeed: 0.15,
+      runSpeed: 0.3,
+      turnRate: 0.4,
+      acceleration: 0.2,
+      glide: 3,
+      climbSpeed: 0.1,
+      modes: {
+        wander: {
+          radius: 6,
+          wait: [2, 6],
+          actions: [],
+          hold: { drift: 0.5, every: [3, 6], speed: 0.05 },
+        },
+      },
+    },
+    habitat: [
+      {
+        type: 'water',
+        bedMargin: 1,
+        surfaceMargin: 0.5,
+        depth: { from: 3, to: 5 },
+        waterTypes: ['ocean'],
       },
     ],
   },

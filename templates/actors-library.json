@@ -109,6 +109,14 @@
           "templateId": "trout"
         },
         {
+          "name": "Crab",
+          "templateId": "crab"
+        },
+        {
+          "name": "Jellyfish",
+          "templateId": "jellyfish"
+        },
+        {
           "name": "Sardine School",
           "templateId": "sardine-school",
           "properties": [
