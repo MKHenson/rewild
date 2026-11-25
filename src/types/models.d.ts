@@ -41,6 +41,7 @@ declare module 'models' {
     | 'radius'
     | 'targetLevel'
     | 'locked'
+    | 'action'
     | 'camera-transform';
   export type PropValueType =
     | 'string'
@@ -71,7 +72,10 @@ declare module 'models' {
     value: PropValue;
   };
 
-  export type CustomEditorType = 'camera-capture' | 'level-select';
+  export type CustomEditorType =
+    | 'camera-capture'
+    | 'level-select'
+    | 'action-select';
 
   export type IProperty = {
     label: string;

@@ -164,6 +164,12 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
     label: 'Locked',
     valueType: 'boolean',
   },
+  // A target asset's id and one of its actions. See `src/core/routing/actions.ts`.
+  action: {
+    label: 'Action',
+    valueType: 'object',
+    customEditor: 'action-select',
+  },
   'camera-transform': {
     label: 'Camera Transform',
     valueType: 'object',
