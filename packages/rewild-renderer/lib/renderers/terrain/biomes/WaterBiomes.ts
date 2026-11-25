@@ -96,16 +96,19 @@ const SEAGRASS: SeaScatter = {
   density: 1,
   waterDepth: [
     { from: 0.4, to: 0.8 },
-    { from: 7, to: 5 },
+    { from: 25, to: 18 },
   ],
-  shore: [{ from: 120, to: 80 }],
+  shore: [
+    { from: 15, to: 30 },
+    { from: 220, to: 180 },
+  ],
   noise: { scale: 16, seedSalt: 149, band: { from: 0.25, to: 0.45 } },
 };
 
 // Cobbles on the bed, thinning on steep ground.
 const BED_PEBBLES: SeaScatter = {
   layer: 'granite_pebble_01',
-  density: 0.15,
+  density: 0.5,
   slope: { from: 30, to: 10 },
   noise: { scale: 40, seedSalt: 167, band: { from: 0.4, to: 0.65 } },
 };

@@ -9,7 +9,7 @@ export const REEDS: BiomeScatter = {
   slope: { from: 20, to: 6 },
   waterDepth: [
     { from: -2.5, to: -2.0 },
-    { from: 2.5, to: 2.2 },
+    { from: 0.5, to: 0.2 },
   ],
   underwater: true,
   noise: { scale: 10, seedSalt: 131, band: { from: 0.35, to: 0.6 } },
