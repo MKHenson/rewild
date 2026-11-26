@@ -34,6 +34,7 @@ The DOM stays the home of most of the UI. Mica is for the UI a player uses while
 | In-game menu, game over             | Mica     | 2     |
 | Settings, from the in-game menu     | Mica     | 3     |
 | Personal assistant: a menu on the player's hand that opens a portal | Mica | 4 |
+| Library parts for slots: images, a grid, carrying items, shown in the inspector | Mica | 5 |
 | Hotbar, inventory, prompts          | Mica     | Later |
 
 Both UIs read the same theme values, so they look like one product. See Theme.
@@ -48,8 +49,9 @@ Both UIs read the same theme values, so they look like one product. See Theme.
 | **2. The menu**        | Text v2, icons, events, focus, gamepad, glass, theme, transitions. Button and Modal                         | In-game menu, game over         |
 | **3. Settings**        | Popups, form controls: tabs, select, slider, switch, field                                                  | Settings in the game            |
 | **4. In the world**    | World surfaces, the look-at pointer and crosshair, locked portals, actions, the personal assistant         | The assistant's Portal tab      |
+| **5. Carrying**        | Images, the `Grid` component, carrying items from slot to slot with pick up and place                      | The Images, Grid and Carry examples in the inspector |
 
-Each stage is playable on its own. Stage 1 looks the same as today on purpose: it proves the new parts against a UI we know. From Stage 3, Settings in the in-game menu opens the Mica panel. The main menu's `/settings` route keeps the DOM panel.
+Each stage is playable on its own. Stage 1 looks the same as today on purpose: it proves the new parts against a UI we know. From Stage 3, Settings in the in-game menu opens the Mica panel. The main menu's `/settings` route keeps the DOM panel. Stage 5 shows only in the inspector. The game's inventory uses its parts later.
 
 ---
 
@@ -90,6 +92,9 @@ The MSDF shader is right in principle. It takes the median, finds the screen pix
 | World UI      | Stage 4 adds the personal assistant: a menu on the player's hand, in 3D, that the player opens with I. It proves the VR use. Its first job is to open a portal            |
 | Actions       | An asset type declares the actions it can do, in one TypeScript file that the game and the editor share. One `action` property holds a target and an action. See Actions |
 | VR            | A future goal. No headset yet. World surfaces and ray pointers are the parts VR needs                                                                                   |
+| Carrying      | Pick up and place, with no drag. A click exchanges the carried item and the slot's item. Slots take an amount, for stacks. See Why not drag and drop                   |
+| Images        | Small images share an atlas. Large images get a texture each. One shader path. See Images                                                                               |
+| Grid          | A `Grid` component over flex with wrap. No CSS grid layout. See Grid                                                                                                     |
 
 ### Why not Rust
 
@@ -112,7 +117,7 @@ Game UIs use a few layout models. Each one does a part of the job:
 | Grid                   | Forms in columns, inventories                   | More to build. Little else needs it                  |
 | Constraints (Cassowary) | Any shape                                       | Slow to solve, hard to debug, too much for this UI   |
 
-Flex with absolute position covers anchors as well: `position: 'absolute'` with `bottom`, `left` and percentage sizes pins the HUD the same way an anchor does. Settings rows get their columns from a fixed label width. Inventory slots are fixed-size items in a wrapped row. So flex with absolute position is enough, and grid can come later if a screen needs it.
+Flex with absolute position covers anchors as well: `position: 'absolute'` with `bottom`, `left` and percentage sizes pins the HUD the same way an anchor does. Settings rows get their columns from a fixed label width. Inventory slots are fixed-size items in a wrapped row. So flex with absolute position is enough. Stage 5's `Grid` is a helper over flex, not grid layout. See Grid.
 
 ---
 
@@ -227,6 +232,7 @@ The theme values, not the CSS. The DOM's components keep their styles as CSS tex
 | Text       | `color`, `fontSize`, `fontWeight`, `lineHeight`, `textAlign`, `whiteSpace`, `textOverflow` (`ellipsis`)       | 2 |
 | Effects    | `boxShadow` (outer and inset, a list), `backdrop` (`glass`), `transform` (`x`, `y` and a uniform `scale`), `transition` (colours, opacity, `transform`) | 2 |
 | Input      | `pointerEvents` (`auto`, `none`), `focusable`                                                                 | 2 |
+| Image      | `objectFit` (`fill`, `contain`, `cover`)                                                                      | 5 |
 
 ---
 
@@ -275,6 +281,7 @@ One pipeline draws a surface. Each node adds primitives to one instance stream, 
 | `rect`    | A rounded box: SDF corners per corner, border width, fill, border colour, shadow, backdrop   |
 | `glyph`   | One MSDF character                                                                          |
 | `icon`    | One icon from the SDF icon atlas                                                            |
+| `image`   | One image from the image atlas. See Images. Stage 5                                         |
 | `custom`  | A rect drawn by a registered fragment function. See Effects                                 |
 
 Each instance carries its rectangle, a clip rectangle, its colours and one `vec4` of parameters. A node with `overflow: hidden` sets the clip for its children.
@@ -464,6 +471,8 @@ Components are TypeScript classes that build a subtree, handle their own states,
 | `Switch`   | An on and off toggle, the same shape as the DOM's              | 3     |
 | `Field`    | A label, a control and an optional description in a row        | 3     |
 | `Divider`, `InfoBox` | A line, and a box of help text                       | 3     |
+| `Image`    | One image, small or large. See Images                          | 5     |
+| `Grid`     | Cells of one size in columns and rows, over flex. See Grid     | 5     |
 
 A closed `Modal` stays in its surface at opacity 0, and its surface takes no input. So it draws nothing, and it fades and shrinks in when it opens, as the DOM modal does. Game over keeps its title and its options at opacity 0 for the same reason.
 
@@ -668,6 +677,178 @@ The renderer uses WebGPU. An XR session needs the browser to share WebXR with We
 
 ---
 
+## Images, grids and carrying (Stage 5)
+
+Stage 5 adds three parts to the library: images, a grid, and a way to carry an item from one slot to another. The game's inventory, and other screens with slots, use them later.
+
+The parts are library parts. Their API and the inspector's examples use no game words. Each example tests one API. The game's own rules, such as which items stack and how far, live in the game. The examples write small rules of their own to prove the API can hold them.
+
+### Why not drag and drop
+
+A web style drag and drop API is the wrong tool for slots. Mica uses pick up and place, as many games do.
+
+- **A gamepad cannot drag.** A drag needs a pointer that moves while a button is down. A gamepad has no pointer. Its d-pad moves focus from slot to slot. To hold A down during those moves is awkward.
+- **Pick up and place is common.** A click picks the item up, and the item follows the pointer. A second click puts it down. Players know this from many inventory screens.
+- **The DOM's API is hard to use.** A target must prevent the default of `dragover` to accept a drop. The data goes as strings in `dataTransfer`. Mica gets nothing from a copy of this.
+- **One model for each input.** Pick up and place works the same with a mouse, a touch, the keys, a gamepad and a ray. Only the place where the carried item shows changes: at the pointer, or over the focused slot.
+
+There is no drag. A press that moves and comes up on another slot is a press with no click, as in the DOM. One way in keeps the rules small.
+
+### Carry
+
+`UICarry` carries one item at most. `UIRenderer` owns one, as `ui.carry`. A slot is a node that can give an item to the carry and take one from it. `UICarry` does not know what an item is.
+
+```ts
+const carry = renderer.ui.carry;
+
+carry.slot<Item>(cell, {
+  take: (amount) => items.take(i, amount), // removes and gives an item, or null when empty
+  put: (item, amount) => items.put(i, item, amount), // gives what stays carried, or null
+  accepts: (item) => true,
+  ghost: (item) => new Image({ image: item.image, style: { width: 56, height: 56 } }).node,
+  enter: () => (slot.lit = true),
+  leave: () => (slot.lit = false),
+});
+
+carry.held; // the carried item, or null
+carry.onChange = (held) => redraw();
+carry.onReturn = (item, from) => items.stow(item, from); // Escape, B, cancel()
+carry.cancel();
+```
+
+**The one rule.** A click on a slot exchanges the carried item and the slot's item:
+
+| Carried | Slot  | A click                                                              |
+| ------- | ----- | -------------------------------------------------------------------- |
+| Nothing | Empty | Nothing. The click goes on as normal                                 |
+| Nothing | Full  | `take` gives the slot's item, and it is carried                      |
+| An item | Empty | `put` puts the item in. Nothing is carried                           |
+| An item | Full  | `put` puts the item in and gives the slot's item, and it is carried  |
+
+`UICarry` calls `take` when it carries nothing and `put` when it carries an item. What `put` gives back is carried. So the slot's code decides what a full slot does: swap, merge or refuse. `UICarry` has no idea of full or empty.
+
+**Amounts.** `take` and `put` get an amount, so slots can hold stacks. `UICarry` passes the amount and does not read it.
+
+| Input                                    | `take`   | `put`   |
+| ---------------------------------------- | -------- | ------- |
+| The main button, a tap, Enter, A         | `'all'`  | `'all'` |
+| The right button, Shift+Enter, X         | `'half'` | `'one'` |
+
+A slot that holds one item and ignores the amount works the same for each input. A stack slot merges in `put` and gives back what is left. So with a stack carried, a right click on a slot puts one item in it, and the rest stays carried. Each right click puts one more. With nothing carried, a right click on a stack takes half of it. The carried item shows its count through its ghost, which the slot builds. So counts need no API of their own.
+
+- **Clicks.** When the carry acts, the slot gets no `click` event. A slot that does not accept the carried item takes no click, and the item stays carried. Over a slot, the right button opens no context menu.
+- **Not a slot.** While an item is carried, a click on a node that is not a slot goes on as normal. So a Close button still works.
+- **The ghost.** The slot that gives the item builds its ghost with `ghost`. After a `put` that gives back part of a stack, the slot builds the ghost again. The ghost draws on the carry surface, a screen surface at order 3, over popups. The carry surface takes no input, so the hit test finds the slots under the ghost.
+- **Where the ghost shows.** With a pointer, centred on the pointer. With the keys or a gamepad, over the focused node, 12 px up and to the right. It slides from node to node over 80 ms. The ghost moves by its `transform`, so its surface does not lay out again.
+- **The slot under the carry.** With a pointer, the hit node or its nearest parent that is a slot. With the keys or a gamepad, the focused node or its nearest parent that is a slot.
+- **Enter and leave.** When the slot under the carry changes, the old slot gets `leave`. The new slot gets `enter` if it accepts the carried item. Over a slot that does not accept it, the ghost shows at 50 % opacity.
+- **Returning.** Escape, B and `cancel()` give the carried item to `onReturn`, with the slot that it came from last. The owner puts it back, for example in that slot or the first empty one. A press off each surface, and the close of the slot's surface, do the same.
+- **Escape first.** `UICarry` takes the Escape key down before the nodes of the focus scope, and prevents its default. So Escape returns a carried item and the modal round the slots stays open. A second Escape closes the modal.
+- **The keys and the gamepad.** Each slot must be focusable. Focus moves as normal while an item is carried.
+- **Touch.** A tap clicks. A tap has no right button, so touch takes only `'all'`. There is no drag, so a scroll container of slots pans as normal.
+- **Across surfaces.** The carry surface is over each screen surface, so an item goes from a slot on one surface to a slot on another.
+- **World surfaces.** Stage 5 carries on screen surfaces only. On a world surface, the ghost must draw on that surface, at the ray's point.
+- **Debug.** `printUIFocus` also prints the carried item, the slot it came from and the slot under it.
+
+### Room for later
+
+Stage 5 does not build these. The API leaves room for each one, so none of them changes the slots of Stage 5.
+
+- **Items that span cells**, such as an item 1 by 3. The carried item gets a size in cells. The slot under the carry is the cell under the ghost's top left cell, not under the pointer. `Grid` gives the rectangle of a range of cells, and the item draws over the cells there. `accepts` refuses a place where the item does not fit. `put` gives back the one item that the new item covers.
+- **A press off each surface** returns the item in Stage 5. The game can give it a callback of its own, for example to drop the item in the world.
+- **Drag** can come back as a second way to pick up, if players ask for it. It ends in the same state, so the slots do not change.
+
+### Images
+
+Mica needs two kinds of image:
+
+- **Small images**, such as icons of items: many of them, at 32 to 256 px, often on one screen.
+- **Large images**, such as pictures: up to 1024 by 1024 or more, many over a session, a few on one screen.
+
+One atlas cannot serve both. A 1024 image fills a quarter of a 2048 layer. To grow the atlas, the renderer must copy each layer. Freed images leave holes. And one texture per image puts each small image in its own draw call. So Mica keeps the two apart, behind one API and one shader path.
+
+```ts
+await renderer.ui.images.load('panel', '/images/panel.png');
+renderer.ui.images.add('circle', canvas); // an image drawn by code
+const panel = new Image({ image: 'panel', style: { width: 480, height: 600 } });
+renderer.ui.images.release('photo-3'); // the screen that showed it closed
+```
+
+- **Small images** fit a block of 512 texels with a border of 4 texels round them, so they are 504 texels or less on each side. They share an atlas: a texture array of 2048 by 2048 layers. A buddy allocator gives each image a square block of a power of two in size, 16 to 512 texels, with the border inside the block. A block is cleared before it takes an image, so the border is clear. When the four blocks that one block split into are all free, they join again, so the space is used again. When the layers are full, `UIImages` adds a layer. It makes a new array, copies the old layers on the GPU and makes the bind groups again. A layer with mips is 22 MB, and small images rarely fill one.
+- **Large images** are larger than 504 texels on a side. Each one has its own texture, up to the device's `maxTextureDimension2D`. A 1024 by 1024 image with mips is 5.6 MB.
+- **One shader path.** The shader samples a `texture_2d_array` in a second bind group. The atlas is that array. A large image is an array of one layer. The primitive holds the layer and the texture rectangle.
+- **Draw calls.** A surface draws in runs of primitives with the same image texture, as with effects. All small images are in one run, so a screen of slots draws in one call. Each large image adds one draw call. A page of 12 pictures adds 12, which is small next to the scene.
+- **Lifetime.** Each `load` and `add` counts once for its name, and each `release` takes one away. At zero, a large image's texture goes and a small image's block is free again. A node whose image is not loaded draws nothing. The owner of a screen of large images loads them when it opens and releases them when it closes.
+- **Loading.** `createImageBitmap` decodes off the main thread. `copyExternalImageToTexture` writes the image, and one render pass per level makes the mips. A second `load` or `add` of a name that is loaded or loading only counts. `add` takes an `ImageBitmap`, a canvas or an `OffscreenCanvas`. For an `img` element, make an `ImageBitmap` of it first.
+- **Decoding.** The decode uses `premultiplyAlpha: 'none'` and `colorSpaceConversion: 'none'`, because macOS zeroes the colour of clear texels in a premultiplied decode. The copy to the texture then premultiplies, with `premultipliedAlpha: true`. So filtering and mips work on premultiplied texels, and clear edges do not go dark.
+- **Colour.** The textures are `rgba8unorm`, not `-srgb`. Mica blends sRGB values into a plain canvas format, and images must match the theme colours.
+- **Mips.** Atlas layers have 3 levels: full, half and quarter size. A block of a power of two, on a multiple of its size, stays on whole texels at each level. The border is still one texel at the quarter level, so neighbours stay apart. The shader keeps texture coordinates half a texel inside the image. Large images have all levels. The shader picks the level from the image's size on the target.
+- **Drawing.** `node.image` draws in the content box, after the node's box and before its icon and text. `objectFit` places it as in CSS: `fill`, `contain` (the default) or `cover`. `cover` crops by texture coordinates, so no texel outside the image shows. The image takes the node's rounded corners and its clip.
+- **Size.** An image node with no width or height takes the image's size in CSS pixels. That is its texel size over its `pixelRatio`, a `load` and `add` option, 1 by default. With only a width or only a height, the other side keeps the image's aspect ratio. Padding and border go round the image. Before the image loads, it has no size. Give a size to a node that must not move when it loads.
+- **Children.** An image node lays out its children, unlike a text node. The children draw over the image and do not size the node, so an image can hold a grid.
+- **Stats.** `UIRenderer.stats` gives the image count and the image memory. `UIImages.stats` splits the count into small and large. The inspector shows both under each example.
+- **The DOM mirror** draws an image node's image as a background in its content box, with the `background-size` that matches its `objectFit`. So its children draw over it, as in Mica.
+- **Publishing.** The game build copies the game's images to `public/images` under hashed names, the same as the font. The inspector serves the plain names.
+- **Later: compressed textures.** KTX2 files with BC7 on desktop and ASTC on headsets and handhelds cut a 1024 image to 1.4 MB with mips. Only the loader changes.
+
+### Grid
+
+`Grid` is a component over flex. It is not CSS grid.
+
+```ts
+const grid = new Grid({
+  columns: 6,
+  rows: 4,
+  cellSize: 64,
+  gap: 6,
+  cell: (column, row, index) => new Cell(index).node,
+});
+grid.cell(2, 1); // the node in column 2, row 1
+grid.cells; // all the nodes, row by row
+```
+
+- **Layout.** One row that wraps, `columns * cellSize + (columns - 1) * gap` wide. Each cell has a fixed width and height, with no grow and no shrink. So each row holds `columns` cells, and each cell is at its column and row.
+- **Cell size.** A number gives square cells. `{ width, height }` gives other shapes.
+- **Focus.** Spatial focus moves work by rectangles, so the d-pad moves through the cells with no code in `Grid`. The cell's node decides if it is focusable.
+- **Over an image.** Put the grid on an image with `position: 'absolute'`, `top` and `left`. The grid draws the cells and the image draws only what is behind them. So a change to the grid needs no new art.
+
+**Why not CSS grid.** A grid of slots is a fixed lattice of equal cells. Flex with wrap gives that exactly. CSS grid is worth its cost for tracks of mixed sizes and for items that span cells. Items that span cells do not need grid layout either. They draw over the cells, at a rectangle that `Grid` works out. See Room for later.
+
+### The inspector examples
+
+Each example tests one API. The content is neutral: coloured shapes, numbered tiles and test images.
+
+**Images**
+
+- **Sizes.** Shapes at their size, at half and at a quarter, with a box, text and an icon. The counts show one draw call.
+- **Object fit.** A wide image in wide and tall boxes, with each `objectFit`.
+- **Corners and clips.** An image in a round box, in a box with a rounded border and padding, cut by a parent with `overflow: 'hidden'`, and at half opacity.
+- **Natural size.** An image with no size, one with a pixel ratio of 2, one with only a width, and one with padding and children over it.
+- **From a URL.** The inspector's test image, loaded with `load`. It is a large image.
+- **Large images.** A page of six 1024 by 1024 test images. Buttons load and release them. The counts show one draw call more for each image, and the image memory.
+
+**Grid**
+
+- **Cells.** A 6 by 4 grid of square cells, next to its DOM version.
+- **Cell shapes.** A grid of cells that are wider than they are tall.
+- **Over an image.** A grid on a framed panel image, at an offset from its top left.
+- **Focus.** Focusable cells. The arrow keys and the d-pad move through them.
+
+**Carry**
+
+- **Move.** Two rows of slots with shapes in some of them. A click shows each row of the one rule: take, put, exchange and nothing.
+- **Accepts.** Slots with a coloured border take only shapes of their colour. Over a slot that refuses, the ghost fades and the slot does not light.
+- **Stacks.** Numbered tiles that merge up to 10 in a slot. With nothing carried, the right button, Shift+Enter and X take half a stack. With a stack carried, they put one tile and the rest stays carried. The rule is about 20 lines in the example, not in the library. The ghost shows the count.
+- **Return.** Slots in a `Modal`. Escape and B return the carried item, and the modal stays open. Buttons call `cancel()`. A line shows each call to `onReturn`.
+- **Across surfaces.** Slots in a `Modal` and slots on the surface under it. An item goes both ways.
+- **Together.** A grid of slots over a panel image, with shapes in the slots. It checks that the parts work together: the grid on the image, and the ghost over the modal.
+
+Each Carry example has a line under the canvas that shows the carried item and its count, such as `Carried: 7 × tile`.
+
+**The art.** Drawn in code at start, with `images.add` from a canvas: shapes in a few colours, numbered tiles, a framed panel and large test images with a gradient and their number. So the examples need no files, and they test `add`. Real art can replace them later as PNG files in `inspector/images`, with no change to the examples except the load.
+
+---
+
 ## Quality and performance
 
 - **Layout** runs only for dirty surfaces.
@@ -685,7 +866,7 @@ npm run ui-inspector
 ```
 
 - **Served** by esbuild, the same as the game, from its own entry and HTML page. It does not load the game, a level or the editor.
-- **The list.** On the left, the parts of Mica to check: layout, boxes, text, icons, meters, buttons, focus, glass, scrolling, form controls, world surfaces and the look-at pointer.
+- **The list.** On the left, the parts of Mica to check: layout, boxes, text, icons, meters, buttons, focus, glass, scrolling, form controls, world surfaces, the look-at pointer, images, grids and carrying.
 - **The examples.** A click on a part loads its examples on the right, drawn by Mica on a WebGPU canvas. An example is a small function that builds a tree.
 - **Side by side.** A layout example also draws as DOM elements with the same styles, next to the Mica version. The two must match.
 - **Tools.** The layout overlay, a light and dark theme switch, and a device pixel ratio switch.
@@ -719,7 +900,8 @@ Mica runs on a bare `GPUDevice` and a canvas. It does not need the game's `Rende
 
 - CSS text, selectors, classes and the cascade.
 - JSX.
-- Grid layout.
+- CSS grid layout. `Grid` is a helper over flex.
+- In Stage 5: drag, items that span cells, stack rules in the library, dropping an item into the world, carrying on world surfaces, and compressed textures.
 - Text input fields. Settings has none.
 - Right-to-left text and complex scripts.
 - Moving the main menu, project views or editor off the DOM.
@@ -731,7 +913,7 @@ Mica runs on a bare `GPUDevice` and a canvas. It does not need the game's `Rende
 
 ## Open questions
 
-None at the moment.
+- **Freeing large images.** Stage 5 frees an image when its owner releases it. The other way is to free a large image when no node has shown it for some seconds. That needs no owner code, but an image can go and come back with a gap. Explicit release is proposed.
 
 ## Answered questions
 
@@ -756,6 +938,13 @@ None at the moment.
 - **Font sizes in the world.** 1,000 pixels per metre by default, so 1 pixel is 1 mm. See World surfaces.
 - **Transitions.** Colours, opacity and `transform`. No layout properties. See Transitions.
 - **Pausing.** The in-game menu and settings do what the in-game menu does today.
+- **Drag.** None. Pick up and place only, as it is more common and simpler.
+- **A click on a full slot.** The carried item goes in and the slot's item is carried, as in Minecraft. The slot's `put` decides, so a slot can merge or refuse.
+- **Stacks.** The API takes an amount now, so slots can hold stacks. The stack rules stay out of the library. The Stacks example proves the API holds them.
+- **Items that span cells.** Not in Stage 5. The API leaves room for them. See Room for later.
+- **Names.** Library words only, in the API and the inspector. `UICarry` and "carry", not "hand". No bags or game items in the examples.
+- **Examples.** One example for each API, with neutral content, not one demo of a bag.
+- **The art.** Drawn in code for Stage 5. Real art can replace it later.
 
 ---
 
@@ -870,3 +1059,25 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
 
   - Scope: the `first-person-arms` model on the assistant's rig, with its raise, hold and lower clips. The panel comes out of the `watch` bone, and sits clear of the raised hand.
   - Expect: opening the assistant raises the left arm, and the panel comes out of the watch on its wrist. Closing puts the panel back into the watch, and then the arm goes down.
+
+### Stage 5: carrying
+
+- [ ] **21. Images**
+
+  - Scope: `UIImages`: `load`, `add` and `release` with counts. The atlas for small images, with the buddy allocator, the border, mips and new layers. A texture for each large image, with mips. The second bind group and runs by image texture. The unpremultiplied decode. The `image` primitive, `node.image`, `objectFit` and the image's size in layout. The `Image` component, the `img` in the DOM mirror, the stats, and hashed image files in the game build. The Images examples, with images drawn in code.
+  - Expect: an image draws sharp at its size and does not shimmer at a quarter of it. Each `objectFit` matches its DOM version. A surface of boxes, text, icons and small images draws in one call. Six large images add six calls. Releasing them frees their memory, and the stats show it.
+
+- [ ] **22. Grid**
+
+  - Scope: the `Grid` component, `cell` and `cells`. Unit tests for the cell rectangles. The Grid examples.
+  - Expect: each Grid example matches its DOM version, and the d-pad moves to each cell.
+
+- [ ] **23. Carry**
+
+  - Scope: `UICarry`: slots with `take`, `put`, `accepts` and `ghost`, the one rule, amounts, the carry surface and the ghost, enter and leave, `onReturn`. The mouse, touch, the keys, the gamepad and Escape first. The carried item in `printUIFocus`. Unit tests for each row of the one rule, each amount and each way to return, with a fake input.
+  - Expect: an item goes from slot to slot by the mouse, a tap and the gamepad. A click on a full slot exchanges the two items. Escape returns the item, and the modal stays open.
+
+- [ ] **24. The Carry examples**
+
+  - Scope: the Carry part in the inspector: Move, Accepts, Stacks, Return, Across surfaces and Together, each with its state line. The stack rule in the Stacks example.
+  - Expect: each example works by each input. Tiles merge to 10, and the right button takes half and puts one. Together draws the grid on the image, and the ghost over the modal.
