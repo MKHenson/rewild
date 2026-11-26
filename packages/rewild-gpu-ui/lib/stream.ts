@@ -1,6 +1,7 @@
 import { RGBA, resolveColor } from './color';
 import type { Bounds, UIFont } from './font';
 import type { UIIcons } from './icons';
+import { cropUv, fitImage, NO_TEXTURE, UIImage, UIImageLookup } from './image';
 import { innerBox } from './layout';
 import { isScrollContainer, SCROLLBAR_SIZE, scrollbars } from './scroll';
 import {
@@ -41,6 +42,11 @@ export enum PrimitiveKind {
   Shadow = 4,
   /** An inset box shadow. Its border colour holds the radii of the hole. */
   InsetShadow = 5,
+  /**
+   * An image. Its rect is the part that shows, its border colour holds the
+   * content box it is cut to, and its effect params its texture coordinates.
+   */
+  Image = 6,
 }
 
 /** Where the effect params start in a primitive. */
@@ -89,6 +95,24 @@ export interface AtlasPrimitive {
   distanceRange: number;
 }
 
+/**
+ * One image, or the part of one that shows. It draws with the plain rect
+ * pipeline, from the texture in bind group 1.
+ */
+export interface ImagePrimitive {
+  /** The part of the image that shows. */
+  rect: Rect;
+  /** The node's content box, which the image is cut to with `radii`. */
+  box: Rect;
+  radii: Radii;
+  clip: Rect;
+  clipRadii: Radii;
+  opacity: number;
+  image: UIImage;
+  /** Left, top, right and bottom of the part that shows, in its texture, from 0 to 1. */
+  uv: [number, number, number, number];
+}
+
 /** The primitives of one surface, in draw order. */
 export class PrimitiveStream {
   data = new Float32Array(64 * PRIMITIVE_FLOATS);
@@ -99,6 +123,11 @@ export class PrimitiveStream {
   readonly effects: (string | null)[] = [];
   /** The node of each primitive, or null for an overlay primitive. */
   readonly nodes: (UINode | null)[] = [];
+  /**
+   * The image texture of each primitive: `NO_TEXTURE` for a primitive that
+   * is not an image, which any texture can draw. See `UIImage.texture`.
+   */
+  readonly textures: number[] = [];
   /** The primitives changed since the last upload, from `dirtyFrom` up to but not including `dirtyTo`. */
   dirtyFrom = 0;
   dirtyTo = 0;
@@ -125,6 +154,7 @@ export class PrimitiveStream {
     write4(d, o + 16, p.borderWidth ?? 0, p.opacity ?? 1, kind, p.outset ?? 0);
     d.set(p.effectParams ?? NONE, o + 20);
     if (kind === PrimitiveKind.Glass) this.glass++;
+    this.textures[this.count] = NO_TEXTURE;
     this.effects[this.count] = p.effect ?? null;
     this.nodes[this.count] = p.node ?? null;
     if (p.node) p.node.primitive = this.count;
@@ -145,6 +175,27 @@ export class PrimitiveStream {
     d.set(NONE, o + 12);
     write4(d, o + 16, 0, p.opacity, p.kind, p.distanceRange);
     write4(d, o + 20, atlas.left, atlas.top, atlas.right, atlas.bottom);
+    this.textures[this.count] = NO_TEXTURE;
+    this.effects[this.count] = null;
+    this.nodes[this.count] = null;
+    this.count++;
+    this.dirtyTo = this.count;
+  }
+
+  pushImage(p: ImagePrimitive): void {
+    this.reserve(this.count + 1);
+    const d = this.data;
+    const { rect, clip, box, uv } = p;
+    let o = this.count * PRIMITIVE_FLOATS;
+    o = write4(d, o, rect.x, rect.y, rect.width, rect.height);
+    o = write4(d, o, clip.x, clip.y, clip.width, clip.height);
+    d.set(p.clipRadii, o);
+    d.set(p.radii, o + 4);
+    d.set(NONE, o + 8);
+    write4(d, o + 12, box.x, box.y, box.width, box.height);
+    write4(d, o + 16, 0, p.opacity, PrimitiveKind.Image, p.image.layer);
+    write4(d, o + 20, uv[0], uv[1], uv[2], uv[3]);
+    this.textures[this.count] = p.image.texture;
     this.effects[this.count] = null;
     this.nodes[this.count] = null;
     this.count++;
@@ -184,6 +235,39 @@ export class PrimitiveStream {
   }
 }
 
+/** A run of primitives that one draw call draws. */
+export interface PrimitiveRun {
+  first: number;
+  count: number;
+  effect: string | null;
+  /** The image texture, or `NO_TEXTURE` when no primitive in the run is an image. */
+  texture: number;
+}
+
+/**
+ * Splits the stream into runs of primitives that share an effect and an
+ * image texture, in order. A primitive that is not an image joins any run,
+ * so a screen of boxes, text and small images is one run.
+ */
+export function primitiveRuns(stream: PrimitiveStream): PrimitiveRun[] {
+  const { count, effects, textures } = stream;
+  const runs: PrimitiveRun[] = [];
+  for (let first = 0; first < count; ) {
+    const effect = effects[first];
+    let texture = textures[first];
+    let end = first + 1;
+    for (; end < count && effects[end] === effect; end++) {
+      const next = textures[end];
+      if (next === NO_TEXTURE || next === texture) continue;
+      if (texture !== NO_TEXTURE) break;
+      texture = next;
+    }
+    runs.push({ first, count: end - first, effect, texture });
+    first = end;
+  }
+  return runs;
+}
+
 function write4(
   d: Float32Array,
   o: number,
@@ -206,6 +290,8 @@ export interface WriteOptions {
   font?: UIFont | null;
   /** Icons draw only when there are icons. */
   icons?: UIIcons | null;
+  /** Images draw only when there are images, and each once it has loaded. */
+  images?: UIImageLookup | null;
   /** Device pixels per CSS pixel, which text baselines snap to. */
   pixelRatio?: number;
   /** The node that draws the focus ring, or null. */
@@ -223,7 +309,8 @@ interface WriteContext extends WriteOptions {
 
 /**
  * Writes the tree's primitives in tree order: a node's outer shadows, its
- * box, its inset shadows, then its icon, its text and its children. Layout
+ * box, its inset shadows, then its image, its icon, its text and its
+ * children. Layout
  * must have run. Returns true when a transition is running, so the tree
  * must be written again on the next frame.
  */
@@ -351,6 +438,18 @@ function writeNode(
     clip = intersect(clip, placeRect(innerBox(node), placement));
     clipRadii = radii.map((r) => Math.max(0, r - borderWidth)) as Radii;
   }
+  if (node.image !== null && context.images)
+    writeImage(
+      node,
+      stream,
+      context.images,
+      clip,
+      clipRadii,
+      opacity,
+      placement,
+      radii,
+      borderWidth
+    );
   if (node.icon && context.icons)
     writeIcon(
       node,
@@ -599,6 +698,57 @@ function writeIcon(
     opacity,
     atlas,
     distanceRange: icons.distanceRange,
+  });
+}
+
+/**
+ * Draws the node's image in its content box, placed by `objectFit` and cut to
+ * the content box's rounded corners. Only the part that shows is drawn, so
+ * `cover` reads no texel outside the image.
+ */
+function writeImage(
+  node: UINode,
+  stream: PrimitiveStream,
+  images: UIImageLookup,
+  clip: Rect,
+  clipRadii: Radii,
+  opacity: number,
+  placement: Placement,
+  radii: Radii,
+  borderWidth: number
+): void {
+  const image = images.image(node.image!);
+  if (!image) return;
+  const box = contentBox(node);
+  const fitted = fitImage(
+    box,
+    image.width,
+    image.height,
+    node.style.objectFit ?? 'contain'
+  );
+  if (!fitted) return;
+  // The content box's corners: the border box's, less the border and the
+  // padding. `radii` is already scaled by the transform.
+  const [top, right, bottom, left] = node.padding.map(
+    (p) => p * placement.scale
+  );
+  const inset = [
+    Math.max(top, left),
+    Math.max(top, right),
+    Math.max(bottom, right),
+    Math.max(bottom, left),
+  ];
+  stream.pushImage({
+    rect: placeRect(fitted.rect, placement),
+    box: placeRect(box, placement),
+    radii: radii.map((r, i) =>
+      Math.max(0, r - borderWidth - inset[i])
+    ) as Radii,
+    clip,
+    clipRadii,
+    opacity,
+    image,
+    uv: cropUv(image.uv, fitted.crop),
   });
 }
 

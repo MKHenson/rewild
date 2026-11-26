@@ -4,6 +4,7 @@ import './scrolling';
 import './meters';
 import './text';
 import './icons';
+import './images';
 import './events';
 import './focus';
 import './theme';

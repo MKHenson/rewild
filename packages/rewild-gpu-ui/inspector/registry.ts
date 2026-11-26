@@ -1,4 +1,10 @@
-import type { UIInput, UISurface, UISurfaceOptions, UIWorldSize } from '../lib';
+import type {
+  UIImages,
+  UIInput,
+  UISurface,
+  UISurfaceOptions,
+  UIWorldSize,
+} from '../lib';
 
 /** What an example builds into. The inspector mirrors the surface's tree as DOM elements. */
 export interface ExampleView {
@@ -11,6 +17,8 @@ export interface ExampleView {
   createSurface(options: UISurfaceOptions): UISurface;
   /** Sends input to the surfaces on the canvas. */
   input: UIInput;
+  /** The images of the canvas's renderer. Each card has its own. */
+  images: UIImages;
 }
 
 export interface Example {

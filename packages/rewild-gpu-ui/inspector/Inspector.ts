@@ -100,6 +100,7 @@ class ExampleCard {
     this.renderer.input.attach(canvasElement, { pageKeys: false });
     this.renderer.input.onDispatch = () => requestDraw();
     this.renderer.input.onRedraw = () => requestDraw();
+    this.renderer.images.addListener(() => requestDraw());
     this.surface = this.renderer.createSurface(
       example.world
         ? { kind: 'world', name: example.name, size: example.world }
@@ -119,9 +120,21 @@ class ExampleCard {
         log,
         createSurface: (options) => this.renderer.createSurface(options),
         input: this.renderer.input,
+        images: this.renderer.images,
       }) ?? null;
     if (!example.log) {
-      this.mirror = mirrorTree(this.surface.root);
+      const images = this.renderer.images;
+      this.mirror = mirrorTree(this.surface.root, (name) => {
+        const image = images.image(name);
+        const url = images.url(name);
+        return image && url
+          ? {
+              url,
+              width: image.width / image.pixelRatio,
+              height: image.height / image.pixelRatio,
+            }
+          : null;
+      });
       domPane.append(
         example.world
           ? fitWorldMirror(this.surface, this.mirror.element, domPane)
@@ -208,12 +221,21 @@ class ExampleCard {
       this.backdrop || world ? undefined : background
     );
     device.queue.submit([encoder.finish()]);
-    const { drawCalls, nodes, primitives } = this.renderer.stats;
+    const { drawCalls, nodes, primitives, images, imageBytes } =
+      this.renderer.stats;
+    const { cached, cachedBytes } = this.renderer.images.stats;
+    const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    const imageText =
+      images || cached
+        ? ` · ${images} image${images === 1 ? '' : 's'}, ${mb(imageBytes)}${
+            cached ? ` · ${cached} cached, ${mb(cachedBytes)}` : ''
+          }`
+        : '';
     this.micaCaption.textContent = `Mica · ${canvas.width} × ${
       canvas.height
     } px at ${pixelRatio}x · ${nodes} nodes · ${primitives} primitives · ${drawCalls} draw call${
       drawCalls === 1 ? '' : 's'
-    }`;
+    }${imageText}`;
   }
 
   /**

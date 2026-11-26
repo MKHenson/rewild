@@ -7,6 +7,7 @@ import {
   UIStyle,
 } from './style';
 import { contentSize, isScrollContainer, withGutters } from './scroll';
+import { naturalSize, UIImageLookup } from './image';
 import { MeasureFunction, Rect, UINode } from './UINode';
 
 /**
@@ -74,11 +75,24 @@ const MAX_PASSES = 3;
 
 /** Measured sizes per node, for one layout pass. */
 let cache = new Map<UINode, Map<string, Size>>();
+/** The images of the tree being laid out. */
+let lookup: UIImageLookup | null = null;
 /** True when a scroll container gained or lost a gutter in this pass. */
 let guttersChanged = false;
 
 /** Places each node of the tree in surface CSS pixels. */
-export function layoutTree(root: UINode, width: number, height: number): void {
+/**
+ * Lays out the tree in a box of `width` by `height`. `images` gives the size
+ * of each image a node takes its size from. With none, an image node with no
+ * size has none.
+ */
+export function layoutTree(
+  root: UINode,
+  width: number,
+  height: number,
+  images: UIImageLookup | null = null
+): void {
+  lookup = images;
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     cache = new Map();
     guttersChanged = false;
@@ -87,6 +101,7 @@ export function layoutTree(root: UINode, width: number, height: number): void {
     if (!guttersChanged) break;
   }
   cache = new Map();
+  lookup = null;
 }
 
 /** The box inside the border, which children are placed and clipped in. */
@@ -227,9 +242,12 @@ function layoutNode(
       }
     : null;
 
-  const content = node.measure
+  let content = node.measure
     ? measureContent(node.measure, inner, innerAvailable, bounds)
     : layoutFlex(node, inner, base, innerAvailable, bounds, origin);
+  // An image node's content size is its image's, as with a CSS `img`. Its
+  // children still lay out in the box, and do not size it.
+  if (node.image !== null) content = imageContent(node, inner, bounds);
 
   if (place) {
     node.padding = r.padding;
@@ -243,6 +261,33 @@ function layoutNode(
   return {
     width: width ?? content.width + r.extra.width,
     height: height ?? content.height + r.extra.height,
+  };
+}
+
+/**
+ * The content size of an image node: the image's natural size. With one side
+ * known, the other keeps the image's aspect ratio. Before the image loads, it
+ * is 0 by 0.
+ */
+function imageContent(
+  node: UINode,
+  inner: Base,
+  bounds: { min: Size; max: Size }
+): Size {
+  const image = lookup?.image(node.image!);
+  const natural = image ? naturalSize(image) : { width: 0, height: 0 };
+  const ratio =
+    natural.width > 0 && natural.height > 0
+      ? natural.width / natural.height
+      : 0;
+  const { width, height } = inner;
+  let w = natural.width;
+  let h = natural.height;
+  if (width === undefined && height !== undefined && ratio) w = height * ratio;
+  if (height === undefined && width !== undefined && ratio) h = width / ratio;
+  return {
+    width: width ?? fit(bounds, 'width', w),
+    height: height ?? fit(bounds, 'height', h),
   };
 }
 

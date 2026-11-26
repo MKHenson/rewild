@@ -3,6 +3,7 @@ import { UIFocusEvent } from './events';
 import { canFocus } from './focus';
 import type { UIFont } from './font';
 import type { UIIcons } from './icons';
+import type { UIImageLookup } from './image';
 import { layoutTree } from './layout';
 import { scrollIntoView } from './scroll';
 import { PrimitiveStream, writeTree } from './stream';
@@ -118,6 +119,7 @@ export class UISurface {
   private _focusVisible = false;
   private _font: UIFont | null = null;
   private _icons: UIIcons | null = null;
+  private _images: UIImageLookup | null = null;
   private _theme: UITheme | null = null;
   private themeRevision = -1;
 
@@ -163,6 +165,22 @@ export class UISurface {
   set icons(icons: UIIcons | null) {
     if (icons === this._icons) return;
     this._icons = icons;
+    this.needsPaint = true;
+  }
+
+  /**
+   * The images that image nodes size from and draw. Images do not draw until
+   * it is set. Call `invalidate` when an image loads or goes.
+   */
+  get images(): UIImageLookup | null {
+    return this._images;
+  }
+
+  set images(images: UIImageLookup | null) {
+    if (images === this._images) return;
+    this._images = images;
+    this.root.syncImageHolds(images);
+    this.needsLayout = true;
     this.needsPaint = true;
   }
 
@@ -275,7 +293,7 @@ export class UISurface {
     if (this.needsLayout) {
       for (let i = 0; i < MAX_LAYOUTS && this.needsLayout; i++) {
         this.needsLayout = false;
-        layoutTree(this.root, width, height);
+        layoutTree(this.root, width, height, this._images);
         this.onLayout?.();
       }
       const end = performance.now();
@@ -290,6 +308,7 @@ export class UISurface {
       overlay: this.overlay,
       font: this._font,
       icons: this._icons,
+      images: this._images,
       pixelRatio,
       focus: this.focusVisible ? this._focused : null,
       theme: this._theme,
