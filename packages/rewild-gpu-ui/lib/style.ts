@@ -1,6 +1,7 @@
 /** Pixels as a number, or a percentage of the containing block. */
 export type Length = number | `${number}%`;
 
+import type { UIObjectFit } from './image';
 import type { UIThemeColor } from './theme';
 
 /** `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`. */
@@ -150,6 +151,11 @@ export interface UIStyle {
    * where it is larger than the node. See `UINode.scrollTo`.
    */
   overflow?: 'visible' | 'hidden' | 'scroll';
+  /**
+   * How a node's image fills its content box, as CSS's `object-fit`, centred.
+   * Defaults to `contain`. It does not pass down.
+   */
+  objectFit?: UIObjectFit;
 
   /** The text colour. Passes down to children. Defaults to white, for text over the game. */
   color?: UIColor;

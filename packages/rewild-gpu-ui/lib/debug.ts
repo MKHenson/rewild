@@ -89,6 +89,7 @@ function contents(node: UINode): string[] {
   const parts: string[] = [];
   if (node.text !== null) parts.push(`text ${JSON.stringify(node.text)}`);
   if (node.icon !== null) parts.push(`icon ${node.icon}`);
+  if (node.image !== null) parts.push(`image ${node.image}`);
   if (node.effect !== null) parts.push(`effect ${node.effect}`);
   return parts;
 }

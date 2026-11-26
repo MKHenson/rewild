@@ -6,6 +6,7 @@ import {
   UIListenerOptions,
 } from './events';
 import type { UIIconName } from './iconNames';
+import type { UIImageLookup } from './image';
 import { maxScroll, scrollIntoView, translateChildren } from './scroll';
 import type { EffectParams } from './stream';
 import { affectsLayout, affectsNoDrawing, Sides, UIStyle } from './style';
@@ -71,6 +72,18 @@ export interface UINodeOptions {
    * It does not size the node.
    */
   icon?: UIIconName;
+  /**
+   * An image by its name in `UIImages`, drawn in the content box after the
+   * box and before the icon and the text. See `objectFit`. A node with no
+   * width or height takes the image's size. Its children lay out as normal
+   * and draw over the image.
+   */
+  image?: string;
+  /**
+   * An image to load by its key, through the images' loader. While the node
+   * is on a surface, it holds the image. It also sets `image` to the key.
+   */
+  src?: string;
   /** A registered effect that draws the node's box. See `UIEffects`. */
   effect?: string;
   /**
@@ -126,6 +139,10 @@ export class UINode {
   private _effectOutset: number;
   private _text: string | null = null;
   private _icon: UIIconName | null;
+  private _image: string | null;
+  private _src: string | null;
+  /** The image this node holds for its `src`, and where, or null. */
+  private held: { images: UIImageLookup; key: string } | null = null;
   private listeners: Map<UIEventType, Listener[]> | null = null;
   private readonly measureText: MeasureFunction = (limit) =>
     measureText(this, limit);
@@ -136,6 +153,8 @@ export class UINode {
     this._effect = options.effect ?? null;
     this._effectOutset = options.effectOutset ?? 0;
     this._icon = options.icon ?? null;
+    this._src = options.src ?? null;
+    this._image = options.src ?? options.image ?? null;
     if (options.text !== undefined) this.text = options.text;
     this.style = new Proxy<UIStyle>(
       { ...options.style },
@@ -190,6 +209,56 @@ export class UINode {
     if (name === this._icon) return;
     this._icon = name;
     this.markDirty(Dirty.Paint);
+  }
+
+  /**
+   * An image to load by its key, or null. While the node is on a surface, it
+   * holds the image, so it loads and stays. It also sets `image` to the key.
+   */
+  get src(): string | null {
+    return this._src;
+  }
+
+  set src(key: string | null) {
+    if (key === this._src) return;
+    this._src = key;
+    this.image = key;
+    this.syncImageHolds(this.surface?.images ?? null, false);
+  }
+
+  /**
+   * Holds the image of each `src` in the subtree from `images`, and gives
+   * back each hold that is no longer right: the node left the surface, the
+   * surface left the renderer, or the `src` changed. With `deep` false, only
+   * this node.
+   */
+  syncImageHolds(images: UIImageLookup | null, deep = true): void {
+    const want = this._src !== null && images?.hold ? images : null;
+    const held = this.held;
+    if (held && (held.images !== want || held.key !== this._src)) {
+      held.images.release?.(held.key);
+      this.held = null;
+    }
+    if (want && !this.held) {
+      want.hold!(this._src!);
+      this.held = { images: want, key: this._src! };
+    }
+    if (deep)
+      for (const child of this.children) child.syncImageHolds(images, true);
+  }
+
+  /**
+   * The image drawn in the content box, by its name in `UIImages`, or null.
+   * It can size the node, so a change lays out again.
+   */
+  get image(): string | null {
+    return this._image;
+  }
+
+  set image(name: string | null) {
+    if (name === this._image) return;
+    this._image = name;
+    this.markDirty(Dirty.Layout | Dirty.Paint);
   }
 
   /** The registered effect that draws the box in place of its fill, or null. */
@@ -415,6 +484,7 @@ export class UINode {
     const index = ref ? this.children.indexOf(ref) : this.children.length;
     this.children.splice(index, 0, node);
     node.parent = this;
+    node.syncImageHolds(this.surface?.images ?? null);
     node.markDirty(Dirty.Layout | Dirty.Paint);
     this.markDirty(Dirty.Layout);
   }
@@ -424,6 +494,7 @@ export class UINode {
     if (!parent) return;
     parent.children.splice(parent.children.indexOf(this), 1);
     this.parent = null;
+    this.syncImageHolds(null);
     parent.markDirty(Dirty.Layout | Dirty.Paint);
   }
 

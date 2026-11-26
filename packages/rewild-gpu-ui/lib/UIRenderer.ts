@@ -1,12 +1,14 @@
 import { Matrix4 } from 'rewild-common';
 import type { UIFont } from './font';
 import type { UIIcons } from './icons';
+import { NO_TEXTURE } from './image';
 import meterEffect from './shaders/meter.wgsl';
 import hologramEffect from './shaders/hologram.wgsl';
-import { PRIMITIVE_FLOATS } from './stream';
+import { PRIMITIVE_FLOATS, primitiveRuns } from './stream';
 import { UITheme } from './theme';
 import { UIBackdrop, UIBackdropSource } from './UIBackdrop';
 import { UIEffects } from './UIEffects';
+import { UIImages } from './UIImages';
 import { UIInput } from './UIInput';
 import { UISurface, UISurfaceOptions } from './UISurface';
 import { outsideView, screenClip, worldClip } from './world';
@@ -44,6 +46,10 @@ export interface UIStats {
   writes: number;
   /** Milliseconds of stream writes, over all surfaces. */
   writeTime: number;
+  /** Images loaded, small and large. */
+  images: number;
+  /** Bytes of GPU memory the images take. */
+  imageBytes: number;
 }
 
 /**
@@ -67,9 +73,11 @@ interface SurfaceBuffers {
 /** Floats in the uniforms. Matches `Uniforms` in ui.wgsl. */
 const UNIFORM_FLOATS = 24;
 
-/** A run of primitives in one surface that share a pipeline. */
+/** A run of primitives in one surface that share a pipeline and an image texture. */
 interface DrawRun {
   bindGroup: GPUBindGroup;
+  /** The image texture, as `UIImage.texture`, or `NO_TEXTURE` for a run with no image. */
+  texture: number;
   pipeline: GPURenderPipeline;
   first: number;
   count: number;
@@ -94,10 +102,17 @@ export class UIRenderer {
     layoutTime: 0,
     writes: 0,
     writeTime: 0,
+    images: 0,
+    imageBytes: 0,
   };
   /** Times the UI's passes on the GPU, when set. */
   timestampWrites: UITimestampWrites | null = null;
   readonly effects: UIEffects;
+  /**
+   * The images that image nodes draw, by name. Each surface lays out and
+   * draws again when one loads or goes.
+   */
+  readonly images: UIImages;
   /** Sends input to the surfaces. Attach it to the canvas the UI draws on. */
   readonly input = new UIInput(this);
   /**
@@ -166,9 +181,16 @@ export class UIRenderer {
       format: 'rgba8unorm',
       usage: GPUTextureUsage.TEXTURE_BINDING,
     });
+    this.images = new UIImages(device);
+    this.images.addListener(() => {
+      for (const surface of this._surfaces) {
+        surface.needsLayout = true;
+        surface.needsPaint = true;
+      }
+    });
     const layout = device.createPipelineLayout({
       label: 'ui',
-      bindGroupLayouts: [this.bindGroupLayout],
+      bindGroupLayouts: [this.bindGroupLayout, this.images.bindGroupLayout],
     });
     this.effects = new UIEffects(device, format, layout, depthFormat);
     this.effects.register('meter', meterEffect);
@@ -238,6 +260,7 @@ export class UIRenderer {
     if (this._surfaces.includes(surface)) return surface;
     surface.font = this._font;
     surface.icons = this._icons;
+    surface.images = this.images;
     surface.theme = this.theme;
     surface.showLayout = this._showLayout;
     surface.needsPaint = true;
@@ -249,6 +272,8 @@ export class UIRenderer {
   removeSurface(surface: UISurface): void {
     const index = this._surfaces.indexOf(surface);
     if (index !== -1) this._surfaces.splice(index, 1);
+    // Its nodes give back their images, which go into the cache.
+    if (surface.images === this.images) surface.images = null;
     const buffers = this.buffers.get(surface);
     if (buffers) this.destroyBuffers(buffers);
     this.buffers.delete(surface);
@@ -421,6 +446,8 @@ export class UIRenderer {
     this.input.detach();
     this.stopWatchingTheme();
     this.blur.dispose();
+    for (const surface of this._surfaces) surface.images = null;
+    this.images.dispose();
     for (const buffers of this.buffers.values()) this.destroyBuffers(buffers);
     this.buffers.clear();
     this.uniforms.destroy();
@@ -444,6 +471,9 @@ export class UIRenderer {
       stats.layoutTime += surface.layoutTime;
       stats.writeTime += surface.writeTime;
     }
+    const images = this.images.stats;
+    stats.images = images.small + images.large;
+    stats.imageBytes = images.bytes;
   }
 
   /**
@@ -486,19 +516,21 @@ export class UIRenderer {
       this.addRuns(surface, bindGroup, true);
   }
 
-  /** Adds the surface's runs of primitives that share an effect to `runs`. */
+  /**
+   * Adds the surface's runs of primitives that share an effect and an image
+   * texture to `runs`. A primitive with no image joins any run.
+   */
   private addRuns(
     surface: UISurface,
     bindGroup: GPUBindGroup,
     world: boolean
   ): void {
-    const { count, effects } = surface.stream;
-    for (let first = 0; first < count; ) {
-      const effect = effects[first];
-      let end = first + 1;
-      while (end < count && effects[end] === effect) end++;
+    for (const { first, count, effect, texture } of primitiveRuns(
+      surface.stream
+    ))
       this.runs.push({
         bindGroup,
+        texture,
         pipeline: this.effects.pipeline(
           effect,
           surface.effect,
@@ -506,19 +538,24 @@ export class UIRenderer {
           surface.depthTest
         ),
         first,
-        count: end - first,
+        count,
       });
-      first = end;
-    }
   }
 
   /** Draws `runs` into the pass. Returns the number of draw calls. */
   private drawRuns(pass: GPURenderPassEncoder): number {
     let bindGroup: GPUBindGroup | null = null;
+    let imageGroup: GPUBindGroup | null = null;
     let pipeline: GPURenderPipeline | null = null;
     for (const run of this.runs) {
       if (run.pipeline !== pipeline) pass.setPipeline(run.pipeline);
       if (run.bindGroup !== bindGroup) pass.setBindGroup(0, run.bindGroup);
+      // A run with no image keeps the texture bound before it.
+      if (run.texture !== NO_TEXTURE || !imageGroup) {
+        const group = this.images.bindGroup(run.texture);
+        if (group !== imageGroup) pass.setBindGroup(1, group);
+        imageGroup = group;
+      }
       pipeline = run.pipeline;
       bindGroup = run.bindGroup;
       pass.draw(4, run.count, 0, run.first);

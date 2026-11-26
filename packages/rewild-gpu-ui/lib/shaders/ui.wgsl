@@ -8,8 +8,9 @@
 // then the quad grows by the outset, and the effect can draw outside the box,
 // such as a glow, and covers what it draws itself from `px.edge`.
 //
-// Glyph, icon and shadow primitives skip the effect. The base draws glyphs
-// and icons from the font atlas and the icon atlas, and shadows from the box.
+// Glyph, icon, image and shadow primitives skip the effect. The base draws
+// glyphs and icons from the font atlas and the icon atlas, images from the
+// image texture in bind group 1, and shadows from the box.
 // A glass box lays its effect over the blurred backdrop.
 //
 // Each pipeline also adds one surface effect, which moves and colours a
@@ -51,14 +52,17 @@ struct Primitive {
   radii: vec4f,
   // The colour of a glyph, an icon or a shadow.
   fill: vec4f,
-  // A shadow's radii: of its box, or of the hole of an inset shadow.
+  // A shadow's radii: of its box, or of the hole of an inset shadow. An
+  // image's content box, which it is cut to with `radii`.
   border: vec4f,
   // x: border width, y: opacity, z: kind, w: a glyph's or an icon's distance
-  // range in the atlas, or else the CSS pixels the quad grows by.
+  // range in the atlas, an image's layer, or else the CSS pixels the quad
+  // grows by.
   params: vec4f,
   // Free for the effect. A glyph's or an icon's cell in its atlas, in texels:
   // left, top, right, bottom, on texel centres. A shadow's x and y offset, its
-  // deviation and its spread.
+  // deviation and its spread. An image's left, top, right and bottom in its
+  // texture, from 0 to 1.
   effect: vec4f,
 };
 
@@ -80,6 +84,7 @@ const KIND_ICON = 2.0;
 const KIND_GLASS = 3.0;
 const KIND_SHADOW = 4.0;
 const KIND_INSET_SHADOW = 5.0;
+const KIND_IMAGE = 6.0;
 
 // The DOM glass's `saturate(150%)`.
 const GLASS_SATURATION = 1.5;
@@ -92,6 +97,10 @@ const GLASS_SATURATION = 1.5;
 // The blurred image under the UI, the size of the surface. Transparent when
 // there is none.
 @group(0) @binding(5) var backdrop: texture_2d<f32>;
+// The image texture of the draw run: the atlas of small images, or one large
+// image as an array of one layer. Its texels are premultiplied.
+@group(1) @binding(0) var imageTexture: texture_2d_array<f32>;
+@group(1) @binding(1) var imageSampler: sampler;
 
 struct VertexOut {
   @builtin(position) position: vec4f,
@@ -105,6 +114,11 @@ var<private> scale: f32;
 
 fn isAtlas(kind: f32) -> bool {
   return kind == KIND_GLYPH || kind == KIND_ICON;
+}
+
+// True for a kind whose `params.w` is not an outset.
+fn hasNoOutset(kind: f32) -> bool {
+  return isAtlas(kind) || kind == KIND_IMAGE;
 }
 
 // The surface point `p` in device pixels on the target.
@@ -129,7 +143,7 @@ fn vs(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) index: u
   let rect = prim.rect;
   let corner = vec2f(f32(vertexIndex & 1u), f32(vertexIndex >> 1u));
   // One device pixel round the box for the anti-aliased edge, and the outset.
-  let outset = select(prim.params.w, 0.0, isAtlas(prim.params.z));
+  let outset = select(prim.params.w, 0.0, hasNoOutset(prim.params.z));
   var pixel = 1.0 / u.pixelRatio;
   if (u.world > 0.0) {
     pixel = worldPixelSize(rect.xy + corner * rect.zw);
@@ -187,6 +201,23 @@ fn atlasCoverage(atlas: texture_2d<f32>, prim: Primitive, p: vec2f) -> f32 {
   // At least 1, so small text stays smooth.
   let range = max(prim.params.w * pixelsPerTexel, 1.0);
   return clamp(distance * range + 0.5, 0.0, 1.0);
+}
+
+// An image's pixel at `p`, premultiplied, cut to its content box's rounded
+// corners. `dx` and `dy` are the derivatives of `p`, taken before any
+// branch, so the mip level follows the image's size on the target. The
+// texture coordinates stay half a texel inside the image, so the filter does
+// not read the next image in the atlas.
+fn imageColor(prim: Primitive, p: vec2f, dx: vec2f, dy: vec2f) -> vec4f {
+  let uvRect = prim.effect;
+  let t = (p - prim.rect.xy) / prim.rect.zw;
+  let half = 0.5 / vec2f(textureDimensions(imageTexture));
+  let uv = clamp(mix(uvRect.xy, uvRect.zw, t), uvRect.xy + half, max(uvRect.zw - half, uvRect.xy + half));
+  let perPixel = (uvRect.zw - uvRect.xy) / prim.rect.zw;
+  let color = textureSampleGrad(imageTexture, imageSampler, uv, i32(prim.params.w), dx * perPixel, dy * perPixel);
+  let shape = coverage(roundRectDistance(p, prim.border, prim.radii));
+  let edge = coverage(roundRectDistance(p, prim.rect, vec4f(0.0)));
+  return color * min(shape, edge);
 }
 
 // The blurred backdrop at `uv` on the target, premultiplied, with the
@@ -320,6 +351,9 @@ fn shade(input: VertexOut, front: bool) -> vec4f {
   }
   if (kind == KIND_ICON) {
     return premultiply(prim.fill) * atlasCoverage(iconAtlas, prim, p) * alpha;
+  }
+  if (kind == KIND_IMAGE) {
+    return imageColor(prim, p, dx, dy) * alpha;
   }
   if (kind == KIND_SHADOW) {
     return outerShadow(prim, p) * alpha;

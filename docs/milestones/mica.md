@@ -768,28 +768,48 @@ Mica needs two kinds of image:
 One atlas cannot serve both. A 1024 image fills a quarter of a 2048 layer. To grow the atlas, the renderer must copy each layer. Freed images leave holes. And one texture per image puts each small image in its own draw call. So Mica keeps the two apart, behind one API and one shader path.
 
 ```ts
-await renderer.ui.images.load('panel', '/images/panel.png');
-renderer.ui.images.add('circle', canvas); // an image drawn by code
-const panel = new Image({ image: 'panel', style: { width: 480, height: 600 } });
-renderer.ui.images.release('photo-3'); // the screen that showed it closed
+// The usual way: the node loads the image, and holds it while it is on a surface.
+const fox = new Image({ src: 'animals/fox', style: { width: 320 } });
+
+// Images drawn by code have a name, not a key to load.
+renderer.ui.images.add('circle', canvas);
+const circle = new Image({ image: 'circle' });
+
+// Load ahead, so a screen opens with its images ready. Release when done.
+await renderer.ui.images.load('animals/fox');
+renderer.ui.images.release('animals/fox');
+
+// Each platform can load keys in its own way.
+renderer.ui.images.loader = (key) => loadFromPackage(key);
 ```
+
+**Keys, not URLs.** An image has a key, such as `animals/fox`. The images' `loader` turns a key into an image. Nodes and screens name only keys, so they do not change from one platform to another. Only the loader does:
+
+- **The web.** The default loader takes the key as a URL, and fetches and decodes it. The game sets a loader that maps each key to its hashed file name. See Publishing.
+- **Headsets and handhelds.** A loader can read a compressed texture made for the device, or a file in the app's package.
+- **Code.** A loader can draw an image, as the inspector does.
+
+A loader gives a source, and can also give a `pixelRatio` and a `url` for the DOM mirror. `UIImages` closes an `ImageBitmap` that a loader gives, after it copies it.
+
+**`src` and `image`.** A node's `src` is a key. While the node is on a surface, it holds one count of its image, and its image loads if it is not loaded. When the node leaves the surface, or the surface leaves the renderer, it gives the count back. A node's `image` is a name, and holds nothing. Use it for an image that code added, or one that something else holds. Setting `src` also sets `image` to the same key.
 
 - **Small images** fit a block of 512 texels with a border of 4 texels round them, so they are 504 texels or less on each side. They share an atlas: a texture array of 2048 by 2048 layers. A buddy allocator gives each image a square block of a power of two in size, 16 to 512 texels, with the border inside the block. A block is cleared before it takes an image, so the border is clear. When the four blocks that one block split into are all free, they join again, so the space is used again. When the layers are full, `UIImages` adds a layer. It makes a new array, copies the old layers on the GPU and makes the bind groups again. A layer with mips is 22 MB, and small images rarely fill one.
 - **Large images** are larger than 504 texels on a side. Each one has its own texture, up to the device's `maxTextureDimension2D`. A 1024 by 1024 image with mips is 5.6 MB.
 - **One shader path.** The shader samples a `texture_2d_array` in a second bind group. The atlas is that array. A large image is an array of one layer. The primitive holds the layer and the texture rectangle.
 - **Draw calls.** A surface draws in runs of primitives with the same image texture, as with effects. All small images are in one run, so a screen of slots draws in one call. Each large image adds one draw call. A page of 12 pictures adds 12, which is small next to the scene.
-- **Lifetime.** Each `load` and `add` counts once for its name, and each `release` takes one away. At zero, a large image's texture goes and a small image's block is free again. A node whose image is not loaded draws nothing. The owner of a screen of large images loads them when it opens and releases them when it closes.
-- **Loading.** `createImageBitmap` decodes off the main thread. `copyExternalImageToTexture` writes the image, and one render pass per level makes the mips. A second `load` or `add` of a name that is loaded or loading only counts. `add` takes an `ImageBitmap`, a canvas or an `OffscreenCanvas`. For an `img` element, make an `ImageBitmap` of it first.
+- **Lifetime.** Each node with a `src` on a surface counts once for its key, and so does each `load` and `add`. Each `release` takes one away. A node whose image is not loaded draws nothing.
+- **The cache.** At zero, an image is not freed at once. It goes into a cache of unused images, so a node that comes back, such as in a list that is built again, finds it ready. When the cache holds more than `cacheBytes`, 64 MB by default, the image that was used longest ago is freed. A large image's texture goes, and a small image's block is free again. `clearCache()` frees every unused image now. A node that names a cached image with `image` still draws it, until the cache frees it.
+- **Loading.** The default loader decodes with `createImageBitmap`, off the main thread. `copyExternalImageToTexture` writes the image, and one render pass per level makes the mips. A second `load`, `add` or `src` of a key that is loaded, loading or cached only counts. `add` takes an `ImageBitmap`, a canvas or an `OffscreenCanvas`. For an `img` element, make an `ImageBitmap` of it first.
 - **Decoding.** The decode uses `premultiplyAlpha: 'none'` and `colorSpaceConversion: 'none'`, because macOS zeroes the colour of clear texels in a premultiplied decode. The copy to the texture then premultiplies, with `premultipliedAlpha: true`. So filtering and mips work on premultiplied texels, and clear edges do not go dark.
 - **Colour.** The textures are `rgba8unorm`, not `-srgb`. Mica blends sRGB values into a plain canvas format, and images must match the theme colours.
 - **Mips.** Atlas layers have 3 levels: full, half and quarter size. A block of a power of two, on a multiple of its size, stays on whole texels at each level. The border is still one texel at the quarter level, so neighbours stay apart. The shader keeps texture coordinates half a texel inside the image. Large images have all levels. The shader picks the level from the image's size on the target.
 - **Drawing.** `node.image` draws in the content box, after the node's box and before its icon and text. `objectFit` places it as in CSS: `fill`, `contain` (the default) or `cover`. `cover` crops by texture coordinates, so no texel outside the image shows. The image takes the node's rounded corners and its clip.
 - **Size.** An image node with no width or height takes the image's size in CSS pixels. That is its texel size over its `pixelRatio`, a `load` and `add` option, 1 by default. With only a width or only a height, the other side keeps the image's aspect ratio. Padding and border go round the image. Before the image loads, it has no size. Give a size to a node that must not move when it loads.
 - **Children.** An image node lays out its children, unlike a text node. The children draw over the image and do not size the node, so an image can hold a grid.
-- **Stats.** `UIRenderer.stats` gives the image count and the image memory. `UIImages.stats` splits the count into small and large. The inspector shows both under each example.
+- **Stats.** `UIRenderer.stats` gives the image count and the image memory. `UIImages.stats` splits the count into small, large and cached, and gives the cached memory. The inspector shows them under each example.
 - **The DOM mirror** draws an image node's image as a background in its content box, with the `background-size` that matches its `objectFit`. So its children draw over it, as in Mica.
-- **Publishing.** The game build copies the game's images to `public/images` under hashed names, the same as the font. The inspector serves the plain names.
-- **Later: compressed textures.** KTX2 files with BC7 on desktop and ASTC on headsets and handhelds cut a 1024 image to 1.4 MB with mips. Only the loader changes.
+- **Publishing.** The game build copies the game's images to `public/images` under hashed names, the same as the font. It writes a map from each key to its hashed URL, and the game's loader reads it. Nodes never see the hashed names. The inspector's images are drawn in code, so it needs none.
+- **Later: compressed textures.** KTX2 files with BC7 on desktop and ASTC on headsets and handhelds cut a 1024 image to 1.4 MB with mips. Only the loader changes, and `UIImages` takes the compressed data it gives.
 
 ### Grid
 
@@ -824,8 +844,8 @@ Each example tests one API. The content is neutral: coloured shapes, numbered ti
 - **Object fit.** A wide image in wide and tall boxes, with each `objectFit`.
 - **Corners and clips.** An image in a round box, in a box with a rounded border and padding, cut by a parent with `overflow: 'hidden'`, and at half opacity.
 - **Natural size.** An image with no size, one with a pixel ratio of 2, one with only a width, and one with padding and children over it.
-- **From a URL.** The inspector's test image, loaded with `load`. It is a large image.
-- **Large images.** A page of six 1024 by 1024 test images. Buttons load and release them. The counts show one draw call more for each image, and the image memory.
+- **From a URL.** The inspector's test image, with its URL as the `src`, through the default loader. It is a large image.
+- **Large images.** Six 1024 by 1024 test images with a `src` each, from a loader that draws them. Buttons show and hide the nodes, and clear the cache. The counts show one draw call more for each image, and the memory in use and in the cache.
 
 **Grid**
 
@@ -913,7 +933,7 @@ Mica runs on a bare `GPUDevice` and a canvas. It does not need the game's `Rende
 
 ## Open questions
 
-- **Freeing large images.** Stage 5 frees an image when its owner releases it. The other way is to free a large image when no node has shown it for some seconds. That needs no owner code, but an image can go and come back with a gap. Explicit release is proposed.
+None at the moment.
 
 ## Answered questions
 
@@ -945,6 +965,8 @@ Mica runs on a bare `GPUDevice` and a canvas. It does not need the game's `Rende
 - **Names.** Library words only, in the API and the inspector. `UICarry` and "carry", not "hand". No bags or game items in the examples.
 - **Examples.** One example for each API, with neutral content, not one demo of a bag.
 - **The art.** Drawn in code for Stage 5. Real art can replace it later.
+- **Freeing images.** Automatic. A node with a `src` holds its image while it is on a surface. At zero, the image goes into a cache with a memory limit, and the image used longest ago is freed first. `load` and `release` stay, to load ahead and to hold an image.
+- **Other platforms.** Images have keys, and a loader that each platform can set turns a key into an image. Nodes do not change from one platform to another.
 
 ---
 
@@ -1062,10 +1084,11 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
 
 ### Stage 5: carrying
 
-- [ ] **21. Images**
+- [x] **21. Images**
 
   - Scope: `UIImages`: `load`, `add` and `release` with counts. The atlas for small images, with the buddy allocator, the border, mips and new layers. A texture for each large image, with mips. The second bind group and runs by image texture. The unpremultiplied decode. The `image` primitive, `node.image`, `objectFit` and the image's size in layout. The `Image` component, the `img` in the DOM mirror, the stats, and hashed image files in the game build. The Images examples, with images drawn in code.
   - Expect: an image draws sharp at its size and does not shimmer at a quarter of it. Each `objectFit` matches its DOM version. A surface of boxes, text, icons and small images draws in one call. Six large images add six calls. Releasing them frees their memory, and the stats show it.
+  - Then: keys and a loader that each platform can set, `src` on nodes and `Image`, counts that follow nodes on and off surfaces, and the cache of unused images. The hashed image files in the game build wait for the game's first image.
 
 - [ ] **22. Grid**
 

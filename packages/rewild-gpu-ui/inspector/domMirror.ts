@@ -24,12 +24,29 @@ export interface DomMirror {
   sync(): void;
 }
 
-/** Builds DOM elements with the same styles as a surface's tree. */
-export function mirrorTree(root: UINode): DomMirror {
+/** An image as the DOM shows it: a URL and its size in CSS pixels. */
+export interface MirrorImage {
+  url: string;
+  width: number;
+  height: number;
+}
+
+/** Finds an image node's image for the DOM, or null until it loads. */
+export type MirrorImages = (name: string) => MirrorImage | null;
+
+/**
+ * Builds DOM elements with the same styles as a surface's tree. An image
+ * node shows its image as a background in its content box, so its children
+ * draw over it as in Mica.
+ */
+export function mirrorTree(
+  root: UINode,
+  images: MirrorImages = () => null
+): DomMirror {
   const elements = new Map<UINode, HTMLElement>();
-  const element = mirrorNode(root, elements);
+  const element = mirrorNode(root, elements, images);
   const sync = () => {
-    for (const [node, element] of elements) applyStyle(element, node);
+    for (const [node, element] of elements) applyStyle(element, node, images);
     applyRootStyle(element.style);
   };
   applyRootStyle(element.style);
@@ -53,11 +70,12 @@ function applyRootStyle(css: CSSStyleDeclaration): void {
 
 function mirrorNode(
   node: UINode,
-  elements: Map<UINode, HTMLElement>
+  elements: Map<UINode, HTMLElement>,
+  images: MirrorImages
 ): HTMLElement {
   const element = document.createElement('div');
   elements.set(node, element);
-  applyStyle(element, node);
+  applyStyle(element, node, images);
   if (node.icon !== null) {
     // Lucide's own SVG, as the DOM UI draws it. It fills the content box, and
     // its viewBox centres the largest square that fits, as in Mica.
@@ -71,14 +89,19 @@ function mirrorNode(
     element.textContent = node.text;
   } else {
     for (const child of node.children)
-      element.append(mirrorNode(child, elements));
+      element.append(mirrorNode(child, elements, images));
   }
   return element;
 }
 
-function applyStyle(element: HTMLElement, node: UINode): void {
+function applyStyle(
+  element: HTMLElement,
+  node: UINode,
+  images: MirrorImages
+): void {
   const css = element.style;
   setStyle(css, node.style);
+  if (node.image !== null) applyImage(css, node.style, images(node.image));
   // Items in a Mica scroll container do not shrink. In the DOM, the
   // automatic minimum size does that, which the mirror sets to 0.
   if (node.parent?.style.overflow === 'scroll') css.flexShrink = '0';
@@ -87,7 +110,55 @@ function applyStyle(element: HTMLElement, node: UINode): void {
   if (node.text !== null && css.display !== 'none') css.display = 'block';
 }
 
+const BACKGROUND_SIZES = {
+  fill: '100% 100%',
+  contain: 'contain',
+  cover: 'cover',
+} as const;
+
+/**
+ * The image as a background in the content box, placed as `object-fit` with
+ * the centre as its position. With no width or height, the element takes
+ * the image's size, as a Mica image node does.
+ */
+function applyImage(
+  css: CSSStyleDeclaration,
+  style: UIStyle,
+  image: MirrorImage | null
+): void {
+  if (!image) return;
+  css.backgroundImage = `url("${image.url}")`;
+  css.backgroundSize = BACKGROUND_SIZES[style.objectFit ?? 'contain'];
+  css.backgroundPosition = 'center';
+  css.backgroundRepeat = 'no-repeat';
+  css.backgroundOrigin = 'content-box';
+  css.backgroundClip = 'content-box';
+  const { width, height } = style;
+  const ratio = image.width / image.height;
+  // The image is the content box. Padding and border go round it.
+  const sides = (edges: Edges | undefined, a: number, b: number) => {
+    if (edges === undefined) return 0;
+    const list = Array.isArray(edges) ? edges : [edges, edges, edges, edges];
+    return [list[a], list[b]].reduce<number>(
+      (sum, v) => sum + (typeof v === 'number' ? v : 0),
+      0
+    );
+  };
+  const border = 2 * (style.borderWidth ?? 0);
+  const extraX = sides(style.padding, 1, 3) + border;
+  const extraY = sides(style.padding, 0, 2) + border;
+  if (width === undefined && height === undefined) {
+    css.width = `${image.width + extraX}px`;
+    css.height = `${image.height + extraY}px`;
+  } else if (height === undefined && typeof width === 'number' && ratio) {
+    css.height = `${(width - extraX) / ratio + extraY}px`;
+  } else if (width === undefined && typeof height === 'number' && ratio) {
+    css.width = `${(height - extraY) * ratio + extraX}px`;
+  }
+}
+
 function setStyle(css: CSSStyleDeclaration, style: UIStyle): void {
+  css.backgroundImage = '';
   css.boxSizing = 'border-box';
   // Each Mica node is a flex container with no automatic minimum size.
   css.display = style.display ?? 'flex';
