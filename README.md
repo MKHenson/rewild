@@ -19,6 +19,7 @@ Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (
 - [Terrain](./docs/milestones/strata.md)
 - [Foliage & Scatter](./docs/milestones/understory.md)
 - [Rust](./docs/milestones/rust.md)
+- [In-Game UI](./docs/milestones/mica.md)
 
 ## Debugging
 
