@@ -357,8 +357,8 @@ frame.
 
 - **The plate.** The bars sit on a glass plate at the bottom of the screen, each with an icon:
   health, hunger, stamina and oxygen. Health has ticks, and every bar beats when it is low.
-- **Only what matters shows.** Health always shows. Hunger shows below 70%, stamina and oxygen
-  below full. While all is well, the plate dims.
+- **Only what matters shows.** Health and hunger always show, stamina and oxygen below full.
+  While all is well (hunger at 70% or more), the plate dims.
 - **Temperature** is a gauge on its own plate at the bottom right. It shows once the body is away
   from normal.
 - **Sizes are in pixels**, so the HUD is the same size on any screen.

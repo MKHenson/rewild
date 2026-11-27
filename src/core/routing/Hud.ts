@@ -10,8 +10,8 @@ import {
   UIStyle,
 } from 'rewild-gpu-ui';
 
-/** Hunger's row shows below this, so a fed player sees no hunger bar. */
-export const HUD_HUNGER_SHOWN = 0.7;
+/** The plate stays dimmed while hunger is at or above this. */
+export const HUD_HUNGER_CALM = 0.7;
 /** The temperature gauge shows once the body is this far from normal, -1 to 1. */
 export const HUD_TEMPERATURE_SHOWN = 0.05;
 /** The plate's opacity while nothing needs the player's attention. */
@@ -135,9 +135,9 @@ class HudBar {
 
 /**
  * The player's bars on a glass plate at the bottom of the screen, with the
- * body temperature gauge at the right. Health always shows. Hunger shows
- * below `HUD_HUNGER_SHOWN`, stamina and oxygen below full, and the gauge once
- * the body is away from normal. While all is well, the plate dims.
+ * body temperature gauge at the right. Health and hunger always show, stamina
+ * and oxygen below full, and the gauge once the body is away from normal.
+ * While all is well, the plate dims.
  */
 export class Hud {
   readonly root: UINode;
@@ -255,7 +255,6 @@ export class Hud {
   }
 
   private refresh(): void {
-    this.hunger.visible = this.hunger.meter.value < HUD_HUNGER_SHOWN;
     this.stamina.visible = this.stamina.meter.value < 1;
     this.oxygen.visible = this.oxygen.meter.value < 1;
 
@@ -263,7 +262,7 @@ export class Hud {
     const calm =
       health.value >= 1 &&
       health.trail >= 1 &&
-      !this.hunger.visible &&
+      this.hunger.meter.value >= HUD_HUNGER_CALM &&
       !this.stamina.visible &&
       !this.oxygen.visible;
     if (calm !== this.calm) {

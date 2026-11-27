@@ -1,5 +1,5 @@
 import { printTree, UINode, UISurface, UISurfaceOptions } from 'rewild-gpu-ui';
-import { Hud, HUD_CALM_OPACITY, HUD_HUNGER_SHOWN } from './Hud';
+import { Hud, HUD_CALM_OPACITY, HUD_HUNGER_CALM } from './Hud';
 
 function setup() {
   let surface: UISurface | null = null;
@@ -29,20 +29,19 @@ describe('Hud', () => {
     expect(surface.input).toBe('none');
   });
 
-  it('shows only health while all is well, on a dimmed plate', () => {
+  it('shows only health and hunger while all is well, on a dimmed plate', () => {
     const { find } = setup();
     expect(find('health-row').style.display).not.toBe('none');
-    expect(find('hunger-row').style.display).toBe('none');
+    expect(find('hunger-row').style.display).not.toBe('none');
     expect(find('stamina-row').style.display).toBe('none');
     expect(find('oxygen-row').style.display).toBe('none');
     expect(find('plate').style.opacity).toBe(HUD_CALM_OPACITY);
   });
 
-  it('shows hunger once it falls, and brightens the plate', () => {
+  it('brightens the plate once hunger falls', () => {
     const { hud, find } = setup();
-    hud.hungerValue = HUD_HUNGER_SHOWN - 0.01;
+    hud.hungerValue = HUD_HUNGER_CALM - 0.01;
     hud.update(1 / 60);
-    expect(find('hunger-row').style.display).toBe('flex');
     expect(find('plate').style.opacity).toBe(1);
   });
 
@@ -84,7 +83,6 @@ describe('Hud', () => {
     hud.healthValue = 0.1;
     hud.hungerValue = 0.1;
     hud.reset();
-    expect(find('hunger-row').style.display).toBe('none');
     expect(find('plate').style.opacity).toBe(HUD_CALM_OPACITY);
     expect(printTree(surface)).toContain('#health');
   });
