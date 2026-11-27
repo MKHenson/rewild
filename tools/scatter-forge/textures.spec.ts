@@ -312,8 +312,8 @@ describe('frond atlas', () => {
   // would never be seen, and a column left blank would leave the card empty.
   it('paints every frond inside the column its card samples, and nothing outside it', () => {
     const layout = atlasLayoutFor(params, null, []);
-    const rects = cellPixels(canvas.width, layout).slice(0, layout.cells);
-    const gutter = gutterFor(canvas.width);
+    const rects = cellPixels(params.textureSize, layout).slice(0, layout.cells);
+    const gutter = gutterFor(params.textureSize);
 
     for (const rect of rects) {
       const inner = insetRect(rect, gutter);

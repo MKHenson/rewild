@@ -9,7 +9,7 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import sharp from 'sharp';
-import { cellPixels, columnPixels, gutterFor, insetRect, leafCellPixels, type AtlasLayout, type PixelRect } from './atlas.ts';
+import { atlasExtent, cellPixels, columnPixels, gutterFor, insetRect, leafCellPixels, type AtlasLayout, type PixelRect } from './atlas.ts';
 import {
   atlasLayoutFor,
   fitBark,
@@ -860,7 +860,8 @@ export function buildBladeCanvas(params: Params, source: LeafSource | null = nul
 
   if (source) {
     const fit = fitClump(source, size, layout);
-    const canvas = createCanvas(size, size, gradientGainFor(source, params, fit.cellPx));
+    const { width, height } = atlasExtent(size, layout);
+    const canvas = createCanvas(width, height, gradientGainFor(source, params, fit.cellPx));
 
     rects.forEach((rect, index) => {
       const inner = insetRect(rect, gutter);
@@ -994,10 +995,11 @@ export function buildFrondCanvas(params: Params, source: LeafSource | null = nul
   const gutter = gutterFor(size);
   const layout = atlasLayoutFor(params, source, accents);
   const rects = cellPixels(size, layout).slice(0, layout.cells);
+  const extent = atlasExtent(size, layout);
 
   if (source) {
     const fit = fitCrown(source, size, layout);
-    const canvas = createCanvas(size, size, gradientGainFor(source, params, fit.cellPx));
+    const canvas = createCanvas(extent.width, extent.height, gradientGainFor(source, params, fit.cellPx));
 
     rects.forEach((rect, index) => {
       const inner = insetRect(rect, gutter);
@@ -1010,7 +1012,7 @@ export function buildFrondCanvas(params: Params, source: LeafSource | null = nul
     return canvas;
   }
 
-  const canvas = createCanvas(size, size, params.bumpStrength);
+  const canvas = createCanvas(extent.width, extent.height, params.bumpStrength);
 
   // Painted into the column the card samples, inset like a blade's cell so the
   // base is not sliced off at the gutter.

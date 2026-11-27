@@ -231,7 +231,7 @@ function buildBlades(params: Params, atlas: AtlasLayout): MeshAttributes {
   });
 
   params.accents.forEach((spec, index) =>
-    buildAccent(out, params, index, spec, accentSites[index], accentCells(params.textureSize, atlas, index), {
+    buildAccent(out, params, index, spec, accentSites[index], accentCells(params.textureSize, atlas, index, spec.aspect), {
       bend: (_site, _along, t) => t ** params.bendCurve,
       normal: (_site, outward) => tuftNormal(params, outward),
     })

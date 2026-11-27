@@ -1,5 +1,6 @@
 {
   "type": "kelp",
+  "blades": ["boa"],
   "name": "kelp-boa-01",
   "textureSet": "kelp-boa",
   "seed": 23,
@@ -11,7 +12,7 @@
   "bladeLayout": "along",
   "bladesPerStipe": 7,
   "bladeSpan": 0.9,
-  "bladeLength": 0.9,
+  "bladeLength": 1.9,
   "cardAspect": 0.52,
   "bladeAngle": 28,
   "bladeTwist": 40,

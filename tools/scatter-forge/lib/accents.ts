@@ -12,7 +12,7 @@
 // with spine or sphere normals are the exception: they go in the piece's authored tail,
 // which ships as a second primitive on the same material.
 
-import { columnOf, type UvRect } from './atlas.ts';
+import type { UvRect } from './atlas.ts';
 import { pushVertex, type Builder } from './builder.ts';
 import type { AccentSpec, Params } from './params.ts';
 import { createRng, hash2, type Rng } from './rng.ts';
@@ -98,7 +98,7 @@ export function buildAccent(
     const halfWidth = (length * spec.aspect) / 2;
     const base = add(site.p, scale(outward, site.radius));
 
-    const cell = columnOf(cells[Math.floor(hash2(params.seed, site.key * 977 + index) * cells.length) % cells.length], spec.aspect);
+    const cell = cells[Math.floor(hash2(params.seed, site.key * 977 + index) * cells.length) % cells.length];
     const cardPhase = hash2(params.seed ^ 0x2545f491, site.key * 31 + index);
 
     const directionAt = (t: number): Vec3 => normalize(rotateAbout(UP, side, (pitch + spec.curve * t * t) * DEG));

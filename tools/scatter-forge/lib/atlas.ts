@@ -149,14 +149,27 @@ export function cellPixels(size: number, layout: AtlasLayout): PixelRect[] {
   return layout.aspects ? packStrips(size, layout.aspects) : leafCellPixels(size, layout.grid);
 }
 
+/** The image a layout is written to: cropped to the strips it packs, or the whole square grid. */
+export function atlasExtent(size: number, layout: AtlasLayout): { width: number; height: number } {
+  if (!layout.aspects) return { width: size, height: size };
+  let width = 0;
+  let height = 0;
+  for (const rect of packStrips(size, layout.aspects)) {
+    width = Math.max(width, rect.x + rect.width);
+    height = Math.max(height, rect.y + rect.height);
+  }
+  return { width, height };
+}
+
 /** Every cell in UV space, inset by the gutter. */
 export function cellUvs(size: number, layout: AtlasLayout): UvRect[] {
   const g = gutterFor(size);
+  const { width, height } = atlasExtent(size, layout);
   return cellPixels(size, layout).map((rect) => ({
-    u0: (rect.x + g) / size,
-    u1: (rect.x + rect.width - g) / size,
-    v0: (rect.y + g) / size,
-    v1: (rect.y + rect.height - g) / size,
+    u0: (rect.x + g) / width,
+    u1: (rect.x + rect.width - g) / width,
+    v0: (rect.y + g) / height,
+    v1: (rect.y + rect.height - g) / height,
   }));
 }
 
@@ -166,10 +179,16 @@ export function cellInnerPx(size: number, layout: AtlasLayout): number {
   return size / layout.grid - 2 * gutterFor(size);
 }
 
-/** The cells one accent's cards address. */
-export function accentCells(size: number, layout: AtlasLayout, index: number): UvRect[] {
+/** The column of every cell that a card of `aspect` samples, in UV space. */
+export function cellColumns(size: number, layout: AtlasLayout, aspect: number): UvRect[] {
+  const { width, height } = atlasExtent(size, layout);
+  return cellUvs(size, layout).map((cell) => columnOf(cell, aspect, width / height));
+}
+
+/** The columns one accent's cards address. */
+export function accentCells(size: number, layout: AtlasLayout, index: number, aspect: number): UvRect[] {
   const range = layout.accents[index];
-  return cellUvs(size, layout).slice(range.offset, range.offset + range.count);
+  return cellColumns(size, layout, aspect).slice(range.offset, range.offset + range.count);
 }
 
 /** The leaf cells in UV space, inset by the gutter. */
@@ -222,8 +241,8 @@ export function insetRect(rect: PixelRect, gutter: number): PixelRect {
  * The card samples this column instead, so a stamp lands at its own aspect and
  * a generated frond is painted at the same. The rest of the cell is blank.
  */
-export function columnOf(rect: UvRect, aspect: number): UvRect {
-  const width = Math.min(rect.u1 - rect.u0, (rect.v1 - rect.v0) * aspect);
+export function columnOf(rect: UvRect, aspect: number, imageAspect = 1): UvRect {
+  const width = Math.min(rect.u1 - rect.u0, ((rect.v1 - rect.v0) * aspect) / imageAspect);
   const centre = (rect.u0 + rect.u1) / 2;
   return { u0: centre - width / 2, u1: centre + width / 2, v0: rect.v0, v1: rect.v1 };
 }

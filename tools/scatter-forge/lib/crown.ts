@@ -9,7 +9,7 @@
 // ground, and phased with the stem so the rosette rides its sway.
 
 import { accentRng, buildAccent, cardsAt, type AccentSite } from './accents.ts';
-import { accentCells, cellUvs, columnOf, type AtlasLayout } from './atlas.ts';
+import { accentCells, cellColumns, type AtlasLayout } from './atlas.ts';
 import {
   buildBark,
   createBuilder,
@@ -224,7 +224,7 @@ function crownSites(params: Params, stem: Branch | null, rosette: Rosette, spec:
  */
 function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, atlas: AtlasLayout): MeshAttributes {
   const cells = atlas.cells;
-  const uvCells = cellUvs(params.textureSize, atlas).slice(0, cells);
+  const uvCells = cellColumns(params.textureSize, atlas, params.cardAspect).slice(0, cells);
   const rng = createRng(params.seed ^ 0x6c3f9a17);
   const out = createBuilder();
   const stem = skeleton.branches[0] ?? null;
@@ -260,7 +260,7 @@ function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, atlas
 
     const key = frond;
     const frondPhase = hash2(params.seed ^ 0x51ed270b, key);
-    const cell = columnOf(uvCells[Math.floor(hash2(params.seed, key * 977) * cells) % cells], params.cardAspect);
+    const cell = uvCells[Math.floor(hash2(params.seed, key * 977) * cells) % cells];
     // Walked rather than solved, so the frond's length is its arc length.
     let point = base;
     const rowStart: number[] = [];
@@ -297,7 +297,7 @@ function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, atlas
   }
 
   params.accents.forEach((spec, index) =>
-    buildAccent(out, params, index, spec, crownSites(params, stem, rosette, spec, accentRng(params, index)), accentCells(params.textureSize, atlas, index), {
+    buildAccent(out, params, index, spec, crownSites(params, stem, rosette, spec, accentRng(params, index)), accentCells(params.textureSize, atlas, index, spec.aspect), {
       bend: (site, along) => bendWeight(params, skeleton, site.dist + along),
       normal: (_site, outward, face) => frondNormal(params, outward, face),
     })

@@ -10,7 +10,7 @@
 // midrib stays flat.
 
 import { accentRng, buildAccent, cardsAt, type AccentSite } from './accents.ts';
-import { accentCells, cellUvs, columnOf, type AtlasLayout, type UvRect } from './atlas.ts';
+import { accentCells, cellColumns, type AtlasLayout, type UvRect } from './atlas.ts';
 import { createBuilder, finish, pushVertex, type BarkTile, type Builder, type ForgeMesh } from './mesh.ts';
 import type { AccentSpec, Params } from './params.ts';
 import { createRng, hash2, type Rng } from './rng.ts';
@@ -434,7 +434,7 @@ export function buildKelp(params: Params, atlas: AtlasLayout, bark: BarkTile | n
   const solid = createBuilder();
   const blades = createBuilder();
   const cells = Math.max(1, atlas.cells);
-  const uvCells = cellUvs(params.textureSize, { ...atlas, cells }).slice(0, cells);
+  const uvCells = cellColumns(params.textureSize, { ...atlas, cells }, params.cardAspect).slice(0, cells);
   const bladeRng = createRng(params.seed ^ 0x6c3f9a17);
   let bladeCount = 0;
   let bladderCount = 0;
@@ -472,14 +472,14 @@ export function buildKelp(params: Params, atlas: AtlasLayout, bark: BarkTile | n
       }
 
       const bladeLength = params.bladeLength * (site.key % 256 === 0 ? 1 : bladeRng.range(0.7, 1));
-      const cell = columnOf(uvCells[Math.floor(hash2(params.seed, site.key * 977) * cells) % cells], params.cardAspect);
+      const cell = uvCells[Math.floor(hash2(params.seed, site.key * 977) * cells) % cells];
       pushBlade(params, blades, site, bladeLength, cell, hash2(params.seed ^ 0x2545f491, site.key));
       bladeCount++;
     }
   });
 
   params.accents.forEach((spec, index) =>
-    buildAccent(blades, params, index, spec, kelpSites(params, stalks, spec, accentRng(params, index)), accentCells(params.textureSize, atlas, index), {
+    buildAccent(blades, params, index, spec, kelpSites(params, stalks, spec, accentRng(params, index)), accentCells(params.textureSize, atlas, index, spec.aspect), {
       bend: (site, along) => bendAt(params, site.dist + along),
       normal: (_site, outward, face) => bladeNormal(params, outward, face),
     })

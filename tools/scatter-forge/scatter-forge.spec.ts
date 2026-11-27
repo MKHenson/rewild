@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cellInnerPx, cellUvs, columnOf, gutterFor, layoutAtlas, leafCellPixels, leafCells, packStrips } from './lib/atlas.ts';
+import { atlasExtent, cellColumns, cellInnerPx, cellUvs, columnOf, gutterFor, layoutAtlas, leafCellPixels, leafCells, packStrips } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
 import {
   boundsOf,
@@ -1017,7 +1017,23 @@ describe('atlas', () => {
       const [u, v] = [uvs[i * 2], uvs[i * 2 + 1]];
       expect(strips.some((cell) => u >= cell.u0 - 1e-6 && u <= cell.u1 + 1e-6 && v >= cell.v0 - 1e-6 && v <= cell.v1 + 1e-6)).toBe(true);
     }
-    for (const cell of strips) expect((cell.u1 - cell.u0) / (cell.v1 - cell.v0)).toBeCloseTo(0.25, 2);
+    const { width, height } = atlasExtent(512, layout);
+    for (const cell of strips) expect(((cell.u1 - cell.u0) * width) / ((cell.v1 - cell.v0) * height)).toBeCloseTo(0.25, 2);
+  });
+
+  it('crops a strip image to the strips it packs and keeps a grid square', () => {
+    const single = layoutAtlas(1, [], [0.5]);
+    const { width, height } = atlasExtent(512, single);
+    expect(height).toBe(512);
+    expect(width).toBe(packStrips(512, [0.5])[0].width);
+
+    const [cell] = cellUvs(512, single);
+    expect(cell.u0).toBeGreaterThan(0);
+    expect(cell.u1).toBeLessThan(1);
+    expect(cell.u1 - cell.u0).toBeGreaterThan(0.9);
+    expect(cellColumns(512, single, 0.5)[0].u1 - cellColumns(512, single, 0.5)[0].u0).toBeCloseTo(cell.u1 - cell.u0, 2);
+
+    expect(atlasExtent(512, layoutAtlas(4, []))).toEqual({ width: 512, height: 512 });
   });
 
   it('insets every leaf cell inside its own image', () => {

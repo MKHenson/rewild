@@ -446,7 +446,7 @@ function buildLeaves(params: Params, skeleton: Skeleton, atlas: AtlasLayout): Me
   // Into the same piece, after the leaves: an accent is more cutout on the
   // leaf material, addressing the cells set aside past the leaf grid.
   params.accents.forEach((spec, index) =>
-    buildAccent(out, params, index, spec, treeSites(params, skeleton, spec, accentRng(params, index)), accentCells(params.textureSize, atlas, index), {
+    buildAccent(out, params, index, spec, treeSites(params, skeleton, spec, accentRng(params, index)), accentCells(params.textureSize, atlas, index, spec.aspect), {
       bend: (site, along) => bendWeight(params, skeleton, site.dist + along),
       normal: (site, _outward, face) => leafNormal(params.leafNormalMode, site.p, face, skeleton.canopy.centre),
     })
