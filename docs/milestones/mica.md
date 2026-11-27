@@ -714,6 +714,7 @@ carry.held; // the carried item, or null
 carry.onChange = (held) => redraw();
 carry.onReturn = (item, from) => items.stow(item, from); // Escape, B, cancel()
 carry.cancel();
+carry.describe = (item) => `${item.count} × ${item.kind}`; // for printUIFocus
 ```
 
 **The one rule.** A click on a slot exchanges the carried item and the slot's item:
@@ -725,7 +726,7 @@ carry.cancel();
 | An item | Empty | `put` puts the item in. Nothing is carried                           |
 | An item | Full  | `put` puts the item in and gives the slot's item, and it is carried  |
 
-`UICarry` calls `take` when it carries nothing and `put` when it carries an item. What `put` gives back is carried. So the slot's code decides what a full slot does: swap, merge or refuse. `UICarry` has no idea of full or empty.
+`UICarry` calls `take` when it carries nothing and `put` when it carries an item. What `put` gives back is carried, and it comes from that slot. So the slot's code decides what a full slot does: swap, merge or refuse. `UICarry` has no idea of full or empty.
 
 **Amounts.** `take` and `put` get an amount, so slots can hold stacks. `UICarry` passes the amount and does not read it.
 
@@ -733,6 +734,8 @@ carry.cancel();
 | ---------------------------------------- | -------- | ------- |
 | The main button, a tap, Enter, A         | `'all'`  | `'all'` |
 | The right button, Shift+Enter, X         | `'half'` | `'one'` |
+
+The gamepad reader sends X as Shift+Enter, so X clicks a node that is not a slot, as A does.
 
 A slot that holds one item and ignores the amount works the same for each input. A stack slot merges in `put` and gives back what is left. So with a stack carried, a right click on a slot puts one item in it, and the rest stays carried. Each right click puts one more. With nothing carried, a right click on a stack takes half of it. The carried item shows its count through its ghost, which the slot builds. So counts need no API of their own.
 
@@ -742,7 +745,7 @@ A slot that holds one item and ignores the amount works the same for each input.
 - **Where the ghost shows.** With a pointer, centred on the pointer. With the keys or a gamepad, over the focused node, 12 px up and to the right. It slides from node to node over 80 ms. The ghost moves by its `transform`, so its surface does not lay out again.
 - **The slot under the carry.** With a pointer, the hit node or its nearest parent that is a slot. With the keys or a gamepad, the focused node or its nearest parent that is a slot.
 - **Enter and leave.** When the slot under the carry changes, the old slot gets `leave`. The new slot gets `enter` if it accepts the carried item. Over a slot that does not accept it, the ghost shows at 50 % opacity.
-- **Returning.** Escape, B and `cancel()` give the carried item to `onReturn`, with the slot that it came from last. The owner puts it back, for example in that slot or the first empty one. A press off each surface, and the close of the slot's surface, do the same.
+- **Returning.** Escape, B and `cancel()` give the carried item to `onReturn`, with the slot that it came from last. The owner puts it back, for example in that slot or the first empty one. With no `onReturn`, the item goes back through that slot's `put`. A press off each surface does the same, and the game does not get it. So does the close of the slot's surface: it is hidden, its input is `none`, or it leaves the renderer.
 - **Escape first.** `UICarry` takes the Escape key down before the nodes of the focus scope, and prevents its default. So Escape returns a carried item and the modal round the slots stays open. A second Escape closes the modal.
 - **The keys and the gamepad.** Each slot must be focusable. Focus moves as normal while an item is carried.
 - **Touch.** A tap clicks. A tap has no right button, so touch takes only `'all'`. There is no drag, so a scroll container of slots pans as normal.
@@ -1097,7 +1100,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: the `Grid` component, `cell` and `cells`. Unit tests for the cell rectangles. The Grid examples.
   - Expect: each Grid example matches its DOM version, and the d-pad moves to each cell.
 
-- [ ] **23. Carry**
+- [x] **23. Carry**
 
   - Scope: `UICarry`: slots with `take`, `put`, `accepts` and `ghost`, the one rule, amounts, the carry surface and the ghost, enter and leave, `onReturn`. The mouse, touch, the keys, the gamepad and Escape first. The carried item in `printUIFocus`. Unit tests for each row of the one rule, each amount and each way to return, with a fake input.
   - Expect: an item goes from slot to slot by the mouse, a tap and the gamepad. A click on a full slot exchanges the two items. Escape returns the item, and the modal stays open.
