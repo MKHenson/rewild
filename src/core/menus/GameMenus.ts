@@ -26,6 +26,8 @@ export interface GameMenusOptions extends GameMenusTheme {
   onRestart: () => void;
   /** Quit from the menu, Main Menu on game over, or leave a level that could not load. */
   onQuit: () => void;
+  /** Called with the new state each time it changes. */
+  onStateChange?: (state: GameMenuState) => void;
 }
 
 /** The game leaves these states only through `showLoading`, `showLoadError` or `play`. */
@@ -44,8 +46,10 @@ export class GameMenus {
   private readonly settings: SettingsMenu;
   private readonly gameOver: GameOverScreen;
   private readonly loading: LoadingScreen;
+  private readonly onStateChange?: (state: GameMenuState) => void;
 
   constructor(ui: UIRenderer, options: GameMenusOptions) {
+    this.onStateChange = options.onStateChange;
     this.menu = new InGameMenu(ui, {
       onResume: () => {
         this.setState('playing');
@@ -125,5 +129,6 @@ export class GameMenus {
     else if (from === 'gameOver') this.gameOver.hide();
     if (state === 'loading') this.loading.show();
     else if (state === 'playing') this.loading.hide();
+    this.onStateChange?.(state);
   }
 }

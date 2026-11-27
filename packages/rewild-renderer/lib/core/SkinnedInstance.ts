@@ -1,4 +1,4 @@
-import { Vector3 } from 'rewild-common';
+import { Matrix4, Vector3 } from 'rewild-common';
 import { Renderer } from '../Renderer';
 import { SkinnedModel } from '../renderers/skinning/SkinnedModel';
 import { SkinnedMesh } from './SkinnedMesh';
@@ -96,6 +96,19 @@ export class SkinnedInstance {
 
   clipWeight(clip: string): number {
     return this.model.player.weightOf(this.handle, clip);
+  }
+
+  /** The joint's index for `jointMatrix`, or −1 if the model has none by that name. */
+  jointIndex(name: string): number {
+    return this.model.poses.skeleton.names.indexOf(name);
+  }
+
+  /**
+   * A joint's matrix in model space, in the pose the renderer last built.
+   * Multiply by `transform.matrixWorld` for world space.
+   */
+  jointMatrix(joint: number, out: Matrix4): Matrix4 {
+    return this.model.poses.jointModelMatrix(this.slot, joint, out);
   }
 
   /** Names the bones look-at turns, parent first. One chain per model. */

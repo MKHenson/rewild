@@ -12,6 +12,7 @@ import { Level, Node } from 'rewild-routing';
 import { Asset3D } from './Asset3D';
 import { PersonalAssistant } from '../assistant/PersonalAssistant';
 import { MouseRay } from '../assistant/MouseRay';
+import { createSkinnedArms } from '../assistant/AssistantArms';
 import { levelPortal } from '../assistant/PortalTab';
 import { StateMachineData } from './Types';
 import { Raycaster } from 'node_modules/rewild-renderer/lib/core/Raycaster';
@@ -155,6 +156,8 @@ const _COLD = [0.15, 0.35, 1.0];
 // Health refills over three and a half minutes, from twenty seconds after the last hurt.
 const _HEALTH_REGEN_PER_SEC: f32 = 50 / 210;
 const _HEALTH_REGEN_AFTER: f32 = 20;
+// Milliseconds the HUD takes to fade out as the personal assistant opens, and back in.
+const _HUD_FADE = 250;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
 const _resizeTranslation = { x: 0, y: 0, z: 0 };
@@ -162,6 +165,8 @@ const _lookOrigin = { x: 0, y: 0, z: 0 };
 const _lookDirection = { x: 0, y: 0, z: -1 };
 
 interface Hud {
+  /** Holds every bar. It fades out while the personal assistant is open. */
+  root: UINode;
   health: Meter;
   hunger: Meter;
   stamina: Meter;
@@ -232,8 +237,20 @@ function createHud(ui: UIRenderer): Hud {
       borderRadius: 6,
     },
   });
-  surface.root.append(bars, temperature);
-  return { health, hunger, stamina, oxygen, temperature };
+  const root = new UINode({
+    name: 'bars-root',
+    style: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      transition: { property: 'opacity', duration: _HUD_FADE },
+    },
+  });
+  root.append(bars, temperature);
+  surface.root.append(root);
+  return { root, health, hunger, stamina, oxygen, temperature };
 }
 
 function show(node: UINode, visible: boolean): void {
@@ -289,6 +306,7 @@ export class Player extends Node {
   // Metres a second the wind's gusts shove the player downwind.
   private _gustPush: f32 = 0;
   private _hud: Hud | null = null;
+  private _menuOpen = false;
   // The look-at pointer, for the buttons of world panels.
   private _look: UILookPointer | null = null;
   private _lookRay: Ray | null = null;
@@ -397,6 +415,7 @@ export class Player extends Node {
     if (!assistant || assistant.isOpen || this._dead || !this._canvas) return;
     const camera = this.cameraController as PerspectiveCamera;
     assistant.open(camera.fov, camera.aspect);
+    this._fadeHud();
     if (document.pointerLockElement) document.exitPointerLock();
     this._mouseRay?.attach(this._canvas);
   }
@@ -409,8 +428,22 @@ export class Player extends Node {
     const assistant = this._assistant;
     if (!assistant?.isOpen) return;
     assistant.close();
+    this._fadeHud();
     this._mouseRay?.detach();
     if (relock) this.requestLock();
+  }
+
+  /** Hides the HUD bars while a menu, game over or a loading screen shows. */
+  setMenuOpen(open: boolean): void {
+    this._menuOpen = open;
+    this._fadeHud();
+  }
+
+  // The HUD bars fade out while the personal assistant or a menu shows.
+  private _fadeHud(): void {
+    if (!this._hud) return;
+    this._hud.root.style.opacity =
+      this._menuOpen || this.assistantOpen ? 0 : 1;
   }
 
   /** Sync internal yaw/pitch from the camera quaternion (e.g. after an external lookAt). */
@@ -427,6 +460,7 @@ export class Player extends Node {
     const stateData = this.stateMachine?.data as StateMachineData;
 
     if (!this._hud) this._hud = createHud(stateData.renderer.ui);
+    this._fadeHud();
     this._look ??= new UILookPointer(stateData.renderer.ui);
     this._assistant ??= new PersonalAssistant(
       () =>
@@ -437,13 +471,14 @@ export class Player extends Node {
         ),
       // The click that pressed Close goes on to the canvas, and the canvas's
       // click handler locks the mouse. Locking here too would ask twice.
-      () => this.closeAssistant(false)
+      () => this.closeAssistant(false),
+      createSkinnedArms(stateData.renderer)
     );
     this._mouseRay ??= new MouseRay(
       stateData.renderer.ui.input,
       this.cameraController
     );
-    this.cameraController.camera.transform.addChild(this._assistant.hand);
+    this.cameraController.camera.transform.addChild(this._assistant.rig);
 
     this.hunger = 100.0;
     this.health = 100.0;
@@ -641,7 +676,8 @@ export class Player extends Node {
     this._look?.stop();
     this._mouseRay?.detach();
     this._assistant?.hide();
-    this._assistant?.hand.removeFromParent();
+    this._assistant?.rig.removeFromParent();
+    this._fadeHud();
     document.removeEventListener(
       'pointerlockchange',
       this._onPointerlockChange
