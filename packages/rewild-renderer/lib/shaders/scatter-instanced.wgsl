@@ -40,6 +40,7 @@ const HAS_WATER_CEILING: bool = ${ HAS_WATER_CEILING };
 #include "./shader-lib/caustics.wgsl"
 #include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/foliage-lighting.wgsl"
+#include "./shader-lib/foliage-coverage.wgsl"
 #include "./shader-lib/standard-material.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"

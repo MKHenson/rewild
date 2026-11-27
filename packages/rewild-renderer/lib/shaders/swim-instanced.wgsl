@@ -33,6 +33,7 @@ const HAS_FIN_MASK: bool = ${ HAS_FIN_MASK };
 #include "./shader-lib/caustics.wgsl"
 #include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/foliage-lighting.wgsl"
+#include "./shader-lib/foliage-coverage.wgsl"
 #include "./shader-lib/standard-material.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"

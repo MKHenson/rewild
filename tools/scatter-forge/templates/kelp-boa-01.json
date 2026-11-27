@@ -2,9 +2,6 @@
   "type": "kelp",
   "name": "kelp-boa-01",
   "textureSet": "kelp-boa",
-  "blades": [
-    "feather-boa-kelp/kelp-02"
-  ],
   "seed": 23,
   "height": 4.5,
   "stipes": 4,

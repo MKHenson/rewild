@@ -40,7 +40,7 @@
   "frondSpan": 0.3,
   "cardCurve": 70,
   "cardSegments": 7,
-  "cardAspect": 0.73,
+  "cardAspect": 0.7,
   "normalLean": 0.6,
   "leafAlphaCutoff": 0.45,
   "bendCurve": 2,

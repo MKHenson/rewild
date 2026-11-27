@@ -13,32 +13,25 @@ let attempts: string[];
 let inFlight: number;
 let peakInFlight: number;
 
-// jsdom never fetches, so `img.src = …` fires nothing. Stand in a fake <img>
-// whose src setter schedules the scripted outcome.
-function installImageStub() {
-  const realCreateElement = document.createElement.bind(document);
-
-  jest
-    .spyOn(document, 'createElement')
-    .mockImplementation(((tag: string): HTMLElement => {
-      if (tag !== 'img') return realCreateElement(tag);
-
-      const img = { crossOrigin: '' } as unknown as HTMLImageElement;
-      Object.defineProperty(img, 'src', {
-        set(value: string) {
-          attempts.push(value);
-          inFlight++;
-          peakInFlight = Math.max(peakInFlight, inFlight);
-          const outcome = script.get(value)?.shift() ?? 'ok';
-          setTimeout(() => {
-            inFlight--;
-            if (outcome === 'ok') img.onload?.(new Event('load'));
-            else img.onerror?.(new Event('error'));
-          }, LOAD_MS);
-        },
-      });
-      return img as unknown as HTMLElement;
-    }) as never);
+// Stands in for fetch: each call resolves with the scripted outcome after
+// LOAD_MS.
+function installFetchStub() {
+  globalThis.fetch = jest.fn((src: string) => {
+    attempts.push(src);
+    inFlight++;
+    peakInFlight = Math.max(peakInFlight, inFlight);
+    const outcome = script.get(src)?.shift() ?? 'ok';
+    return new Promise<Response>((resolve) =>
+      setTimeout(() => {
+        inFlight--;
+        resolve({
+          ok: outcome === 'ok',
+          status: outcome === 'ok' ? 200 : 504,
+          blob: () => Promise.resolve(new Blob()),
+        } as Response);
+      }, LOAD_MS)
+    );
+  }) as unknown as typeof fetch;
 }
 
 describe('ImageLoader', () => {
@@ -51,7 +44,7 @@ describe('ImageLoader', () => {
     globalThis.createImageBitmap = jest
       .fn()
       .mockResolvedValue({ width: 4, height: 2 } as ImageBitmap);
-    installImageStub();
+    installFetchStub();
   });
 
   afterEach(() => {

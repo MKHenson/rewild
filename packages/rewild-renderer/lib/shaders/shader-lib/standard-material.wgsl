@@ -200,7 +200,12 @@ fn shadeStandardSurface(
                               * vec3f(standardParams.normalScale, standardParams.normalScale, 1.0);
       foliageNormal = normalize(tbn * foliageNormalSample);
     }
-    return shadeFoliage(baseColorSample.rgb, foliageNormal, viewPosition, sunShadow);
+    return shadeFoliage(
+      foliageCoverageShade(baseColorSample.rgb, baseColorSample.a),
+      foliageNormal,
+      viewPosition,
+      sunShadow
+    );
   }
 
   // glTF's normalTexture.scale, which tilts X and Y while leaving Z alone —

@@ -3,6 +3,9 @@ import { loadActivity } from '../core/LoadActivity';
 // premultiplyAlpha 'none', because the default lets the platform choose, and
 // macOS decodes premultiplied. The cutout mips (MipMapGenerator's
 // generateCoverageMips) weight colour by alpha, so they need straight alpha.
+// Only honoured losslessly when decoding from encoded bytes: a source that is
+// already decoded, such as an <img>, is held premultiplied, and dividing it back
+// out turns the low-alpha texels at every cutout edge into bright noise.
 const BITMAP_OPTIONS: ImageBitmapOptions = {
   colorSpaceConversion: 'none',
   premultiplyAlpha: 'none',
@@ -51,18 +54,16 @@ function release(): void {
   else inFlight--;
 }
 
-function decode(src: string): Promise<ImageBitmap> {
-  return new Promise<ImageBitmap>((resolve, reject) => {
-    const img = document.createElement('img');
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      createImageBitmap(img, BITMAP_OPTIONS).then(resolve, reject);
-    };
-    // The error event carries nothing useful, so name the source: a failed
-    // texture is otherwise untraceable back to its URL.
-    img.onerror = () => reject(new Error(`Failed to load image '${src}'`));
-    img.src = src;
-  });
+// Names the source on failure: a failed texture is otherwise untraceable back
+// to its URL.
+async function decode(src: string): Promise<ImageBitmap> {
+  try {
+    const response = await fetch(src);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await createImageBitmap(await response.blob(), BITMAP_OPTIONS);
+  } catch (err) {
+    throw new Error(`Failed to load image '${src}': ${(err as Error).message}`);
+  }
 }
 
 // Jittered so a stalled pipe — which tends to fail several requests at once —

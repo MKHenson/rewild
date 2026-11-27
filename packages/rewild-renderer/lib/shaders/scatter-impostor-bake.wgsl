@@ -28,6 +28,8 @@ struct BakeUniforms {
 @group(0) @binding(2) var baseColorMap : texture_2d<f32>;
 @group(0) @binding(3) var occlusionMap : texture_2d<f32>;
 
+#include "./shader-lib/foliage-coverage.wgsl"
+
 struct VertexOutput {
   @builtin(position) Position : vec4f,
   @location(0) uv : vec2f,
@@ -91,7 +93,7 @@ fn fs(input : VertexOutput) -> FragmentOutput {
   let occlusion = 1.0 + bake.params.w * (occlusionSample - 1.0);
 
   var output : FragmentOutput;
-  output.albedo = vec4f(sample.rgb * occlusion, 1.0);
+  output.albedo = vec4f(foliageCoverageShade(sample.rgb, sample.a) * occlusion, 1.0);
   output.normal = vec4f(n * 0.5 + 0.5, 1.0);
   return output;
 }
