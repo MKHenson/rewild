@@ -1,7 +1,13 @@
 import { gamepad, MOUSE, PAD } from './components/testing';
 import type { UIPointerType } from './events';
 import { printFocus } from './debug';
-import { UICarry, UIPutAmount, UISlot, UITakeAmount } from './UICarry';
+import {
+  UICarry,
+  UIPutAmount,
+  UIReturnReason,
+  UISlot,
+  UITakeAmount,
+} from './UICarry';
 import { UIInput } from './UIInput';
 import { UINode } from './UINode';
 import { UISurface, UISurfaceOptions } from './UISurface';
@@ -99,9 +105,9 @@ function setup(
     );
   });
   menu.root.append(...nodes);
-  const returns: [unknown, number][] = [];
-  carry.onReturn = (item, from) =>
-    returns.push([item, slots.indexOf(from as UISlot<Stack>)]);
+  const returns: [unknown, number, UIReturnReason][] = [];
+  carry.onReturn = (item, from, reason) =>
+    returns.push([item, slots.indexOf(from as UISlot<Stack>), reason]);
 
   const update = () => {
     for (const surface of surfaces) surface.update(400, 300);
@@ -321,7 +327,7 @@ describe('UICarry', () => {
       click(0);
       key('Escape');
       expect(carry.held).toBeNull();
-      expect(returns).toEqual([[tile(), 0]]);
+      expect(returns).toEqual([[tile(), 0, 'cancel']]);
       expect(keydown).not.toHaveBeenCalled();
       key('Escape');
       expect(keydown).toHaveBeenCalledTimes(1);
@@ -332,7 +338,52 @@ describe('UICarry', () => {
       click(0);
       pad(PAD.B);
       expect(carry.held).toBeNull();
-      expect(returns).toEqual([[tile(), 0]]);
+      expect(returns).toEqual([[tile(), 0, 'cancel']]);
+    });
+
+    it('returns the item on a right click off a slot', () => {
+      const { carry, click, menu, update, returns } = setup([tile()]);
+      const button = new UINode({ style: { width: SIZE, height: SIZE } });
+      const clicked = jest.fn();
+      button.on('click', clicked);
+      menu.root.append(button);
+      update();
+      click(0);
+      click(1, 2);
+      expect(returns).toEqual([[tile(), 0, 'outside']]);
+      expect(carry.held).toBeNull();
+      expect(clicked).not.toHaveBeenCalled();
+    });
+
+    it('returns the item on a right click on the surface round the slots', () => {
+      const { carry, input, click, returns } = setup([tile()]);
+      click(0);
+      const at = { ...MOUSE, button: 2, x: 300, y: 200 };
+      input.pointer('down', at);
+      input.pointer('up', at);
+      expect(returns).toEqual([[tile(), 0, 'outside']]);
+      expect(carry.held).toBeNull();
+    });
+
+    it('keeps the item on a right click on a slot', () => {
+      const { carry, click, returns } = setup([tile(3), null]);
+      click(0);
+      click(1, 2);
+      expect(returns).toEqual([]);
+      expect(carry.held).toEqual(tile(2));
+    });
+
+    it('returns the item on a press on the root, which gets no click', () => {
+      const { carry, input, click, menu, returns } = setup([tile()]);
+      const rootClick = jest.fn();
+      menu.root.on('click', rootClick);
+      click(0);
+      const at = { ...MOUSE, x: 300, y: 200 };
+      expect(input.pointer('down', at)).toBe('prevented');
+      input.pointer('up', at);
+      expect(returns).toEqual([[tile(), 0, 'outside']]);
+      expect(carry.held).toBeNull();
+      expect(rootClick).not.toHaveBeenCalled();
     });
 
     it('returns the item on cancel', () => {
@@ -340,7 +391,7 @@ describe('UICarry', () => {
       click(0);
       click(1);
       carry.cancel();
-      expect(returns).toEqual([[tile(1, 'b'), 1]]);
+      expect(returns).toEqual([[tile(1, 'b'), 1, 'cancel']]);
       expect(carry.held).toBeNull();
     });
 
@@ -352,7 +403,7 @@ describe('UICarry', () => {
       const at = { ...MOUSE, x: 300, y: 200 };
       expect(input.pointer('down', at)).not.toBe('passed');
       expect(input.pointer('up', at)).not.toBe('passed');
-      expect(returns).toEqual([[tile(), 0]]);
+      expect(returns).toEqual([[tile(), 0, 'outside']]);
       expect(carry.held).toBeNull();
     });
 
@@ -361,7 +412,7 @@ describe('UICarry', () => {
       click(0);
       menu.input = 'none';
       carry.update();
-      expect(returns).toEqual([[tile(), 0]]);
+      expect(returns).toEqual([[tile(), 0, 'closed']]);
       expect(carry.held).toBeNull();
     });
 
