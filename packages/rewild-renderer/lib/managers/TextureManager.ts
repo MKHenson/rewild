@@ -7,15 +7,7 @@ import { DataTexture } from '../textures/DataTexture';
 import { EncodedTexture } from '../textures/EncodedTexture';
 import { GltfTextureRequest } from '../core/GltfTextures';
 import { IMaterialsTemplate } from './types';
-
-const MEDIA_URL = process.env.SHARED_ASSETS_BASE_URL;
-
-// Resolves a materials.json `url` against the shared asset bucket. Exported so
-// loaders that build textures from the template outside this manager (the
-// terrain material arrays) resolve them the same way.
-export function resolveAssetUrl(url: string): string {
-  return MEDIA_URL + url;
-}
+import { resolveAssetUrl } from './AssetUrls';
 
 export class TextureManager {
   textures: Map<string, ITexture>;
@@ -50,12 +42,12 @@ export class TextureManager {
       if (textureTemplate.type === 'cubemap' && textureTemplate.urls) {
         texture = new BitmapCubeTexture(
           new TextureProperties(textureTemplate.name, true, colorSpace),
-          textureTemplate.urls.map((url) => MEDIA_URL + url)
+          textureTemplate.urls.map((url) => resolveAssetUrl(url))
         );
       } else if (textureTemplate.url) {
         texture = new BitmapTexture(
           new TextureProperties(textureTemplate.name, true, colorSpace),
-          MEDIA_URL + textureTemplate.url
+          resolveAssetUrl(textureTemplate.url)
         );
       } else {
         throw new Error(

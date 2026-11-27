@@ -45,6 +45,7 @@ import { IFrameEffect } from './post-processes/IFrameEffect';
 import { AmbientOcclusion } from './renderers/ao/AmbientOcclusion';
 import { QualitySettings } from './utils/QualitySettings';
 import { sortFrontToBack } from './utils/frontToBack';
+import { assetUrls } from './managers/AssetUrls';
 
 const _projScreenMatrix = new Matrix4();
 const _uiViewProjection = new Matrix4();
@@ -449,9 +450,12 @@ export class Renderer {
     this.swimModels = new SwimModelManager();
     this.mipmapGenerator = new MipMapGenerator();
 
-    const materialsTemplate = (await fetch('/templates/materials.json').then(
-      (res) => res.json()
-    )) as IMaterialsTemplate;
+    const [materialsTemplate] = await Promise.all([
+      fetch('/templates/materials.json').then(
+        (res) => res.json() as Promise<IMaterialsTemplate>
+      ),
+      assetUrls.load(),
+    ]);
 
     await this.samplerManager.initialize(this);
     await this.textureManager.initialize(this, materialsTemplate);

@@ -281,8 +281,11 @@ Assets are organised by type under a flat prefix:
 **Referencing assets in code**
 
 ```typescript
-const SKY_TEXTURE = `${env.SHARED_ASSETS_BASE_URL}/sky/milky-way.hdr`;
+const SKY_TEXTURE = resolveAssetUrl('sky/milky-way.hdr');
 ```
+
+`resolveAssetUrl` (`managers/AssetUrls.ts`) adds the file's `?v=` hash from `asset-versions.json`,
+so a republished file reaches clients at once.
 
 **Local development**
 

@@ -5,7 +5,10 @@ import {
   DUCKABLE_BUSES,
   SoundManifest,
 } from 'rewild-audio';
-import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
+import {
+  assetUrls,
+  resolveAssetUrl,
+} from 'rewild-renderer/lib/managers/AssetUrls';
 import type { FootstepsDef } from './Footsteps';
 import type { SoundscapesDef } from './Soundscape';
 import type { VoiceDef } from './VoiceSound';
@@ -40,6 +43,7 @@ export function closeSceneScope(scope: AudioScope): void {
 
 /** Fetches the audio templates: the sound manifest, whose files start downloading, the footsteps, the voice and the soundscapes. */
 export async function loadAudioTemplates(): Promise<void> {
+  await assetUrls.load();
   await Promise.all([
     loadSoundManifest(),
     loadFootsteps(),

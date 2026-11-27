@@ -9,7 +9,7 @@ import { SettingsPanel } from './SettingsPanel';
 import { PerfPanel } from './PerfPanel';
 import { AdminPage } from './admin/AdminPage';
 import { LaunchPage } from './launch/LaunchPage';
-import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
+import { resolveAssetUrl } from 'rewild-renderer/lib/managers/AssetUrls';
 import {
   audio,
   audioSettings,

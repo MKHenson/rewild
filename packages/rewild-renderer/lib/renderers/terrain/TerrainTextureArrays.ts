@@ -1,5 +1,5 @@
 import { Renderer } from '../..';
-import { resolveAssetUrl } from '../../managers/TextureManager';
+import { resolveAssetUrl } from '../../managers/AssetUrls';
 import { TextureArray } from '../../textures/TextureArray';
 import { TextureProperties } from '../../textures/Texture';
 import { TerrainLayerParams } from '../../materials/uniforms/TerrainUniforms';

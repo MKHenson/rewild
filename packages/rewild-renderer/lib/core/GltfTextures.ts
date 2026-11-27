@@ -5,6 +5,7 @@ import type {
 } from '@loaders.gl/gltf';
 import { TextureColorSpace } from '../textures/Texture';
 import { hashBytes } from '../utils/hash';
+import { assetUrls } from '../managers/AssetUrls';
 
 // The postprocessed sampler type is not exported from the package's barrel.
 type GltfSampler = NonNullable<GLTFTexturePostprocessed['sampler']>;
@@ -214,7 +215,9 @@ function resolveSlot(
     // A sibling file. The absolute URL is the identity, so every model
     // referencing it shares one fetch, one decode and one GPU texture — the
     // reason to export a shared material with external images.
-    identity = baseUrl ? new URL(image.uri, baseUrl).href : image.uri;
+    identity = assetUrls.version(
+      baseUrl ? new URL(image.uri, baseUrl).href : image.uri
+    );
     source = { url: identity };
   } else {
     console.warn(
