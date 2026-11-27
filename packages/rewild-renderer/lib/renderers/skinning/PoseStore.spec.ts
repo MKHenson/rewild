@@ -1,3 +1,4 @@
+import { Matrix4 } from 'rewild-common';
 import { GltfSkeleton } from '../../core/GltfSkeleton';
 import { POSE_STRIDE, PoseStore } from './PoseStore';
 
@@ -101,6 +102,25 @@ describe('PoseStore', () => {
 
     expectMatrix(jointMatrix(poses, 0, 0), translation(0, 2, 0));
     expectMatrix(jointMatrix(poses, 0, 1), translation(0, 2, 0));
+  });
+
+  it('gives a joint its model-space matrix in the posed slot', () => {
+    const poses = new PoseStore(skeleton());
+    poses.add();
+    const handle = poses.add();
+    poses.pose[poses.poseOffset(handle) + 1] = 3;
+    poses.markPoseChanged();
+    poses.update();
+
+    const out = new Matrix4();
+    expectMatrix(
+      Array.from(poses.jointModelMatrix(0, 1, out).elements),
+      translation(0, 0.5, 0)
+    );
+    expectMatrix(
+      Array.from(poses.jointModelMatrix(1, 1, out).elements),
+      translation(0, 2.5, 0)
+    );
   });
 
   it('rotates a child about its parent', () => {

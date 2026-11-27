@@ -523,7 +523,7 @@ The in-game settings use the same settings data as the DOM panel: render quality
 
 ## In the world (Stage 4)
 
-A player walks up to a portal that stays closed. They press I. A glass panel comes up from their side, as a watch on their arm would, and stops in front of them. It covers most of the view, and the level shows through it. The mouse is free. They click the Portal tab's Unlock button, press I again, and the panel goes back down. The portal opens as they near it.
+A player walks up to a portal that stays closed. They press I. Their left arm comes up, and a glass panel comes out of the watch on its wrist and stops in front of them. It covers much of the view, and the level shows through it. The mouse is free. They click the Portal tab's Unlock button and press I again. The panel goes back into the watch, and the arm goes down. The portal opens as they near it.
 
 The panel is the personal assistant. In VR it will be on a controller, and the controller's ray will point at it. On the desktop the mouse points at it. It is the first proof of the VR use: a menu that moves in 3D with the player, and takes a ray as its input.
 
@@ -582,17 +582,19 @@ look.release('mouse'); // clicks when no other source holds the pointer
 
 A menu that the player wears, as a watch on the arm. Later it goes on a VR controller. It is not an asset, and the editor does not place it. The player always has it.
 
-- **The hand.** A transform that is a child of the camera, so it moves with the view. It has no model yet. At rest it is low at the player's right side, out of view.
-- **Opening.** I opens it. The panel's `UISurface3D` goes onto the hand, and the hand moves up from the side to in front of the eye over 1 s, with an ease out. It turns to face the eye as it comes. Once the hand is a third of the way up, the panel's hologram turns on over 1.5 s, on its own clock. The panel takes input only once the hand is up and the hologram is on. I again, or its Close button, closes it: the hologram turns off, then the hand goes back down, and then the panel leaves the scene.
-- **Breathing.** While the hand is raised, it sways as the player breathes: it rises and falls 8 mm over a 4 s breath, tilts a little with it, and drifts 3 mm to each side more slowly. So the panel feels held, not fixed to the screen.
-- **Size and place.** The panel stands 0.5 m in front of the eye and covers 85% of the view's height and width. Its size comes from the camera's field of view and aspect each time it opens. It lays out at 900 px tall at any size, so its text is the size of screen text.
+- **The rig.** A transform that is a child of the camera, so it moves with the view. It holds the arms and the panel. The arms and the panel are in the scene only while they show.
+- **The arms.** The skinned model `first-person-arms`, posed for a camera at its origin, so it sits on the rig with no offset. It has three clips: `personal-inventory` brings the left arm up with the watch toward the eye, `personal-inventory-hold` loops the held pose, and `personal-inventory-lower` takes it back down. The `watch` bone sits at the watch face, with its +Z out of the face. The arms cast no shadow, because the body that would cast with them is not drawn. Without the model, the panel opens on the same timing from where the watch would be.
+- **Opening.** I opens it. The arm plays its raise, then its hold. Once the raise is 60% through, the panel's hologram turns on over 0.7 s. As the hologram opens, the panel moves from the watch to its place, so the dot of light comes out of the watch and rises as it opens. The panel takes input only once the arm is up and the hologram is on. I again, or its Close button, closes it: the hologram turns off as the panel goes back into the watch, then the arm plays its lower, and then the arms and the panel leave the scene. Opened again on the way down, the arm comes up from where it is.
+- **Breathing.** While the arm is raised, the rig sways as the player breathes: it rises and falls 8 mm over a 4 s breath, tilts a little with it, and drifts 3 mm to each side more slowly. So the panel feels held, not fixed to the screen.
+- **Size and place.** The panel stands 0.5 m in front of the eye and covers 72% of the view's height and width. It sits 10% of the view's height up and 8% of its width right of the centre, so its lower left corner clears the raised watch. Its size and place come from the camera's field of view and aspect each time it opens. It lays out at 760 px tall at any size, so its text is the size of screen text.
+- **The arm and the panel.** The arms draw in the scene, and the panel draws over the scene, so the panel would cover the arm. The panel's place keeps it clear of the hand.
 - **Look.** The modal's glass, from the theme, with its white light on the glass and its edge that follows the pointer. The level shows through it. The glass is a node that fills the surface, not the root, because the root lets the pointer through.
 - **The mouse.** Opening frees the mouse, so the player can point at the panel. A ray from the eye through the mouse goes to `UIInput.ray`, the same as a VR controller's ray will. While the panel is open, the mouse does not look round and the look-at pointer stops. The player can still move.
 - **Closing.** I closes it and locks the mouse again. The Close button at the top right closes it, and the click that pressed it locks the mouse. Escape and the gamepad's Start close it and open the in-game menu, as they do in play. Death closes it too.
 - **Not a pause.** Freeing the mouse for the assistant does not open the in-game menu. A click on the canvas does not lock the mouse while the assistant is open.
 - **Tabs.** A column of tabs at the left. One tab for now, Portal. Later tabs add more of the game's UI.
 - **The Portal tab.** The portal's name and whether it is locked, and one button for each portal action from `PORTAL_ACTIONS`: Unlock, Lock and Toggle. A level has at most one portal. The tab finds it in the level, in any container, and a click calls its `doAction`. With no portal in the level, the tab says so and shows no buttons.
-- **The code.** `src/core/assistant`: `PersonalAssistant` owns the hand, the panel and the tabs. `PortalTab` is the Portal tab. `MouseRay` turns the free mouse into a ray. `Player` owns them, gives them I and the mouse, and moves the hand each frame. `GameManager` closes it when Escape or Start opens the in-game menu.
+- **The code.** `src/core/assistant`: `PersonalAssistant` owns the rig, the panel and the tabs, and drives the arms. `AssistantArms` names the clips and the watch bone, and wraps the skinned model. `PortalTab` is the Portal tab. `MouseRay` turns the free mouse into a ray. `Player` owns them, gives them I and the mouse, and updates the assistant each frame. `GameManager` closes it when Escape or Start opens the in-game menu.
 
 ### Actions
 
@@ -660,7 +662,6 @@ Today a portal opens when the player comes within `OPEN_RANGE` of it and closes 
 
 - An XR session, with the camera driven by the headset, and XR controllers as ray sources.
 - The assistant on a VR controller, with the controller's ray pointing at it.
-- A model for the player's arm. See ticket 20.
 - Sizes and distances tuned on real hardware, in a headset and on handheld devices.
 
 The renderer uses WebGPU. An XR session needs the browser to share WebXR with WebGPU, so that work starts with checking browser support.
@@ -867,5 +868,5 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
 
 - [ ] **20. A model for the player's arm**
 
-  - Scope: a model on the assistant's hand, so the player sees their arm come up with the panel.
-  - Expect: opening the assistant shows the arm move up from the side with the panel on its wrist.
+  - Scope: the `first-person-arms` model on the assistant's rig, with its raise, hold and lower clips. The panel comes out of the `watch` bone, and sits clear of the raised hand.
+  - Expect: opening the assistant raises the left arm, and the panel comes out of the watch on its wrist. Closing puts the panel back into the watch, and then the arm goes down.

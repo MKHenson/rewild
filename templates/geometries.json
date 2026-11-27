@@ -217,5 +217,9 @@
   "lioness": {
     "type": "gltf",
     "url": "models/lioness.glb"
+  },
+  "first-person-arms": {
+    "type": "gltf",
+    "url": "models/first-person-arms.glb"
   }
 }

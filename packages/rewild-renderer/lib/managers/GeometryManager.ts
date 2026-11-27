@@ -49,6 +49,10 @@ export class GeometryManager {
     return toRet;
   }
 
+  hasModel(id: string): boolean {
+    return this.models.has(id);
+  }
+
   getModel(id: string) {
     const toRet = this.models.get(id);
     if (!toRet) throw new Error(`Could not find model with id ${id}`);

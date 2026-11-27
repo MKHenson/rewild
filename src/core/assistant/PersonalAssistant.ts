@@ -8,47 +8,58 @@ import {
 } from 'rewild-gpu-ui';
 import { Transform, UISurface3D } from 'rewild-renderer';
 import { PortalTab, PortalTarget } from './PortalTab';
+import {
+  ARMS_HOLD,
+  ARMS_LOWER,
+  ARMS_RAISE,
+  AssistantArms,
+} from './AssistantArms';
 
-/** Seconds the hand takes to come up, and to go back down. */
+/** Seconds the arm takes to come up, and to go back down, with no arms clip. */
 export const ASSISTANT_MOVE_TIME = 1.0;
-/** The share of the hand's rise before the panel's hologram starts to turn on. */
-export const ASSISTANT_HOLOGRAM_FROM = 0.35;
+/** The share of the arm's rise before the panel's hologram starts to turn on. */
+export const ASSISTANT_HOLOGRAM_FROM = 0.6;
 /** Seconds the hologram takes to turn on, and to turn off. */
 export const ASSISTANT_HOLOGRAM_TIME = 0.7;
+/** The hologram's value by which the panel has left the watch for its place. */
+export const ASSISTANT_BEAM_END = 0.4;
+/** Seconds of the crossfade from one arms clip to the next. */
+export const ASSISTANT_ARMS_FADE = 0.15;
 /** Metres from the eye to the open panel. */
 export const ASSISTANT_DISTANCE = 0.5;
 /** The share of the view's height and width that the open panel covers. */
-export const ASSISTANT_COVER = 0.85;
+export const ASSISTANT_COVER = 0.72;
+/**
+ * How far the panel sits up and to the right of the view's centre, as shares
+ * of the view's height and width, so its lower left corner clears the watch.
+ */
+export const ASSISTANT_RAISE = 0.1;
+export const ASSISTANT_SHIFT = 0.08;
 /** The panel's layout height in pixels, at any size, so text reads as on the screen. */
-export const ASSISTANT_LAYOUT_HEIGHT = 900;
-/** Seconds of one breath. The raised hand rises and falls with it. */
+export const ASSISTANT_LAYOUT_HEIGHT = 760;
+/** Seconds of one breath. The raised arm rises and falls with it. */
 export const ASSISTANT_BREATH_TIME = 4.0;
-/** Metres the raised hand rises and falls with each breath. */
+/** Metres the raised arm rises and falls with each breath. */
 export const ASSISTANT_BREATH_RISE = 0.008;
-/** Metres the raised hand drifts to each side, more slowly than it breathes. */
+/** Metres the raised arm drifts to each side, more slowly than it breathes. */
 export const ASSISTANT_BREATH_DRIFT = 0.003;
-/** Radians the raised hand tilts back and forward with each breath. */
+/** Radians the raised arm tilts back and forward with each breath. */
 export const ASSISTANT_BREATH_TILT = 0.01;
+/** The raised watch, in the eye's space, for arms with no watch bone. */
+export const ASSISTANT_WATCH = new Vector3(-0.14, -0.15, -0.3);
 
-// The hand at rest: low at the right side, its face turned up as a watch.
-const REST_POSITION = new Vector3(0.3, -0.55, -0.25);
-const REST_ROTATION = new Quaternion().setFromEuler(new Euler(-1.3, 0.5, 0));
-// The hand open: in front of the eye, its face toward it.
-const OPEN_POSITION = new Vector3(0, 0, -ASSISTANT_DISTANCE);
-const OPEN_ROTATION = new Quaternion();
-
-const _tilt = new Quaternion();
+const _watch = new Vector3();
 const _euler = new Euler();
 
 /**
- * The player's personal assistant: a glass menu on the player's hand, as a
- * watch on the arm. Later it goes on a VR controller. Opening brings the
- * hand up from the side to in front of the eye. The panel is in the scene
- * only while it shows.
+ * The player's personal assistant: a glass menu that a watch on the left
+ * wrist projects. Later it goes on a VR controller. Opening raises the arm,
+ * and the panel comes out of the watch to its place in front of the eye. The
+ * arms and the panel are in the scene only while they show.
  */
 export class PersonalAssistant {
-  /** Add it to the camera's transform, so it moves with the view. */
-  readonly hand = new Transform();
+  /** Add it to the camera's transform. It holds the arms and the panel. */
+  readonly rig = new Transform();
   readonly panel: UISurface3D;
   /**
    * The glass, which fills the panel. It is not the surface's root, so it
@@ -59,16 +70,29 @@ export class PersonalAssistant {
   readonly portalTab: PortalTab;
   readonly closeButton: Button;
   private _isOpen = false;
-  /** 0 at rest, 1 in front of the eye. */
+  /** 0 with the arm down, 1 with it raised. */
   private progress = 0;
   /** The hologram's effect value: 0 off, 1 on. */
   private hologram = 0;
-  /** Seconds of breathing, for the raised hand's sway. */
+  /** Seconds of breathing, for the raised arm's sway. */
   private breath = 0;
+  private readonly raiseTime: number;
+  private readonly lowerTime: number;
+  /** The panel's place in the rig, set by `fit`. */
+  private readonly panelPosition = new Vector3(0, 0, -ASSISTANT_DISTANCE);
 
-  /** `onClose` is called when the player clicks Close. */
-  constructor(findPortal: () => PortalTarget | null, onClose: () => void) {
-    this.hand.name = 'assistant-hand';
+  /**
+   * `onClose` is called when the player clicks Close. Without `arms`, the
+   * panel opens on the same timing from where the watch would be.
+   */
+  constructor(
+    findPortal: () => PortalTarget | null,
+    onClose: () => void,
+    private readonly arms: AssistantArms | null = null
+  ) {
+    this.rig.name = 'assistant';
+    this.raiseTime = clipTime(arms, ARMS_RAISE);
+    this.lowerTime = clipTime(arms, ARMS_LOWER);
     this.panel = new UISurface3D({
       name: 'personal-assistant',
       input: 'none',
@@ -115,52 +139,86 @@ export class PersonalAssistant {
   }
 
   /**
-   * Brings the hand up with the panel on it, sized for a camera's vertical
-   * field of view in degrees and its aspect.
+   * Raises the arm and opens the panel, sized for a camera's vertical field
+   * of view in degrees and its aspect.
    */
   open(fov: number, aspect: number): void {
+    if (this._isOpen) return;
     this.fit(fov, aspect);
     this.portalTab.refresh();
-    if (this.panel.transform.parent !== this.hand)
-      this.hand.addChild(this.panel.transform);
+    if (this.panel.transform.parent !== this.rig)
+      this.rig.addChild(this.panel.transform);
+    const arms = this.arms;
+    if (arms) {
+      if (arms.transform.parent !== this.rig) this.rig.addChild(arms.transform);
+      // Opened again while the hologram turned off: the arm is still up.
+      if (this.progress === 1)
+        arms.play(ARMS_HOLD, ASSISTANT_ARMS_FADE, true, 0);
+      else
+        arms.play(
+          ARMS_RAISE,
+          ASSISTANT_ARMS_FADE,
+          false,
+          this.progress * this.raiseTime
+        );
+    }
     this._isOpen = true;
   }
 
-  /** Takes the hand back down. The panel leaves the scene once it is down. */
+  /** Turns the panel off, then lowers the arm. Both leave the scene once it is down. */
   close(): void {
     this._isOpen = false;
   }
 
-  /** Puts the hand down and takes the panel out of the scene now, with no move. */
+  /** Puts the arm down and takes it and the panel out of the scene now, with no move. */
   hide(): void {
     this._isOpen = false;
     this.progress = 0;
     this.hologram = 0;
+    this.arms?.stop();
     this.place();
   }
 
   /**
-   * Moves the hand and turns the hologram toward where they go, and sways
-   * the raised hand as the player breathes. Call it once per frame. Opening turns the hologram on once the hand is part way up.
-   * Closing turns it off first, and then the hand goes down.
+   * Moves the arm and turns the hologram toward where they go, and sways the
+   * raised arm as the player breathes. Call it once per frame. Opening turns
+   * the hologram on once the arm is part way up. Closing turns it off first,
+   * and then the arm goes down.
    */
   update(delta: number): void {
-    const move = delta / ASSISTANT_MOVE_TIME;
     const turn = delta / ASSISTANT_HOLOGRAM_TIME;
     this.breath += delta;
+    const arms = this.arms;
     if (this._isOpen) {
-      this.progress = Math.min(1, this.progress + move);
+      const was = this.progress;
+      this.progress = Math.min(1, this.progress + delta / this.raiseTime);
+      if (this.progress === 1 && was < 1)
+        arms?.play(ARMS_HOLD, ASSISTANT_ARMS_FADE, true, 0);
       if (this.progress >= ASSISTANT_HOLOGRAM_FROM)
         this.hologram = Math.min(1, this.hologram + turn);
     } else {
       if (this.progress === 0 && this.hologram === 0) return;
-      if (this.hologram > 0) this.hologram = Math.max(0, this.hologram - turn);
-      else this.progress = Math.max(0, this.progress - move);
+      if (this.hologram > 0) {
+        this.hologram = Math.max(0, this.hologram - turn);
+        if (this.hologram === 0)
+          arms?.play(
+            ARMS_LOWER,
+            ASSISTANT_ARMS_FADE,
+            false,
+            (1 - this.progress) * this.lowerTime
+          );
+      } else {
+        this.progress = Math.max(0, this.progress - delta / this.lowerTime);
+        if (this.progress === 0) arms?.stop();
+      }
     }
     this.place();
   }
 
-  /** Sizes the panel to cover ASSISTANT_COVER of the view at ASSISTANT_DISTANCE. */
+  /**
+   * Sizes the panel to cover ASSISTANT_COVER of the view at
+   * ASSISTANT_DISTANCE, and moves it up and right of the view's centre.
+   */
   fit(fov: number, aspect: number): void {
     const viewHeight =
       2 * ASSISTANT_DISTANCE * Math.tan(((fov / 2) * Math.PI) / 180);
@@ -168,33 +226,63 @@ export class PersonalAssistant {
     const surface = this.panel.surface;
     surface.size = { width: height * aspect, height };
     surface.pixelsPerMetre = ASSISTANT_LAYOUT_HEIGHT / height;
+    this.panelPosition.set(
+      viewHeight * aspect * ASSISTANT_SHIFT,
+      viewHeight * ASSISTANT_RAISE,
+      -ASSISTANT_DISTANCE
+    );
   }
 
-  // Sets the hand and the hologram from the progress, with an ease out, and
-  // takes the panel off the hand once it is down.
+  // Sways the rig as the player breathes, moves the panel out of the watch
+  // with the hologram, and takes the arms and the panel out of the scene once
+  // the arm is down.
   private place(): void {
-    // The panel takes input only while the hand is up and the hologram is on.
+    // The panel takes input only while the arm is up and the hologram is on.
     const surface = this.panel.surface;
     surface.effectValue = this.hologram;
     surface.input =
       this.progress === 1 && this.hologram === 1 ? 'nodes' : 'none';
+
+    // The raised arm and its panel sway as the player breathes, so the panel
+    // feels held. The sway grows as the arm rises.
     const t = 1 - (1 - this.progress) ** 3;
-    this.hand.position.lerpVectors(REST_POSITION, OPEN_POSITION, t);
-    this.hand.quaternion.slerpQuaternions(REST_ROTATION, OPEN_ROTATION, t);
-    // The raised hand sways as the player breathes, so the panel feels held.
-    // The sway grows as the hand rises.
     const phase = (2 * Math.PI * this.breath) / ASSISTANT_BREATH_TIME;
-    this.hand.position.y += ASSISTANT_BREATH_RISE * Math.sin(phase) * t;
-    this.hand.position.x +=
-      ASSISTANT_BREATH_DRIFT * Math.sin(phase / 1.7 + 1) * t;
+    this.rig.position.set(
+      ASSISTANT_BREATH_DRIFT * Math.sin(phase / 1.7 + 1) * t,
+      ASSISTANT_BREATH_RISE * Math.sin(phase) * t,
+      0
+    );
     _euler.set(
       ASSISTANT_BREATH_TILT * Math.cos(phase) * t,
       0,
       0,
       EulerRotationOrder.XYZ
     );
-    this.hand.quaternion.multiply(_tilt.setFromEuler(_euler));
-    if (this.progress === 0 && !this._isOpen)
+    this.rig.quaternion.setFromEuler(_euler);
+
+    // The panel comes out of the watch as its hologram opens.
+    const watch = this.arms?.watchPosition(_watch)
+      ? _watch
+      : _watch.copy(ASSISTANT_WATCH);
+    const beam = Math.min(1, this.hologram / ASSISTANT_BEAM_END);
+    this.panel.transform.position.lerpVectors(
+      watch,
+      this.panelPosition,
+      1 - (1 - beam) ** 2
+    );
+    this.panel.transform.quaternion.copy(IDENTITY);
+
+    if (this.progress === 0 && !this._isOpen) {
       this.panel.transform.removeFromParent();
+      this.arms?.transform.removeFromParent();
+    }
   }
+}
+
+const IDENTITY = new Quaternion();
+
+/** The clip's length, or ASSISTANT_MOVE_TIME without arms or the clip. */
+function clipTime(arms: AssistantArms | null, clip: string): number {
+  const duration = arms?.clipDuration(clip) ?? -1;
+  return duration > 0 ? duration : ASSISTANT_MOVE_TIME;
 }

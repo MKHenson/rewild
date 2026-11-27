@@ -49,6 +49,8 @@ export class PoseStore {
   private readonly slotData: PoseSlotData[] = [];
   private readonly world: Float32Array;
   private readonly local = new Float32Array(MATRIX);
+  /** Each joint's bind matrix: the inverse of its inverse bind. */
+  private readonly bindMatrices: Float32Array;
 
   constructor(skeleton: GltfSkeleton, initialCapacity = 8) {
     this.skeleton = skeleton;
@@ -62,6 +64,14 @@ export class PoseStore {
       this.restPose.set(skeleton.rotations.subarray(j * 4, j * 4 + 4), p + 3);
       this.restPose.set(skeleton.scales.subarray(j * 3, j * 3 + 3), p + 7);
     }
+
+    this.bindMatrices = new Float32Array(this.jointCount * MATRIX);
+    const bind = new Matrix4();
+    for (let j = 0; j < this.jointCount; j++)
+      bind
+        .fromArray(skeleton.inverseBindMatrices, j * MATRIX)
+        .invert()
+        .toArray(this.bindMatrices, j * MATRIX);
 
     this.grow(initialCapacity);
   }
@@ -128,6 +138,19 @@ export class PoseStore {
     this.posesDirty = true;
     if (slot < 0) this.dirty.fill(1, 0, this.count);
     else this.dirty[slot] = 1;
+  }
+
+  /** A joint's model-space matrix in the slot's pose, as of the last `update`. */
+  jointModelMatrix(slot: number, joint: number, out: Matrix4): Matrix4 {
+    Matrix4.multiplyMatricesFlat(
+      out.elements,
+      0,
+      this.jointMatrices,
+      (slot * this.jointCount + joint) * MATRIX,
+      this.bindMatrices,
+      joint * MATRIX
+    );
+    return out;
   }
 
   /** Call once the changed joint matrices are uploaded. */

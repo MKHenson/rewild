@@ -120,6 +120,7 @@ export class GameManager {
         onResume: () => this.lock(),
         onRestart: () => this.restart(),
         onQuit: () => this.onQuit?.(),
+        onStateChange: (state) => this.player.setMenuOpen(state !== 'playing'),
       });
 
       document.addEventListener('pointerlockchange', this._onPointerlockChange);

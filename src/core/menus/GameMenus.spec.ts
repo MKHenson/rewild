@@ -28,6 +28,7 @@ function setup() {
     onResume: jest.fn(),
     onRestart: jest.fn(),
     onQuit: jest.fn(),
+    onStateChange: jest.fn(),
   };
   const menus = new GameMenus(ui, options);
   const input = new UIInput({ surfaces });
@@ -93,6 +94,19 @@ describe('GameMenus', () => {
     expect(menus.state).toBe('menu');
     expect(shown(surfaces)).toEqual(['in-game-menu']);
     expect(duck.mock.calls).toEqual([[true]]);
+  });
+
+  it('tells the game each state it changes to', () => {
+    const { menus, options } = setup();
+    menus.openMenu();
+    menus.openMenu();
+    menus.play();
+    menus.showGameOver();
+    expect(options.onStateChange.mock.calls).toEqual([
+      ['menu'],
+      ['playing'],
+      ['gameOver'],
+    ]);
   });
 
   it('goes to settings and back without lifting the dim', () => {
