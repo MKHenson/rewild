@@ -1,6 +1,7 @@
 import { Renderer } from 'rewild-renderer';
 
 const SCREENSHOT_KEY = 'F9';
+const UI_SCREENSHOT_KEY = 'F10';
 
 function timestamp(): string {
   const d = new Date();
@@ -11,8 +12,12 @@ function timestamp(): string {
   );
 }
 
-export async function saveScreenshot(renderer: Renderer): Promise<void> {
-  const blob = await renderer.captureScreenshot();
+/** Saves a PNG of the next frame. With `ui`, the shot includes the UI. */
+export async function saveScreenshot(
+  renderer: Renderer,
+  ui = false
+): Promise<void> {
+  const blob = await renderer.captureScreenshot({ ui });
   if (!blob) {
     console.error('Screenshot capture failed');
     return;
@@ -26,14 +31,21 @@ export async function saveScreenshot(renderer: Renderer): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-/** Saves a PNG of the canvas on F9. Returns a function that unbinds the key. */
+/**
+ * Saves a PNG of the canvas on F9, and one with the UI on F10. Returns a
+ * function that unbinds the keys.
+ */
 export function bindScreenshotHotkey(renderer: Renderer): () => void {
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.code !== SCREENSHOT_KEY || event.repeat) return;
+    if (event.repeat) return;
+    if (event.code !== SCREENSHOT_KEY && event.code !== UI_SCREENSHOT_KEY)
+      return;
     event.preventDefault();
-    void saveScreenshot(renderer);
+    void saveScreenshot(renderer, event.code === UI_SCREENSHOT_KEY);
   };
 
-  document.addEventListener('keydown', onKeyDown);
-  return () => document.removeEventListener('keydown', onKeyDown);
+  // On the window in the capture phase, so an open menu that takes keys
+  // does not stop it.
+  window.addEventListener('keydown', onKeyDown, true);
+  return () => window.removeEventListener('keydown', onKeyDown, true);
 }

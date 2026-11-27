@@ -28,13 +28,8 @@ import {
   Ray,
 } from '@dimforge/rapier3d-compat';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
-import {
-  hexColor,
-  Meter,
-  UILookPointer,
-  UINode,
-  UIRenderer,
-} from 'rewild-gpu-ui';
+import { UILookPointer } from 'rewild-gpu-ui';
+import { Hud } from './Hud';
 import {
   clamp,
   Color,
@@ -141,121 +136,14 @@ const _GROUND_STICK: f32 = 0.001;
 // Hunger empties over ten minutes; once it has, starvation drains health over one.
 const _HUNGER_DRAIN_PER_SEC: f32 = 100 / 600;
 const _STARVATION_DAMAGE_PER_SEC: f32 = 100 / 60;
-// The body temperature bar: on the right, growing up from its foot to its
-// full height; hidden while the body is within NORMAL of normal. Percentages
-// of the screen.
-const _TEMPERATURE_BAR_X: f32 = 97.5;
-const _TEMPERATURE_BAR_FOOT: f32 = 5;
-const _TEMPERATURE_BAR_HEIGHT: f32 = 35;
-const _TEMPERATURE_NORMAL: f32 = 0.05;
-// Its colour from slightly to really hot, and from slightly to really cold.
-const _WARM = [1.0, 0.75, 0.4];
-const _HOT = [0.95, 0.12, 0.08];
-const _COOL = [0.6, 0.85, 1.0];
-const _COLD = [0.15, 0.35, 1.0];
 // Health refills over three and a half minutes, from twenty seconds after the last hurt.
 const _HEALTH_REGEN_PER_SEC: f32 = 50 / 210;
 const _HEALTH_REGEN_AFTER: f32 = 20;
-// Milliseconds the HUD takes to fade out as the personal assistant opens, and back in.
-const _HUD_FADE = 250;
 // Reused so the per-frame update allocates nothing.
 const _spawnTranslation = { x: 0, y: 0, z: 0 };
 const _resizeTranslation = { x: 0, y: 0, z: 0 };
 const _lookOrigin = { x: 0, y: 0, z: 0 };
 const _lookDirection = { x: 0, y: 0, z: -1 };
-
-interface Hud {
-  /** Holds every bar. It fades out while the personal assistant is open. */
-  root: UINode;
-  health: Meter;
-  hunger: Meter;
-  stamina: Meter;
-  oxygen: Meter;
-  temperature: Meter;
-}
-
-/**
- * Builds the HUD bars. Health, hunger, stamina and oxygen stack up from the
- * bottom of the screen in its middle 40%. Bar heights are percentages of the
- * screen. The temperature bar grows up the right edge.
- */
-function createHud(ui: UIRenderer): Hud {
-  // The bars take no input, so clicks on them reach the game.
-  const surface = ui.createSurface({
-    kind: 'screen',
-    name: 'hud',
-    input: 'none',
-  });
-  // The gap above each bar is its top margin. A hidden stamina bar takes its
-  // gap with it, so the oxygen bar moves down into its place.
-  const health = new Meter({
-    name: 'health',
-    style: { height: '5%', borderRadius: 20, margin: [10, 0, 0, 0] },
-  });
-  const hunger = new Meter({
-    name: 'hunger',
-    fullColor: '#f2991a',
-    emptyColor: '#8c3300',
-    style: { height: '3%', borderRadius: 12, margin: [5, 0, 0, 0] },
-  });
-  const stamina = new Meter({
-    name: 'stamina',
-    fullColor: '#73ccff',
-    emptyColor: '#334d8c',
-    style: { height: '1.5%', borderRadius: 8, margin: [10, 0, 0, 0] },
-  });
-  const oxygen = new Meter({
-    name: 'oxygen',
-    fullColor: '#ebf5ff',
-    emptyColor: '#8c1a73',
-    style: { height: '1.5%', borderRadius: 8 },
-  });
-  const bars = new UINode({
-    name: 'bars',
-    style: {
-      position: 'absolute',
-      left: '30%',
-      width: '40%',
-      top: 0,
-      bottom: 0,
-      flexDirection: 'column',
-      justifyContent: 'flex-end',
-    },
-  });
-  // Holds the bars 3% of the screen off the bottom.
-  const foot = new UINode({ name: 'foot', style: { height: '3%' } });
-  bars.append(oxygen, stamina, hunger, health, foot);
-
-  const temperature = new Meter({
-    name: 'temperature',
-    style: {
-      position: 'absolute',
-      left: `${_TEMPERATURE_BAR_X}%`,
-      width: '0.8%',
-      bottom: `${_TEMPERATURE_BAR_FOOT}%`,
-      height: 0,
-      borderRadius: 6,
-    },
-  });
-  const root = new UINode({
-    name: 'bars-root',
-    style: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-      transition: { property: 'opacity', duration: _HUD_FADE },
-    },
-  });
-  root.append(bars, temperature);
-  surface.root.append(root);
-  return { root, health, hunger, stamina, oxygen, temperature };
-}
-
-function show(node: UINode, visible: boolean): void {
-  node.style.display = visible ? 'flex' : 'none';
-}
 
 export class Player extends Node {
   /** The player in the running game, for the console. */
@@ -315,8 +203,6 @@ export class Player extends Node {
   private _stamina = new Stamina();
   private _oxygen = new Oxygen();
   private _body = new BodyTemperature();
-  // The body temperature the bar last showed.
-  private _shownTemperature: f32 = NaN;
   // Seconds since health last fell.
   private _sinceHurt: f32 = 0;
   /** Called once when health reaches zero. */
@@ -459,7 +345,7 @@ export class Player extends Node {
 
     const stateData = this.stateMachine?.data as StateMachineData;
 
-    if (!this._hud) this._hud = createHud(stateData.renderer.ui);
+    if (!this._hud) this._hud = new Hud(stateData.renderer.ui);
     this._fadeHud();
     this._look ??= new UILookPointer(stateData.renderer.ui);
     this._assistant ??= new PersonalAssistant(
@@ -486,7 +372,7 @@ export class Player extends Node {
     this._stamina.reset();
     this._oxygen.reset();
     this._body.reset();
-    this._showBars();
+    this._hud?.reset();
     this._dead = false;
     this._sinceDeath = 0;
     this._eye = _STANDING_EYE_HEIGHT;
@@ -596,7 +482,7 @@ export class Player extends Node {
 
   set hunger(value: f32) {
     this._hunger = clamp(value, 0.0, 100.0);
-    if (this._hud) this._hud.hunger.value = this._hunger / 100.0;
+    if (this._hud) this._hud.hungerValue = this._hunger / 100.0;
   }
 
   get stamina(): Stamina {
@@ -622,48 +508,16 @@ export class Player extends Node {
   set health(value: f32) {
     if (value < this._health) this._sinceHurt = 0;
     this._health = clamp(value, 0.0, 100.0);
-    if (this._hud) this._hud.health.value = this._health / 100.0;
+    if (this._hud) this._hud.healthValue = this._health / 100.0;
   }
 
-  /**
-   * Fills the stamina and oxygen bars, each shown only while below full. The
-   * oxygen bar sits above the stamina bar while both show, and takes its
-   * place when stamina is full.
-   */
+  // Gives the HUD the stamina, oxygen and body temperature.
   private _showBars(): void {
     const hud = this._hud;
     if (!hud) return;
-    const stamina = this._stamina.value;
-    const oxygen = this._oxygen.value;
-    hud.stamina.value = stamina / STAMINA_FULL;
-    show(hud.stamina.node, stamina < STAMINA_FULL);
-    hud.oxygen.value = oxygen / OXYGEN_FULL;
-    show(hud.oxygen.node, oxygen < OXYGEN_FULL);
-    this._showTemperature();
-  }
-
-  /**
-   * Grows the body temperature bar up the right of the screen, red and deeper
-   * as the body heats, blue as it chills.
-   */
-  private _showTemperature(): void {
-    const bar = this._hud?.temperature;
-    if (!bar) return;
-    const t = this._body.value;
-    const size = Math.abs(t);
-    const visible = size > _TEMPERATURE_NORMAL;
-    show(bar.node, visible);
-    if (!visible || Math.abs(t - this._shownTemperature) < 0.005) return;
-    this._shownTemperature = t;
-    bar.node.style.height = `${size * _TEMPERATURE_BAR_HEIGHT}%`;
-    const from = t > 0 ? _WARM : _COOL;
-    const to = t > 0 ? _HOT : _COLD;
-    const color = hexColor(
-      from[0] + (to[0] - from[0]) * size,
-      from[1] + (to[1] - from[1]) * size,
-      from[2] + (to[2] - from[2]) * size
-    );
-    bar.setColors(color, color);
+    hud.staminaValue = this._stamina.value / STAMINA_FULL;
+    hud.oxygenValue = this._oxygen.value / OXYGEN_FULL;
+    hud.temperature = this._body.value;
   }
 
   unMount(): void {
@@ -830,6 +684,7 @@ export class Player extends Node {
     const alive = !this._dead;
     this._readGamepad(delta);
     this._assistant?.update(delta);
+    this._hud?.update(delta);
 
     // Mouse look; a dying body levels its gaze and rolls onto its side.
     let pitch = this._pitch;
