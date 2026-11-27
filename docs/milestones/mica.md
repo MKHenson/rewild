@@ -825,9 +825,11 @@ const grid = new Grid({
 });
 grid.cell(2, 1); // the node in column 2, row 1
 grid.cells; // all the nodes, row by row
+grid.rect(1, 0, 3, 1); // the rectangle of 3 cells from column 1, row 0, from the grid's top left
 ```
 
-- **Layout.** One row that wraps, `columns * cellSize + (columns - 1) * gap` wide. Each cell has a fixed width and height, with no grow and no shrink. So each row holds `columns` cells, and each cell is at its column and row.
+- **Layout.** One row that wraps, `columns * cellSize + (columns - 1) * gap` wide. Each cell has a fixed width and height, with no grow and no shrink. So each row holds `columns` cells, and each cell is at its column and row. The grid sets its own size, padding, border, direction, wrap and gap, so its `style` leaves them out. It does not shrink.
+- **Rectangles.** `rect` gives the rectangle of a range of cells, with the gaps inside it, from the arithmetic and not from layout. `cell` and `rect` throw outside the grid.
 - **Cell size.** A number gives square cells. `{ width, height }` gives other shapes.
 - **Focus.** Spatial focus moves work by rectangles, so the d-pad moves through the cells with no code in `Grid`. The cell's node decides if it is focusable.
 - **Over an image.** Put the grid on an image with `position: 'absolute'`, `top` and `left`. The grid draws the cells and the image draws only what is behind them. So a change to the grid needs no new art.
@@ -1077,7 +1079,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: `UISurface3D` and the renderer collecting it from the scene. `depthTest: false` on world surfaces. A mouse ray into `UIInput.ray`. `PersonalAssistant` with the hand, the open and close move, the hologram glass, the tab column, the Portal tab and the Close button. I, the mouse freed and locked again, and no pause while it is open.
   - Expect: in the game, I brings the panel up from the right side to cover most of the view, and the level shows through it. The mouse is free, and Unlock on the Portal tab unlocks the level's portal. I takes the panel down and locks the mouse. The Close button takes it down and locks the mouse. A wall in front of the player does not hide the panel.
 
-- [ ] **20. A model for the player's arm**
+- [x] **20. A model for the player's arm**
 
   - Scope: the `first-person-arms` model on the assistant's rig, with its raise, hold and lower clips. The panel comes out of the `watch` bone, and sits clear of the raised hand.
   - Expect: opening the assistant raises the left arm, and the panel comes out of the watch on its wrist. Closing puts the panel back into the watch, and then the arm goes down.
@@ -1090,7 +1092,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Expect: an image draws sharp at its size and does not shimmer at a quarter of it. Each `objectFit` matches its DOM version. A surface of boxes, text, icons and small images draws in one call. Six large images add six calls. Releasing them frees their memory, and the stats show it.
   - Then: keys and a loader that each platform can set, `src` on nodes and `Image`, counts that follow nodes on and off surfaces, and the cache of unused images. The hashed image files in the game build wait for the game's first image.
 
-- [ ] **22. Grid**
+- [x] **22. Grid**
 
   - Scope: the `Grid` component, `cell` and `cells`. Unit tests for the cell rectangles. The Grid examples.
   - Expect: each Grid example matches its DOM version, and the d-pad moves to each cell.
