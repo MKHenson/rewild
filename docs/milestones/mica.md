@@ -306,7 +306,8 @@ menu.open();
 | `Icon`     | One icon                                                                      |
 | `Button`   | A label and an optional icon. `contained` or `text` variant, and a `color`     |
 | `Stack`    | A column or row with a theme gap: `xs`, `s`, `m`, `l`, `xl`, `xxl`             |
-| `Meter`    | A bar filled to a `value` from 0 to 1, coloured from full to empty             |
+| `Meter`    | A bar filled to a `value` from 0 to 1. See [Meters and gauges](#meters-and-gauges) |
+| `Gauge`    | A scale from cold to hot with a marker. See [Meters and gauges](#meters-and-gauges) |
 | `Modal`    | A glass panel on its own surface, over a dimmed backdrop. Escape and B close it |
 | `Popup`    | A small panel next to a node, on its own surface                              |
 | `Tabs`     | A row or column of tabs that picks one panel                                  |
@@ -318,6 +319,49 @@ menu.open();
 | `InfoBox`  | A box of help text with an icon                                               |
 | `Image`    | An image. See [Images](#images)                                               |
 | `Grid`     | Cells of one size in rows and columns. See [Grids](#grids)                    |
+
+### Meters and gauges
+
+```ts
+const health = new Meter({
+  fullColor: '#5fd84a',
+  emptyColor: '#e5352b',
+  trail: true,
+  ticks: 10,
+  danger: 0.25,
+  style: { height: 12, borderRadius: 6 },
+});
+health.value = 0.6; // a pale band shows what was lost, then drains away
+health.update(seconds); // each frame, for the trail
+health.snap(1); // no trail, such as on a respawn
+
+const heat = new Gauge({ value: 0.5, style: { width: 8, height: 160, borderRadius: 4 } });
+heat.value = 0.9; // the marker moves up, and the hot end glows
+```
+
+- **A meter** has a rounded fill and a gloss, and its colour moves from full to empty as it drains.
+  Set its `borderRadius` to half its height for a pill.
+- **`trail`** shows a loss as a pale band and a gain as a bright band with a shine, until the fill
+  catches up. A big change waits a moment first, so the player sees what a hit cost. Call `update`
+  each frame.
+- **`ticks`** splits the bar into equal parts with thin lines.
+- **`danger`** makes the bar beat like a heart below that value, and glow, faster as it drains.
+- **A gauge** is for a reading where both ends are bad, such as temperature. The marker's `value` is
+  0 at the cold end and 1 at the hot end. It runs up a box that is taller than it is wide, and to
+  the right otherwise.
+
+### The HUD
+
+The HUD is `Hud` in `src/core/routing/Hud.ts`. `Player` gives it values and calls `update` each
+frame.
+
+- **The plate.** The bars sit on a glass plate at the bottom of the screen, each with an icon:
+  health, hunger, stamina and oxygen. Health has ticks, and every bar beats when it is low.
+- **Only what matters shows.** Health always shows. Hunger shows below 70%, stamina and oxygen
+  below full. While all is well, the plate dims.
+- **Temperature** is a gauge on its own plate at the bottom right. It shows once the body is away
+  from normal.
+- **Sizes are in pixels**, so the HUD is the same size on any screen.
 
 ### Modals
 
@@ -614,6 +658,8 @@ to find it in the output. A locked mouse has no pointer, so open the menu before
 you want to see the mouse.
 
 The commands are registered in `UIDebugCommands.ts` and `ActionDebugCommands.ts`.
+
+**Screenshots.** F10 saves a PNG of the frame with the UI. F9 saves one without it.
 
 ---
 

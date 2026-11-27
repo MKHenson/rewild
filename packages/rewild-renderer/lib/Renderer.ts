@@ -193,6 +193,7 @@ export class Renderer {
 
   private onFrameHandler: () => void;
   private pendingScreenshots: ((blob: Blob | null) => void)[] = [];
+  private pendingUIScreenshots: ((blob: Blob | null) => void)[] = [];
 
   /** The camera's view frustum for the frame being rendered, in world
    *  space. Refreshed before anything is culled, whether or not the scene BVH
@@ -983,16 +984,21 @@ export class Renderer {
   }
 
   /**
-   * PNG of the next rendered frame without overlays, UI or debug viewers.
-   * toBlob copies the canvas as of the work submitted so far, so it is called
-   * after the scene passes and before the overlay and GUI passes are submitted.
+   * PNG of the next rendered frame without overlays or debug viewers. With
+   * `ui`, it includes the overlays and the screen UI. toBlob copies the canvas
+   * as of the work submitted so far, so each kind is flushed at its point in
+   * the frame.
    */
-  captureScreenshot(): Promise<Blob | null> {
-    return new Promise((resolve) => this.pendingScreenshots.push(resolve));
+  captureScreenshot(options: { ui?: boolean } = {}): Promise<Blob | null> {
+    const pending = options.ui
+      ? this.pendingUIScreenshots
+      : this.pendingScreenshots;
+    return new Promise((resolve) => pending.push(resolve));
   }
 
-  private flushScreenshots(): void {
-    const pending = this.pendingScreenshots;
+  private flushScreenshots(
+    pending: ((blob: Blob | null) => void)[] = this.pendingScreenshots
+  ): void {
     if (pending.length === 0) return;
     const resolvers = pending.slice();
     pending.length = 0;
@@ -1425,6 +1431,7 @@ export class Renderer {
         pixelRatio: canvas.clientWidth ? canvas.width / canvas.clientWidth : 1,
       });
       device.queue.submit([uiEncoder.finish()]);
+      this.flushScreenshots(this.pendingUIScreenshots);
       this.uiGpuTimer.resolve();
       this.recordUIStats();
 

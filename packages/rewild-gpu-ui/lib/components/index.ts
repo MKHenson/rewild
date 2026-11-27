@@ -1,6 +1,7 @@
 export * from './Button';
 export * from './Divider';
 export * from './Field';
+export * from './Gauge';
 export * from './Grid';
 export * from './Icon';
 export * from './Image';

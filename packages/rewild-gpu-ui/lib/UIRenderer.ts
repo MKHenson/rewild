@@ -3,6 +3,7 @@ import type { UIFont } from './font';
 import type { UIIcons } from './icons';
 import { NO_TEXTURE } from './image';
 import meterEffect from './shaders/meter.wgsl';
+import gaugeEffect from './shaders/gauge.wgsl';
 import hologramEffect from './shaders/hologram.wgsl';
 import { PRIMITIVE_FLOATS, primitiveRuns } from './stream';
 import { UITheme } from './theme';
@@ -197,6 +198,7 @@ export class UIRenderer {
     });
     this.effects = new UIEffects(device, format, layout, depthFormat);
     this.effects.register('meter', meterEffect);
+    this.effects.register('gauge', gaugeEffect);
     this.effects.registerSurface('hologram', hologramEffect);
     this.uniforms = this.createUniforms('ui-uniforms');
     this.blur = new UIBackdrop(device);
