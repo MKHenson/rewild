@@ -8,6 +8,17 @@ export type UITakeAmount = 'all' | 'half';
 /** What a slot takes of the carried item: all of it, or one of a stack. */
 export type UIPutAmount = 'all' | 'one';
 
+/**
+ * Why a carried item goes back.
+ *
+ * - `cancel`: Escape, B or `cancel()`. The player undoes the carry.
+ * - `outside`: a press on a surface's root, off each surface or on another
+ *   element of the page, or a right click off a slot. The player points away
+ *   from the UI, so the game can drop the item in the world.
+ * - `closed`: the surface of the slot the item came from closed.
+ */
+export type UIReturnReason = 'cancel' | 'outside' | 'closed';
+
 export interface UISlotOptions<T> {
   /** Removes and gives the slot's item, or null when it is empty. */
   take(amount: UITakeAmount): T | null;
@@ -46,17 +57,21 @@ const FOCUS_SLIDE: UITransition = { property: 'transform', duration: 80 };
  * the slot's `take` runs when nothing is carried and its `put` when an item
  * is. The right button, Shift+Enter and X pass `half` and `one`.
  *
- * Escape, B, `cancel`, a press off each surface and the close of the surface
- * of the slot the item came from give the item to `onReturn`.
+ * Escape, B, `cancel`, a press off the slots and the close of the surface of
+ * the slot the item came from give the item to `onReturn`, with the reason.
+ * A press on a surface's root returns the item and does nothing else, so a
+ * modal's backdrop does not close it.
  */
 export class UICarry {
   /** Called after the carried item changes. */
   onChange: ((held: unknown | null) => void) | null = null;
   /**
-   * Gives back a carried item, with the slot it came from last. With none,
-   * the item goes back through that slot's `put`.
+   * Gives back a carried item, with the slot it came from last and why. With
+   * none, the item goes back through that slot's `put`.
    */
-  onReturn: ((item: unknown, from: UISlot) => void) | null = null;
+  onReturn:
+    | ((item: unknown, from: UISlot, reason: UIReturnReason) => void)
+    | null = null;
   /** Names an item in debug output. */
   describe: (item: unknown) => string = describeItem;
   /** Draws the ghost over every other screen surface. It takes no input. */
@@ -128,12 +143,12 @@ export class UICarry {
   }
 
   /** Gives the carried item to `onReturn`. */
-  cancel(): void {
+  cancel(reason: UIReturnReason = 'cancel'): void {
     const item = this._held;
     const from = this._from;
     if (item === null || !from) return;
     this.setHeld(null, null);
-    if (this.onReturn) this.onReturn(item, from);
+    if (this.onReturn) this.onReturn(item, from, reason);
     else from.options.put(item, 'all');
     this.update();
   }
@@ -189,7 +204,7 @@ export class UICarry {
   update(): void {
     const from = this._from;
     if (this._held !== null && from && !this.isOpen(from.node)) {
-      this.cancel();
+      this.cancel('closed');
       return;
     }
     const held = this._held;

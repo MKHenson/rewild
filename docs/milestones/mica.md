@@ -712,7 +712,8 @@ carry.slot<Item>(cell, {
 
 carry.held; // the carried item, or null
 carry.onChange = (held) => redraw();
-carry.onReturn = (item, from) => items.stow(item, from); // Escape, B, cancel()
+carry.onReturn = (item, from, reason) =>
+  reason === 'outside' ? world.drop(item) : items.stow(item, from);
 carry.cancel();
 carry.describe = (item) => `${item.count} × ${item.kind}`; // for printUIFocus
 ```
@@ -739,13 +740,21 @@ The gamepad reader sends X as Shift+Enter, so X clicks a node that is not a slot
 
 A slot that holds one item and ignores the amount works the same for each input. A stack slot merges in `put` and gives back what is left. So with a stack carried, a right click on a slot puts one item in it, and the rest stays carried. Each right click puts one more. With nothing carried, a right click on a stack takes half of it. The carried item shows its count through its ghost, which the slot builds. So counts need no API of their own.
 
-- **Clicks.** When the carry acts, the slot gets no `click` event. A slot that does not accept the carried item takes no click, and the item stays carried. Over a slot, the right button opens no context menu.
-- **Not a slot.** While an item is carried, a click on a node that is not a slot goes on as normal. So a Close button still works.
+- **Clicks.** When the carry acts, the slot gets no `click` event. A slot that does not accept the carried item takes no click, and the item stays carried. Over a slot, and for a press that began while an item was carried, the right button opens no context menu.
+- **Not a slot.** While an item is carried, a click on a node that is not a slot goes on as normal. So a Close button still works. A right click on it returns the item.
 - **The ghost.** The slot that gives the item builds its ghost with `ghost`. After a `put` that gives back part of a stack, the slot builds the ghost again. The ghost draws on the carry surface, a screen surface at order 3, over popups. The carry surface takes no input, so the hit test finds the slots under the ghost.
 - **Where the ghost shows.** With a pointer, centred on the pointer. With the keys or a gamepad, over the focused node, 12 px up and to the right. It slides from node to node over 80 ms. The ghost moves by its `transform`, so its surface does not lay out again.
 - **The slot under the carry.** With a pointer, the hit node or its nearest parent that is a slot. With the keys or a gamepad, the focused node or its nearest parent that is a slot.
 - **Enter and leave.** When the slot under the carry changes, the old slot gets `leave`. The new slot gets `enter` if it accepts the carried item. Over a slot that does not accept it, the ghost shows at 50 % opacity.
-- **Returning.** Escape, B and `cancel()` give the carried item to `onReturn`, with the slot that it came from last. The owner puts it back, for example in that slot or the first empty one. With no `onReturn`, the item goes back through that slot's `put`. A press off each surface does the same, and the game does not get it. So does the close of the slot's surface: it is hidden, its input is `none`, or it leaves the renderer.
+- **Returning.** A carried item goes to `onReturn`, with the slot that it came from last and a reason. The owner decides where it goes, for example back in that slot, in the first empty one, or into the world. With no `onReturn`, the item goes back through that slot's `put`.
+
+  | Reason      | When                                                                                                         |
+  | ----------- | ------------------------------------------------------------------------------------------------------------ |
+  | `'cancel'`  | Escape, B and `cancel()`. The player undoes the carry                                                        |
+  | `'outside'` | A press on a surface's root, such as a modal's backdrop. A press off each surface, or on another element of the page. A right click off a slot |
+  | `'closed'`  | The slot's surface closes: it is hidden, its input is `none`, or it leaves the renderer                      |
+
+- **Outside.** A press on a root or off each surface returns the item and does nothing else: no node gets it, and the game does not get it. So a modal's backdrop stays open, and the game can drop the item in the world. A press on another element of the page still gets its press and its menu.
 - **Escape first.** `UICarry` takes the Escape key down before the nodes of the focus scope, and prevents its default. So Escape returns a carried item and the modal round the slots stays open. A second Escape closes the modal.
 - **The keys and the gamepad.** Each slot must be focusable. Focus moves as normal while an item is carried.
 - **Touch.** A tap clicks. A tap has no right button, so touch takes only `'all'`. There is no drag, so a scroll container of slots pans as normal.
@@ -758,7 +767,6 @@ A slot that holds one item and ignores the amount works the same for each input.
 Stage 5 does not build these. The API leaves room for each one, so none of them changes the slots of Stage 5.
 
 - **Items that span cells**, such as an item 1 by 3. The carried item gets a size in cells. The slot under the carry is the cell under the ghost's top left cell, not under the pointer. `Grid` gives the rectangle of a range of cells, and the item draws over the cells there. `accepts` refuses a place where the item does not fit. `put` gives back the one item that the new item covers.
-- **A press off each surface** returns the item in Stage 5. The game can give it a callback of its own, for example to drop the item in the world.
 - **Drag** can come back as a second way to pick up, if players ask for it. It ends in the same state, so the slots do not change.
 
 ### Images
@@ -864,11 +872,11 @@ Each example tests one API. The content is neutral: coloured shapes, numbered ti
 - **Move.** Two rows of slots with shapes in some of them. A click shows each row of the one rule: take, put, exchange and nothing.
 - **Accepts.** Slots with a coloured border take only shapes of their colour. Over a slot that refuses, the ghost fades and the slot does not light.
 - **Stacks.** Numbered tiles that merge up to 10 in a slot. With nothing carried, the right button, Shift+Enter and X take half a stack. With a stack carried, they put one tile and the rest stays carried. The rule is about 20 lines in the example, not in the library. The ghost shows the count.
-- **Return.** Slots in a `Modal`. Escape and B return the carried item, and the modal stays open. Buttons call `cancel()`. A line shows each call to `onReturn`.
-- **Across surfaces.** Slots in a `Modal` and slots on the surface under it. An item goes both ways.
+- **Return.** Slots in a `Modal`. Escape and B put the carried item back, and the modal stays open. Buttons call `cancel()`. A click on the backdrop drops the item in a world list, and the modal stays open. A line shows each call to `onReturn` with its reason.
+- **Across surfaces.** Slots on a panel surface and slots on the surface under it. An item goes both ways. The panel is not a `Modal`, because a modal takes all input and the pointer would not reach the slots under it.
 - **Together.** A grid of slots over a panel image, with shapes in the slots. It checks that the parts work together: the grid on the image, and the ghost over the modal.
 
-Each Carry example has a line under the canvas that shows the carried item and its count, such as `Carried: 7 × tile`.
+Each Carry example has a line under the canvas that shows the carried item and its count, such as `Carried: 7 × tile`, from `carry.describe`. Its DOM side is an event log of each take, put, click and `onReturn`, since the DOM mirror does not follow changes to the tree.
 
 **The art.** Drawn in code at start, with `images.add` from a canvas: shapes in a few colours, numbered tiles, a framed panel and large test images with a gradient and their number. So the examples need no files, and they test `add`. Real art can replace them later as PNG files in `inspector/images`, with no change to the examples except the load.
 
@@ -1105,7 +1113,7 @@ Each TODO is one GitHub ticket in the Mica milestone. The order follows the depe
   - Scope: `UICarry`: slots with `take`, `put`, `accepts` and `ghost`, the one rule, amounts, the carry surface and the ghost, enter and leave, `onReturn`. The mouse, touch, the keys, the gamepad and Escape first. The carried item in `printUIFocus`. Unit tests for each row of the one rule, each amount and each way to return, with a fake input.
   - Expect: an item goes from slot to slot by the mouse, a tap and the gamepad. A click on a full slot exchanges the two items. Escape returns the item, and the modal stays open.
 
-- [ ] **24. The Carry examples**
+- [x] **24. The Carry examples**
 
   - Scope: the Carry part in the inspector: Move, Accepts, Stacks, Return, Across surfaces and Together, each with its state line. The stack rule in the Stacks example.
   - Expect: each example works by each input. Tiles merge to 10, and the right button takes half and puts one. Together draws the grid on the image, and the ghost over the modal.

@@ -1,4 +1,5 @@
 import type {
+  UICarry,
   UIImages,
   UIInput,
   UISurface,
@@ -19,6 +20,8 @@ export interface ExampleView {
   input: UIInput;
   /** The images of the canvas's renderer. Each card has its own. */
   images: UIImages;
+  /** The carry of the canvas's renderer. Each card has its own. */
+  carry: UICarry;
 }
 
 export interface Example {
@@ -30,6 +33,8 @@ export interface Example {
   height?: number;
   /** Shows an event log in place of the DOM side. */
   log?: boolean;
+  /** Shows the carried item under the canvas, named by `carry.describe`. */
+  carried?: boolean;
   /** Draws the test image under both sides, so glass has something to blur. */
   backdrop?: boolean;
   /**

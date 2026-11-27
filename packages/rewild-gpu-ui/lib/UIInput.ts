@@ -205,6 +205,8 @@ export class UIInput {
   private pressTaken = false;
   private moveTaken = false;
   private pageKeys = true;
+  /** A right press began while an item was carried, so its menu does not open. */
+  private carryMenu = false;
   private gamepads = new GamepadReader();
   /** The time of the last gamepad read, for the right stick's scroll. */
   private lastPadTime: number | null = null;
@@ -293,9 +295,14 @@ export class UIInput {
     if (pick === this.pickScreen) this.carry?.pointed(init.x, init.y, target);
 
     if (action === 'down') {
-      if (!target && this.carry?.carrying) {
-        // A press off each surface returns the carried item.
-        this.carry.cancel();
+      if ((init.button ?? 0) === 2) this.carryMenu = !!this.carry?.carrying;
+      if (
+        this.carry?.carrying &&
+        (!target || target === target.surface?.root)
+      ) {
+        // A press on a root or off each surface returns the carried item, and
+        // does nothing else, so a modal's backdrop stays open.
+        this.carry.cancel('outside');
         state.taken = true;
         return 'prevented';
       }
@@ -332,9 +339,13 @@ export class UIInput {
     if (result === 'passed' && state.taken) result = 'taken';
     // A click goes to the nearest node that holds both the down and the up,
     // as in the DOM. Only the main button clicks. A slot takes the main and
-    // the right button in place of a click.
+    // the right button in place of a click. The right button off a slot
+    // returns the carried item.
     const at = target && state.down && commonAncestor(state.down, target);
     const button = init.button ?? 0;
+    const carry = this.carry;
+    if (button === 2 && carry?.carrying && !carry.slotOf(target))
+      carry.cancel('outside');
     const carried =
       at &&
       (button === 0 || button === 2) &&
@@ -843,6 +854,12 @@ export class UIInput {
     const action = POINTER_ACTIONS[e.type as PointerEventType];
     const element = this.element;
     if (!element || origin(e) !== element) {
+      // A press on another element is off each surface, so it returns the
+      // carried item. The element still gets the press and its menu.
+      if (element && action === 'down' && this.carry?.carrying) {
+        this.carry.cancel('outside');
+        this.onRedraw?.();
+      }
       // The game's press can end over another element.
       if (action === 'up' || action === 'cancel')
         if (this.pointers.get(e.pointerId)?.game)
@@ -877,10 +894,14 @@ export class UIInput {
     if (origin(e) !== this.element || document.pointerLockElement) return;
     const taken = e.type === 'mousemove' ? this.moveTaken : this.pressTaken;
     if (taken) e.stopPropagation();
-    // The right button over a slot opens no menu.
-    if (e.type === 'contextmenu' && this.carry) {
+    // The right button opens no menu over a slot, or for a press that began
+    // while an item was carried.
+    const carry = this.carry;
+    if (e.type === 'contextmenu' && carry) {
       const { x, y } = this.toSurface(e.clientX, e.clientY);
-      if (this.carry.slotOf(this.pick(x, y))) e.preventDefault();
+      if (carry.carrying || this.carryMenu || carry.slotOf(this.pick(x, y)))
+        e.preventDefault();
+      this.carryMenu = false;
     }
   };
 

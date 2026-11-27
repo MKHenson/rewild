@@ -122,6 +122,11 @@ body {
   font-size: var(--font-size-s);
 }
 
+.side figcaption.carried {
+  color: var(--on-surface-light);
+  font-family: monospace;
+}
+
 .pane.log {
   overflow: auto;
   padding: var(--space-2);

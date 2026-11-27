@@ -32,6 +32,7 @@ class ExampleCard {
   private surface: UISurface;
   private micaPane: HTMLElement;
   private micaCaption: HTMLElement;
+  private carriedLine: HTMLElement | null = null;
   private stopObserving: () => void;
   private size: CanvasResize | null = null;
   private animate: ((seconds: number) => void) | null;
@@ -69,6 +70,10 @@ class ExampleCard {
     this.micaPane.append(canvasElement);
     this.micaCaption = el('figcaption');
     mica.append(this.micaPane, this.micaCaption);
+    if (example.carried) {
+      this.carriedLine = el('figcaption', 'carried');
+      mica.append(this.carriedLine);
+    }
 
     const dom = el('figure', 'side');
     const domPane = el('div', example.log ? 'pane log' : 'pane');
@@ -121,6 +126,7 @@ class ExampleCard {
         createSurface: (options) => this.renderer.createSurface(options),
         input: this.renderer.input,
         images: this.renderer.images,
+        carry: this.renderer.carry,
       }) ?? null;
     if (!example.log) {
       const images = this.renderer.images;
@@ -231,6 +237,13 @@ class ExampleCard {
             cached ? ` · ${cached} cached, ${mb(cachedBytes)}` : ''
           }`
         : '';
+    if (this.carriedLine) {
+      const { carry } = this.renderer;
+      const held = carry.held;
+      this.carriedLine.textContent = `Carried: ${
+        held === null ? 'nothing' : carry.describe(held)
+      }`;
+    }
     this.micaCaption.textContent = `Mica · ${canvas.width} × ${
       canvas.height
     } px at ${pixelRatio}x · ${nodes} nodes · ${primitives} primitives · ${drawCalls} draw call${
