@@ -7,6 +7,7 @@ import hologramEffect from './shaders/hologram.wgsl';
 import { PRIMITIVE_FLOATS, primitiveRuns } from './stream';
 import { UITheme } from './theme';
 import { UIBackdrop, UIBackdropSource } from './UIBackdrop';
+import { UICarry } from './UICarry';
 import { UIEffects } from './UIEffects';
 import { UIImages } from './UIImages';
 import { UIInput } from './UIInput';
@@ -115,6 +116,8 @@ export class UIRenderer {
   readonly images: UIImages;
   /** Sends input to the surfaces. Attach it to the canvas the UI draws on. */
   readonly input = new UIInput(this);
+  /** Carries one item at most from slot to slot. Its ghost draws on its own surface. */
+  readonly carry: UICarry;
   /**
    * The DOM's theme colours. In a page, it reads them at the start and again
    * when the theme changes.
@@ -197,6 +200,7 @@ export class UIRenderer {
     this.effects.registerSurface('hologram', hologramEffect);
     this.uniforms = this.createUniforms('ui-uniforms');
     this.blur = new UIBackdrop(device);
+    this.carry = new UICarry(this, this.input);
     if (typeof document !== 'undefined') {
       this.theme.read();
       this.stopWatchingTheme = this.theme.watch();
@@ -387,6 +391,7 @@ export class UIRenderer {
     );
 
     const now = performance.now();
+    this.carry.update();
     let glass = this.worldGlass;
     for (const surface of this._surfaces) {
       if (surface.kind !== 'screen') continue;

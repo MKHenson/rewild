@@ -1,3 +1,4 @@
+import type { UISlot } from './UICarry';
 import type { UIInput } from './UIInput';
 import type { UINode } from './UINode';
 import type { UISurface } from './UISurface';
@@ -77,7 +78,22 @@ export function printFocus(
       : 'no node';
     lines.push(`${at}: ${over}`);
   }
+  const carry = input.carry;
+  if (carry?.held != null) {
+    lines.push(
+      `Carried: ${carry.describe(carry.held)} from ${slotName(carry.from)}`
+    );
+    lines.push(`  over: ${slotName(carry.over)}`);
+  } else if (carry) {
+    lines.push('Carried: nothing');
+  }
   return lines.join('\n');
+}
+
+function slotName(slot: UISlot | null): string {
+  if (!slot) return 'none';
+  const surface = slot.node.surface?.name ?? 'no surface';
+  return `${surface} ${describeNode(slot.node)}`;
 }
 
 /** ` #name` for a named node, or else nothing. */

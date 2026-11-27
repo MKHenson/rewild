@@ -17,6 +17,8 @@ interface Control {
   code: string;
   /** Repeats while held, as a held key does. */
   repeats: boolean;
+  /** Sends the key with Shift held. */
+  shift?: boolean;
   /** Down for this pad. */
   read(pad: GamepadState, held: boolean): boolean;
 }
@@ -24,6 +26,7 @@ interface Control {
 /** Button indices in the standard mapping. */
 const A = 0;
 const B = 1;
+const X = 2;
 const DPAD_UP = 12;
 const DPAD_DOWN = 13;
 const DPAD_LEFT = 14;
@@ -61,6 +64,13 @@ function stick(axis: 0 | 1, sign: 1 | -1) {
 const CONTROLS: Control[] = [
   { key: 'Enter', code: 'GamepadA', repeats: false, read: button(A) },
   { key: 'Escape', code: 'GamepadB', repeats: false, read: button(B) },
+  {
+    key: 'Enter',
+    code: 'GamepadX',
+    repeats: false,
+    shift: true,
+    read: button(X),
+  },
   {
     key: 'ArrowUp',
     code: 'GamepadDpadUp',
@@ -107,9 +117,9 @@ const CONTROLS: Control[] = [
 ];
 
 /**
- * Turns gamepads into key presses. A is Enter, B is Escape, and the d-pad and
- * the left stick are the arrow keys. The right stick is not a key: read it
- * with `rightStick`. Only pads with the standard mapping
+ * Turns gamepads into key presses. A is Enter, B is Escape, X is Shift+Enter,
+ * and the d-pad and the left stick are the arrow keys. The right stick is not
+ * a key: read it with `rightStick`. Only pads with the standard mapping
  * count. Call `update` once per frame.
  */
 export class GamepadReader {
@@ -129,7 +139,7 @@ export class GamepadReader {
         const next = this.held.get(id);
         if (!control.read(pad, next !== undefined)) continue;
         seen.add(id);
-        const init = { key: control.key, code: control.code };
+        const init = keyInit(control);
         if (next === undefined) {
           this.held.set(id, now + REPEAT_DELAY);
           send('down', init);
@@ -147,7 +157,7 @@ export class GamepadReader {
       if (next === SYNCED) continue;
       const code = id.slice(id.indexOf(' ') + 1);
       const control = CONTROLS.find((c) => c.code === code)!;
-      send('up', { key: control.key, code });
+      send('up', keyInit(control));
     }
   }
 
@@ -186,6 +196,12 @@ export class GamepadReader {
   reset(): void {
     this.held.clear();
   }
+}
+
+function keyInit(control: Control): UIKeyboardInit {
+  return control.shift
+    ? { key: control.key, code: control.code, shiftKey: true }
+    : { key: control.key, code: control.code };
 }
 
 /** Cuts out the dead zone and scales the rest back to the full range. */

@@ -29,6 +29,7 @@ import {
 } from './scroll';
 import { Dirty, Rect, UINode } from './UINode';
 import type { UISurface } from './UISurface';
+import type { UICarry } from './UICarry';
 import { rayToSurface, UIVector3 } from './world';
 
 /**
@@ -192,6 +193,11 @@ export class UIInput {
    * on input draws again here.
    */
   onRedraw: (() => void) | null = null;
+  /**
+   * Picks up and places items in slots. A click or Enter on a slot goes to it
+   * in place of a click, and Escape returns its item before the nodes get it.
+   */
+  carry: UICarry | null = null;
   private pointers = new Map<number, PointerState>();
   private element: HTMLElement | null = null;
   private touchAction = '';
@@ -284,8 +290,15 @@ export class UIInput {
 
     const target = this.captured(id) ?? pick(init.x, init.y);
     this.hover(state, target, init);
+    if (pick === this.pickScreen) this.carry?.pointed(init.x, init.y, target);
 
     if (action === 'down') {
+      if (!target && this.carry?.carrying) {
+        // A press off each surface returns the carried item.
+        this.carry.cancel();
+        state.taken = true;
+        return 'prevented';
+      }
       if (!target) {
         state.game = true;
         return 'passed';
@@ -318,9 +331,15 @@ export class UIInput {
       : 'passed';
     if (result === 'passed' && state.taken) result = 'taken';
     // A click goes to the nearest node that holds both the down and the up,
-    // as in the DOM. Only the main button clicks.
+    // as in the DOM. Only the main button clicks. A slot takes the main and
+    // the right button in place of a click.
     const at = target && state.down && commonAncestor(state.down, target);
-    if (at && (init.button ?? 0) === 0)
+    const button = init.button ?? 0;
+    const carried =
+      at &&
+      (button === 0 || button === 2) &&
+      this.carry?.press(at, button === 2);
+    if (at && button === 0 && !carried)
       this.send(at, new UIPointerEvent('click', init));
     this.releaseCapture(id);
     state.down = null;
@@ -361,6 +380,10 @@ export class UIInput {
    * Then, unless a listener prevents it, a key down does its default action.
    */
   key(action: 'down' | 'up', init: UIKeyboardInit): UIInputResult {
+    if (action === 'down' && init.key === 'Escape' && this.carry?.carrying) {
+      this.carry.cancel();
+      return 'prevented';
+    }
     const scope = this.focusScope();
     if (!scope) return 'passed';
     const target = scope.focused ?? scope.root;
@@ -566,6 +589,7 @@ export class UIInput {
       const nodes = focusableNodes(scope.root);
       const next = nextInTabOrder(nodes, current, init.shiftKey ?? false);
       if (next) scope.setFocus(next, true);
+      this.carry?.keyed();
       // Tab stays in the scope, so it does not move the page's focus.
       return true;
     }
@@ -582,9 +606,12 @@ export class UIInput {
         : nodes[0];
       // With nowhere to go, the ring still shows where focus is.
       scope.setFocus(next ?? current, true);
+      this.carry?.keyed();
       return true;
     }
     if (key === 'Enter' && current && !init.repeat) {
+      this.carry?.keyed();
+      if (this.carry?.press(current, init.shiftKey ?? false)) return true;
       const { x, y, width, height } = current.rect;
       this.send(
         current,
@@ -850,6 +877,11 @@ export class UIInput {
     if (origin(e) !== this.element || document.pointerLockElement) return;
     const taken = e.type === 'mousemove' ? this.moveTaken : this.pressTaken;
     if (taken) e.stopPropagation();
+    // The right button over a slot opens no menu.
+    if (e.type === 'contextmenu' && this.carry) {
+      const { x, y } = this.toSurface(e.clientX, e.clientY);
+      if (this.carry.slotOf(this.pick(x, y))) e.preventDefault();
+    }
   };
 
   private onWheel = (e: WheelEvent): void => {

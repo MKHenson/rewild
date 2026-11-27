@@ -21,6 +21,7 @@ export * from './transform';
 export * from './transition';
 export * from './UIBackdrop';
 export * from './UICanvas';
+export * from './UICarry';
 export * from './UIEffects';
 export * from './UIImages';
 export * from './UIInput';
