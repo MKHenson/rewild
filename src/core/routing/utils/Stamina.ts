@@ -27,7 +27,7 @@ export function jumpShare(stamina: number): number {
 /**
  * The player's stamina. Sprinting and jumping spend it; it comes back soon
  * after. Run it empty and the player is exhausted: it waits a few seconds,
- * then refills quickly, and the player cannot sprint until it is full.
+ * then refills quickly, and the player only jogs until it is full.
  */
 export class Stamina {
   value = STAMINA_FULL;
@@ -51,6 +51,11 @@ export class Stamina {
   /** Whether the player can sprint now. */
   get canSprint(): boolean {
     return !this.exhausted;
+  }
+
+  /** How far a sprint is above a jog: 1 with a full bar, 0 empty or exhausted. */
+  get sprintShare(): number {
+    return this.exhausted ? 0 : this.value / STAMINA_FULL;
   }
 
   /**

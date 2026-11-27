@@ -65,6 +65,18 @@ describe('Stamina', () => {
     expect(stamina.canSprint).toBe(true);
   });
 
+  it('sprints fastest full, falling to a jog as it drains', () => {
+    const stamina = new Stamina();
+    expect(stamina.sprintShare).toBe(1);
+    stamina.set(STAMINA_FULL / 2);
+    expect(stamina.sprintShare).toBeCloseTo(0.5, 5);
+    stamina.set(0);
+    expect(stamina.sprintShare).toBe(0);
+    run(stamina, EXHAUSTED_WAIT + 0.5, false);
+    expect(stamina.value).toBeGreaterThan(0);
+    expect(stamina.sprintShare).toBe(0);
+  });
+
   it('sets a value as if spent, exhausting the player at empty', () => {
     const stamina = new Stamina();
     stamina.set(40);

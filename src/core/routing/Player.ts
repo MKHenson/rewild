@@ -101,10 +101,13 @@ function lockPointer(): void {
 }
 // Per dt (two seconds' worth of delta): walking is 3 m/s.
 const _MOVE_SPEED: f32 = 1.5;
-const _RUN_MULTIPLIER: f32 = 3.0;
+const _RUN_MULTIPLIER: f32 = 4.0;
+// Sprint speed falls with stamina from the run to the jog.
+const _JOG_MULTIPLIER: f32 = 1.8;
+const _SWIM_JOG_MULTIPLIER: f32 = 1.3;
 // How much faster than walking a player in god mode flies.
 const GOD_SPEED_SHARE: f32 = 3.0;
-const _SWIM_RUN_MULTIPLIER: f32 = 1.8;
+const _SWIM_RUN_MULTIPLIER: f32 = 2.5;
 const _CROUCH_SPEED_MULTIPLIER: f32 = 0.5;
 // The body is 1.78 m tall; eye heights are over the capsule centre (0.89 m up).
 const _STANDING_EYE_HEIGHT: f32 = 0.77;
@@ -886,16 +889,15 @@ export class Player extends Node {
       this._movingRight ||
       this._padMoveX !== 0 ||
       this._padMoveY !== 0;
-    const sprinting =
-      (this._sprinting || this._padSprint) && this._stamina.canSprint;
+    const sprintHeld = this._sprinting || this._padSprint;
+    const sprinting = sprintHeld && this._stamina.canSprint;
+    const sprintShare = this._stamina.sprintShare;
     this._stamina.update(sprinting && pushing, delta);
+    const jog = this.swimming ? _SWIM_JOG_MULTIPLIER : _JOG_MULTIPLIER;
+    const run = this.swimming ? _SWIM_RUN_MULTIPLIER : _RUN_MULTIPLIER;
     const speed =
       _MOVE_SPEED *
-      (sprinting
-        ? this.swimming
-          ? _SWIM_RUN_MULTIPLIER
-          : _RUN_MULTIPLIER
-        : 1.0) *
+      (sprintHeld ? jog + (run - jog) * sprintShare : 1.0) *
       (this._crouching && !this.swimming ? _CROUCH_SPEED_MULTIPLIER : 1.0) *
       (this.swimming
         ? SWIM_SPEED_SHARE
